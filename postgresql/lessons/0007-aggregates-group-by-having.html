@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 7: Aggregates, GROUP BY and HAVING</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Aggregates, GROUP BY and HAVING</h1>
+<p class="meta">PostgreSQL · Lesson 0007 · step 2 of 13 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use aggregates with GROUP BY, and say whether a filter belongs in WHERE or HAVING.</div>
+
+<h2>Aggregates</h2>
+<p>An aggregate computes one result from many input rows: <code>count</code>, <code>sum</code>, <code>avg</code>, <code>max</code>, <code>min</code>.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a> With <code>GROUP BY</code> you get one output row per group.</p>
+<h2>WHERE versus HAVING</h2>
+<p>"<code>WHERE</code> selects input rows before groups and aggregates are computed ... whereas <code>HAVING</code> selects group rows after groups and aggregates are computed." The <code>WHERE</code> clause must not contain aggregates; <code>HAVING</code> always does.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 07-aggregates.sql
+GROUP BY city:           Hayward 2 rows, Oakland 1, San Francisco 2
+WHERE temp_lo &lt; 40 ...:  Hayward 1, Oakland 1                  # rows filtered first
+HAVING max(temp_lo)&lt;40:  Oakland 35                            # groups filtered after
+WHERE temp_lo = max(...): ERROR: aggregate functions are not allowed in WHERE</code></pre>
+<p>The fix the docs give: a subquery, <code>WHERE temp_lo = (SELECT max(temp_lo) FROM weather)</code>.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a> Source: <a href="../examples/07-aggregates.sql"><code>07-aggregates.sql</code></a>. Contrast with <a href="0003-window-functions.html">window functions</a>, which keep every row.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which clause filters rows before grouping?</p>
+  <button data-correct>WHERE</button>
+  <button>LIMIT</button>
+  <button>ORDER BY</button>
+  <button>HAVING</button>
+  <p class="explain">WHERE selects input rows before groups are computed.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which clause contains aggregate conditions?</p>
+  <button>JOIN</button>
+  <button>FROM</button>
+  <button data-correct>HAVING</button>
+  <button>WHERE</button>
+  <p class="explain">HAVING selects groups after aggregation and always contains aggregates.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Can WHERE contain max(x)?</p>
+  <button>Only in subqueries</button>
+  <button>Only with GROUP BY</button>
+  <button data-correct>No, it errors</button>
+  <button>Yes, always</button>
+  <p class="explain">PostgreSQL rejects aggregates in WHERE (shown in the run).<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. GROUP BY city returns how many rows per city?</p>
+  <button>One per input row</button>
+  <button>Two</button>
+  <button data-correct>One</button>
+  <button>None</button>
+  <p class="explain">One output row per group.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-report-queries.md">Exercise 0007: report queries</a></p>
+<p>Runnable example: <a href="../examples/07-aggregates.sql"><code>07-aggregates.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-agg.html">PostgreSQL Tutorial: Aggregate Functions</a>. Section 2.7.</p>
+<p><a href="0001-tables-and-constraints.html">← Tables and constraints</a> &nbsp;|&nbsp; <a href="0002-joins-inner-and-left.html">Inner and left joins, and the WHERE trap →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/tutorial-agg.html">PostgreSQL Tutorial: Aggregate functions</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

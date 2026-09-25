@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 6: Inheritance: extends, super and is-a</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Inheritance: extends, super and is-a</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0006 · step 5 of 22 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use <code>extends</code> and <code>super</code>, explain constructor chaining, and say what 'is-a' promises.</div>
+
+<h2>Idea</h2>
+<p>Classes can inherit commonly used state and behavior from other classes: the <em>superclass</em> is the parent; <em>subclasses</em> inherit. In Java "each class is allowed to have one direct superclass, and each superclass has the potential for an unlimited number of subclasses." Syntax: <code>class MountainBike extends Bicycle</code>, which gives it all of Bicycle's fields and methods while its own code focuses on what is unique.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[1]</a></p>
+<pre><code>java oop/examples/InheritanceDemo.java
+Bike constructor
+MountainBike constructor
+gear 6, speed 12, full suspension
+b instanceof MountainBike: true
+Bike constructor
+new Bike() instanceof MountainBike: false</code></pre>
+<p>The subclass constructor calls <code>super(gear)</code> first, so the parent part is built before the child part; <code>super.describe()</code> reuses the parent's behavior inside an override; <code>instanceof</code> shows the is-a relationship in one direction only. Source: <a href="../examples/InheritanceDemo.java"><code>InheritanceDemo.java</code></a>.</p>
+<div class="aside">Inheritance couples the subclass to its parent's implementation. The <a href="0011-composition-over-inheritance.html">composition lesson</a> shows a real bug this causes; use inheritance for genuine is-a relationships and stable base classes.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. How many direct superclasses can a Java class have?</p>
+  <button>Unlimited</button>
+  <button data-correct>One</button>
+  <button>None</button>
+  <button>Two</button>
+  <p class="explain">Each class has one direct superclass.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Keyword to create a subclass?</p>
+  <button>inherits</button>
+  <button data-correct>extends</button>
+  <button>super</button>
+  <button>implements</button>
+  <p class="explain">class MountainBike extends Bicycle.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which constructor runs first?</p>
+  <button>Both at once</button>
+  <button>The child's</button>
+  <button>Neither</button>
+  <button data-correct>The parent's</button>
+  <p class="explain">The demo printed Bike constructor before MountainBike constructor.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A Bike object instanceof MountainBike?</p>
+  <button>Null</button>
+  <button>Compile error</button>
+  <button>True</button>
+  <button data-correct>False</button>
+  <p class="explain">is-a holds from subclass to superclass, not the reverse.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-vehicle-hierarchy.md">Exercise 6: a vehicle hierarchy</a></p>
+<p>Runnable example: <a href="../examples/InheritanceDemo.java"><code>InheritanceDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">Java Tutorials: What Is Inheritance?</a>. Short page.</p>
+<p><a href="0004-static-members.html">← Static members: shared state and constants</a> &nbsp;|&nbsp; <a href="0005-initialization-order.html">Initialization order: static blocks, fields, constructors →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">Java Tutorials: What Is Inheritance?</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 25: ConcurrentHashMap: atomic updates and weak consistency</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ConcurrentHashMap: atomic updates and weak consistency</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0025 · step 15 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use <code>ConcurrentHashMap</code> atomic methods correctly and explain its null rule and weakly consistent iterators.</div>
+
+<h2>Behavior</h2>
+<ul><li>"Retrieval operations (including get) do not entail locking" and reflect the most recently completed updates; updates enjoy high expected concurrency.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li>
+<li>Iterators are <em>weakly consistent</em> and do not throw <code>ConcurrentModificationException</code>; use them from one thread at a time.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a> Compare <code>HashMap</code>, whose iterators are fail-fast.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a></li>
+<li>Null keys and values are <strong>not</strong> permitted (<code>NullPointerException</code>).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li>
+<li>Atomic compound methods: <code>putIfAbsent</code>, <code>computeIfAbsent</code>, <code>computeIfPresent</code>, <code>compute</code>, <code>merge</code>. Functions passed to them must be short and must not modify the map.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li>
+<li><code>size()</code>, <code>isEmpty()</code> are only useful without concurrent updates.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li></ul>
+<pre><code>java java/examples/ChmDemo.java
+merge() total   : 400000 (expected 400000)
+null key        : NullPointerException
+modified while iterating: no exception, size=9
+HashMap          : ConcurrentModificationException</code></pre>
+<p>The docs' frequency-count idiom: <code>map.computeIfAbsent(key, k -&gt; new LongAdder()).increment()</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a> A "check then put" with a plain get/put is a race even on a concurrent map; use the atomic methods. Source: <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Can ConcurrentHashMap hold a null key?</p>
+  <button>Yes, one only</button>
+  <button data-correct>No, NPE is thrown</button>
+  <button>Only in Java 8</button>
+  <button>Yes, many</button>
+  <p class="explain">Null keys and values are not permitted.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Do its iterators throw ConcurrentModificationException?</p>
+  <button>Only in parallel</button>
+  <button>Yes, fail-fast</button>
+  <button data-correct>No, weakly consistent</button>
+  <button>Only on remove</button>
+  <p class="explain">Iterators are weakly consistent and do not throw CME.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Atomic way to count occurrences?</p>
+  <button>containsKey then put</button>
+  <button>get then put</button>
+  <button>size then put</button>
+  <button data-correct>merge with sum</button>
+  <p class="explain">merge (or computeIfAbsent with LongAdder) is atomic; get-then-put races.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Mapping functions in compute methods must...?</p>
+  <button data-correct>Be short, not modify map</button>
+  <button>Return null</button>
+  <button>Lock the map</button>
+  <button>Be recursive</button>
+  <p class="explain">They should be short and must not update the map.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0025-word-count-concurrently.md">Exercise 0025: concurrent word count</a></p>
+<p>Runnable example: <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a>. Class description.</p>
+<p><a href="0024-atomics-and-locks.html">← Atomics and ReentrantLock: fixing lost updates</a> &nbsp;|&nbsp; <a href="0023-thread-pools-executors.html">Thread pools: core, max, queue and rejection →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

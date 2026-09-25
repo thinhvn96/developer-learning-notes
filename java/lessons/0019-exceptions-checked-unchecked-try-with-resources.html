@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 19: Exceptions: checked vs unchecked and try-with-resources</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Exceptions: checked vs unchecked and try-with-resources</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0019 · step 2 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> say which exceptions you must catch or declare, and use try-with-resources with correct close order and suppressed exceptions.</div>
+
+<h2>What an exception is</h2>
+<p>"An exception is an event, which occurs during the execution of a program, that disrupts the normal flow of the program's instructions." The runtime searches the call stack for a matching handler; if none is found the program terminates.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">[3]</a></p>
+<h2>Three kinds</h2>
+<ul><li><strong>Checked</strong> exceptions: must be caught or declared (catch-or-specify).</li>
+<li><strong>Runtime exceptions</strong> and <strong>errors</strong> are unchecked: no catch or declaration required.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[1]</a></li></ul>
+<p>The tutorial's guideline: "If a client can reasonably be expected to recover from an exception, make it a checked exception. If a client cannot do anything to recover from the exception, make it an unchecked exception." Do not use <code>RuntimeException</code> merely to avoid declaring exceptions.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[1]</a></p>
+<h2>try-with-resources</h2>
+<p>A resource is an object that must be closed; anything implementing <code>AutoCloseable</code> qualifies. Resources are closed in the <em>opposite</em> order of creation. If the body throws and <code>close()</code> also throws, the body's exception is the one propagated and the others are <em>suppressed</em>, retrievable with <code>getSuppressed()</code>. Any <code>catch</code>/<code>finally</code> runs after the resources are closed.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
+<pre><code>java java/examples/ExceptionsDemo.java
+open first / open second / body / close second / close first
+caught: body failed
+suppressed: close failed: r</code></pre>
+<p>Source: <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a>. Link to Spring: checked exceptions do not roll back <code>@Transactional</code> by default (<a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which kind must be caught or declared?</p>
+  <button>Runtime exceptions</button>
+  <button>None of them</button>
+  <button data-correct>Checked exceptions</button>
+  <button>Errors only</button>
+  <p class="explain">Catch-or-specify applies to checked exceptions only.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. try-with-resources closes resources in what order?</p>
+  <button>Order of opening</button>
+  <button>Alphabetical order</button>
+  <button data-correct>Reverse of opening</button>
+  <button>Random order</button>
+  <p class="explain">Close methods are called in the opposite order of creation.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Body and close() both throw. Which propagates?</p>
+  <button>The close exception</button>
+  <button data-correct>The body's exception</button>
+  <button>Both together</button>
+  <button>Neither exception</button>
+  <p class="explain">The close exception is suppressed; retrieve it with getSuppressed.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Interface a resource must implement?</p>
+  <button>Cloneable</button>
+  <button>Serializable</button>
+  <button data-correct>AutoCloseable</button>
+  <button>Comparable</button>
+  <p class="explain">Any object implementing AutoCloseable can be a resource.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0019-design-an-exception-hierarchy.md">Exercise 0019: design exceptions</a></p>
+<p>Runnable example: <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/index.html">Java Tutorials: Exceptions trail</a>. Read 'The Catch or Specify Requirement' and 'The try-with-resources Statement'.</p>
+<p><a href="0018-strings-immutability-and-stringbuilder.html">← Strings: immutability, the pool and StringBuilder</a> &nbsp;|&nbsp; <a href="0001-hashmap-equals-hashcode.html">HashMap, equals and hashCode →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Java Tutorials: Three kinds of exceptions</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Java Tutorials: try-with-resources</a> · [3] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">Java Tutorials: What is an exception</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 6: Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</h1>
+<p class="meta">Spring Boot · Lesson 0006 · step 10 of 13 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pick between REQUIRED, REQUIRES_NEW and NESTED for a given scenario and name the risk of each.</div>
+
+<h2>The three modes</h2>
+<table>
+<tr><th>Mode</th><th>Behavior<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></th><th>Watch for</th></tr>
+<tr><td>REQUIRED (default)</td><td>one physical transaction; joins an existing outer one</td><td>an inner rollback-only marker affects the outer; may raise <code>UnexpectedRollbackException</code></td></tr>
+<tr><td>REQUIRES_NEW</td><td>always a new, independent physical transaction</td><td>can exhaust the connection pool and deadlock if the pool is too small</td></tr>
+<tr><td>NESTED</td><td>one physical transaction with savepoints; inner can roll back without the outer</td><td>works only with JDBC resource transactions (for example <code>DataSourceTransactionManager</code>)</td></tr>
+</table>
+<h2>Choosing</h2>
+<p><strong>REQUIRED</strong> suits the common call stack of a service delegating to repositories.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a> Use <strong>REQUIRES_NEW</strong> when work must commit or roll back independently of the caller, for example an audit record that must persist even if the business transaction fails. Because the outer transaction still holds its connection while the inner runs, the reference advises that the pool must exceed the number of concurrent threads by at least one.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a> <strong>NESTED</strong> gives partial rollback via savepoints.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+<h2>Verified</h2>
+<pre><code>RESULT REQUIRES_NEW audit            -&gt; accounts: 0, audit rows: 1
+RESULT REQUIRED audit (joins caller) -&gt; accounts: 0, audit rows: 0</code></pre>
+<p>Both scenarios fail the order after the audit call. The independent transaction committed its audit row; the joined one rolled back with the order. Code: <a href="../examples/demo-app/src/main/java/com/example/demo/bank/AuditService.java"><code>AuditService.java</code></a>.</p>
+<p class="aside">Remember the proxy rule from the <a href="0005-transactional-proxies-and-rollback.html">previous lesson</a>: propagation set on a self-invoked method is ignored, so a REQUIRES_NEW method called from the same class does not start a new transaction.</p><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Independent commit regardless of caller's outcome?</p>
+  <button data-correct>REQUIRES_NEW</button>
+  <button>NESTED</button>
+  <button>SUPPORTS</button>
+  <button>REQUIRED</button>
+  <p class="explain">REQUIRES_NEW always creates an independent physical transaction.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which mode uses savepoints?</p>
+  <button>REQUIRED</button>
+  <button>REQUIRES_NEW</button>
+  <button data-correct>NESTED</button>
+  <button>MANDATORY</button>
+  <p class="explain">NESTED uses one physical transaction with savepoints.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Main operational risk of REQUIRES_NEW?</p>
+  <button>Checked exceptions</button>
+  <button>Missing getters</button>
+  <button data-correct>Connection pool exhaustion</button>
+  <button>Slow logging</button>
+  <p class="explain">It can exhaust the pool and deadlock if not properly sized.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Default mode joins an existing transaction?</p>
+  <button data-correct>REQUIRED</button>
+  <button>NEVER</button>
+  <button>NESTED</button>
+  <button>REQUIRES_NEW</button>
+  <p class="explain">REQUIRED participates in an existing outer transaction.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-audit-log-scenario.md">Exercise 0006: the audit-log scenario</a></p>
+<p>Runnable example: <a href="../examples/TransactionalPitfalls.java"><code>TransactionalPitfalls.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring Framework Reference: Transaction Propagation</a>. Read the whole page; short.</p>
+<p><a href="0005-transactional-proxies-and-rollback.html">← @Transactional: proxies and rollback rules</a> &nbsp;|&nbsp; <a href="0011-actuator-and-kubernetes-probes.html">Actuator and Kubernetes probes →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring Framework Reference: Transaction Propagation</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

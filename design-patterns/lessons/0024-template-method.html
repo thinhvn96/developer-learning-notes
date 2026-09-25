@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 24: Template Method</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Template Method</h1>
+<p class="meta">Design Patterns · Lesson 0024 · step 24 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> fix an algorithm's skeleton in a base class and let subclasses supply steps, and spot the risks.</div>
+
+<h2>Intent</h2>
+<p>Template Method is "a behavioral design pattern that defines the skeleton of an algorithm in the superclass but lets subclasses override specific steps of the algorithm without changing its structure." Use it to let clients extend only particular steps, to share near-identical algorithms, and to pull duplicated code up.<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/TemplateMethodDemo.java
+a,b|1,2|end
+&lt;h1&gt;|&lt;p&gt;1&lt;/p&gt;|&lt;/html&gt;
+AbstractList (template) gives contains/indexOf/iterator for free: [0, 1, 4, 9, 16] contains 9? true</code></pre><p><code>generate()</code> is <code>final</code>, so the order header, body, footer cannot change; <code>header()</code> and <code>body()</code> are abstract steps and <code>footer()</code> is an optional hook. In the JDK, <code>AbstractList</code> works this way: implement <code>get</code> and <code>size</code> and inherit the rest (shown in the run). Source: <a href="../examples/TemplateMethodDemo.java"><code>TemplateMethodDemo.java</code></a>. It is the abstract-class shape from the <a href="../../oop/lessons/0009-abstract-classes-vs-interfaces.html">OOP lesson</a>; the calling-an-overridable-method-from-constructor hazard applies (<a href="../../oop/lessons/0005-initialization-order.html">initialization order</a>).</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Clients override only chosen steps</li><li>Duplicate code consolidated in the superclass</li></ul>
+<p><strong>Cons</strong></p><ul><li>The skeleton can be restrictive</li><li>Risk of violating Liskov if subclasses suppress default steps</li><li>Harder to maintain as steps accumulate</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a> Template Method is inheritance-based (static) while Strategy is composition-based; factory methods are often steps in a template method.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Who fixes the algorithm order?</p>
+  <button>The JVM</button>
+  <button data-correct>The base class</button>
+  <button>The client</button>
+  <button>The subclass</button>
+  <p class="explain">The superclass defines the skeleton.<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Why make the template method final?</p>
+  <button>Speed</button>
+  <button data-correct>Order cannot be changed</button>
+  <button>Testing</button>
+  <button>Serialization</button>
+  <p class="explain">Subclasses override steps, not the structure.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Risk?</p>
+  <button>No polymorphism</button>
+  <button>Static state</button>
+  <button data-correct>Violating Liskov by suppressing defaults</button>
+  <button>No hooks</button>
+  <p class="explain">Subclasses that suppress a default step can break substitutability.<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. JDK template example?</p>
+  <button>Integer</button>
+  <button data-correct>AbstractList</button>
+  <button>Proxy</button>
+  <button>Runtime</button>
+  <p class="explain">AbstractList needs only get and size.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0024-data-import-template.md">Exercise 24: a data import template</a></p>
+<p>Runnable example: <a href="../examples/TemplateMethodDemo.java"><code>TemplateMethodDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/template-method">Template Method (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0023-strategy.html">← Strategy</a> &nbsp;|&nbsp; <a href="0025-visitor.html">Visitor →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/template-method">Template Method (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

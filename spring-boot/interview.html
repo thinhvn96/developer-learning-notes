@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Spring Boot: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · Spring Boot · 14 questions · <a href="index.html">Spring Boot ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Spring and Spring Boot questions for Senior backend interviews. The Spring code in this course is documentation snippets; it was not compiled here.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>What are IoC and dependency injection? What is a bean?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the container creates and wires objects; a bean is an object the container manages.</p>
+<p>DI is a specialized form of IoC in which objects declare dependencies only through constructor arguments, factory-method arguments or properties, and the container injects them when it creates the bean, the inverse of the bean constructing or locating its own dependencies. A bean is "an object that is instantiated, assembled, and managed by a Spring IoC container."<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a> Benefit: components depend on abstractions and can be tested with fakes.</p>
+<div class="follow"><strong>Likely follow-up:</strong> BeanFactory vs ApplicationContext? (ApplicationContext is a sub-interface and complete superset adding AOP integration, message resources, event publication and web contexts.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0001-ioc-and-beans.html">IoC and beans</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Constructor vs setter vs field injection: which do you use and why?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> constructor injection for mandatory dependencies.</p>
+<p>The reference: use constructors for mandatory dependencies and setters for optional ones. The Spring team advocates constructor injection because it lets you build immutable components, guarantees required dependencies are not null, and returns fully initialized components. Setter injection suits optional dependencies with defaults, or third-party classes.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[2]</a> Constructor injection also makes unit tests simple: call <code>new OrderService(fake)</code> without a container. (The reference page I read does not discuss field injection; explain your objection from the testability and immutability points above.)</p>
+<div class="follow"><strong>Likely follow-up:</strong> What about circular dependencies? (Constructor injection surfaces them as <code>BeanCurrentlyInCreationException</code>; setter injection on one bean can break the cycle, but redesign is better.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[2]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0002-constructor-injection.html">Constructor injection</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>How does Spring Boot auto-configuration work? How do you debug it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> it configures beans conditionally from the jars on the classpath, and backs away when you define your own.</p>
+<p>Boot "attempts to automatically configure your Spring application based on the jar dependencies that you have added" (with HSQLDB on the classpath and no connection beans, it configures an in-memory database). You opt in with <code>@EnableAutoConfiguration</code> or <code>@SpringBootApplication</code>. It is non-invasive: define your own <code>DataSource</code> and the default backs away. Start with <code>--debug</code> to log a conditions report of what was applied and why; exclude classes with <code>exclude</code> or <code>spring.autoconfigure.exclude</code>.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[3]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> How would you write your own starter? (Beyond the pages read here; the Boot reference has a section on creating auto-configuration.)</div>
+<p class="see">Learn it: <a href="lessons/0003-auto-configuration.html">Auto-configuration</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>How do you design a REST controller in Spring MVC?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>@RestController</code> with composed mapping annotations, <code>@PathVariable</code>, <code>@RequestBody</code> and explicit status codes.</p>
+<p>Prefer <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, <code>@DeleteMapping</code>, <code>@PatchMapping</code> over bare <code>@RequestMapping</code>, which by default matches all HTTP methods. <code>@ResponseStatus(HttpStatus.CREATED)</code> sets 201 for creation.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[4]</a> Mention idempotency (PUT and DELETE) because clients and gateways retry.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you validate input and handle errors globally? (Not covered by the pages read for this course; ask your teacher to extend the lesson.)</div>
+<p class="see">Learn it: <a href="lessons/0004-rest-controllers.html">REST controllers</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>How does @Transactional work, and what are the classic pitfalls?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a proxy starts and commits/rolls back the transaction around external calls; pitfalls are self-invocation, visibility and checked exceptions.</p>
+<p>Defaults: propagation REQUIRED, database default isolation, read-write, rollback on <code>RuntimeException</code> and <code>Error</code> but <strong>not</strong> checked exceptions (use <code>rollbackFor = Exception.class</code>). In default proxy mode only external calls through the proxy are intercepted, so a method calling another method on the same object bypasses the transaction; private methods are never transactional. AspectJ mode is the alternative if you need self-invocation.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[5]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Your service method throws a checked exception but the row was committed. Why? (Default rollback rules.)</div>
+<p class="see">Learn it: <a href="lessons/0005-transactional-proxies-and-rollback.html">@Transactional</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>REQUIRED vs REQUIRES_NEW vs NESTED?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> join, always-new independent transaction, or savepoint.</p>
+<p><strong>REQUIRED</strong> (default): one physical transaction; joins an existing outer one; an inner rollback-only marker affects the outer (possibly <code>UnexpectedRollbackException</code>). <strong>REQUIRES_NEW</strong>: an independent physical transaction with its own commit/rollback; it can exhaust the connection pool and deadlock if the pool is too small, since the outer connection stays bound. <strong>NESTED</strong>: one physical transaction with savepoints; the inner can roll back without the outer; works only with JDBC resource transactions.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[6]</a> Classic use: REQUIRES_NEW for an audit record that must persist even if the business transaction fails.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why did my REQUIRES_NEW not start a new transaction? (Self-invocation bypassed the proxy.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[5]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0006-transaction-propagation.html">Transaction propagation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>How does Spring transaction isolation relate to the database?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>@Transactional</code>'s isolation defaults to the database's default; on PostgreSQL that is Read committed.</p>
+<p>The attribute table lists isolation with default <code>ISOLATION_DEFAULT</code>.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[5]</a> PostgreSQL's default is Read committed and its Serializable level can fail with a serialization error that the application must retry.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[7]</a> So a Spring service using Serializable needs retry logic around the transactional method.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where should the retry live? (Outside the transactional boundary, wrapping the whole call, so each attempt gets a new transaction.)</div>
+<p class="see">Learn it: <a href="lessons/0005-transactional-proxies-and-rollback.html">@Transactional</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>What is a derived query method in Spring Data JPA, and when do you stop using them?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Spring parses the method name (for example <code>findByEmailAddressAndLastname</code>) into a query; use <code>@Query</code> or other approaches when names get unwieldy.</p>
+<p>Supported keywords include <code>And</code>, <code>Or</code>, <code>Between</code>, <code>LessThan</code>, <code>Like</code>, <code>In</code>, <code>OrderBy</code>. When derived queries become too complex, use <code>@Query</code>, named queries, custom repository methods, Query by Example or Specifications.<a class="cite" href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html">[8]</a> The N+1 query problem is a planned lesson in this course; the sources for it have not been gathered yet, so do not rely on this course for that topic yet.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What is the N+1 problem? (Prepare from Hibernate documentation; flagged as a gap in RESOURCES.md.)</div>
+<p class="see">Learn it: <a href="index.html">Spring Boot ladder</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Singleton versus prototype scope. What goes wrong when a singleton depends on a prototype?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the prototype is injected once, so the singleton keeps the same instance forever.</p>
+<p>Singleton (default): one shared instance per container, not per class loader; prototype: a new instance per request, with no destruction callbacks. "When a singleton bean has a dependency on a prototype bean, the prototype bean is injected only once."<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[9]</a> Verified in the demo project: injected prototype ids 1, 1; via <code>ObjectProvider</code> 4, 5. Also: singletons must be thread-safe.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you get a fresh prototype each call? (ObjectProvider or method injection.)</div>
+<p class="see">Learn it: <a href="lessons/0007-bean-scopes.html">Bean scopes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>How does Spring Boot resolve configuration, and what are profiles?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> layered property sources where later ones win: files, env vars, system properties, command line; profiles activate environment-specific beans and files.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[10]</a> Order (low to high): defaults, <code>@PropertySource</code>, config files, random, OS env vars, system properties, JNDI, servlet params, <code>SPRING_APPLICATION_JSON</code>, command-line arguments. Profiles segregate configuration; activate with <code>spring.profiles.active</code>, with a <code>default</code> profile when none is set.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[11]</a> Verified: a property set in the test annotation overrode <code>application-dev.properties</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you configure a Spring Boot container in Kubernetes? (ConfigMap as env vars or a mounted properties file.)</div>
+<p class="see">Learn it: <a href="lessons/0008-externalized-configuration-and-profiles.html">Configuration and profiles</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span><code>@Value</code> versus <code>@ConfigurationProperties</code>?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> type-safe binding of a property group to an object, immutable via constructor binding, with relaxed binding and validation.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[10]</a> Works with records and <code>@DefaultValue</code>; <code>@Validated</code> enables constraint checks; relaxed binding maps <code>my-project</code>, <code>myProject</code> and <code>MY_PROJECT</code>. My demo bound <code>app.name</code> and a default greeting into a record.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Startup with a missing required property? (Fails with validation enabled per the docs; I did not run that case.)</div>
+<p class="see">Learn it: <a href="lessons/0009-configuration-properties-binding.html">Configuration properties</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>How do you validate a request body and what does the client get on failure?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> constraint annotations plus <code>@Valid</code>; a failure raises <code>MethodArgumentNotValidException</code> and typically a 400.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[12]</a> Verified in the demo: a blank name and negative age returned 400, a valid body 201.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where else should the rule live? (In the database as a constraint too.)</div>
+<p class="see">Learn it: <a href="lessons/0010-validation-and-400-errors.html">Validation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>How do you expose health for Kubernetes, and what should liveness not check?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Actuator liveness and readiness groups; liveness must not depend on external systems.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[13]</a> Only health is exposed by default; groups at <code>/actuator/health/liveness</code> and <code>/readiness</code>; if liveness depends on the database, an outage can restart every instance and cascade. My test: liveness and readiness returned 200 UP, while <code>/actuator/env</code> and <code>/actuator/beans</code> returned 404 (not exposed).</p>
+<div class="follow"><strong>Likely follow-up:</strong> What goes into readiness? (Essential shared dependencies, deliberately.)</div>
+<p class="see">Learn it: <a href="lessons/0011-actuator-and-kubernetes-probes.html">Actuator</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>How do you test a Spring Boot application efficiently?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> many slice tests (<code>@WebMvcTest</code>, <code>@DataJpaTest</code>), fewer full <code>@SpringBootTest</code>, and real-backend integration tests with Testcontainers.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[14]</a> <code>@SpringBootTest</code> creates the full context and does not start a server by default (MOCK); <code>RANDOM_PORT</code> starts a real server. Slices load only part of the configuration. <code>@MockitoBean</code> replaces beans.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[14]</a> Testcontainers manages Docker-run backends, and <code>@ServiceConnection</code> supplies connection details automatically (I did not run Testcontainers here).<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[15]</a> My demo ran 17 tests across both styles.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why not H2 for everything? (Behavior differences from PostgreSQL: isolation, locking, dialect.)</div>
+<p class="see">Learn it: <a href="lessons/0012-test-slices-and-springboottest.html">Testing</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Spring Boot questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">Spring: IoC container and beans</a> · [2] <a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring: Dependency injection</a> · [3] <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot: Auto-configuration</a> · [4] <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">Spring MVC: Mapping requests</a> · [5] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring: @Transactional</a> · [6] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring: Transaction propagation</a> · [7] <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL: Transaction isolation</a> · [8] <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html">Spring Data JPA: Query methods</a> · [9] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring: Bean scopes</a> · [10] <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized configuration</a> · [11] <a href="https://docs.spring.io/spring-boot/reference/features/profiles.html">Spring Boot: Profiles</a> · [12] <a href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">Spring: Bean Validation</a> · [13] <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot: Actuator endpoints</a> · [14] <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot: Testing</a> · [15] <a href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">Spring Boot: Testcontainers</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

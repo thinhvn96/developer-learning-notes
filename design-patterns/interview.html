@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Design Patterns: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · Design Patterns · 18 questions · <a href="index.html">Design Patterns ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Design-pattern interview questions with detailed answers, each backed by a runnable Java example in the ladder and a Refactoring.Guru intent line.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>What is a design pattern, and when would you NOT use one?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a typical, reusable solution blueprint to a commonly occurring design problem; not code you paste and not always warranted.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a> Criticisms: patterns can be workarounds for weak language abstraction, can be implemented "to the letter" without adapting to context, and get applied by novices to everything ("If all you have is a hammer, everything looks like a nail").<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[2]</a> Do not use one when a simpler design (a lambda, an enum, a plain method) solves the problem.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Name a pattern that modern Java makes almost trivial. (Strategy via lambdas.)</div>
+<p class="see">Learn it: <a href="lessons/0003-criticism-and-anti-patterns.html">Criticism</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Classify the GoF patterns.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> creational (5), structural (7), behavioral (10).</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/catalog">[3]</a> Creational: Factory Method, Abstract Factory, Builder, Prototype, Singleton. Structural: Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy. Behavioral: Chain of Responsibility, Command, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Which category solves 'how do these objects collaborate'? (Behavioral.)</div>
+<p class="see">Learn it: <a href="lessons/0002-classification-and-catalog.html">Catalog</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Factory Method versus Abstract Factory versus Builder?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Factory Method: a superclass method that subclasses override to choose one product; Abstract Factory: a family of related products from one factory; Builder: step-by-step construction of one complex object.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[4]</a><a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[5]</a><a class="cite" href="https://refactoring.guru/design-patterns/builder">[6]</a> Abstract Factory returns products immediately; Builder allows extra steps. Abstract Factory is often built from Factory Methods. In my demos: a dialog choosing a button, a GUI factory producing matching button and checkbox, a pizza builder replacing a 6-argument constructor.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Which for 12 optional parameters? (Builder, or a record if data is simple.)</div>
+<p class="see">Learn it: <a href="lessons/0006-builder.html">Builder</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Implement a thread-safe Singleton in Java. What are the downsides?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> single-element enum or a lazy holder class; downsides are hidden global state and hard testing.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/singleton">[7]</a> My demo confirmed one instance across 8 threads for the holder idiom and showed mutable state leaking between "tests". The pattern violates SRP (two problems at once) and needs care in multithreaded code.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[7]</a> The JDK's <code>Runtime</code> is a documented single instance.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[8]</a> Spring's singleton scope is per container, not per class loader.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[9]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Alternative? (Dependency injection with container-managed scope.)</div>
+<p class="see">Learn it: <a href="lessons/0008-singleton.html">Singleton</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>What is the Prototype pattern? Shallow versus deep copy?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> copy an existing configured object without depending on its class; a shallow copy shares nested objects, a deep copy duplicates them.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/prototype">[10]</a> My demo: after the template's list changed, the shallow copy showed the change and the deep copy did not.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Cloneable pitfalls? (Prefer copy constructors; a general Java caution.)</div>
+<p class="see">Learn it: <a href="lessons/0007-prototype.html">Prototype</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Adapter versus Decorator versus Proxy versus Facade?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Adapter changes the interface, Decorator keeps or extends it to add behavior, Proxy keeps it to control access, Facade offers a new simpler interface to a subsystem.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/adapter">[12]</a><a class="cite" href="https://refactoring.guru/design-patterns/decorator">[13]</a><a class="cite" href="https://refactoring.guru/design-patterns/proxy">[14]</a><a class="cite" href="https://refactoring.guru/design-patterns/facade">[15]</a> Adapter usually wraps one object, Facade a whole subsystem; a Decorator's composition is controlled by the client, while a Proxy usually manages its service object's lifecycle. JDK: <code>Arrays.asList</code> (adapter), <code>BufferedReader</code> (decorator), <code>java.lang.reflect.Proxy</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[16]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Which is @Transactional? (Proxy.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[11]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0026-choosing-between-similar-patterns.html">Choosing between similar patterns</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Explain Decorator with an example, and its drawbacks.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> wrap an object in another with the same interface to add behavior; stack wrappers to combine.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/decorator">[13]</a> Drawbacks: hard to remove one wrapper, order dependence, messy configuration. My coffee example priced stacked milk and sugar; JDK examples: <code>BufferedReader(new StringReader(..))</code> and <code>Collections.unmodifiableList</code> (a read-through view).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Decorator vs inheritance? (Runtime combination vs compile-time subclass explosion.)</div>
+<p class="see">Learn it: <a href="lessons/0012-decorator.html">Decorator</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>What does the Proxy pattern give you, and where is it used in Spring?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a stand-in with the same interface: lazy loading, access control, logging, caching, remote access.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/proxy">[14]</a> JDK dynamic proxies dispatch calls to an <code>InvocationHandler</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[16]</a> Spring's <code>@Transactional</code> uses proxies: only external calls through the proxy are intercepted, so my self-invocation test saved 2 accounts instead of rolling back.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[11]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you fix self-invocation? (Call through another bean, or use AspectJ mode.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[11]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0015-proxy.html">Proxy</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>What is the Composite pattern and where does it fit?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a tree of parts and wholes handled through one interface.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/composite">[17]</a> My folder/file example computed sizes recursively through <code>Node</code>. Related: Iterator and Visitor traverse it; Builder constructs it.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Composite vs Decorator? (Composite aggregates children; Decorator wraps one object.)</div>
+<p class="see">Learn it: <a href="lessons/0011-composite.html">Composite</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Explain Strategy, and when a lambda replaces it.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a family of interchangeable algorithms behind one interface, chosen at runtime.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a> <code>Comparator</code> is the JDK's strategy.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[20]</a> For a single-method interface a lambda is enough (the page notes functional languages can make the pattern unnecessary).<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Strategy vs State? (States know each other and trigger transitions.<a class="cite" href="https://refactoring.guru/design-patterns/state">[18]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0023-strategy.html">Strategy</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>State versus Strategy?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> same shape, different intent: State changes behavior as internal state changes and states trigger transitions; Strategy is chosen from outside and strategies do not know each other.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/state">[18]</a><a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a> My document example moved Draft to Moderation to Published on repeated <code>publish()</code> calls.</p>
+<div class="follow"><strong>Likely follow-up:</strong> State machine with few states? (An enum may be enough.)</div>
+<p class="see">Learn it: <a href="lessons/0022-state.html">State</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Observer: how does it work, why is java.util.Observable deprecated, and what replaces it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a subject notifies dynamically registered subscribers; Observable was deprecated for a limited event model and unspecified notification order.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/observer">[22]</a> The Javadoc points to <code>java.beans</code>, concurrent structures, and the <code>Flow</code> API for reactive streams.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[23]</a> <code>Flow</code>: Publishers, Subscribers, Subscriptions with <code>request(n)</code> back-pressure.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[24]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Observer vs Mediator? (One-way subscriptions vs centralized two-way coordination.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[21]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0021-observer.html">Observer</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Command pattern: why turn a request into an object?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> to queue, log, schedule and undo requests and decouple invokers from receivers.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/command">[25]</a> My editor kept a stack of commands and undid them in reverse; <code>Runnable</code> is a one-method command. Pair with Memento for undo.<a class="cite" href="https://refactoring.guru/design-patterns/memento">[26]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Command vs Strategy? (An operation as an object vs choosing an algorithm.)</div>
+<p class="see">Learn it: <a href="lessons/0017-command.html">Command</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Template Method versus Strategy?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Template Method fixes the algorithm skeleton in a base class and lets subclasses override steps (inheritance, static); Strategy swaps whole algorithms via composition at runtime.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/template-method">[27]</a><a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a> Risk: subclasses suppressing default steps can violate Liskov. JDK: <code>AbstractList</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why make the template method final? (To protect the order of steps.)</div>
+<p class="see">Learn it: <a href="lessons/0024-template-method.html">Template Method</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>Chain of Responsibility: give a real-world example and a downside.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> request handlers in sequence, each handling or passing on (auth, rate limit, business logic).</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[28]</a> Downside: some requests may end unhandled (my last demo line). Web filter/middleware pipelines are a common realization (general observation).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Chain vs Decorator? (A handler may stop the chain; a decorator always delegates.)</div>
+<p class="see">Learn it: <a href="lessons/0016-chain-of-responsibility.html">Chain of Responsibility</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">16.</span>Visitor pattern: what is double dispatch, and how does modern Java change it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the element's <code>accept</code> calls the visitor's overload for its concrete type; sealed types with pattern switches now give exhaustive checking without a visitor.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/visitor">[29]</a> Downside: every visitor changes when element types change. JDK: <code>FileVisitor</code> with <code>Files.walkFileTree</code>. My demo computed areas both ways.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When keep Visitor? (Many operations over a stable hierarchy, or when you cannot use sealed types.)</div>
+<p class="see">Learn it: <a href="lessons/0025-visitor.html">Visitor</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">17.</span>What is the Flyweight pattern? How is it used in the JDK?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> share intrinsic state among many similar objects to save memory, passing extrinsic state in.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[30]</a> <code>Integer.valueOf</code> always caches -128 to 127, so <code>==</code> works there and fails beyond it (my run: true then false).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[31]</a> Always compare boxed values with <code>equals</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Cost? (More CPU and complexity for less RAM.)</div>
+<p class="see">Learn it: <a href="lessons/0014-flyweight.html">Flyweight</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">18.</span>How would you talk about patterns in an interview?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> problem first, then pattern and intent, then the shape, then trade-offs and the simpler alternative.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/criticism">[2]</a> Avoid name-dropping and letter-perfect implementations; state the cons each pattern page lists.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Show one example from your own project. (Prepare one per category.)</div>
+<p class="see">Learn it: <a href="lessons/0030-talking-about-patterns-in-interviews.html">Interview technique</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Design Patterns questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern?</a> · [2] <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns</a> · [3] <a href="https://refactoring.guru/design-patterns/catalog">Catalog</a> · [4] <a href="https://refactoring.guru/design-patterns/factory-method">Factory Method</a> · [5] <a href="https://refactoring.guru/design-patterns/abstract-factory">Abstract Factory</a> · [6] <a href="https://refactoring.guru/design-patterns/builder">Builder</a> · [7] <a href="https://refactoring.guru/design-patterns/singleton">Singleton</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">Runtime Javadoc</a> · [9] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring: Bean Scopes</a> · [10] <a href="https://refactoring.guru/design-patterns/prototype">Prototype</a> · [11] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring: @Transactional</a> · [12] <a href="https://refactoring.guru/design-patterns/adapter">Adapter</a> · [13] <a href="https://refactoring.guru/design-patterns/decorator">Decorator</a> · [14] <a href="https://refactoring.guru/design-patterns/proxy">Proxy</a> · [15] <a href="https://refactoring.guru/design-patterns/facade">Facade</a> · [16] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">Proxy Javadoc</a> · [17] <a href="https://refactoring.guru/design-patterns/composite">Composite</a> · [18] <a href="https://refactoring.guru/design-patterns/state">State</a> · [19] <a href="https://refactoring.guru/design-patterns/strategy">Strategy</a> · [20] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc</a> · [21] <a href="https://refactoring.guru/design-patterns/mediator">Mediator</a> · [22] <a href="https://refactoring.guru/design-patterns/observer">Observer</a> · [23] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">Observable Javadoc (deprecated)</a> · [24] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">Flow Javadoc</a> · [25] <a href="https://refactoring.guru/design-patterns/command">Command</a> · [26] <a href="https://refactoring.guru/design-patterns/memento">Memento</a> · [27] <a href="https://refactoring.guru/design-patterns/template-method">Template Method</a> · [28] <a href="https://refactoring.guru/design-patterns/chain-of-responsibility">Chain of Responsibility</a> · [29] <a href="https://refactoring.guru/design-patterns/visitor">Visitor</a> · [30] <a href="https://refactoring.guru/design-patterns/flyweight">Flyweight</a> · [31] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">Integer Javadoc</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

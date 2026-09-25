@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 6: Liveness, readiness and startup probes</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Liveness, readiness and startup probes</h1>
+<p class="meta">Kubernetes · Lesson 0006 · step 10 of 15 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pick the right probe for each job, and explain what a wrong probe does to a Java service that starts slowly.</div>
+
+<h2>Three probes, three consequences</h2>
+<table>
+<tr><th>Probe</th><th>Question</th><th>On failure<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></th></tr>
+<tr><td>Liveness</td><td>Is it broken beyond recovery?</td><td>the container is killed and restarted</td></tr>
+<tr><td>Readiness</td><td>Can it take traffic now?</td><td>removed from Service endpoints, not restarted</td></tr>
+<tr><td>Startup</td><td>Has it finished starting?</td><td>liveness and readiness checks wait for it</td></tr>
+</table>
+<p>The docs describe liveness probes for applications that "eventually transition to broken states, and cannot recover except by being restarted", and startup probes as protection for slow-starting containers.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+<pre><code>livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 3</code></pre>
+<p>An HTTP probe succeeds on any status from 200 to 399.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+<h2>Why this matters for Java</h2>
+<p>A JVM app can take many seconds to start. A liveness probe that begins too early kills it before it is up, and it restarts in a loop. That follows from the liveness rule above; the fix the docs offer is a startup probe. The sketch in <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a> uses all three probes.</p>
+<h2>Verified on a cluster</h2>
+<pre><code>kubectl apply -f examples/probe-demo.yaml
+liveness-demo    1/1 Running  ...  Warning Unhealthy: Liveness probe failed: cat: can't open '/tmp/healthy'
+                                    Normal  Killing:   Container app failed liveness probe, will be restarted
+readiness-demo   0/1 Running          # never Ready
+kubectl get endpoints readiness-demo   # ENDPOINTS: (empty)</code></pre>
+<p>After the liveness failure the restart happened about 30 s later (<code>RESTARTS 1</code>, last exit code 137): the container's shell (PID 1) did not react to <code>SIGTERM</code>, so Kubernetes waited out the default <code>terminationGracePeriodSeconds</code> of 30 before killing it. That is the signal-handling point from the <a href="../../docker/lessons/0006-pinning-nonroot-and-signals.html">Docker hardening lesson</a>, seen for real. Files: <a href="../examples/probe-demo.yaml"><code>probe-demo.yaml</code></a>.</p>
+<div class="aside">Design rule for interviews: keep liveness cheap and independent of dependencies. If liveness fails when the database is down, restarting your Pods cannot fix it. Use readiness for "can I serve?".</div>
+<p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Liveness probe fails. What happens?</p>
+  <button>Node is drained</button>
+  <button data-correct>Container is restarted</button>
+  <button>Nothing at all</button>
+  <button>Pod leaves endpoints only</button>
+  <p class="explain">Kubernetes kills and restarts the container.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Readiness probe fails. What happens?</p>
+  <button>Pod is deleted</button>
+  <button data-correct>Removed from Service endpoints</button>
+  <button>Container is restarted</button>
+  <button>Image is re-pulled</button>
+  <p class="explain">The container is removed from service endpoints but not restarted.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Slow-starting JVM keeps restarting. Add which probe?</p>
+  <button>A NodePort</button>
+  <button>A second liveness</button>
+  <button data-correct>A startup probe</button>
+  <button>A bigger limit</button>
+  <p class="explain">Startup probes delay liveness and readiness checks until initialization completes.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. HTTP probe returns 204. Result?</p>
+  <button>Failure</button>
+  <button>Timeout</button>
+  <button data-correct>Success</button>
+  <button>Restart</button>
+  <p class="explain">Any status from 200 up to 399 counts as success.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-probe-design.md">Exercise 0006: probe design</a></p>
+<p>Runnable example: <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes Docs: Configure liveness, readiness and startup probes</a>. Follow the liveness example if you have a cluster.</p>
+<p><a href="0005-requests-limits-and-the-jvm.html">← Requests, limits and the JVM</a> &nbsp;|&nbsp; <a href="0007-rolling-updates-and-rollbacks.html">Rolling updates and rollbacks →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes Docs: Configure liveness, readiness and startup probes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

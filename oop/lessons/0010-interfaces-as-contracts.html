@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 10: Interfaces as contracts</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Interfaces as contracts</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0010 · step 10 of 22 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain an interface as a contract enforced by the compiler, and swap implementations behind it.</div>
+
+<h2>The contract</h2>
+<p>An interface is a group of related methods "that defines a contract between a class and the outside world". "Implementing an interface allows a class to become more formal about the behavior it promises to provide", and "this contract is enforced at build time by the compiler": if a class claims to implement the interface, all its methods must appear before the class compiles.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+<pre><code>java oop/examples/InterfaceContracts.java
+card ****4242 charged 100
+wallet declined 100
+gift card paid 30
+PaymentMethod: pay(int) -&gt; receipt</code></pre>
+<p><code>checkout(PaymentMethod, int)</code> knows only the contract; three different implementations (two classes and a lambda) work unchanged. Interfaces can also carry <code>default</code> and <code>static</code> methods since JDK 8 (<a href="../../java/lessons/0009-default-methods-and-conflicts.html">lesson</a>). Source: <a href="../examples/InterfaceContracts.java"><code>InterfaceContracts.java</code></a>.</p>
+<div class="aside">Design rule reused everywhere later: "program to an interface, not an implementation". It is the seed of Strategy, Factory, Adapter and the <a href="0021-dependency-inversion-principle.html">Dependency Inversion Principle</a>.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. An interface is a...?</p>
+  <button>Package</button>
+  <button>Thread</button>
+  <button data-correct>Contract</button>
+  <button>Runtime object</button>
+  <p class="explain">It defines a contract between a class and the outside world.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Who enforces the contract?</p>
+  <button data-correct>The compiler</button>
+  <button>Nobody</button>
+  <button>The IDE only</button>
+  <button>The JVM at random</button>
+  <p class="explain">It is enforced at build time by the compiler.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Missing an interface method in the class?</p>
+  <button>Runtime warning</button>
+  <button data-correct>Compile error</button>
+  <button>Silent default</button>
+  <button>Null method</button>
+  <p class="explain">All methods must appear before the class compiles.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A lambda can implement...?</p>
+  <button>A record</button>
+  <button data-correct>A one-method interface</button>
+  <button>Any class</button>
+  <button>An enum</button>
+  <p class="explain">The demo passed a lambda as a PaymentMethod.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-swap-the-implementation.md">Exercise 10: swap the implementation</a></p>
+<p>Runnable example: <a href="../examples/InterfaceContracts.java"><code>InterfaceContracts.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">Java Tutorials: What Is an Interface?</a>. Short page.</p>
+<p><a href="0009-abstract-classes-vs-interfaces.html">← Abstract classes versus interfaces</a> &nbsp;|&nbsp; <a href="0011-composition-over-inheritance.html">Composition over inheritance →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">Java Tutorials: What Is an Interface?</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

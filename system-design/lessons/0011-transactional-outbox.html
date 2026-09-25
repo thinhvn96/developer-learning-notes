@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 11: The transactional outbox</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The transactional outbox</h1>
+<p class="meta">System Design · Lesson 0011 · step 10 of 11 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain the dual-write problem and how the transactional outbox solves it, including why consumers still need idempotence.</div>
+
+<h2>The problem</h2>
+<p>A service saves an order, then publishes an <code>OrderCreated</code> event. If the publish fails between the two steps (network error, broker outage, host failure), other services are never told, and "lost events can cause data inconsistencies across the application".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+<h2>The solution</h2>
+<p>The Transactional Outbox "saves events in a data store, typically in an outbox table in your database, before it pushes them to a message broker". Business object and events are saved in the same transaction, which "either commits everything or rolls back everything". A separate worker queries unhandled entries, publishes them and marks them processed.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a> Event <em>order</em> must be preserved; and the guide ties the pattern to idempotent message processing.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh ../../system-design/examples/05-outbox.sql
+success : orders=1, outbox=1 (committed together)
+failure : CHECK violation on the order -&gt; ROLLBACK -&gt; no outbox row for the failed order
+relay   : SELECT unpublished -&gt; publish -&gt; UPDATE published = true</code></pre>
+<p>If the relay crashes after publishing but before the update, it publishes again: at-least-once, so consumers must be idempotent (see <a href="../../kafka/lessons/0004-delivery-semantics.html">Kafka delivery semantics</a>). Source: <a href="../examples/05-outbox.sql"><code>05-outbox.sql</code></a>. The Azure guide's implementation uses Cosmos DB's change feed and Service Bus; the relational version above is the general pattern. Alternatives named in the guide: libraries such as NServiceBus or MassTransit that provide an outbox.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a> Related: the <a href="0009-saga.html">saga</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Dual-write problem?</p>
+  <button>Two databases disagree</button>
+  <button data-correct>Save then publish can half-fail</button>
+  <button>Two queues merge</button>
+  <button>Two caches expire</button>
+  <p class="explain">An error between saving and publishing loses the event.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Where do events go first?</p>
+  <button>Directly to the broker</button>
+  <button data-correct>An outbox table in the same database</button>
+  <button>To a cache</button>
+  <button>To a log file</button>
+  <p class="explain">Events are saved with the business object in one transaction.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Who publishes the events?</p>
+  <button>The database trigger only</button>
+  <button>Nobody</button>
+  <button data-correct>A separate worker</button>
+  <button>The client</button>
+  <p class="explain">A worker queries the outbox and publishes.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Relay crashes after publish, before marking. Result?</p>
+  <button>Order deleted</button>
+  <button>Event lost</button>
+  <button data-correct>Event published again</button>
+  <button>Nothing</button>
+  <p class="explain">At-least-once delivery: consumers must be idempotent.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-outbox-with-kafka.md">Exercise 0011: outbox with Kafka</a></p>
+<p>Runnable example: <a href="../examples/05-outbox.sql"><code>05-outbox.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">Azure: Transactional Outbox guide</a>. Overview and Solution sections.</p>
+<p><a href="0009-saga.html">← The saga pattern: distributed work without distributed transactions</a> &nbsp;|&nbsp; <a href="0010-sharding.html">Sharding, shard keys and consistent hashing →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">Azure: Transactional Outbox (Cosmos DB guide)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

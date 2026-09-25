@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 4: Indexes: what they buy and what they cost</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Indexes: what they buy and what they cost</h1>
+<p class="meta">PostgreSQL · Lesson 0004 · step 7 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why an index makes a lookup fast, what it costs on writes, and prove it with a before/after plan.</div>
+
+<h2>Why an index helps</h2>
+<p>Without one, "the system would have to scan the entire table, row by row". With an index on the searched column, "it might only have to walk a few levels deep into a search tree."<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+<h2>What it costs</h2>
+<p>"After an index is created, the system has to keep it synchronized with the table. This adds overhead to data manipulation operations." So "indexes that are seldom or never used in queries should be removed."<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+<h2>Before and after (200,000 rows)</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 04-index-explain.sql
+Seq Scan on test1  (cost=0.00..3582.00 rows=1 ...) (actual time=3.107..5.069 ...)
+   Rows Removed by Filter: 199999
+   Execution Time: 5.078 ms
+CREATE INDEX test1_id_index ON test1 (id);
+Index Scan using test1_id_index on test1 (cost=0.42..8.44 rows=1 ...)
+   Index Cond: (id = 123456)
+   Execution Time: 0.028 ms</code></pre>
+<p>Timings are from one run on this machine; the shape (a full scan reading every row versus a few tree hops) is the point. For deeper treatment of composite indexes, sorting and joins, the free web book <a href="https://use-the-index-luke.com/">Use The Index, Luke</a><a class="cite" href="https://use-the-index-luke.com/">[2]</a> covers PostgreSQL among other databases.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Query with no index on the filtered column?</p>
+  <button data-correct>Scans the whole table</button>
+  <button>Builds an index itself</button>
+  <button>Walks a search tree</button>
+  <button>Fails with an error</button>
+  <p class="explain">Without an index the system scans the table row by row.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What is the cost of an extra index?</p>
+  <button>Slower reads always</button>
+  <button>Less disk used</button>
+  <button data-correct>Write overhead</button>
+  <button>Lost constraints</button>
+  <p class="explain">The index must be kept in sync with the table, adding overhead to data changes.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What should you do with an unused index?</p>
+  <button>Duplicate it</button>
+  <button>Make it unique</button>
+  <button data-correct>Remove it</button>
+  <button>Rebuild it daily</button>
+  <p class="explain">Indexes seldom or never used should be removed.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. After <code>CREATE INDEX</code>, what did the plan show?</p>
+  <button>A Seq Scan node</button>
+  <button data-correct>An Index Scan node</button>
+  <button>A Sort node only</button>
+  <button>A Hash Join node</button>
+  <p class="explain">The lookup used test1_id_index in the example run.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-index-a-join-column.md">Exercise 0004: index a join column</a></p>
+<p>Runnable example: <a href="../examples/04-index-explain.sql"><code>04-index-explain.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://use-the-index-luke.com/">Use The Index, Luke (Markus Winand)</a>. Start with the 'Anatomy of an Index' chapter.</p>
+<p><a href="0009-ctes-with-and-recursive.html">← CTEs: WITH and WITH RECURSIVE</a> &nbsp;|&nbsp; <a href="0010-index-types.html">Index types: B-tree, hash, GIN, BRIN →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/indexes-intro.html">PostgreSQL Docs: Indexes, introduction</a> · [2] <a href="https://use-the-index-luke.com/">Use The Index, Luke</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

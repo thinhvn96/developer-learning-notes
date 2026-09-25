@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 1: The AMQP model: exchanges, queues and bindings</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The AMQP model: exchanges, queues and bindings</h1>
+<p class="meta">RabbitMQ · Lesson 0001 · step 1 of 9 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> trace a message from publisher to consumer through exchange, binding and queue, and explain why publishers never send to queues directly.</div>
+
+<h2>The model</h2>
+<p>"Messages are published to exchanges, which are often compared to post offices or mailboxes. Exchanges then distribute message copies to queues using rules called bindings."<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> Consumers take messages from queues, by subscription (push) or by polling (pull, which the docs discourage).<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+<pre><code>publisher --&gt; [exchange] --binding--&gt; (queue) --&gt; consumer
+                        \--binding--&gt; (queue) --&gt; consumer</code></pre>
+<h2>The default exchange</h2>
+<p>The "default exchange is a direct exchange with no name (empty string) pre-declared by the broker"; every new queue is automatically bound to it with the queue name as routing key.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> That is why "publish straight to a queue name" works in tutorials: it is really the default exchange routing.</p>
+<p>Because of this indirection, a publisher does not need to know which queues exist. A message that matches no binding is dropped unless you handle it: the example's API replies <code>{"routed":false}</code> for those.</p>
+<h2>Run it</h2>
+<pre><code>cd rabbitmq/examples &amp;&amp; ./01-routing-ack-dlx.sh
+{"routed":true}  &lt;- ex.direct 'error'
+{"routed":false} &lt;- ex.direct 'info'      # no binding matched: unroutable</code></pre>
+<p>Source: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a> (throwaway <code>rabbitmq:4-management</code> container, driven through the HTTP API).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Publishers send messages to what?</p>
+  <button>A queue directly</button>
+  <button>A binding</button>
+  <button>A consumer</button>
+  <button data-correct>An exchange</button>
+  <p class="explain">Messages are published to exchanges, which route copies to queues.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What links an exchange to a queue?</p>
+  <button>A channel</button>
+  <button>A vhost</button>
+  <button>A prefetch</button>
+  <button data-correct>A binding</button>
+  <p class="explain">Exchanges distribute copies to queues using rules called bindings.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Default exchange type?</p>
+  <button>Fanout, named</button>
+  <button data-correct>Direct, no name</button>
+  <button>Topic, named</button>
+  <button>Headers, no name</button>
+  <p class="explain">The default exchange is a nameless direct exchange.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message matches no binding. Example API says?</p>
+  <button>queue full</button>
+  <button>routed true</button>
+  <button data-correct>routed false</button>
+  <button>consumer busy</button>
+  <p class="explain">The publish call returned routed:false for messages with no matching binding.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-trace-a-message.md">Exercise 0001: trace a message</a></p>
+<p>Runnable example: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a>. Read the whole page; it is the mental model for everything else.</p>
+<p> &nbsp;|&nbsp; <a href="0002-exchange-types.html">Direct, fanout and topic exchanges →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

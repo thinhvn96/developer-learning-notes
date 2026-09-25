@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 9: The saga pattern: distributed work without distributed transactions</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The saga pattern: distributed work without distributed transactions</h1>
+<p class="meta">System Design · Lesson 0009 · step 9 of 11 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain a saga, choreography versus orchestration, and compensating transactions, and run a small orchestrator.</div>
+
+<h2>Idea</h2>
+<p>A saga maintains data consistency across services by "coordinating a sequence of local transactions". Each local transaction commits in its own service and triggers the next step through an event or message; if a step fails, <em>compensating transactions</em> undo the completed steps. It suits microservices that each own a database, where traditional ACID and two-phase commit are a poor fit.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+<h2>Vocabulary</h2>
+<ul><li><strong>Compensable</strong> transactions can be undone; the <strong>pivot</strong> transaction is the point of no return; <strong>retryable</strong> transactions after it are idempotent and must eventually succeed.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></li>
+<li><strong>Choreography:</strong> services exchange events with no central controller (simple, but hard to follow as it grows; risk of cyclic dependencies).</li>
+<li><strong>Orchestration:</strong> a central orchestrator tells participants what to do and handles compensation (better for complex flows; a point of failure).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></li></ul>
+<pre><code>java system-design/examples/SagaDemo.java
+--- payment fails
+  do create order / do reserve stock / do charge payment
+  FAILED: card declined -&gt; compensating
+  compensate reserve stock  (stock released)
+  compensate create order   (order cancelled)</code></pre>
+<p>Source: <a href="../examples/SagaDemo.java"><code>SagaDemo.java</code></a> (an in-memory orchestrator; real ones persist saga state). Cautions from the docs: sagas lack isolation (lost updates, dirty reads, fuzzy reads), compensations can fail, and steps must be idempotent; countermeasures include semantic locks, commutative updates, re-reading values, and versioning.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a> Related: <a href="0011-transactional-outbox.html">outbox</a> for reliable events, <a href="../../spring-boot/lessons/0006-transaction-propagation.html">local transactions in Spring</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A saga is...?</p>
+  <button data-correct>Local transactions plus compensations</button>
+  <button>A queue type</button>
+  <button>One global ACID transaction</button>
+  <button>A cache</button>
+  <p class="explain">It coordinates local transactions with compensating transactions.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Central controller style?</p>
+  <button>Sharding</button>
+  <button>Bulkhead</button>
+  <button>Choreography</button>
+  <button data-correct>Orchestration</button>
+  <p class="explain">An orchestrator handles all transactions and tells participants what to do.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Compensation on failure runs...?</p>
+  <button>For failed step only</button>
+  <button data-correct>For completed steps</button>
+  <button>For all steps</button>
+  <button>Never</button>
+  <p class="explain">Compensating transactions undo the changes of completed steps.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Missing from sagas?</p>
+  <button>Durability</button>
+  <button data-correct>Isolation</button>
+  <button>Events</button>
+  <button>Services</button>
+  <p class="explain">There is no built-in isolation across services.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-design-a-booking-saga.md">Exercise 0009: a booking saga</a></p>
+<p>Runnable example: <a href="../examples/SagaDemo.java"><code>SagaDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">Azure: Saga pattern</a>. Solution, approaches and data anomalies.</p>
+<p><a href="0003-queue-versus-log.html">← Queue versus log: choosing RabbitMQ or Kafka</a> &nbsp;|&nbsp; <a href="0011-transactional-outbox.html">The transactional outbox →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">Azure: Saga pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

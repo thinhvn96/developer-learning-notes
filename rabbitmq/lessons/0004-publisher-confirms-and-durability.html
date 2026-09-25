@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 4: Publisher confirms and durability</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Publisher confirms and durability</h1>
+<p class="meta">RabbitMQ · Lesson 0004 · step 4 of 9 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> list what you must set for a message to survive a broker restart, and what publisher confirms tell (and do not tell) a producer.</div>
+
+<h2>Durability needs two things</h2>
+<p>Queues and messages can be durable (persisted to disk) or transient (memory). To avoid data loss "both the queue and messages must be marked durable."<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a> The example declares <code>"durable":true</code> queues.</p>
+<h2>Publisher confirms</h2>
+<p>Consumer acks protect the consumer side. For the producer side, publisher confirms let the broker acknowledge receipt: once enabled, "the broker then confirms messages as it handles them by sending a <code>basic.ack</code> on the same channel." It may send <code>basic.nack</code> instead, meaning it "was unable to process the messages and refuses responsibility for them." Confirms are asynchronous, so applications should process them as a stream rather than waiting synchronously for each.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+<h2>Putting it together</h2>
+<ol>
+<li>Durable queue + persistent messages.</li>
+<li>Publisher confirms on, and retry or alert on <code>nack</code> and on unroutable messages.</li>
+<li>Manual consumer acks, idempotent processing.</li>
+</ol>
+<p>For replicated queues so a single node failure does not lose the queue, see the <a href="0006-quorum-queues-and-poison-messages.html">quorum queues lesson</a>. Compare Kafka's approach in <a href="../../kafka/lessons/0005-replication-isr-and-durability.html">Kafka replication</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. To avoid loss on restart, what must be durable?</p>
+  <button>Only the channel</button>
+  <button>Only the exchange</button>
+  <button data-correct>Queue and messages</button>
+  <button>Only the consumer</button>
+  <p class="explain">Both the queue and messages must be marked durable.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How are publisher confirms delivered?</p>
+  <button data-correct>Asynchronously, as acks</button>
+  <button>Only on close</button>
+  <button>By email</button>
+  <button>Synchronously per publish</button>
+  <p class="explain">Publisher acknowledgements are emitted asynchronously on the same channel.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. A broker sends basic.nack to a publisher. Meaning?</p>
+  <button>Queue is durable</button>
+  <button>Consumer acked</button>
+  <button data-correct>Refuses responsibility</button>
+  <button>Message delivered</button>
+  <p class="explain">A nack indicates the broker was unable to process the message and refuses responsibility.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Do consumer acks confirm publishing?</p>
+  <button>Only with TTL</button>
+  <button>Yes, always</button>
+  <button>Only with fanout</button>
+  <button data-correct>No, separate mechanism</button>
+  <p class="explain">Publisher confirms are the producer-side mechanism; consumer acks concern deliveries.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-lose-a-message.md">Exercise 0004: find every way to lose a message</a></p>
+<p>Runnable example: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a>. Read 'Publisher Confirms'.</p>
+<p><a href="0003-acks-prefetch-redelivery.html">← Consumer acknowledgements, prefetch and redelivery</a> &nbsp;|&nbsp; <a href="0007-message-ttl.html">Message TTL: per-queue and per-message expiry →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a> · [2] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

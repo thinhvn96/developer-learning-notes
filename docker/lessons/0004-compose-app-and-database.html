@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 4: Compose: an app and a database</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Compose: an app and a database</h1>
+<p class="meta">Docker · Lesson 0004 · step 9 of 12 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> describe Compose's service, network and volume model, and start an app with a database that waits for it to be healthy.</div>
+
+<h2>The model</h2>
+<p>"With Docker Compose you use a YAML configuration file, known as the Compose file, to configure your application's services, and then you create and start all the services from your configuration with the Compose CLI." A <em>service</em> is "running the same container image, and configuration, one or more times". Services communicate through <em>networks</em> and keep persistent data in <em>volumes</em>.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+<h2>A working example</h2>
+<p>File: <a href="../examples/compose-postgres/compose.yaml"><code>compose.yaml</code></a>. It starts <code>postgres:18</code> with a health check, then runs a client that connects to the host name <code>db</code> (the service name on the default network) and prints the server version.</p>
+<pre><code>cd docker/examples/compose-postgres
+docker compose up --abort-on-container-exit
+docker compose down -v      # -v also removes the volume</code></pre>
+<p>Running it here printed a <code>psql</code> result table with <code>PostgreSQL 18.6</code> in the server log. <code>depends_on</code> with <code>condition: service_healthy</code> makes the client wait for the health check; without it, the client may start before the database accepts connections.</p>
+<div class="aside">Interview angle: Compose is for local development and simple single-host setups. The same idea (services, networking, config, storage) is what Kubernetes expresses with Deployments, Services and PersistentVolumes; see the <a href="../../kubernetes/index.html">Kubernetes ladder</a>.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What is a Compose service?</p>
+  <button>A build cache entry</button>
+  <button data-correct>One image run N times</button>
+  <button>A single Linux user</button>
+  <button>A host firewall rule</button>
+  <p class="explain">A service is the same image and configuration run one or more times.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How do services reach each other?</p>
+  <button>Through image layers</button>
+  <button data-correct>Through shared networks</button>
+  <button>Through the JVM heap</button>
+  <button>Through host reboot</button>
+  <p class="explain">Services communicate through networks.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where does persistent database data live?</p>
+  <button data-correct>In volumes</button>
+  <button>In the Dockerfile</button>
+  <button>In image layers</button>
+  <button>In the JVM heap</button>
+  <p class="explain">Services store and share persistent data in volumes.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why add a health check plus <code>service_healthy</code>?</p>
+  <button>Image builds get faster</button>
+  <button>Volumes get encrypted</button>
+  <button data-correct>Client waits for readiness</button>
+  <button>Ports become public</button>
+  <p class="explain">A running container is not necessarily ready; the condition delays dependents until healthy.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-add-a-table.md">Exercise 0004: add a table on startup</a></p>
+<p>Runnable example: <a href="../examples/compose-postgres/compose.yaml"><code>compose-postgres/compose.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/compose/intro/compose-application-model/">Docker Docs: Compose</a>. Then the 'Get started' guide.</p>
+<p><a href="0011-networks-and-port-publishing.html">← Networks, DNS by name and port publishing</a> &nbsp;|&nbsp; <a href="0005-memory-cpu-limits-and-the-jvm.html">Memory and CPU limits, and what the JVM sees →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/compose/intro/compose-application-model/">Docker Docs: The Compose application model</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

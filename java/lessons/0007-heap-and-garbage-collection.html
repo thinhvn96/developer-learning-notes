@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 7: Heap sizing and garbage collection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Heap sizing and garbage collection</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0007 · step 18 of 27 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> state the default heap size and collector rules, read one line of a GC log, and know which knob to turn first.</div>
+
+<h2>What the GC does</h2>
+<p>The garbage collector allocates memory, hands it to the application, "determines which parts of that memory is still in use", and reclaims the rest.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">[1]</a> HotSpot collectors use "generational scavenging in conjunction with aging" to concentrate effort where reclaimable memory is most likely.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">[1]</a></p>
+<h2>Defaults you should be able to recite</h2>
+<ul>
+<li>Collector: G1 on a "server-class machine" (two or more processors and at least 1792 MB physical memory), otherwise the Serial collector.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></li>
+<li>Initial heap: 1/64 of physical memory. Maximum heap: 1/4 of physical memory.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></li>
+<li><code>-XX:MaxRAMPercentage</code> sets the maximum heap as a percentage of the max memory the JVM sees; default 25 percent.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[3]</a></li>
+</ul>
+<h2>Read a GC log line</h2>
+<pre><code>java -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.001s][info][gc] Using G1
+max heap (MB): 64
+[0.278s][info][gc] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 24M-&gt;3M(64M) 2.547ms</code></pre>
+<p>Reading it: collection number 0, a young-generation pause, heap occupancy went from 24 MB to 3 MB out of 64 MB, taking 2.5 ms. The demo allocates short-lived arrays, so almost everything is reclaimed. (Log format is from running the example on this machine with JDK 21.)</p>
+<div class="aside">Interview move: before touching collector flags, set the heap size on purpose (<code>-Xmx</code> or <code>MaxRAMPercentage</code>) and turn on GC logging. The Docker and Kubernetes lessons revisit this: heap is only part of a container's memory.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default maximum heap without flags?</p>
+  <button>One eighth of RAM</button>
+  <button data-correct>One quarter of RAM</button>
+  <button>One half of RAM</button>
+  <button>All physical RAM</button>
+  <p class="explain">The maximum heap defaults to 1/4 of physical memory.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which collector is the default on a server-class machine?</p>
+  <button data-correct>Garbage-First G1</button>
+  <button>Shenandoah low-pause</button>
+  <button>Epsilon no-op</button>
+  <button>Serial collector</button>
+  <p class="explain">G1 on server-class machines, Serial otherwise.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Server-class means at least how much?</p>
+  <button data-correct>Two CPUs, 1792 MB</button>
+  <button>Two CPUs, 4 GB</button>
+  <button>One CPU, 512 MB</button>
+  <button>Four CPUs, 8 GB</button>
+  <p class="explain">Two or more processors and physical memory of at least 1792 MB.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Log shows <code>24M-&gt;3M(64M)</code>. What is 64M?</p>
+  <button data-correct>Total heap size</button>
+  <button>Pause length</button>
+  <button>Live objects left</button>
+  <button>Bytes reclaimed</button>
+  <p class="explain">Before -> after (total heap capacity).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-gc-log-reading.md">Exercise 0007: two collectors, one program</a></p>
+<p>Runnable example: <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a>. Then read the Ergonomics chapter.</p>
+<p><a href="0026-deadlock-and-lock-ordering.html">← Deadlock and lock ordering</a> &nbsp;|&nbsp; <a href="0012-var-and-text-blocks.html">JDK 10 and 15: var and text blocks (in JDK 17) →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

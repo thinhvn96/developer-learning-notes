@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java (JDK 8, 17, 21) Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Java (JDK 8, 17, 21): interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · Java · 26 questions · <a href="index.html">Java ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Questions you should be able to answer aloud for a Senior Java interview. Each answer starts with a short version, then the detail, with citations to the specification or official docs. Anything beyond the sources I read is flagged in the follow-up.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Explain the equals/hashCode contract. What breaks if you override only equals?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> equal objects must have equal hash codes; the reverse is not required. Overriding only <code>equals</code> makes hash-based collections silently lose entries.</p>
+<p>The <code>Object</code> Javadoc states that if two objects are equal by <code>equals</code>, calling <code>hashCode</code> on each must give the same integer, while unequal objects are <em>not required</em> to have different hash codes (distinct ones just help performance). <code>equals</code> must also be reflexive, symmetric, transitive, consistent, and return false for null.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">[1]</a></p>
+<p>A <code>HashMap</code> uses the hash code to choose a bucket and then <code>equals</code> inside it. If two equal keys hash differently, the second lookup goes to the wrong bucket and <code>equals</code> never runs, so <code>get</code> returns <code>null</code>. It compiles and runs, which is what makes it dangerous. I demonstrated it in <code>LostKey.java</code>: the broken key printed <code>null</code>, the correct key printed <code>value</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why are mutable keys dangerous even with a correct hashCode? (If the fields used in hashCode change after insertion, the entry is in the wrong bucket. The Map Javadoc warns great care must be exercised with mutable keys.)</div>
+<p class="see">Learn it: <a href="lessons/0001-hashmap-equals-hashcode.html">HashMap, equals and hashCode</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>How does HashMap work, and what do you say about thread safety?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an array of buckets addressed by hash; default capacity 16 and load factor 0.75; it doubles when it fills past load factor times capacity; it is not thread-safe.</p>
+<p>From the Javadoc: the default load factor is 0.75 and default initial capacity 16. When the number of entries exceeds load factor times capacity, the table is rehashed to about twice as many buckets. It permits one null key and null values, makes no ordering guarantee, and "is not synchronized": concurrent structural modification needs external synchronization. Iterators are fail-fast and throw <code>ConcurrentModificationException</code> on structural modification outside the iterator. When keys are <code>Comparable</code> the class may use comparison order to help break ties.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a></p>
+<p>For concurrent use I would name <code>ConcurrentHashMap</code> and explain the trade-off rather than wrapping HashMap in <code>Collections.synchronizedMap</code> (the atomics/concurrent-collections lesson is still planned in this course; say so honestly if you have not studied it).</p>
+<div class="follow"><strong>Likely follow-up:</strong> What happens to iteration order when the map resizes? (No guarantee: the docs say order may not remain constant over time.)</div>
+<p class="see">Learn it: <a href="lessons/0001-hashmap-equals-hashcode.html">HashMap, equals and hashCode</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>ArrayList vs LinkedList vs ArrayDeque: which do you choose?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> default to <code>ArrayList</code>; use <code>ArrayDeque</code> for stacks and queues; <code>LinkedList</code> needs a specific justification.</p>
+<p><code>ArrayList</code>: <code>size</code>, <code>isEmpty</code>, <code>get</code>, <code>set</code> and iterator run in constant time, <code>add</code> is amortized constant, the rest linear, and its constant factor is low compared to <code>LinkedList</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[3]</a> <code>LinkedList</code> index operations traverse from the nearer end, so <code>get(i)</code> is a walk.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">[4]</a> <code>ArrayDeque</code> "is likely to be faster than <code>Stack</code> when used as a stack, and faster than <code>LinkedList</code> when used as a queue"; nulls are prohibited.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[5]</a> None is synchronized.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Delete elements while iterating an ArrayList? (Use removeIf or the iterator's remove; a for-each with list.remove throws ConcurrentModificationException, as ListPitfalls.java shows.)</div>
+<p class="see">Learn it: <a href="lessons/0002-choosing-a-list.html">Choosing a list</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>What did Java 8 add that changed how you write code?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> lambdas and method references, default methods, streams, <code>Optional</code>, <code>java.time</code>, and <code>CompletableFuture</code>.</p>
+<ul>
+<li><strong>Lambdas:</strong> treat functionality as a method argument; used with functional interfaces (one abstract method), with standard ones in <code>java.util.function</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[6]</a></li>
+<li><strong>Default methods:</strong> add methods to interfaces without breaking existing implementers.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[7]</a></li>
+<li><strong>Streams:</strong> lazy pipelines with a terminal operation; single use.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[8]</a></li>
+<li><strong>Optional:</strong> a return type for "no result".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[9]</a></li>
+<li><strong>java.time:</strong> <code>LocalDate</code>, <code>Instant</code>, <code>Duration</code>, <code>ZonedDateTime</code> and friends.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[10]</a></li>
+<li><strong>CompletableFuture:</strong> composable async computations.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[11]</a></li>
+</ul>
+<div class="follow"><strong>Likely follow-up:</strong> Pick one and go deep. (Have a 60-second answer ready for each; the follow-ups are in the questions below.)</div>
+<p class="see">Learn it: <a href="index.html">Java ladder</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>What is the rule for local variables captured by a lambda?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> they must be final or effectively final.</p>
+<p>"A lambda expression can only access local variables and parameters of the enclosing block that are final or effectively final." Effectively final means never reassigned after initialization; assigning to it inside the lambda or afterwards is a compile error. Lambdas are lexically scoped: they add no new scope level and inherit no names from a supertype.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[6]</a> The reason is that a lambda may run later or on another thread, and captured locals are copied, so allowing mutation would give confusing, racy semantics (that rationale is standard reasoning, not a quote from the tutorial).</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you count inside forEach then? (Use a reduction, an AtomicInteger, or restructure; do not mutate an outer local.)</div>
+<p class="see">Learn it: <a href="lessons/0008-lambdas-and-functional-interfaces.html">Lambdas</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Streams: what are the traps? And Optional's orElse vs orElseGet?</summary>
+<div class="ans">
+<p><strong>Streams:</strong> intermediate operations are lazy and nothing runs until a terminal operation; a consumed stream cannot be reused (it throws <code>IllegalStateException</code>); behavioral parameters should not modify the source and should avoid side effects, with the docs showing <code>toList()</code> instead of <code>forEach(results::add)</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[8]</a></p>
+<p><strong>Optional:</strong> "primarily intended for use as a method return type"; a variable of type <code>Optional</code> should never itself be null. <code>orElse(x)</code> evaluates <code>x</code> even when a value is present; <code>orElseGet(supplier)</code> calls the supplier only when empty, so use it when the default is expensive.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[9]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Should Optional be a field or parameter? (The Javadoc's intent is return types.)</div>
+<p class="see">Learn it: <a href="lessons/0004-streams-and-optional.html">Streams and Optional</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Two interfaces provide the same default method. What happens?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the class must override the method and choose, or it does not compile.</p>
+<p>Rules: a concrete class method wins over an interface default; a more specific interface can inherit, redeclare (abstract) or redefine the default.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[7]</a> For two unrelated defaults with the same signature, the compiler rejects the class ("types W and S are incompatible" in my test) until you override and pick with <code>Walker.super.move()</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Default methods vs abstract classes? (Interfaces have no instance state and a class can implement many; default methods exist to evolve interfaces.)</div>
+<p class="see">Learn it: <a href="lessons/0009-default-methods-and-conflicts.html">Default methods</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>CompletableFuture: which threads run it, and how do errors surface?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> async methods without an executor use <code>ForkJoinPool.commonPool()</code>; <code>join()</code> throws <code>CompletionException</code>, <code>get()</code> throws <code>ExecutionException</code>.</p>
+<p>The Javadoc: a <code>CompletableFuture</code> may be explicitly completed and supports dependent actions; async methods without an explicit <code>Executor</code> use the common pool; <code>exceptionally</code> recovers, <code>handle</code> sees result and exception; cancellation is exceptional completion; among competing <code>complete</code>/<code>cancel</code> calls only one wins.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[11]</a> Practical consequence: do not run blocking I/O in the common pool; supply your own executor (or, on JDK 21, virtual threads).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Compare CompletableFuture with virtual threads. (Virtual threads let you write simple blocking code per task; CompletableFuture composes async stages.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[12]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0010-completablefuture.html">CompletableFuture</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Which java.time type would you use for a birthday, a meeting, a timestamp and an elapsed time?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>LocalDate</code>, <code>ZonedDateTime</code>, <code>Instant</code>, <code>Duration</code>.</p>
+<p>The tutorial: human time uses the Local classes, machine time uses <code>Instant</code> (nanosecond resolution from the epoch), zone-aware needs use <code>ZonedDateTime</code> or <code>OffsetDateTime</code>; <code>Duration</code> measures seconds and nanoseconds while <code>Period</code> measures years, months and days.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[10]</a> Store and exchange <code>Instant</code>s, convert to a zone for display.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why not java.util.Date? (Beyond this course's scope of sources; describe the design issues you know and check the Javadoc before an interview.)</div>
+<p class="see">Learn it: <a href="lessons/0011-java-time.html">java.time</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>What language features arrived between Java 8 and 17?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>var</code> (10), switch expressions (14), text blocks (15), pattern matching for <code>instanceof</code> (16), records (16), sealed classes (17).</p>
+<ul>
+<li><code>var</code>: local variable type inference for locals with initializers; not for fields, parameters or return types.<a class="cite" href="https://openjdk.org/jeps/286">[13]</a></li>
+<li>Switch expressions: arrow labels, no fall-through, <code>yield</code>, must be exhaustive.<a class="cite" href="https://openjdk.org/jeps/361">[14]</a></li>
+<li>Text blocks: multi-line literals opened with <code>"""</code>, indentation stripped.<a class="cite" href="https://openjdk.org/jeps/378">[15]</a></li>
+<li><code>instanceof</code> patterns: <code>if (o instanceof String s)</code> with flow-scoped binding.<a class="cite" href="https://openjdk.org/jeps/394">[16]</a></li>
+<li>Records: shallowly immutable, transparent carriers with generated <code>equals</code>, <code>hashCode</code>, <code>toString</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[17]</a></li>
+<li>Sealed classes: <code>permits</code>; subclasses are <code>final</code>, <code>sealed</code> or <code>non-sealed</code>.<a class="cite" href="https://openjdk.org/jeps/409">[18]</a></li>
+</ul>
+<p>Java 17 is an LTS release (8, 11, 17, 21 and 25 are).<a class="cite" href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">[19]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Which of these would you use in a real codebase first, and why? (Records for DTOs, with a defensive copy for collections.)</div>
+<p class="see">Learn it: <a href="index.html">Java ladder</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Are records immutable? What do they generate?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> shallowly immutable only.</p>
+<p>"A record class is a shallowly immutable, transparent carrier for a fixed set of values." It has a canonical constructor, a private final field and a public accessor per component; <code>equals</code>, <code>hashCode</code> and <code>toString</code> derive from all components.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[17]</a> A record holding an <code>ArrayList</code> is only as immutable as that list; use a compact constructor with <code>List.copyOf</code>. Demonstrated in <code>RecordDemo.java</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Can a record extend a class? (Records cannot extend other classes; check the Java Language Specification before asserting details beyond what the Javadoc says.)</div>
+<p class="see">Learn it: <a href="lessons/0003-records-and-immutability.html">Records</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Why sealed classes? How do they relate to switch?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> to model a closed set of subtypes, which lets the compiler check switches for exhaustiveness.</p>
+<p>JEP 409's goals: let the author control which code implements a type, be more declarative than access modifiers, and support exhaustive pattern analysis. Each permitted subclass is exactly one of <code>final</code>, <code>sealed</code>, <code>non-sealed</code>.<a class="cite" href="https://openjdk.org/jeps/409">[18]</a> In JDK 21, a pattern <code>switch</code> over a sealed type must be exhaustive, and coverage is checked from the permitted subtypes, sometimes removing the need for <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/441">[20]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Sealed vs enum? (Enum: closed set of instances of one type. Sealed: closed set of types with different data.)</div>
+<p class="see">Learn it: <a href="lessons/0014-sealed-classes.html">Sealed classes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>What changed from Java 17 to 21 that you would actually use?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> pattern matching for <code>switch</code>, record patterns, sequenced collections, virtual threads, generational ZGC.</p>
+<ul>
+<li>Pattern <code>switch</code> (final in 21): type patterns, <code>when</code> guards, <code>case null</code>, exhaustiveness for sealed types, dominance checks.<a class="cite" href="https://openjdk.org/jeps/441">[20]</a></li>
+<li>Record patterns: deconstruct records, nestable.<a class="cite" href="https://openjdk.org/jeps/440">[21]</a></li>
+<li>Sequenced collections: <code>SequencedCollection</code>, <code>SequencedSet</code>, <code>SequencedMap</code> with <code>getFirst</code>, <code>getLast</code>, <code>reversed</code> and more.<a class="cite" href="https://openjdk.org/jeps/431">[22]</a></li>
+<li>Virtual threads: for scale (throughput), not speed.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[12]</a></li>
+<li>Generational ZGC: <code>-XX:+UseZGC -XX:+ZGenerational</code>, sub-millisecond pause goal.<a class="cite" href="https://openjdk.org/jeps/439">[23]</a></li>
+</ul>
+<p>I verified that a pattern-switch example compiles with <code>--release 21</code> and fails with <code>--release 17</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Show a pattern switch over a sealed hierarchy. (See Jdk21Features.java.)</div>
+<p class="see">Learn it: <a href="lessons/0015-pattern-matching-switch-and-record-patterns.html">Pattern matching for switch</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>What are virtual threads, and what are the rules for using them?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> lightweight <code>Thread</code>s not tied to an OS thread; they give scale, not speed; do not pool them.</p>
+<p>A virtual thread runs on an OS thread but is suspended on blocking I/O so the OS thread serves others. "Virtual threads are not faster threads ... They exist to provide scale (higher throughput), not speed (lower latency)." Use one per task via <code>Executors.newVirtualThreadPerTaskExecutor()</code>, never pool them, and limit concurrency with a <code>Semaphore</code>. They can be pinned to their carrier (for example in native calls), which hurts scalability but not correctness.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[12]</a> My demo ran 10,000 one-second sleeps in about one second.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When would virtual threads not help? (CPU-bound work: they do not run code faster.)</div>
+<p class="see">Learn it: <a href="lessons/0006-virtual-threads.html">Virtual threads</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>Explain the Java Memory Model: what is happens-before, and what does volatile give you?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> happens-before is the ordering guarantee that makes one thread's writes visible to another; volatile gives visibility and ordering for that variable, not atomic compound actions.</p>
+<p>JLS 17: two conflicting accesses not ordered by happens-before are a <em>data race</em>. Edges include: monitor unlock before every later lock of that monitor; a volatile write before every later read of that field; <code>Thread.start()</code> before the started thread's actions; a thread's actions before another thread returns from <code>join()</code> on it. If a program is correctly synchronized, all executions appear sequentially consistent. Non-volatile <code>long</code> and <code>double</code> writes can be split into two 32-bit writes.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[24]</a> The concurrent package adds edges for concurrent collections, <code>Executor</code> submission, <code>Future.get()</code>, locks and latches.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/package-summary.html">[25]</a> <code>volatile</code> does not make <code>count++</code> atomic (that needs atomics or a lock).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why can a loop on a non-volatile flag hang? (No happens-before edge means the write is not guaranteed to become visible.)</div>
+<p class="see">Learn it: <a href="lessons/0005-visibility-and-happens-before.html">Visibility and happens-before</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">16.</span>How does the JVM choose a GC and heap size, and what do you do in a container?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> G1 on server-class machines, otherwise Serial; initial heap 1/64 and max heap 1/4 of physical memory.</p>
+<p>Server-class means two or more processors and at least 1792 MB of physical memory.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[26]</a> <code>-XX:MaxRAMPercentage</code> defaults to 25 percent; on Linux the JVM detects container limits by default (<code>-Xlog:os+container=trace</code> shows what it saw).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[27]</a> In my Docker run, a 256 MB limit gave a heap of about 121 MB, consistent with the documented 50 percent default for small heaps. For a service I would set <code>MaxRAMPercentage</code> deliberately (for example 70) to leave room for non-heap memory, enable GC logging and measure. On JDK 21, generational ZGC is available for very low pause targets.<a class="cite" href="https://openjdk.org/jeps/439">[23]</a> The GC's job is allocating memory and reclaiming what is no longer in use.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">[28]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Your pod is OOM-killed but heap looks fine. Why? (Non-heap memory: metaspace, thread stacks, buffers; heap plus that exceeded the limit.)</div>
+<p class="see">Learn it: <a href="lessons/0007-heap-and-garbage-collection.html">Heap and GC</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">17.</span>Which Java version would you run in production, and why?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an LTS release: 17, 21 or 25 today, depending on library and support constraints.</p>
+<p>Oracle lists 8, 11, 17, 21 and 25 as LTS releases, with a two-year cadence going forward and the next LTS planned as 29 in September 2027. Java 25 updates are planned under the No-Fee Terms until September 2028.<a class="cite" href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">[19]</a> A migration path from 8: move to 17 (get records, sealed classes, text blocks, switch expressions, <code>var</code>), then to 21 (pattern switch, virtual threads, sequenced collections). I would justify with support windows and measured GC/startup, not fashion.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What breaks when migrating from 8 to 17? (Beyond the sources gathered in this course; prepare your own list from the release notes of each version.)</div>
+<p class="see">Learn it: <a href="index.html">Java ladder</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">18.</span>Why are Strings immutable, and what is the difference between <code>==</code> and <code>equals</code> on them?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the Javadoc says strings are constant, so they can be shared safely; <code>==</code> compares references, <code>equals</code> compares contents.</p>
+<p>"Strings are constant; their values cannot be changed after they are created", which is why references can share them. Literals refer to interned instances, and <code>intern()</code> returns a canonical representation. In <code>StringDemo.java</code>: two identical literals were <code>==</code>, but <code>new String("abc")</code> was not, while <code>equals</code> was true for both. How <code>+</code> is compiled is up to the compiler (<code>StringBuilder</code>, <code>StringBuffer</code> or <code>StringConcatFactory</code>); in loops use a <code>StringBuilder</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[29]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why is String a good HashMap key? (Immutable, so its hashCode cannot change after insertion; see the mutable-key exercise.)</div>
+<p class="see">Learn it: <a href="lessons/0018-strings-immutability-and-stringbuilder.html">Strings</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">19.</span>Checked versus unchecked exceptions: which do you use and why? What is try-with-resources?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> checked when the caller can reasonably recover, unchecked otherwise; try-with-resources closes <code>AutoCloseable</code> resources automatically.</p>
+<p>Checked exceptions are subject to catch-or-specify; <code>RuntimeException</code> and <code>Error</code> are not. The tutorial's guideline: make it checked if a client can reasonably recover, unchecked if not; do not use <code>RuntimeException</code> just to avoid declaring.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[30]</a> Try-with-resources closes resources in the opposite order of creation; if the body throws and <code>close()</code> also throws, the body's exception propagates and the other is suppressed (<code>getSuppressed()</code>); <code>catch</code>/<code>finally</code> run after the resources are closed.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[31]</a> Spring link: checked exceptions do not roll back <code>@Transactional</code> by default.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where is the suppressed exception lost if you use try/finally instead? (The finally's exception can replace the original; try-with-resources keeps the original and attaches the rest.)</div>
+<p class="see">Learn it: <a href="lessons/0019-exceptions-checked-unchecked-try-with-resources.html">Exceptions</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">20.</span>Explain generic invariance, wildcards (extends/super) and type erasure.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>List&lt;Integer&gt;</code> is not a <code>List&lt;Number&gt;</code>; use <code>? extends</code> for producers and <code>? super</code> for consumers; type arguments are erased at runtime.</p>
+<p>"Although Integer is a subtype of Number, List&lt;Integer&gt; is not a subtype of List&lt;Number&gt;": otherwise you could add a <code>Double</code> to a list of <code>Integer</code>s.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[32]</a> The tutorial's rules: an "in" variable uses an upper bounded wildcard (<code>extends</code>), an "out" variable a lower bounded one (<code>super</code>), unbounded when only <code>Object</code> methods are used, none when it is both; avoid wildcards in return types.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">[33]</a> The compiler erases type parameters to their bounds or <code>Object</code>, inserts casts and generates bridge methods, so parameterized types are not reifiable: no <code>instanceof List&lt;String&gt;</code> and no arrays of parameterized types.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">[34]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why can't you write <code>new T()</code>? (Erasure removes T at runtime; state it as a consequence of erasure.)</div>
+<p class="see">Learn it: <a href="lessons/0021-wildcards-and-type-erasure.html">Wildcards and erasure</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">21.</span>Write a stream that groups employees by department and sums salaries. What happens with <code>toMap</code> and duplicate keys?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>Collectors.groupingBy(Emp::dept, Collectors.summingInt(Emp::salary))</code>; <code>toMap</code> throws <code>IllegalStateException</code> on duplicate keys unless you provide a merge function.</p>
+<p><code>groupingBy</code> classifies into a <code>Map</code> with an optional downstream collector; <code>partitioningBy</code> always yields both <code>true</code> and <code>false</code> keys; <code>joining</code> concatenates; <code>toList</code>/<code>toSet</code> promise nothing about type or mutability (use <code>toCollection</code> for control); <code>toUnmodifiableList</code> etc. arrived in Java 10.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[35]</a> My run: grouping gave <code>{ops=9600, dev=9400}</code>, duplicate keys threw <code>IllegalStateException</code>, and a merge function combined them.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How would this differ in SQL? (GROUP BY with SUM; see the PostgreSQL aggregates lesson.)</div>
+<p class="see">Learn it: <a href="lessons/0022-collectors-groupingby-tomap.html">Collectors</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">22.</span>How does a ThreadPoolExecutor decide between running, queueing and rejecting a task?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> below core size it starts a thread; at or above core it queues; if the queue is full and below max it starts another thread; otherwise it rejects.</p>
+<p>The Javadoc rules plus queue types (direct handoff, unbounded queue where max has no effect, bounded queue) and rejection policies (<code>AbortPolicy</code> default, <code>CallerRunsPolicy</code> slows submission, discard policies rarely acceptable).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[36]</a> In <code>PoolDemo.java</code> (core 2, max 4, queue 2) tasks 1-2 took core threads, 3-4 were queued, 5-6 created extra threads and task 7 was rejected. On JDK 21 consider virtual threads instead of pools for blocking I/O.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why is an unbounded queue risky? (Unbounded work growth if tasks arrive faster than they finish; the Javadoc lists it.)</div>
+<p class="see">Learn it: <a href="lessons/0023-thread-pools-executors.html">Thread pools</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">23.</span><code>volatile int count++</code> from several threads gives wrong totals. Why, and how do you fix it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>count++</code> is read-modify-write, not atomic; use an atomic or a lock.</p>
+<p><code>volatile</code> gives visibility and ordering but not atomic compound actions. The atomic package offers lock-free thread-safe operations on single variables (<code>compareAndSet</code>, <code>getAndUpdate</code>) with volatile semantics, and <code>LongAdder</code> for contended counters.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">[37]</a> <code>ReentrantLock</code> offers <code>synchronized</code>-like semantics plus fairness, <code>tryLock</code> and interruptible locking; unlock in <code>finally</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[38]</a> In <code>AtomicDemo.java</code>, 4 threads x 200,000 increments: the volatile int lost about 1,600 updates, while <code>AtomicInteger</code> and the lock produced 800,000.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When do you prefer a lock to an atomic? (When several variables must change together.)</div>
+<p class="see">Learn it: <a href="lessons/0024-atomics-and-locks.html">Atomics and locks</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">24.</span>HashMap versus ConcurrentHashMap: differences, null rules, and the right way to update a counter?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> ConcurrentHashMap has lock-free reads, weakly consistent iterators, forbids nulls, and offers atomic compound methods like <code>merge</code>.</p>
+<p>Retrievals do not lock, updates have high expected concurrency, iterators do not throw <code>ConcurrentModificationException</code>, null keys/values throw NPE; <code>putIfAbsent</code>, <code>compute*</code> and <code>merge</code> are atomic and their functions must be short and not modify the map; <code>size()</code> is only reliable without concurrent updates.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[39]</a> <code>HashMap</code> is unsynchronized with fail-fast iterators.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a> My run: <code>merge("hits", 1, Integer::sum)</code> from 4 threads gave exactly 400,000. A "check then put" is still a race.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why does ConcurrentHashMap forbid nulls? (Ambiguity of <code>get</code> returning null; a reasoning point, the Javadoc simply states the rule.)</div>
+<p class="see">Learn it: <a href="lessons/0025-concurrenthashmap.html">ConcurrentHashMap</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">25.</span>What is a deadlock, how do you detect it, and how do you prevent it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> threads blocked forever waiting on each other; detect with a thread dump or <code>ThreadMXBean</code>; prevent with a consistent lock order.</p>
+<p>The tutorial's definition and bowing-friends example (both methods <code>synchronized</code>).<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[40]</a> <code>DeadlockDemo.java</code> reproduced it with opposite lock orders, <code>findDeadlockedThreads()</code> reported 2 threads, and the same lock order removed the problem. Other tools: <code>tryLock</code> with a timeout,<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[38]</a> fewer locks held, no foreign calls while holding a lock (the last two are general practice).</p>
+<div class="follow"><strong>Likely follow-up:</strong> How does PostgreSQL handle the same problem? (Detects and aborts one transaction; retry.)</div>
+<p class="see">Learn it: <a href="lessons/0026-deadlock-and-lock-ordering.html">Deadlock</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">26.</span>What is a helpful NullPointerException?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the JVM message names the null expression, for example <code>Cannot invoke "String.trim()" because "names[0]" is null</code>.</p>
+<p>JEP 358 (Java 14): "describing precisely which variable was null"; off by default in JDK 14 behind <code>-XX:+ShowCodeDetailsInExceptionMessages</code>.<a class="cite" href="https://openjdk.org/jeps/358">[41]</a> On JDK 21 my run printed the messages with no flag; local variable names appear only if compiled with <code>-g</code> (otherwise <code>&lt;local1&gt;</code>).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Should you still validate arguments? (Yes: fail early with clear messages via <code>Objects.requireNonNull</code>; helpful NPEs are for debugging.)</div>
+<p class="see">Learn it: <a href="lessons/0027-helpful-nullpointerexceptions.html">Helpful NPEs</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Java (JDK 8, 17, 21) questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">Object Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · [4] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">LinkedList Javadoc</a> · [5] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · [6] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Tutorials: Lambda Expressions</a> · [7] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Tutorials: Default Methods</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> · [9] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">Optional Javadoc</a> · [10] <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Oracle Tutorials: Date-Time</a> · [11] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a> · [12] <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Oracle: Virtual Threads</a> · [13] <a href="https://openjdk.org/jeps/286">JEP 286 (var)</a> · [14] <a href="https://openjdk.org/jeps/361">JEP 361 (switch expressions)</a> · [15] <a href="https://openjdk.org/jeps/378">JEP 378 (text blocks)</a> · [16] <a href="https://openjdk.org/jeps/394">JEP 394 (instanceof patterns)</a> · [17] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · [18] <a href="https://openjdk.org/jeps/409">JEP 409 (sealed classes)</a> · [19] <a href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">Oracle Java SE Support Roadmap</a> · [20] <a href="https://openjdk.org/jeps/441">JEP 441 (pattern matching for switch)</a> · [21] <a href="https://openjdk.org/jeps/440">JEP 440 (record patterns)</a> · [22] <a href="https://openjdk.org/jeps/431">JEP 431 (sequenced collections)</a> · [23] <a href="https://openjdk.org/jeps/439">JEP 439 (generational ZGC)</a> · [24] <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">JLS chapter 17</a> · [25] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary</a> · [26] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · [27] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · [28] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a> · [29] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">String Javadoc</a> · [30] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Java Tutorials: Exceptions</a> · [31] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Java Tutorials: try-with-resources</a> · [32] <a href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Java Tutorials: Generics subtyping</a> · [33] <a href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Java Tutorials: Wildcard guidelines</a> · [34] <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type erasure</a> · [35] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a> · [36] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor Javadoc</a> · [37] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a> · [38] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock Javadoc</a> · [39] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a> · [40] <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a> · [41] <a href="https://openjdk.org/jeps/358">JEP 358 (helpful NPE)</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

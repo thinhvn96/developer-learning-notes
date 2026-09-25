@@ -1,0 +1,26 @@
+# A database plus a one-shot client that waits for it to be healthy.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: example   # demo only; use secrets in real setups
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  client:
+    image: postgres:18
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: example
+    # The service name "db" is resolvable on the default Compose network.
+    command: ["psql", "-h", "db", "-U", "postgres", "-c", "select version();"]
+
+volumes:
+  pgdata:

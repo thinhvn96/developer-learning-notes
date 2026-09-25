@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 10: Index types: B-tree, hash, GIN, BRIN</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Index types: B-tree, hash, GIN, BRIN</h1>
+<p class="meta">PostgreSQL · Lesson 0010 · step 8 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> name the built-in index types and pick one for equality/range, array containment, or huge time-ordered tables.</div>
+
+<h2>The types</h2>
+<table><tr><th>Type</th><th>Good for<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></th></tr>
+<tr><td>B-tree (default)</td><td>equality and range on sortable data: <code>&lt; &lt;= = &gt;= &gt;</code>, <code>BETWEEN</code>, <code>IN</code>, <code>IS NULL</code>, anchored <code>LIKE</code></td></tr>
+<tr><td>Hash</td><td>equality only (stores a 32-bit hash)</td></tr>
+<tr><td>GIN</td><td>"inverted" index for composite values such as arrays and full-text; one entry per component</td></tr>
+<tr><td>GiST / SP-GiST</td><td>infrastructure for many strategies (geometry, nearest neighbor)</td></tr>
+<tr><td>BRIN</td><td>summaries of block ranges; best when values correlate with physical row order</td></tr></table>
+<p><code>CREATE INDEX</code> makes a B-tree unless you say <code>USING</code> something else.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a> In my run a <code>GIN</code> index on a <code>text[]</code> column was used for <code>tags @&gt; ARRAY['x7']</code> (Bitmap Index Scan on <code>t_tags</code>).</p>
+<p>Source: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a>. Foundation: <a href="0004-indexes-what-they-buy.html">indexes: what they buy</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default index type?</p>
+  <button data-correct>B-tree</button>
+  <button>GIN</button>
+  <button>Hash</button>
+  <button>BRIN</button>
+  <p class="explain">B-tree is the default for CREATE INDEX.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Index for array containment?</p>
+  <button data-correct>GIN</button>
+  <button>BRIN</button>
+  <button>Hash</button>
+  <button>B-tree</button>
+  <p class="explain">GIN suits composite values like arrays.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which handles only equality?</p>
+  <button data-correct>Hash</button>
+  <button>B-tree</button>
+  <button>GIN</button>
+  <button>BRIN</button>
+  <p class="explain">Hash indexes only handle equality comparisons.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. BRIN works best when values...?</p>
+  <button>Change constantly</button>
+  <button>Are text only</button>
+  <button data-correct>Follow physical row order</button>
+  <button>Are all unique</button>
+  <p class="explain">It is effective when values correlate with physical row order.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-pick-the-index.md">Exercise 0010: pick the index</a></p>
+<p>Runnable example: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/indexes-types.html">PostgreSQL Docs: Index Types</a>. Section 11.2.</p>
+<p><a href="0004-indexes-what-they-buy.html">← Indexes: what they buy and what they cost</a> &nbsp;|&nbsp; <a href="0011-multicolumn-and-partial-indexes.html">Multicolumn and partial indexes →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/indexes-types.html">PostgreSQL Docs: Index Types</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

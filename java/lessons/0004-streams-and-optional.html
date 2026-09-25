@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 4: Streams and Optional without the traps</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Streams and Optional without the traps</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0004 · step 9 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict what a stream pipeline prints (or does not), and use <code>Optional</code> as intended.</div>
+
+<h2>Four rules from the stream package docs</h2>
+<ul>
+<li><strong>Lazy.</strong> "Intermediate operations are always lazy." Traversal "does not begin until the terminal operation of the pipeline is executed."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
+<li><strong>Single use.</strong> "After the terminal operation is performed, the stream pipeline is considered consumed, and can no longer be used."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
+<li><strong>Non-interference.</strong> Behavioral parameters "should never modify the stream's data source."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
+<li><strong>Avoid side effects.</strong> "Side-effects in behavioral parameters to stream operations are, in general, discouraged." The docs show <code>forEach(results::add)</code> as the anti-pattern and <code>.toList()</code> as the fix.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
+</ul>
+<h2>Optional: a return type, not a field type</h2>
+<p>"<code>Optional</code> is primarily intended for use as a method return type where there is a clear need to represent 'no result,' and where using <code>null</code> is likely to cause errors."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a> And <code>orElseGet</code> takes a supplier that only runs when empty, while <code>orElse</code>'s argument is computed regardless.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a></p>
+<pre><code>java java/examples/StreamAndOptional.java
+1. Intermediate ops are lazy (no terminal op, no output):
+2. A terminal op triggers the pipeline:
+  saw 1  saw 2  saw 3
+3. A stream is consumed once:
+  IllegalStateException: stream has already been operated upon or closed
+4. orElse evaluates its argument even when a value is present:
+  expensive() called
+5. orElseGet only calls the supplier when empty:</code></pre>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Pipeline has <code>filter</code> and <code>map</code> but no terminal op. Result?</p>
+  <button>Only map executes</button>
+  <button>Everything is executed</button>
+  <button>Only filter executes</button>
+  <button data-correct>Nothing is executed</button>
+  <p class="explain">Intermediate operations are lazy; nothing runs until a terminal operation.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. You call <code>count()</code> twice on one stream. Result?</p>
+  <button>Both throw errors</button>
+  <button>Both return the count</button>
+  <button>First call throws</button>
+  <button data-correct>Second call throws</button>
+  <p class="explain">A stream is consumed by its terminal operation; reuse throws IllegalStateException.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Intended primary use of <code>Optional</code>?</p>
+  <button>A serialized DTO field</button>
+  <button>A method parameter</button>
+  <button data-correct>A method return type</button>
+  <button>An entity field type</button>
+  <p class="explain">The Javadoc: primarily a return type where 'no result' must be represented.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Default value is costly to build. Which call?</p>
+  <button data-correct>orElseGet with supplier</button>
+  <button>orElse with a null</button>
+  <button>orElse with a call</button>
+  <button>get without checking</button>
+  <p class="explain">orElseGet only invokes the supplier when the Optional is empty.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-fix-the-pipeline.md">Exercise 0004: fix the pipeline</a></p>
+<p>Runnable example: <a href="../examples/StreamAndOptional.java"><code>StreamAndOptional.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a>. The sections 'Stream operations and pipelines', 'Non-interference' and 'Side-effects'.</p>
+<p><a href="0009-default-methods-and-conflicts.html">← JDK 8: default methods and conflict resolution</a> &nbsp;|&nbsp; <a href="0022-collectors-groupingby-tomap.html">Collectors: groupingBy, partitioningBy and toMap →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">Optional Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

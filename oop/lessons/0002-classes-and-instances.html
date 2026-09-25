@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 2: Classes, instances and constructors</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Classes, instances and constructors</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0002 · step 2 of 22 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain the class/instance distinction, references versus objects, and constructor chaining with <code>this(...)</code>.</div>
+
+<h2>Blueprint and instances</h2>
+<p>"A class is the blueprint from which individual objects are created." Your bicycle is an <em>instance</em> of the class of bicycles: each instance has its own field values (its state) while the methods come from the class.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">[1]</a></p>
+<h2>References</h2>
+<p>A variable holds a <em>reference</em> to an object, not the object. Two variables can point at the same object (an alias), so changing state through one is visible through the other.</p>
+<pre><code>java oop/examples/ClassAndInstances.java
+gear=1 speed=10
+gear=3 speed=25
+a after alias.speedUp(1): 11   b unchanged: 25
+a == alias: true, a == b: false</code></pre>
+<p><code>a</code> and <code>b</code> are separate objects with separate state; <code>alias</code> is a second reference to <code>a</code>'s object (<code>a == alias</code> is true). The no-arg constructor delegates with <code>this(1, 0)</code>, so initialization logic lives in one place. Source: <a href="../examples/ClassAndInstances.java"><code>ClassAndInstances.java</code></a>. This is the same reference-versus-equality issue behind <a href="../../java/lessons/0001-hashmap-equals-hashcode.html">equals and hashCode</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A class is...?</p>
+  <button>A memory address</button>
+  <button data-correct>A blueprint for objects</button>
+  <button>An object copy</button>
+  <button>A running program</button>
+  <p class="explain">A class is the blueprint from which individual objects are created.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Two references to one object. Change via one?</p>
+  <button>Throws an error</button>
+  <button>Only the changed one</button>
+  <button>Copies the object</button>
+  <button data-correct>Visible through both</button>
+  <p class="explain">They alias the same object; the demo showed a's speed changing via alias.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does <code>this(1, 0)</code> in a constructor do?</p>
+  <button data-correct>Calls another constructor</button>
+  <button>Calls a method</button>
+  <button>Creates a new class</button>
+  <button>Copies fields</button>
+  <p class="explain">Constructor chaining delegates to another constructor of the same class.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Do instances share their field values?</p>
+  <button data-correct>No, each has its own</button>
+  <button>Only static ones</button>
+  <button>Only int ones</button>
+  <button>Yes, all of them</button>
+  <p class="explain">Each instance has its own state; the demo's b stayed at 25 while a changed.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-alias-bug.md">Exercise 2: an alias bug</a></p>
+<p>Runnable example: <a href="../examples/ClassAndInstances.java"><code>ClassAndInstances.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">Java Tutorials: What Is a Class?</a>. Short page.</p>
+<p><a href="0001-objects-state-and-behavior.html">← Objects: state, behavior and encapsulation</a> &nbsp;|&nbsp; <a href="0003-access-levels.html">Access levels: hiding what should be hidden →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">Java Tutorials: What Is a Class?</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

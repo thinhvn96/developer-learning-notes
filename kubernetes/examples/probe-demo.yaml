@@ -1,0 +1,41 @@
+# Liveness: the file exists for 10 s, then is deleted, so the probe starts failing and the container is restarted.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-demo
+spec:
+  containers:
+  - name: app
+    image: busybox:1.36
+    args: ["/bin/sh", "-c", "touch /tmp/healthy; sleep 10; rm -f /tmp/healthy; sleep 600"]
+    livenessProbe:
+      exec:
+        command: ["cat", "/tmp/healthy"]
+      initialDelaySeconds: 3
+      periodSeconds: 3
+      failureThreshold: 2
+---
+# Readiness: /nope returns 404, so the Pod never becomes Ready and never joins the Service endpoints.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-demo
+  labels:
+    app: readiness-demo
+spec:
+  containers:
+  - name: web
+    image: nginx:alpine
+    readinessProbe:
+      httpGet: { path: /nope, port: 80 }
+      periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: readiness-demo
+spec:
+  selector:
+    app: readiness-demo
+  ports:
+  - port: 80

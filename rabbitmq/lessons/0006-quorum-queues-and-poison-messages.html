@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 6: Quorum queues and poison messages</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Quorum queues and poison messages</h1>
+<p class="meta">RabbitMQ · Lesson 0006 · step 7 of 9 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why quorum queues are the default choice for replicated queues, and how the delivery limit turns poison messages into dead letters.</div>
+
+<h2>What they are</h2>
+<p>"The RabbitMQ quorum queue is a modern queue type which implements a durable, replicated queue based on the Raft consensus algorithm."<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a> They suit long-lived queues with critical data (sales orders, for instance), and are not meant for temporary queues.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a> The docs' advice: "quorum queues should be considered the default choice when needing a replicated, highly available queue." Classic queue mirroring "was removed starting with RabbitMQ 4.0."<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+<h2>Poison messages</h2>
+<p>A poison message is one that always fails processing and would be requeued forever. Quorum queues count redeliveries in the <code>x-delivery-count</code> header; since RabbitMQ 4.0 they apply a default delivery limit of 20. Past the limit the message is discarded, or dead-lettered if a DLX is configured.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a> Delivery-limit exhaustion is one of the four dead-letter reasons.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[2]</a></p>
+<h2>At-least-once dead lettering</h2>
+<p>Quorum queues support traditional and <em>at-least-once</em> dead lettering, where "the source quorum queue will retain the dead-lettered messages until they have been acknowledged" by the dead-letter target.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+<div class="aside">Interview pattern: quorum queue + manual acks + delivery limit + DLX, plus a job that inspects and replays the dead-letter queue. That is the standard answer to "how do you handle poison messages?".</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Consensus algorithm behind quorum queues?</p>
+  <button>Paxos</button>
+  <button data-correct>Raft</button>
+  <button>Gossip</button>
+  <button>Two-phase commit</button>
+  <p class="explain">Quorum queues are based on the Raft consensus algorithm.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default delivery limit since RabbitMQ 4.0?</p>
+  <button>Unlimited</button>
+  <button>One hundred</button>
+  <button>Three</button>
+  <button data-correct>Twenty</button>
+  <p class="explain">They enforce a default delivery limit of 20.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Mirrored classic queues in RabbitMQ 4.0?</p>
+  <button>Still preferred</button>
+  <button data-correct>Removed</button>
+  <button>Only for streams</button>
+  <button>Now default</button>
+  <p class="explain">Classic queue mirroring was removed starting with RabbitMQ 4.0.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message exceeds the delivery limit. Outcome?</p>
+  <button data-correct>Dead-lettered if DLX set</button>
+  <button>Retried forever</button>
+  <button>Acked automatically</button>
+  <button>Moved to fanout</button>
+  <p class="explain">It is discarded or routed to a DLX if configured.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-poison-message-plan.md">Exercise 0006: a poison message plan</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum Queues</a>. Read the intro, 'Use Cases' and 'Poison Message Handling'.</p>
+<p><a href="0005-dead-letter-exchanges.html">← Dead letter exchanges</a> &nbsp;|&nbsp; <a href="0008-streams.html">Streams: an append-only log inside RabbitMQ →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum Queues</a> · [2] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

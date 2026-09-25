@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 8: Streams: an append-only log inside RabbitMQ</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Streams: an append-only log inside RabbitMQ</h1>
+<p class="meta">RabbitMQ · Lesson 0008 · step 8 of 9 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how a stream differs from a queue (non-destructive reads, replay) and when to choose one.</div>
+
+<h2>What it is</h2>
+<p>A stream is "a persistent replicated data structure that can complete the same tasks as queues" but with an append-only log and "non-destructive consumer semantics". Queues delete messages when consumed; streams keep them until retention applies, so many consumers can read the same messages independently.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+<h2>When to choose streams</h2>
+<ol><li>Large fan-outs: many subscribers reading the same messages without a queue per consumer.</li><li>Replay: consumers attach at any point of the log.</li><li>Throughput higher than traditional persistent queues.</li><li>Large backlogs held cheaply.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></li></ol>
+<p>Consumers choose where to start with the <code>x-stream-offset</code> argument: <code>first</code>, <code>last</code>, a specific offset, a timestamp, or a time interval.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+<h2>What I observed</h2>
+<pre><code>declare queue with x-queue-type=stream, publish 3 messages
+rabbitmqctl list_queues -&gt; q.stream  type=stream
+basic.get against it -&gt; {"error":"bad_request","reason":"540 basic.get not supported by stream queues"}</code></pre>
+<p>A stream is declared like a queue (<code>x-queue-type: stream</code>) but is consumed differently, with <code>basic.consume</code> and an offset, not <code>basic.get</code>. I could not demonstrate non-destructive replay with the HTTP tooling used here, so the replay behavior above is from the docs only. Compare with Kafka's log: <a href="../../system-design/lessons/0003-queue-versus-log.html">queue versus log</a> (streams make RabbitMQ overlap with that model). Source: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Streams' consumer semantics?</p>
+  <button data-correct>Non-destructive</button>
+  <button>Destructive</button>
+  <button>Random</button>
+  <button>Transactional only</button>
+  <p class="explain">Streams offer non-destructive consumer semantics.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Where can a stream consumer start?</p>
+  <button data-correct>first, last, offset or timestamp</button>
+  <button>Only last</button>
+  <button>Only at publish</button>
+  <button>Only first</button>
+  <p class="explain">x-stream-offset accepts first, last, numeric offsets, timestamps and intervals.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Streams suit which workload?</p>
+  <button data-correct>Large fan-outs and replay</button>
+  <button>RPC replies</button>
+  <button>Tiny temporary queues</button>
+  <button>Priority tasks</button>
+  <p class="explain">Fan-out and replay are primary use cases.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. basic.get on a stream in my run?</p>
+  <button>Returned a message</button>
+  <button data-correct>Not supported</button>
+  <button>Deleted it</button>
+  <button>Created a queue</button>
+  <p class="explain">The broker replied 540 basic.get not supported by stream queues.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-stream-or-queue.md">Exercise 0008: stream or queue</a></p>
+<p>Runnable example: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/streams">RabbitMQ: Streams</a>. Overview and consuming sections.</p>
+<p><a href="0006-quorum-queues-and-poison-messages.html">← Quorum queues and poison messages</a> &nbsp;|&nbsp; <a href="0009-clustering-and-replicated-queues.html">Clustering: nodes, odd numbers and replicated queues →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/streams">RabbitMQ: Streams</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

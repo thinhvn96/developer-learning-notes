@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 5: Initialization order: static blocks, fields, constructors</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Initialization order: static blocks, fields, constructors</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0005 · step 6 of 22 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict the exact order in which static blocks, field initializers, instance blocks and constructors run in a class hierarchy.</div>
+
+<h2>The building blocks</h2>
+<ul><li><strong>Static initialization blocks</strong> run in source order when the class is initialized.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[1]</a></li>
+<li><strong>Instance initializer blocks</strong> "look just like static initializer blocks, but without the static keyword"; the compiler copies them into every constructor.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[1]</a></li></ul>
+<h2>The order (observed)</h2>
+<pre><code>java oop/examples/InitializationOrder.java
+main starts
+1 Parent static block
+2 Child static block
+3 Parent field initializer
+4 Parent instance block
+5 Parent constructor
+6 Child field initializer
+7 Child instance block
+8 Child constructor
+--- second object: static parts do not run again
+3 Parent field initializer
+4 Parent instance block
+5 Parent constructor
+6 Child field initializer
+7 Child instance block
+8 Child constructor</code></pre>
+<p>Reading the output: statics of the parent, then of the child (once per class); then, for each <code>new Child()</code>: the parent's field initializers and instance blocks, the parent constructor, then the child's field initializers, instance blocks and constructor. The tutorial documents the blocks; the full ordering above is what this program prints on JDK 21. Source: <a href="../examples/InitializationOrder.java"><code>InitializationOrder.java</code></a>.</p>
+<div class="aside">Interview trap: calling an overridable method from a constructor. The parent constructor runs before the child's fields are initialized, so an override can see default values (a well-known hazard; reproduce it in the exercise).</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which runs first for a new Child?</p>
+  <button>Child field initializer</button>
+  <button data-correct>Parent static block (first use)</button>
+  <button>Child constructor</button>
+  <button>Parent constructor</button>
+  <p class="explain">Class initialization comes first; parents before children.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How many times does a static block run?</p>
+  <button>Once per object</button>
+  <button>Never</button>
+  <button>Twice per object</button>
+  <button data-correct>Once per class</button>
+  <p class="explain">The second object in the demo did not rerun static blocks.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. The compiler copies instance initializer blocks into...?</p>
+  <button data-correct>Every constructor</button>
+  <button>Only main</button>
+  <button>Static methods</button>
+  <button>Interfaces</button>
+  <p class="explain">That is how they are shared between constructors.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Parent constructor vs Child field initializers?</p>
+  <button>Random</button>
+  <button data-correct>Parent constructor first</button>
+  <button>Interleaved</button>
+  <button>Child initializers first</button>
+  <p class="explain">Output shows step 5 (parent ctor) before step 6 (child fields).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-constructor-trap.md">Exercise 5: the constructor trap</a></p>
+<p>Runnable example: <a href="../examples/InitializationOrder.java"><code>InitializationOrder.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">Java Tutorials: Initializing Fields</a>. Static and instance initialization blocks.</p>
+<p><a href="0006-inheritance.html">← Inheritance: extends, super and is-a</a> &nbsp;|&nbsp; <a href="0007-overriding-and-hiding.html">Overriding versus hiding →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">Java Tutorials: Initializing Fields</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

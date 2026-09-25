@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 9: ConfigMaps: configuration outside the image</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ConfigMaps: configuration outside the image</h1>
+<p class="meta">Kubernetes · Lesson 0009 · step 6 of 15 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> externalize configuration with a ConfigMap and consume it as environment variables and files, knowing which one updates live.</div>
+
+<h2>What it is</h2>
+<p>A ConfigMap stores non-confidential data as key-value pairs, decoupling environment-specific configuration from container images. It has a 1 MiB limit and no encryption (use a Secret for confidential data).<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a> Pods can consume it via command/args, environment variables, read-only volume files, or the API.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+<pre><code>env:
+- name: LOG_LEVEL
+  valueFrom:
+    configMapKeyRef: { name: app-config, key: LOG_LEVEL }
+volumes:
+- name: config
+  configMap:
+    name: app-config
+    items: [ { key: application.properties, path: application.properties } ]</code></pre>
+<h2>Which updates live?</h2>
+<p>Environment variables are <strong>not</strong> updated in running containers (restart needed); files in mounted volumes are <em>eventually</em> updated. Immutable ConfigMaps (v1.19+) prevent accidental changes.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+<pre><code>kubectl apply -f examples/configmap-secret.yaml ; kubectl logs config-demo
+LOG_LEVEL=debug
+--- file:
+server.port=8080
+feature.x=true</code></pre>
+<p>Link to Spring: an <code>application.properties</code> mounted as a file, or env vars like <code>SERVER_PORT</code>, override packaged config (<a href="../../spring-boot/lessons/0008-externalized-configuration-and-profiles.html">externalized configuration lesson</a>). File: <a href="../examples/configmap-secret.yaml"><code>configmap-secret.yaml</code></a>.</p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. ConfigMaps are meant for what data?</p>
+  <button>Passwords</button>
+  <button>Certificates only</button>
+  <button data-correct>Non-confidential</button>
+  <button>Binaries only</button>
+  <p class="explain">They hold non-confidential data in key-value pairs.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A ConfigMap changes. Env-var consumers see?</p>
+  <button>A crash</button>
+  <button>A rollback</button>
+  <button>Immediate change</button>
+  <button data-correct>No change until restart</button>
+  <p class="explain">Environment variables are not updated in running containers.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Mounted ConfigMap files after a change?</p>
+  <button>Never updated</button>
+  <button>Read only once</button>
+  <button>Deleted</button>
+  <button data-correct>Eventually updated</button>
+  <p class="explain">Volume-mounted files are eventually reflected.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Size limit of a ConfigMap?</p>
+  <button data-correct>1 MiB</button>
+  <button>Unlimited</button>
+  <button>10 KiB</button>
+  <button>1 GiB</button>
+  <p class="explain">The limit is 1 MiB.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-config-rollout.md">Exercise 0009: config rollout</a></p>
+<p>Runnable example: <a href="../examples/configmap-secret.yaml"><code>configmap-secret.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/configuration/configmap/">Kubernetes Docs: ConfigMaps</a>. Read 'ConfigMaps and Pods' and the update behavior.</p>
+<p><a href="0004-services.html">← Services: a stable address for changing Pods</a> &nbsp;|&nbsp; <a href="0010-secrets.html">Secrets: what they protect and what they do not →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/configuration/configmap/">Kubernetes Docs: ConfigMaps</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

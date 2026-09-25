@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 16: The Law of Demeter</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The Law of Demeter</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0016 · step 16 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> apply the Law of Demeter: replace a chain through an object's internals with a 'tell, don't ask' method.</div>
+
+<h2>The law</h2>
+<p>Also called the principle of least knowledge: "Each unit should only talk to its friends; don't talk to strangers." A method <code>m</code> of object <code>a</code> may call methods only on: <code>a</code> itself, <code>m</code>'s parameters, objects created within <code>m</code>, <code>a</code>'s direct attributes, and accessible globals. It discourages "reaching through" one object to another's internals.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[1]</a></p>
+<pre><code>java oop/examples/LawOfDemeter.java
+after reaching through: 70
+after c.pay(20)       : 50</code></pre>
+<p><code>c.getWallet().setMoney(c.getWallet().getMoney() - 30)</code> makes the caller depend on the fact that a customer has a wallet with money: change that structure and every caller breaks. <code>c.pay(20)</code> says what you want; the customer decides how. Source: <a href="../examples/LawOfDemeter.java"><code>LawOfDemeter.java</code></a>. Caveat: the law is a guideline, not a ban on fluent APIs like builders or streams (my note).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Law of Demeter is also called...?</p>
+  <button>Inversion</button>
+  <button>Liskov</button>
+  <button>Open/Closed</button>
+  <button data-correct>Principle of least knowledge</button>
+  <p class="explain">Also known as the principle of least knowledge.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which call violates it?</p>
+  <button>new B().act()</button>
+  <button data-correct>a.getB().getC().act()</button>
+  <button>this.act()</button>
+  <button>a.act()</button>
+  <p class="explain">It reaches through a's internals to a stranger.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Better design says...?</p>
+  <button>Ask for its parts</button>
+  <button>Make fields public</button>
+  <button>Use statics</button>
+  <button data-correct>Tell the object what to do</button>
+  <p class="explain">c.pay(20) keeps structure private.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A method may call methods on...?</p>
+  <button>Strangers' internals</button>
+  <button data-correct>Its parameters</button>
+  <button>Any global chain</button>
+  <button>Private fields of others</button>
+  <p class="explain">Parameters are among the allowed targets.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0016-remove-the-chain.md">Exercise 16: remove the chain</a></p>
+<p>Runnable example: <a href="../examples/LawOfDemeter.java"><code>LawOfDemeter.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/Law_of_Demeter">Wikipedia: Law of Demeter</a>. Formal rules section.</p>
+<p><a href="0015-coupling-and-cohesion.html">← Coupling and cohesion</a> &nbsp;|&nbsp; <a href="0017-single-responsibility-principle.html">SOLID 1: Single Responsibility Principle →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/Law_of_Demeter">Wikipedia: Law of Demeter</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 30: Talking about patterns in interviews</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Talking about patterns in interviews</h1>
+<p class="meta">Design Patterns · Lesson 0030 · step 30 of 30 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> answer 'which pattern would you use and why?' with a problem-first, trade-off-aware structure.</div>
+
+<h2>A four-step answer</h2>
+<ol><li><strong>Name the problem</strong> in plain words ("the algorithm varies at runtime").</li>
+<li><strong>Name the pattern and its intent</strong> in one sentence (the pattern pages' Intent lines are good models).<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[2]</a></li>
+<li><strong>Show the shape</strong>: which interface, which objects hold which.</li>
+<li><strong>State the trade-off</strong>: every pattern page lists cons (more classes, ordering issues, god-object risk...). Mention the simpler alternative (a lambda, an enum, a plain method).<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li></ol>
+<h2>Traps to avoid</h2>
+<ul><li>Reciting names without a problem: the "hammer and nail" criticism.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li>
+<li>Implementing "to the letter" without adapting to context.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li>
+<li>Singleton as the default answer for shared state (testing cost: see the <a href="0008-singleton.html">Singleton lesson</a>).</li>
+<li>Inheritance where composition fits (<a href="../../oop/lessons/0011-composition-over-inheritance.html">OOP lesson</a>).</li></ul>
+<h2>Practice</h2>
+<p>Use the <a href="../interview.html">interview page</a> for questions with detailed answers, and pick two problems from your own code to describe using the four steps. Ask your teacher for a mock interview: "give me a scenario, I'll name the pattern".</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. First step of a good pattern answer?</p>
+  <button data-correct>Name the problem</button>
+  <button>List classes</button>
+  <button>Draw UML</button>
+  <button>Name the pattern</button>
+  <p class="explain">Problem first, then pattern.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What should every answer include?</p>
+  <button>A benchmark</button>
+  <button>A diagram only</button>
+  <button data-correct>A trade-off</button>
+  <button>A library name</button>
+  <p class="explain">Pattern pages list cons; state them.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Hammer-and-nail warns against...?</p>
+  <button data-correct>Unjustified use</button>
+  <button>Interfaces</button>
+  <button>Small classes</button>
+  <button>Testing</button>
+  <p class="explain">Applying patterns indiscriminately.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A simpler alternative to Strategy?</p>
+  <button>A queue</button>
+  <button>A thread</button>
+  <button data-correct>A lambda</button>
+  <button>A cache</button>
+  <p class="explain">For a one-method interface, a lambda often suffices.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0030-mock-interview.md">Exercise 30: a mock interview</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a>. Short page.</p>
+<p><a href="0029-patterns-in-spring.html">← Patterns in Spring</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a> · [2] <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern? (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 8: Transactions: COMMIT, ROLLBACK and savepoints</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Transactions: COMMIT, ROLLBACK and savepoints</h1>
+<p class="meta">PostgreSQL · Lesson 0008 · step 4 of 13 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> wrap steps in a transaction, predict what a failure does, and use a savepoint for partial rollback.</div>
+
+<h2>All or nothing</h2>
+<p>A transaction "bundles multiple steps into a single, all-or-nothing operation". Intermediate states are not visible to other transactions, and if a failure prevents completion, none of the steps affect the database.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a> Use <code>BEGIN ... COMMIT</code>, or <code>ROLLBACK</code> to cancel. Without <code>BEGIN</code>, each statement is its own transaction.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+<h2>Savepoints</h2>
+<p>Savepoints "allow you to selectively discard parts of a transaction while committing the rest": <code>SAVEPOINT s</code>, then <code>ROLLBACK TO s</code>. The savepoint remains defined after rolling back to it.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+<pre><code>./run.sh 08-transactions.sql
+BEGIN; UPDATE Alice -30; UPDATE Bob +30; COMMIT;        -&gt; Alice 70, Bob 80
+BEGIN; ...second UPDATE violates CHECK...; COMMIT;
+   ERROR: new row for relation "accounts" violates check constraint
+   (the COMMIT was answered with ROLLBACK)               -&gt; balances unchanged
+SAVEPOINT s1; ...; ROLLBACK TO s1; ...; COMMIT;          -&gt; Alice 60, Bob 80, Wally 10</code></pre>
+<p>Note the middle case: after an error inside a transaction block, PostgreSQL aborts the whole transaction; a later <code>COMMIT</code> ends up as a rollback (observed in the run). Source: <a href="../examples/08-transactions.sql"><code>08-transactions.sql</code></a>. This is what Spring's <code>@Transactional</code> automates (<a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">lesson</a>), and <code>NESTED</code> propagation maps to savepoints.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A transaction is...?</p>
+  <button>Read only</button>
+  <button>One statement</button>
+  <button data-correct>All-or-nothing</button>
+  <button>Best effort</button>
+  <p class="explain">It bundles steps into an all-or-nothing operation.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A statement outside BEGIN is...?</p>
+  <button>Not transactional</button>
+  <button>Rolled back</button>
+  <button data-correct>Its own transaction</button>
+  <button>Delayed</button>
+  <p class="explain">Every statement is implicitly wrapped in a transaction.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. ROLLBACK TO s1 does what?</p>
+  <button>Commits work</button>
+  <button>Ends the transaction</button>
+  <button>Deletes the table</button>
+  <button data-correct>Undoes work after s1</button>
+  <p class="explain">It discards only what happened after the savepoint.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. After ROLLBACK TO, is s1 still defined?</p>
+  <button>No, it is dropped</button>
+  <button data-correct>Yes, still defined</button>
+  <button>Only once</button>
+  <button>Only for reads</button>
+  <p class="explain">A savepoint continues to be defined after rolling back to it.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-transfer-money.md">Exercise 0008: transfer money</a></p>
+<p>Runnable example: <a href="../examples/08-transactions.sql"><code>08-transactions.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-transactions.html">PostgreSQL Tutorial: Transactions</a>. Section 3.4.</p>
+<p><a href="0002-joins-inner-and-left.html">← Inner and left joins, and the WHERE trap</a> &nbsp;|&nbsp; <a href="0003-window-functions.html">Window functions →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/tutorial-transactions.html">PostgreSQL Tutorial: Transactions</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

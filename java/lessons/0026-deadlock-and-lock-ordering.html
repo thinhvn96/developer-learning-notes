@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 26: Deadlock and lock ordering</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Deadlock and lock ordering</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0026 · step 17 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how a lock-ordering deadlock arises, detect it with <code>ThreadMXBean</code>, and prevent it.</div>
+
+<h2>Definition</h2>
+<p>"Deadlock describes a situation where two or more threads are blocked forever, waiting for each other."<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[1]</a> The tutorial's example: two friends bow to each other and each must stay bowed until the other bows back, with both methods <code>synchronized</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[1]</a></p>
+<h2>Reproduce, detect, fix</h2>
+<pre><code>java java/examples/DeadlockDemo.java
+--- opposite lock order (A then B, B then A)
+deadlocked threads detected: 2
+--- same lock order everywhere (A then B)
+T5 got both locks
+T6 got both locks</code></pre>
+<p><code>ManagementFactory.getThreadMXBean().findDeadlockedThreads()</code> returns the stuck threads; a thread dump (<code>jstack</code>) reports them too. The fix in the demo is a consistent lock order.</p>
+<p>The same advice appears for databases: PostgreSQL's docs say the best defense is to "acquire locks on multiple objects in a consistent order across all applications", and it detects deadlocks and aborts one transaction, so applications should be prepared to retry.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[2]</a> Source: <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a>; see <a href="../../postgresql/index.html">PostgreSQL locking</a>.</p>
+<div class="aside">Other prevention tools: <code>tryLock</code> with a timeout (from the <a href="0024-atomics-and-locks.html">previous lesson</a>), holding fewer locks, and not calling foreign code while holding a lock (general practice, not from the tutorial).</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Definition of deadlock?</p>
+  <button>A thrown exception</button>
+  <button data-correct>Threads blocked forever</button>
+  <button>Threads running slowly</button>
+  <button>A full heap</button>
+  <p class="explain">Two or more threads blocked forever waiting for each other.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Most reliable prevention?</p>
+  <button>Bigger heap</button>
+  <button data-correct>Consistent lock order</button>
+  <button>More threads</button>
+  <button>Volatile fields</button>
+  <p class="explain">Acquire locks in the same order everywhere.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which API detects deadlocked threads?</p>
+  <button>StringBuilder</button>
+  <button data-correct>ThreadMXBean</button>
+  <button>Optional</button>
+  <button>Collectors</button>
+  <p class="explain">findDeadlockedThreads on ThreadMXBean (shown in the demo).</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Database reports a deadlock. What should code do?</p>
+  <button>Ignore the error</button>
+  <button data-correct>Retry the transaction</button>
+  <button>Disable locking</button>
+  <button>Restart the JVM</button>
+  <p class="explain">PostgreSQL aborts one transaction; handle by retrying.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0026-find-the-deadlock.md">Exercise 0026: find the deadlock</a></p>
+<p>Runnable example: <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a>. Short page with the full example.</p>
+<p><a href="0023-thread-pools-executors.html">← Thread pools: core, max, queue and rejection</a> &nbsp;|&nbsp; <a href="0007-heap-and-garbage-collection.html">Heap sizing and garbage collection →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a> · [2] <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: Explicit locking and deadlocks</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

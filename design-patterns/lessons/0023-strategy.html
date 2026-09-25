@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 23: Strategy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Strategy</h1>
+<p class="meta">Design Patterns · Lesson 0023 · step 23 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> define interchangeable algorithms behind one interface, swap them at runtime, and see when a lambda is enough.</div>
+
+<h2>Intent</h2>
+<p>Strategy is "a behavioral design pattern that lets you define a family of algorithms, put each of them into separate classes, and make their objects interchangeable." Use it to switch algorithm variants at runtime, isolate business logic from algorithm details, and replace big conditionals.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/StrategyDemo.java
+by length     : [fig, pear, kiwi, banana]
+reverse alpha : [pear, kiwi, fig, banana]
+no discount   : 200
+10% off       : 180
+lambda -25    : 175</code></pre><p><code>Comparator</code> is the JDK's best-known strategy: "a comparison function, which imposes a total ordering", passed to sort methods "to allow precise control over the sort order", with factory and combinator methods like <code>comparing</code>, <code>thenComparing</code> and <code>reversed</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[2]</a> The <code>Cart</code> swaps pricing strategies at runtime, including a lambda. Source: <a href="../examples/StrategyDemo.java"><code>StrategyDemo.java</code></a>. This is the Open/Closed lesson (<a href="../../oop/lessons/0018-open-closed-principle.html">OOP</a>) as a pattern.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Swap algorithms at runtime</li><li>Isolates implementation details</li><li>Composition instead of inheritance</li><li>Open/Closed</li></ul>
+<p><strong>Cons</strong></p><ul><li>Needless complexity for simple, stable algorithms</li><li>Clients must know the differences to choose</li><li>Functional languages may make it unnecessary</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a> Strategy vs State: both use composition, but states may know each other; Strategy vs Template Method: composition (runtime) versus inheritance (static); Strategy vs Decorator: internals versus outward behavior.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Strategy encapsulates...?</p>
+  <button>A data model</button>
+  <button>A package</button>
+  <button data-correct>An algorithm family</button>
+  <button>A thread</button>
+  <p class="explain">A family of algorithms in separate classes.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. JDK strategy?</p>
+  <button data-correct>Comparator</button>
+  <button>Object</button>
+  <button>Integer</button>
+  <button>Thread</button>
+  <p class="explain">Comparator passed to sort chooses the ordering.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Strategy vs Template Method?</p>
+  <button data-correct>Composition vs inheritance</button>
+  <button>Same</button>
+  <button>Neither</button>
+  <button>Inheritance vs composition</button>
+  <p class="explain">Strategy uses composition; Template Method uses inheritance.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A lambda can be a strategy when...?</p>
+  <button>Always</button>
+  <button data-correct>The interface has one method</button>
+  <button>Never</button>
+  <button>Only for enums</button>
+  <p class="explain">The demo passed price -> price - 25 as a Pricing.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0023-shipping-strategies.md">Exercise 23: shipping strategies</a></p>
+<p>Runnable example: <a href="../examples/StrategyDemo.java"><code>StrategyDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0022-state.html">← State</a> &nbsp;|&nbsp; <a href="0024-template-method.html">Template Method →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

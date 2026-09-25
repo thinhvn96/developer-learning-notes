@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 19: Mediator</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Mediator</h1>
+<p class="meta">Design Patterns · Lesson 0019 · step 19 of 30 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> centralize how objects communicate so they depend on the mediator, not on each other.</div>
+
+<h2>Intent</h2>
+<p>Mediator is "a behavioral design pattern that lets you reduce chaotic dependencies between objects." Use it when classes are tightly coupled and hard to change, when components cannot be reused because of dependencies, or when you create many subclasses just to reuse behavior.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/MediatorDemo.java
+ann says: hi all
+  bob got &#x27;hi all&#x27; from ann
+  cy got &#x27;hi all&#x27; from ann
+bob says: hello ann
+  ann got &#x27;hello ann&#x27; from bob
+  cy got &#x27;hello ann&#x27; from bob
+each user knows only the room, not the other 2 users</code></pre><p>Users know only the <code>ChatRoom</code>; adding a user changes no other user. Source: <a href="../examples/MediatorDemo.java"><code>MediatorDemo.java</code></a>. Compare Observer: a mediator's purpose "is to eliminate mutual dependencies among a set of system components" by making them depend on one mediator, while Observer sets up dynamic one-way subscriptions.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Communication consolidated in one place</li><li>New mediators without changing components</li><li>Less coupling; components are reusable</li></ul>
+<p><strong>Cons</strong></p><ul><li>A mediator can become a God object</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a> Mediator can be implemented with Observer; Facade only simplifies access while Mediator centralizes communication.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Mediator reduces...?</p>
+  <button>Memory</button>
+  <button>Class count only</button>
+  <button>Threads</button>
+  <button data-correct>Chaotic dependencies</button>
+  <p class="explain">It reduces chaotic dependencies between objects.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Components talk to...?</p>
+  <button>Each other</button>
+  <button data-correct>The mediator</button>
+  <button>Nobody</button>
+  <button>The database</button>
+  <p class="explain">Users only call the ChatRoom.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Risk?</p>
+  <button>Static state</button>
+  <button>No interface</button>
+  <button data-correct>God object</button>
+  <button>Slow start</button>
+  <p class="explain">A mediator can become a God object.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Mediator vs Observer?</p>
+  <button>Observer removes them</button>
+  <button>Neither</button>
+  <button data-correct>Mediator removes mutual dependencies</button>
+  <button>Same</button>
+  <p class="explain">Mediator eliminates mutual dependencies among components.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0019-air-traffic-control.md">Exercise 19: air traffic control</a></p>
+<p>Runnable example: <a href="../examples/MediatorDemo.java"><code>MediatorDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/mediator">Mediator (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0018-iterator.html">← Iterator</a> &nbsp;|&nbsp; <a href="0020-memento.html">Memento →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/mediator">Mediator (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

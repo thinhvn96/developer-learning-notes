@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 26: Choosing between similar patterns</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Choosing between similar patterns</h1>
+<p class="meta">Design Patterns · Lesson 0026 · step 26 of 30 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> tell apart the pattern pairs that look alike in code but differ in intent.</div>
+
+<p>Many patterns share a class shape (an object holds another object behind an interface). What differs is <em>intent</em>, and interviewers love these comparisons. All statements below come from the patterns' own pages.</p>
+<table><tr><th>Pair</th><th>Difference</th></tr>
+<tr><td>Strategy vs State</td><td>Both use composition. "Particular states may be aware of each other and initiate transitions ... whereas strategies almost never know about each other."<a class="cite" href="https://refactoring.guru/design-patterns/state">[2]</a> Strategy is chosen by the client; State changes itself.</td></tr>
+<tr><td>Strategy vs Template Method</td><td>Template Method uses inheritance (static, class level); Strategy uses composition (runtime).<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></td></tr>
+<tr><td>Decorator vs Strategy</td><td>Decorator changes an object's "skin" (outward behavior), Strategy changes its "guts".<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[3]</a></td></tr>
+<tr><td>Decorator vs Proxy</td><td>Both keep the interface. A Decorator's composition is controlled by the client; a Proxy typically manages its service object's lifecycle.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[4]</a> Decorator adds responsibilities, Proxy controls access.</td></tr>
+<tr><td>Adapter vs Decorator vs Proxy vs Facade</td><td>Adapter changes the interface; Decorator keeps or extends it; Proxy keeps it identical; Facade defines a new simplified interface for a whole subsystem.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[3]</a><a class="cite" href="https://refactoring.guru/design-patterns/proxy">[4]</a></td></tr>
+<tr><td>Mediator vs Observer</td><td>Mediator removes mutual dependencies by making components depend on one mediator; Observer creates dynamic one-way subscriptions. A mediator can be built with Observer.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[5]</a></td></tr></table>
+<h2>Decision questions</h2>
+<ol><li>Am I <em>creating</em>, <em>assembling</em> or <em>coordinating</em>? (the three categories)</li><li>Does the client choose the variation, or does the object change itself over time?</li><li>Do I need the same interface (Decorator/Proxy) or a different one (Adapter/Facade)?</li><li>Is the variation known at compile time (inheritance) or runtime (composition)?</li></ol>
+<p>Run the <a href="../examples/StrategyDemo.java">Strategy</a> and <a href="../examples/StateDemo.java">State</a> demos side by side and see which object decides what happens next.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which pair differs by who initiates change?</p>
+  <button>Adapter vs Facade</button>
+  <button data-correct>Strategy vs State</button>
+  <button>Iterator vs Visitor</button>
+  <button>Builder vs Prototype</button>
+  <p class="explain">States trigger transitions; strategies are independent.<a class="cite" href="https://refactoring.guru/design-patterns/state">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Same interface, controls access?</p>
+  <button>Adapter</button>
+  <button data-correct>Proxy</button>
+  <button>Facade</button>
+  <button>Builder</button>
+  <p class="explain">Proxy keeps the interface identical for access control and lifecycle.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[4]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Changes the interface?</p>
+  <button data-correct>Adapter</button>
+  <button>Strategy</button>
+  <button>Decorator</button>
+  <button>Proxy</button>
+  <p class="explain">Adapter provides a different interface.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Inheritance-based algorithm variation?</p>
+  <button>Command</button>
+  <button data-correct>Template Method</button>
+  <button>Strategy</button>
+  <button>State</button>
+  <p class="explain">Template Method is static and inheritance-based.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0026-compare-and-contrast.md">Exercise 26: compare and contrast</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a>. Then read the Relations sections of Decorator and Proxy.</p>
+<p><a href="0025-visitor.html">← Visitor</a> &nbsp;|&nbsp; <a href="0027-patterns-in-the-jdk.html">Patterns you already use in the JDK →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a> · [2] <a href="https://refactoring.guru/design-patterns/state">State (Refactoring.Guru)</a> · [3] <a href="https://refactoring.guru/design-patterns/decorator">Decorator (Refactoring.Guru)</a> · [4] <a href="https://refactoring.guru/design-patterns/proxy">Proxy (Refactoring.Guru)</a> · [5] <a href="https://refactoring.guru/design-patterns/mediator">Mediator (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

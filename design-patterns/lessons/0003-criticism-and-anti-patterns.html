@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 3: Criticism of patterns, and anti-patterns</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Criticism of patterns, and anti-patterns</h1>
+<p class="meta">Design Patterns · Lesson 0003 · step 3 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> state the three main criticisms of patterns, name anti-patterns, and avoid using a pattern where a simpler design works.</div>
+
+<h2>Three fair criticisms</h2>
+<ol><li><strong>Kludges for weak languages:</strong> "the need for patterns arises when people choose a programming language or a technology that lacks the necessary level of abstraction." (Lambdas make several patterns nearly free in Java: see <a href="0028-patterns-in-modern-java.html">modern Java</a>.)</li>
+<li><strong>Inefficient solutions:</strong> people implement patterns "to the letter, without adapting them to the context of their project."</li>
+<li><strong>Unjustified use:</strong> "If all you have is a hammer, everything looks like a nail": novices add patterns and complexity where simpler code would do.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li></ol>
+<h2>Anti-patterns</h2>
+<p>An anti-pattern is "any common but counterproductive solution to some class of problem"; the term was coined in 1995 by Andrew Koenig, inspired by <em>Design Patterns</em>. Examples on the page: God object, magic number, poltergeist, Big Ball of Mud.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a> A God object "references a large number of distinct types, has too many unrelated or uncategorized methods", violating the Single Responsibility Principle and tightly coupling the codebase to it.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[3]</a> See the OOP lesson <a href="../../oop/lessons/0022-god-objects-and-refactoring.html">God objects and refactoring</a>.</p>
+<div class="aside">Rule: name the problem first ("I need to vary the algorithm at runtime"), then choose the pattern. Several patterns' own pages list "may be overkill for a simple case" among their cons.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A criticism of patterns?</p>
+  <button data-correct>Used without justification</button>
+  <button>Too colorful</button>
+  <button>Too small</button>
+  <button>Too fast</button>
+  <p class="explain">Novices apply them indiscriminately.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. An anti-pattern is...?</p>
+  <button data-correct>A common but counterproductive solution</button>
+  <button>A framework</button>
+  <button>A rare pattern</button>
+  <button>A test</button>
+  <p class="explain">Any common but counterproductive solution to a class of problem.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which is an anti-pattern example?</p>
+  <button>Iterator</button>
+  <button>Builder</button>
+  <button>Strategy</button>
+  <button data-correct>God object</button>
+  <p class="explain">God object is listed among anti-patterns.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Best first step before picking a pattern?</p>
+  <button>Add an interface</button>
+  <button>Pick the newest</button>
+  <button data-correct>Name the problem</button>
+  <button>Copy from a library</button>
+  <p class="explain">Choose from the problem, not from the pattern list.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-overengineered.md">Exercise 3: the over-engineered design</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a>. Short page.</p>
+<p><a href="0002-classification-and-catalog.html">← The catalog: creational, structural, behavioral</a> &nbsp;|&nbsp; <a href="0004-factory-method.html">Factory Method →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a> · [2] <a href="https://en.wikipedia.org/wiki/Anti-pattern">Wikipedia: Anti-pattern</a> · [3] <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

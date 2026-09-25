@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 10: Bridge</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bridge</h1>
+<p class="meta">Design Patterns · Lesson 0010 · step 10 of 30 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> split a class with two independent dimensions of variation into two hierarchies connected by composition.</div>
+
+<h2>Intent</h2>
+<p>Bridge is "a structural design pattern that lets you split a large class or a set of closely related classes into two separate hierarchies (abstraction and implementation) which can be developed independently of each other." Use it to divide a monolithic class with several variants, to extend a class in several orthogonal dimensions, or to switch implementations at runtime.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/BridgeDemo.java
+Remote toggled TV, on=true
+AdvancedRemote toggled Radio, on=true
+AdvancedRemote muted Radio
+2 remote types x 2 device types = 4 combinations from 4 classes; a third device adds ONE class, not two</code></pre><p><code>Remote</code> (abstraction) holds a <code>Device</code> (implementation). Remote types and device types vary independently: two of each gives four combinations from four classes, and a third device adds one class instead of two. This is composition over inheritance at scale (<a href="../../oop/lessons/0011-composition-over-inheritance.html">OOP lesson</a>). Source: <a href="../examples/BridgeDemo.java"><code>BridgeDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Platform-independent classes and applications</li><li>Client works with high-level abstractions</li><li>Open/Closed and Single Responsibility benefits</li></ul>
+<p><strong>Cons</strong></p><ul><li>More complicated if applied to a highly cohesive class</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a> Bridge is usually designed up front while Adapter retrofits; it shares structure with State and Strategy but solves a different problem; it pairs with Abstract Factory.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Bridge separates...?</p>
+  <button data-correct>Abstraction and implementation</button>
+  <button>Client and server</button>
+  <button>Data and code</button>
+  <button>Compile and run</button>
+  <p class="explain">Two hierarchies developed independently.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Use when a class varies in...?</p>
+  <button data-correct>Several orthogonal dimensions</button>
+  <button>One dimension</button>
+  <button>Only data</button>
+  <button>No dimension</button>
+  <p class="explain">Extending in several orthogonal dimensions is a stated use.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bridge vs Adapter timing?</p>
+  <button>Neither</button>
+  <button>Same</button>
+  <button>Adapter designed up front</button>
+  <button data-correct>Bridge designed up front</button>
+  <p class="explain">Bridge is typically designed upfront; Adapter retrofits.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Risk?</p>
+  <button>No interfaces</button>
+  <button data-correct>Over-complicating a cohesive class</button>
+  <button>Global state</button>
+  <button>Slow GC</button>
+  <p class="explain">Applying it to a highly cohesive class adds complexity.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-two-dimensions.md">Exercise 10: two dimensions</a></p>
+<p>Runnable example: <a href="../examples/BridgeDemo.java"><code>BridgeDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/bridge">Bridge (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0009-adapter.html">← Adapter</a> &nbsp;|&nbsp; <a href="0011-composite.html">Composite →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/bridge">Bridge (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

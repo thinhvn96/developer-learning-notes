@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 4: REST controllers and request mapping</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>REST controllers and request mapping</h1>
+<p class="meta">Spring Boot · Lesson 0004 · step 7 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a REST controller with path variables and correct HTTP method mappings, and explain why the composed annotations are preferred.</div>
+
+<h2>Mapping shortcuts</h2>
+<p>Spring MVC maps requests to controller methods with <code>@RequestMapping</code>, and provides the composed annotations <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, <code>@DeleteMapping</code> and <code>@PatchMapping</code>. They are preferred because most controller methods should map to a specific HTTP method, while a bare <code>@RequestMapping</code> "by default matches all HTTP methods".<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+<pre><code>@RestController
+@RequestMapping("/persons")
+class PersonController {
+
+    @GetMapping("/{id}")
+    public Person getPerson(@PathVariable Long id) { ... }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public void add(@RequestBody Person person) { ... }
+}</code></pre>
+<p>File: <a href="../examples/PersonController.java"><code>PersonController.java</code></a>. <code>@PathVariable</code> binds the <code>{id}</code> segment; <code>@RequestBody</code> binds the request body to an object; <code>@ResponseStatus(HttpStatus.CREATED)</code> answers 201.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+<div class="aside">Interview angle: "PUT versus PATCH, and which are idempotent?" is HTTP semantics, not Spring. Tie it to the retry lesson: <a href="../../system-design/lessons/0002-retries-and-idempotency.html">retries need idempotent operations</a>.</div><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which annotation maps only HTTP GET?</p>
+  <button>@RequestBody</button>
+  <button>@ResponseStatus</button>
+  <button data-correct>@GetMapping</button>
+  <button>@PathVariable</button>
+  <p class="explain">@GetMapping is a composed annotation for GET.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Bare @RequestMapping matches which methods?</p>
+  <button>Only GET</button>
+  <button>Only POST</button>
+  <button data-correct>All HTTP methods</button>
+  <button>No methods</button>
+  <p class="explain">By default it matches all HTTP methods.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which binds the <code>{id}</code> URL segment?</p>
+  <button>@RestController</button>
+  <button>@GetMapping</button>
+  <button>@RequestBody</button>
+  <button data-correct>@PathVariable</button>
+  <p class="explain">@PathVariable binds a URI template variable.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which sets a 201 response on POST?</p>
+  <button>@GetMapping</button>
+  <button data-correct>@ResponseStatus CREATED</button>
+  <button>@RequestMapping alone</button>
+  <button>@PathVariable</button>
+  <p class="explain">@ResponseStatus(HttpStatus.CREATED) sets the status.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-design-a-resource-api.md">Exercise 0004: design a resource API</a></p>
+<p>Runnable example: <a href="../examples/PersonController.java"><code>PersonController.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">Spring Framework Reference: Mapping Requests</a>. Then 'Handler Methods' for argument types.</p>
+<p><a href="0009-configuration-properties-binding.html">← @ConfigurationProperties: type-safe configuration</a> &nbsp;|&nbsp; <a href="0010-validation-and-400-errors.html">Bean Validation and 400 responses →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">Spring Framework Reference: Mapping Requests</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

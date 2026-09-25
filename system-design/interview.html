@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System design Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>System design: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · System Design · 11 questions · <a href="index.html">System Design ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>System-design questions covering caching, resilience and messaging, plus cross-stack scenario prompts. Capacity estimation and consistency models are not yet covered: no trusted source has been gathered (see RESOURCES.md).</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Explain the cache-aside pattern. In what order do you update the database and the cache?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> read: check cache, on miss load from the store and populate; write: update the store, then invalidate the cache entry.</p>
+<p>The application tries the cache; on a miss it reads the data store, adds the item to the cache and returns it. On update it writes to the store, then invalidates the cached item. Order matters: if you remove the cache entry first, a reader can fetch the old value from the store and put it back, leaving stale data.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a> My <code>CacheAsideDemo.java</code> shows read-hit, write-then-invalidate, and staleness after an out-of-band change.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Does cache-aside guarantee consistency? (No: it does not guarantee consistency; expiry bounds staleness. Write-through gives read-after-write freshness at other costs.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0001-cache-aside.html">Cache-aside</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>What are the failure modes of caching?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> staleness, bad expiration, eviction surprises, local-cache divergence, low hit rate.</p>
+<p>Expiration too short causes constant refetching; too long causes stale data. Caches evict (often least-recently-used) when full. A local in-process cache diverges across instances; a shared distributed cache avoids that. Cache-aside is a poor fit if most requests miss, for sensitive data in shared caches, or for static data that fits entirely (prime it instead).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you decide the TTL? (From the tolerated staleness and access pattern; measure hit rate.)</div>
+<p class="see">Learn it: <a href="lessons/0001-cache-aside.html">Cache-aside</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>When should you retry a failed call, and how?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> only for transient faults, with growing delays, a cap on attempts, and idempotent operations.</p>
+<p>Strategies: cancel when the fault is not transient, retry immediately for rare faults, retry after a delay for common busy/connectivity failures, increasing delays incrementally or exponentially up to a maximum. Choose delays so requests from many instances spread out.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[2]</a> My demo used random delays below an exponential cap (jitter), which implements that spreading. An aggressive retry policy can further degrade a busy service; after many failures stop calling and probe occasionally (Circuit Breaker).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[2]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What if the request succeeded but the response was lost? (That is why idempotency matters: retrying a non-idempotent operation may execute it twice.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[2]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0002-retries-and-idempotency.html">Retries and idempotency</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Service A calls B calls C, and each layer retries 3 times. What happens when C is down?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> retry amplification: up to 3 x 3 = 9 calls to C per request to A (plus A's own attempts multiply again), long delays, and load on a service that is already struggling.</p>
+<p>The Retry pattern's guidance: implement retries only where the full context is understood; with nested retry policies fail fast at the lower level and let the higher level decide, otherwise extra layers "can add long delays".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[2]</a> Also log early failures as informational and only the final failure as an error.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[2]</a> The arithmetic is mine; the guidance is the docs'.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you prevent this? (Single retry layer, retry budgets, circuit breakers, timeouts.)</div>
+<p class="see">Learn it: <a href="lessons/0002-retries-and-idempotency.html">Retries and idempotency</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>RabbitMQ or Kafka for this system?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> depends on whether messages are units of work (queue) or the stream is the asset (log).</p>
+<p>RabbitMQ: exchanges route copies to queues by bindings, consumers ack, un-acked messages are requeued.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[4]</a><a class="cite" href="https://www.rabbitmq.com/docs/confirms">[5]</a> Kafka: events are appended to partitions, ordered per partition, "not deleted after consumption", and consumers track an offset they can rewind.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[3]</a><a class="cite" href="https://kafka.apache.org/43/design/design/">[6]</a> So RabbitMQ fits task queues with flexible routing, retry and dead-lettering; Kafka fits multiple independent consumers, replay and per-key ordering. Both commonly give at-least-once delivery, so consumers must be idempotent. Throughput comparisons need your own benchmark; I have not cited any.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you guarantee ordering? (Kafka: same key, same partition, one consumer per partition in a group.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[3]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0003-queue-versus-log.html">Queue versus log</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Circuit breaker versus retry: how do they work together?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> retry repeats an operation expecting success; a breaker stops calling when failure is likely; use retries through a breaker and stop retrying when it is open.</p>
+<p>Closed counts failures; Open fails fast; Half-Open lets a few trial calls through and returns to Closed on success or Open on failure.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[7]</a> My demo: after 3 failures the service received no further calls until the timeout.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Do you need one when using a message queue with a DLQ? (Often not, per the docs' not-suitable list.)</div>
+<p class="see">Learn it: <a href="lessons/0004-circuit-breaker.html">Circuit breaker</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>What is a bulkhead and why do you want one?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> separate resource pools per dependency so a slow one cannot starve the rest.</p>
+<p><a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[8]</a> My demo: healthy calls took about 2010 ms behind slow ones in a shared pool and about 20 ms with separate pools.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do containers relate? (Resource limits are bulkheads.)</div>
+<p class="see">Learn it: <a href="lessons/0005-bulkhead.html">Bulkhead</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>How do you design a rate limiter? What should a client do when throttled?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> control the send rate (for example a token bucket); respect 429 with Retry-After; avoid naive retries.</p>
+<p><a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[9]</a> The docs' example shows blind retries sending 30,000 records for 10,000. My token bucket allowed a burst of 5 and then about the refill rate.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Distributed rate limits? (Coordinate through shared state; the docs describe lease-based partitioning of capacity.)</div>
+<p class="see">Learn it: <a href="lessons/0006-rate-limiting.html">Rate limiting</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>What is queue-based load leveling and competing consumers?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a queue buffers bursts so the service works at its own pace; multiple consumers on one queue each take different messages.</p>
+<p><a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[10]</a> <a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[11]</a> Watch queue growth, idempotence, poison messages and ordering. My demo absorbed a 100-task burst instantly while the service never exceeded 2 concurrent tasks.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Ordering? (Not guaranteed with parallel consumers.)</div>
+<p class="see">Learn it: <a href="lessons/0007-queue-based-load-leveling.html">Load leveling</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Explain the saga pattern and the transactional outbox. Why not two-phase commit?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a saga chains local transactions with compensations across services; the outbox writes the event in the same transaction as the data so publishing is not lost.</p>
+<p>Sagas: choreography or orchestration, pivot and retryable steps, no isolation (anomalies).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[12]</a> Outbox: solves the dual-write problem; relay publishes at least once, so consumers are idempotent.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[13]</a> The saga docs describe traditional transaction models like two-phase commit as often poorly suited to independently managed data stores.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[12]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you compensate an email already sent? (Some steps are not compensable: pivot/irreversible, see the docs.)</div>
+<p class="see">Learn it: <a href="lessons/0009-saga.html">Saga</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>How do you shard a database and choose a shard key?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> pick an immutable, high-cardinality key aligned with your queries; choose lookup, range, hash or geographic strategy; prefer consistent hashing when shard count changes.</p>
+<p><a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[14]</a> My demo: adding a fifth shard moved 80.1 percent of keys with hash-mod-N and 18.2 percent with consistent hashing.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Cross-shard transactions? (Avoid; eventual consistency and sagas.)</div>
+<p class="see">Learn it: <a href="lessons/0010-sharding.html">Sharding</a></p>
+</div>
+</details>
+<h2>Scenario prompts (practice out loud)</h2>
+<p>These integrate the stacks in this course. There is no single right answer; state assumptions and trade-offs.</p>
+<ol>
+<li>Design an order service: Spring Boot API, PostgreSQL storage, events to Kafka, deployed on Kubernetes. Where are the transaction boundaries? How do you avoid losing or duplicating events? (Start from the <a href="../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">transaction lessons</a> and <a href="../kafka/lessons/0004-delivery-semantics.html">delivery semantics</a>.)</li>
+<li>Logs from 200 pods must be searchable within seconds. Choose components and explain delivery guarantees and duplicate handling. (<a href="../elk/index.html">ELK ladder</a>.)</li>
+<li>A downstream payment API is flaky. Design retries, timeouts, and a dead-letter path. (<a href="../rabbitmq/lessons/0005-dead-letter-exchanges.html">Dead letter exchanges</a>, <a href="lessons/0002-retries-and-idempotency.html">retries</a>.)</li>
+<li>The service is OOM-killed under load. Walk through JVM, container and Kubernetes settings. (<a href="../kubernetes/lessons/0005-requests-limits-and-the-jvm.html">Requests, limits and the JVM</a>.)</li>
+</ol>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these System design questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">Azure: Cache-Aside pattern</a> · [2] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">Azure: Retry pattern</a> · [3] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka: Introduction</a> · [4] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP model</a> · [5] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Acks and confirms</a> · [6] <a href="https://kafka.apache.org/43/design/design/">Kafka: Design</a> · [7] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">Azure: Circuit Breaker</a> · [8] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">Azure: Bulkhead</a> · [9] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">Azure: Rate Limiting</a> · [10] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">Azure: Queue-Based Load Leveling</a> · [11] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">Azure: Competing Consumers</a> · [12] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">Azure: Saga</a> · [13] <a href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">Azure: Transactional Outbox</a> · [14] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">Azure: Sharding</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

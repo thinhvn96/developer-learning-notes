@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 3: Shards and replicas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Shards and replicas</h1>
+<p class="meta">ELK Stack · Lesson 0003 · step 5 of 14 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain primaries and replicas, what is fixed at index creation, and why a one-node cluster shows yellow.</div>
+
+<h2>Shards</h2>
+<p>You add nodes to a cluster to increase capacity, and Elasticsearch "automatically distributes your data and query load across all of the available nodes." There are two kinds of shards: "Each document in an index belongs to one primary shard. A replica shard is a copy of a primary shard."<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+<p>Replicas "maintain redundant copies of your data across the nodes in your cluster", which protects against hardware failure and "increases capacity to serve read requests".<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+<h2>What can change</h2>
+<p>"The number of primary shards in an index is fixed at the time that an index is created, but the number of replica shards can be changed at any time, without interrupting indexing or query operations."<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a> Interview consequence: choose primary shard count with growth in mind (or plan to reindex).</p>
+<h2>Why yellow?</h2>
+<pre><code>logs 0 p STARTED
+logs 0 r UNASSIGNED
+index health: yellow</code></pre>
+<p>That is the output of <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a> on a single node with the default of one replica: the primary is started and the replica is unassigned, so the index is yellow. A replica exists to be a copy on <em>another</em> node, so with one node there is nowhere useful to put it (the page I read does not state the placement rule word for word; the run demonstrates the outcome).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Each document belongs to how many primary shards?</p>
+  <button>No shards</button>
+  <button data-correct>Exactly one</button>
+  <button>Every shard</button>
+  <button>Two shards</button>
+  <p class="explain">Each document in an index belongs to one primary shard.<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which can change after index creation?</p>
+  <button>Neither count</button>
+  <button>Primary count</button>
+  <button data-correct>Replica count</button>
+  <button>Both counts</button>
+  <p class="explain">Replicas can change at any time; primaries are fixed at creation.<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Replicas provide what?</p>
+  <button>Smaller indices</button>
+  <button>Encryption</button>
+  <button>Faster writes only</button>
+  <button data-correct>Redundancy and read capacity</button>
+  <p class="explain">They protect against hardware failure and increase capacity to serve reads.<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Single node, one replica configured. Health?</p>
+  <button data-correct>Yellow</button>
+  <button>Purple</button>
+  <button>Green</button>
+  <button>Red</button>
+  <p class="explain">The replica stays unassigned, so the index is yellow (observed in the run).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-size-the-shards.md">Exercise 0003: size the shards</a></p>
+<p>Runnable example: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">Elasticsearch Docs: Clusters, nodes and shards</a>. Read the whole page.</p>
+<p><a href="0009-text-analysis.html">← Text analysis: analyzers and tokens</a> &nbsp;|&nbsp; <a href="0004-near-real-time-search-and-refresh.html">Near real-time search and refresh →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">Elasticsearch Docs: Clusters, nodes and shards</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 9: Text analysis: analyzers and tokens</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Text analysis: analyzers and tokens</h1>
+<p class="meta">ELK Stack · Lesson 0009 · step 4 of 14 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what an analyzer does at index and search time, and see the tokens a text field produces.</div>
+
+<h2>What analysis is</h2>
+<p>"Text analysis is the process of converting unstructured text ... into a structured format that's optimized for search." An analyzer controls what happens before tokenization, how text becomes tokens, and how tokens are normalized. Elasticsearch analyzes <code>text</code> fields when indexing <em>and</em> when searching; applying the same rules to the query string makes terms match. The default is the <code>standard</code> analyzer, which "works well for most use cases".<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[1]</a></p>
+<h2>Inspect it with _analyze</h2>
+<pre><code>POST _analyze {"analyzer":"standard","text":"Connection Timeout to payment-service!"}
+['connection', 'timeout', 'to', 'payment', 'service']
+
+POST _analyze {"analyzer":"keyword","text":"Connection Timeout"}
+['Connection Timeout']</code></pre>
+<p>The standard analyzer lowercased, split on punctuation and dropped the <code>!</code>; the keyword analyzer kept one token. This is exactly why <code>term</code> queries on <code>text</code> fields surprise people (<a href="0005-query-dsl-term-match-bool.html">lesson 5</a>) and why <code>keyword</code> fields exist. Script: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a>.</p>
+<div class="aside">Interview line: "Full-text search matches analyzed tokens, exact filtering uses keyword fields, and I check what tokens are produced with <code>_analyze</code>."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. When does Elasticsearch analyze a text field?</p>
+  <button data-correct>Index and search time</button>
+  <button>Only at search time</button>
+  <button>Only at index time</button>
+  <button>Never</button>
+  <p class="explain">Analysis happens when indexing or searching text fields.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default analyzer?</p>
+  <button>simple</button>
+  <button data-correct>standard</button>
+  <button>keyword</button>
+  <button>whitespace</button>
+  <p class="explain">The standard analyzer is the default.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Keyword analyzer output for 'Connection Timeout'?</p>
+  <button>Three tokens</button>
+  <button data-correct>One token</button>
+  <button>Zero tokens</button>
+  <button>Two tokens</button>
+  <p class="explain">It kept the whole value as a single token in the run.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which API shows tokens?</p>
+  <button>_bulk</button>
+  <button>_refresh</button>
+  <button>_rollover</button>
+  <button data-correct>_analyze</button>
+  <p class="explain">POST _analyze returned the tokens in the demo.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-inspect-tokens.md">Exercise 0009: inspect tokens</a></p>
+<p>Runnable example: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">Elasticsearch: Text analysis</a>. Overview page.</p>
+<p><a href="0002-documents-indices-and-mappings.html">← Documents, indices and mappings</a> &nbsp;|&nbsp; <a href="0003-shards-and-replicas.html">Shards and replicas →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">Elasticsearch: Text analysis</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

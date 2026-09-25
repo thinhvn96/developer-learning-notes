@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 1: Cluster components: who does what</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Cluster components: who does what</h1>
+<p class="meta">Kubernetes · Lesson 0001 · step 1 of 15 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> name the six cluster components and say which ones run on the control plane and which on every node.</div>
+
+<h2>What Kubernetes is</h2>
+<p>Kubernetes is "a portable, extensible, open-source platform for managing containerized workloads and services" with "declarative configuration and automation". Its capabilities include service discovery and load balancing, automated rollouts and rollbacks, self-healing, secret and configuration management, and horizontal scaling.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/">[1]</a></p>
+<h2>The components, one line each</h2>
+<table>
+<tr><th>Component</th><th>Role (from the docs)<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></th></tr>
+<tr><td>kube-apiserver</td><td>"The core component server that exposes the Kubernetes HTTP API."</td></tr>
+<tr><td>etcd</td><td>"Consistent and highly-available key value store for all API server data."</td></tr>
+<tr><td>kube-scheduler</td><td>"Looks for Pods not yet bound to a node, and assigns each Pod to a suitable node."</td></tr>
+<tr><td>kube-controller-manager</td><td>"Runs controllers to implement Kubernetes API behavior."</td></tr>
+<tr><td>kubelet</td><td>"Ensures that Pods are running, including their containers."</td></tr>
+<tr><td>kube-proxy</td><td>"Maintains network rules on nodes to implement Services." (optional)</td></tr>
+<tr><td>Container runtime</td><td>"Software responsible for running containers."</td></tr>
+</table>
+<p>The first four form the control plane, which manages the overall state of the cluster; kubelet, kube-proxy and the runtime run on nodes.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a> The mental model: you declare desired state to the API server; controllers and the kubelet work to make reality match.</p>
+<div class="aside">Interview angle: "What happens when you run <code>kubectl apply</code>?" Trace it: API server validates and stores in etcd, controllers create the objects, the scheduler picks a node, the kubelet starts the containers via the runtime.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which component stores all API data?</p>
+  <button data-correct>etcd key value store</button>
+  <button>the kubelet</button>
+  <button>kube-proxy</button>
+  <button>kube-scheduler</button>
+  <p class="explain">etcd is the consistent, highly-available key value store for all API server data.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which component picks a node for a new Pod?</p>
+  <button>container runtime</button>
+  <button>kube-apiserver</button>
+  <button>kube-controller-manager</button>
+  <button data-correct>kube-scheduler</button>
+  <p class="explain">The scheduler assigns unbound Pods to suitable nodes.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which component makes sure Pods run on a node?</p>
+  <button>kube-proxy</button>
+  <button data-correct>The kubelet</button>
+  <button>etcd</button>
+  <button>The scheduler</button>
+  <p class="explain">The kubelet ensures Pods and their containers are running.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Where do you send desired state?</p>
+  <button data-correct>The API server</button>
+  <button>The kube-proxy</button>
+  <button>Directly to etcd</button>
+  <button>A container runtime</button>
+  <p class="explain">The kube-apiserver exposes the Kubernetes HTTP API.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-trace-kubectl-apply.md">Exercise 0001: trace kubectl apply</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/overview/components/">Kubernetes Docs: Components</a>. Then the Cluster Architecture page it links to.</p>
+<p> &nbsp;|&nbsp; <a href="0002-pods.html">Pods: the smallest deployable unit →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/overview/">Kubernetes Docs: Overview</a> · [2] <a href="https://kubernetes.io/docs/concepts/overview/components/">Kubernetes Docs: Components</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

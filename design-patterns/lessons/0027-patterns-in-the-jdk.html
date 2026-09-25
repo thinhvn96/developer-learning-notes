@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 27: Patterns you already use in the JDK</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Patterns you already use in the JDK</h1>
+<p class="meta">Design Patterns · Lesson 0027 · step 27 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> name a JDK example for each of a dozen patterns and run them.</div>
+
+<p>Knowing where a pattern hides in code you already use makes interview answers concrete.</p>
+<pre><code>java design-patterns/examples/PatternsInJdkDemo.java
+Singleton  Runtime.getRuntime() same instance : true
+Factory    List.of(..) class chosen by the JDK : List12
+Flyweight  Integer.valueOf(100) == valueOf(100): true
+Builder    StringBuilder                       : x1
+Adapter    Arrays.asList write-through         : z
+Decorator  Collections.unmodifiableList        : [a, b]
+Decorator  BufferedReader(StringReader)        : hi
+Strategy   Comparator                          : [a, bb, ccc]
+Iterator   Iterator.next()                     : a
+Command    Runnable (a request as an object)   : run
+Template   AbstractList (get+size =&gt; the rest) : [0, 1, 2]
+Proxy      java.lang.reflect.Proxy             : true
+Observer   Flow / SubmissionPublisher          : SubmissionPublisher</code></pre>
+<table><tr><th>Pattern</th><th>JDK example</th><th>Source</th></tr>
+<tr><td>Singleton</td><td><code>Runtime.getRuntime()</code>: "a single instance of class Runtime"</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[1]</a></td></tr>
+<tr><td>Factory Method (static factory)</td><td><code>List.of</code>, <code>Integer.valueOf</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a></td></tr>
+<tr><td>Flyweight</td><td><code>Integer.valueOf</code> caches -128 to 127</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a></td></tr>
+<tr><td>Builder</td><td><code>StringBuilder</code></td><td>run above</td></tr>
+<tr><td>Adapter</td><td><code>Arrays.asList</code>: "bridge between array-based and collection-based APIs"</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[3]</a></td></tr>
+<tr><td>Decorator / wrapper</td><td><code>BufferedReader</code>, <code>Collections.unmodifiableList</code></td><td>run above</td></tr>
+<tr><td>Strategy</td><td><code>Comparator</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[4]</a></td></tr>
+<tr><td>Iterator</td><td><code>Iterator</code> / <code>Iterable</code></td><td>run above</td></tr>
+<tr><td>Command</td><td><code>Runnable</code></td><td>run above</td></tr>
+<tr><td>Template Method</td><td><code>AbstractList</code>: implement <code>get</code>/<code>size</code></td><td>run above</td></tr>
+<tr><td>Proxy</td><td><code>java.lang.reflect.Proxy</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[5]</a></td></tr>
+<tr><td>Observer</td><td><code>Flow</code>, <code>SubmissionPublisher</code> (<code>Observable</code> is deprecated)</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[6]</a></td></tr>
+<tr><td>Visitor</td><td><code>FileVisitor</code> with <code>Files.walkFileTree</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">[7]</a></td></tr></table>
+<p>Source: <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a>. The mapping of some classes to a pattern (for example the wrappers to "decorator") is my classification; the Javadocs describe the behavior, not the pattern names.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. JDK singleton?</p>
+  <button>ArrayList</button>
+  <button>Thread</button>
+  <button>Integer</button>
+  <button data-correct>Runtime</button>
+  <p class="explain">Every Java application has a single Runtime instance.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. JDK strategy?</p>
+  <button data-correct>Comparator</button>
+  <button>String</button>
+  <button>Object</button>
+  <button>Runtime</button>
+  <p class="explain">Comparators are passed to sort to choose the order.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[4]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. JDK adapter?</p>
+  <button data-correct>Arrays.asList</button>
+  <button>Runtime</button>
+  <button>Comparator</button>
+  <button>FileVisitor</button>
+  <p class="explain">It bridges array and collection APIs.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. JDK visitor?</p>
+  <button data-correct>FileVisitor</button>
+  <button>Runtime</button>
+  <button>Integer</button>
+  <button>Thread</button>
+  <p class="explain">Passed to Files.walkFileTree to visit each file.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">[7]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0027-find-a-pattern.md">Exercise 27: find a pattern</a></p>
+<p>Runnable example: <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/catalog">Design patterns catalog (Refactoring.Guru)</a>. Then browse the JDK Javadocs for each class above.</p>
+<p><a href="0026-choosing-between-similar-patterns.html">← Choosing between similar patterns</a> &nbsp;|&nbsp; <a href="0028-patterns-in-modern-java.html">Patterns in modern Java: lambdas, records, sealed types →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">Runtime Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">Integer Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc</a> · [4] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc</a> · [5] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">Proxy Javadoc</a> · [6] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">Flow Javadoc</a> · [7] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">FileVisitor Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

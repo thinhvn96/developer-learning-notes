@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 22: Collectors: groupingBy, partitioningBy and toMap</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Collectors: groupingBy, partitioningBy and toMap</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0022 · step 10 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write <code>groupingBy</code>, <code>partitioningBy</code>, <code>joining</code> and <code>toMap</code> pipelines, and know when <code>toMap</code> throws.</div>
+
+<h2>The four you need</h2>
+<ul>
+<li><code>groupingBy(classifier[, downstream])</code>: a "group by" into a <code>Map</code>; downstream collectors like <code>summingInt</code>, <code>counting</code>, <code>mapping</code> aggregate each group.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
+<li><code>partitioningBy(predicate)</code>: a <code>Map&lt;Boolean, List&lt;T&gt;&gt;</code> that "always contains mappings for both false and true keys".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
+<li><code>joining(delimiter, prefix, suffix)</code>: concatenates into one String.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
+<li><code>toMap(keyMapper, valueMapper[, merge])</code>: "If the mapped keys contain duplicates ... an IllegalStateException is thrown"; supply a merge function to combine them.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
+</ul>
+<p>Also: <code>toList()</code>/<code>toSet()</code> give "no guarantees on the type, mutability, serializability, or thread-safety"; use <code>toCollection(Supplier)</code> for control. Java 10 added <code>toUnmodifiableList/Set/Map</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
+<pre><code>java java/examples/CollectorsDemo.java
+groupingBy      : {ops=[cy, dee], dev=[ann, bob]}
+sum by dept     : {ops=9600, dev=9400}
+partitioningBy : {false=3, true=1}
+toMap duplicate: IllegalStateException
+toMap w/ merge  : {4200=bob, 4800=cy+dee, 5200=ann}</code></pre>
+<p>Source: <a href="../examples/CollectorsDemo.java"><code>CollectorsDemo.java</code></a>. Compare with the SQL <code>GROUP BY</code> in the <a href="../../postgresql/index.html">PostgreSQL ladder</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. toMap sees two equal keys and no merge function. Result?</p>
+  <button>First value wins</button>
+  <button>Last value wins</button>
+  <button>Silent drop</button>
+  <button data-correct>IllegalStateException</button>
+  <p class="explain">Duplicate keys throw IllegalStateException unless you pass a merge function.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which collector always yields true and false keys?</p>
+  <button data-correct>partitioningBy</button>
+  <button>counting</button>
+  <button>groupingBy</button>
+  <button>joining</button>
+  <p class="explain">partitioningBy's map contains both keys.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which collector builds a delimited String?</p>
+  <button>toMap</button>
+  <button>filtering</button>
+  <button data-correct>joining</button>
+  <button>mapping</button>
+  <p class="explain">joining concatenates elements with optional delimiter.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Does toList guarantee a mutable list?</p>
+  <button data-correct>No guarantee is given</button>
+  <button>Yes, always</button>
+  <button>Yes, ArrayList only</button>
+  <button>No, always immutable</button>
+  <p class="explain">No guarantees on type or mutability.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0022-report-with-collectors.md">Exercise 0022: report with collectors</a></p>
+<p>Runnable example: <a href="../examples/CollectorsDemo.java"><code>CollectorsDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a>. Class description and its examples.</p>
+<p><a href="0004-streams-and-optional.html">← Streams and Optional without the traps</a> &nbsp;|&nbsp; <a href="0011-java-time.html">JDK 8: java.time, the date and time API →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

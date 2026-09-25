@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 7: docker run: flags and the container lifecycle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>docker run: flags and the container lifecycle</h1>
+<p class="meta">Docker · Lesson 0007 · step 2 of 12 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> start, name, publish, stop and remove a container, and say which flag does what.</div>
+
+<h2>docker run</h2>
+<p><code>docker run</code> will "create and run a new container from an image", pulling the image if needed.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a> The flags you use daily:</p>
+<table><tr><th>Flag</th><th>Meaning<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></th></tr>
+<tr><td><code>-d</code></td><td>run as a background process that does not occupy your terminal</td></tr>
+<tr><td><code>-p host:container</code></td><td>publish a container port to the host, e.g. <code>-p 127.0.0.1:80:8080/tcp</code></td></tr>
+<tr><td><code>--rm</code></td><td>automatically remove the container (and its anonymous volumes) on exit</td></tr>
+<tr><td><code>-e VAR=value</code></td><td>set an environment variable; <code>--env-file</code> loads a file</td></tr>
+<tr><td><code>--name</code></td><td>give the container a name instead of a random one</td></tr>
+<tr><td><code>-it</code></td><td>keep STDIN open and allocate a pseudo-TTY for an interactive session</td></tr></table>
+<h2>Lifecycle in one run</h2>
+<pre><code>cd docker/examples &amp;&amp; ./02-run-and-lifecycle.sh
+GREETING=hello
+GET / -&gt; HTTP 200
+running:  lesson-web-... Up 1 second
+stopped:  lesson-web-... Exited (0) Less than a second ago
+after rm, containers named that: 0</code></pre>
+<p>A stopped container still exists (its writable layer too) until you <code>docker rm</code> it. Source: <a href="../examples/02-run-and-lifecycle.sh"><code>02-run-and-lifecycle.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which flag runs a container in the background?</p>
+  <button data-correct>-d</button>
+  <button>-p</button>
+  <button>-it</button>
+  <button>-e</button>
+  <p class="explain">-d starts a container as a background process.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does --rm do?</p>
+  <button>Restarts it</button>
+  <button>Renames it</button>
+  <button>Removes the image</button>
+  <button data-correct>Removes it on exit</button>
+  <p class="explain">It automatically removes the container and its anonymous volumes when it exits.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which flag publishes a port?</p>
+  <button data-correct>-p</button>
+  <button>--rm</button>
+  <button>--name</button>
+  <button>-e</button>
+  <p class="explain">-p publishes a container port to the host.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A stopped container still...?</p>
+  <button>Runs silently</button>
+  <button>Holds a port</button>
+  <button data-correct>Exists until removed</button>
+  <button>Reruns itself</button>
+  <p class="explain">The demo showed it listed as Exited until docker rm.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-run-a-container.md">Exercise 0007: run and inspect</a></p>
+<p>Runnable example: <a href="../examples/02-run-and-lifecycle.sh"><code>02-run-and-lifecycle.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/reference/cli/docker/container/run/">docker container run reference</a>. Skim the options table.</p>
+<p><a href="0001-containers-images-layers.html">← Containers, images and layers</a> &nbsp;|&nbsp; <a href="0008-dockerfile-instructions.html">Dockerfile instructions: ENV vs ARG, COPY vs ADD, EXPOSE →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/reference/cli/docker/container/run/">docker container run reference</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

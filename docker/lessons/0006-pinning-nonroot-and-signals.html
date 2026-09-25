@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 6: Pinned, non-root and signal-safe images</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pinned, non-root and signal-safe images</h1>
+<p class="meta">Docker · Lesson 0006 · step 12 of 12 · Senior · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> review a Dockerfile against four documented hardening rules: pinned base, non-root user, exec-form CMD, one concern per container.</div>
+
+<h2>Four rules from the official best practices</h2>
+<ul>
+<li><strong>Pin base images.</strong> Tags are mutable, so "you're not guaranteed to get the same for every build." Pin by digest, for example <code>alpine:3.21@sha256:...</code>.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+<li><strong>Run as non-root.</strong> "If a service can run without privileges, use <code>USER</code> to change to a non-root user."<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+<li><strong>Use exec form</strong> for <code>CMD</code> and <code>ENTRYPOINT</code> so the process handles signals properly as PID 1.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+<li><strong>One concern per container</strong>; decouple applications for scalability and modularity.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+</ul>
+<h2>In the example</h2>
+<p>The <a href="../examples/hello-java/Dockerfile">multi-stage Dockerfile</a> creates a system user and switches to it; the run showed <code>uid=10001(app)</code>. Its <code>CMD</code> is in exec form (a JSON array), so <code>java</code> is PID 1 and receives <code>SIGTERM</code> from <code>docker stop</code> directly. In shell form, a shell would be PID 1 (the docs advise exec form for signal handling; verifying signal delivery is left as an exercise).</p>
+<p>Also from the same page: use a <code>.dockerignore</code>; use trusted, minimal base images (Docker Official Images).<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+<div class="aside">Interview line: "I pin base images by digest, drop root, use exec-form entrypoints so shutdown hooks run on <code>SIGTERM</code>, and keep one process per container."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Why pin a base image by digest?</p>
+  <button>It removes layers</button>
+  <button data-correct>Tags can change</button>
+  <button>Tags are banned</button>
+  <button>Digests build faster</button>
+  <p class="explain">Mutable tags do not guarantee the same image on every build.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which Dockerfile line drops privileges?</p>
+  <button>LABEL app</button>
+  <button>WORKDIR app</button>
+  <button data-correct>USER app</button>
+  <button>EXPOSE app</button>
+  <p class="explain">USER changes to a non-root user.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why exec form for CMD?</p>
+  <button data-correct>Proper signal handling</button>
+  <button>Automatic health checks</button>
+  <button>Faster JVM startup</button>
+  <button>Smaller image layer</button>
+  <p class="explain">Exec form ensures signals are handled properly as PID 1.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A container runs app plus database plus cron. Fix?</p>
+  <button>Use a bigger base</button>
+  <button data-correct>Split by concern</button>
+  <button>Pin the digest</button>
+  <button>Add more layers</button>
+  <p class="explain">Docker recommends one concern per container.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-harden-a-dockerfile.md">Exercise 0006: harden a Dockerfile</a></p>
+<p>Runnable example: <a href="../examples/hello-java/Dockerfile"><code>hello-java/Dockerfile</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/build/building/best-practices/">Docker Docs: Building best practices</a>. Read it fully; it is the checklist for Senior-level Dockerfile review.</p>
+<p><a href="0012-restart-policies.html">← Restart policies</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/build/building/best-practices/">Docker Docs: Building best practices</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

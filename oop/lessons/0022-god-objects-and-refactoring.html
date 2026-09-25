@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 22: God objects and refactoring toward SOLID</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>God objects and refactoring toward SOLID</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0022 · step 22 of 22 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> recognize a God object and decompose it into cohesive collaborators.</div>
+
+<h2>The anti-pattern</h2>
+<p>A god object is "an object that references a large number of distinct types, has too many unrelated or uncategorized methods, or some combination of both." It violates the Single Responsibility Principle, is "tightly coupled to (referenced by) so much of the other code" that changes cascade, and makes the whole program depend on one bottleneck.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[1]</a> An anti-pattern is "any common but counterproductive solution to some class of problem"; the God object is one of the classic examples.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+<h2>Decompose</h2>
+<pre><code>java oop/examples/GodObjectDemo.java
+[god] INSERT order for ann
+  [god] email ann: total 54
+god processed 54
+  [mailer] ann: total 54
+processor processed 54</code></pre>
+<p><code>OrderManager</code> validates, prices, persists and emails in one method. <code>OrderProcessor</code> coordinates two focused collaborators (<code>Pricing</code>, <code>Mailer</code>) received through its constructor, and produces the same result. Steps: (1) list the reasons to change, (2) extract each into a class with a name that says what it does, (3) inject them, (4) keep the coordinator thin. Source: <a href="../examples/GodObjectDemo.java"><code>GodObjectDemo.java</code></a>. Refactoring.Guru also warns that Facade and Mediator can drift into god objects; see the <a href="../../design-patterns/lessons/0003-criticism-and-anti-patterns.html">patterns criticism lesson</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A god object is...?</p>
+  <button>A singleton</button>
+  <button data-correct>Too many unrelated responsibilities</button>
+  <button>A record</button>
+  <button>An interface</button>
+  <p class="explain">It references many types or has too many unrelated methods.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which principle does it violate?</p>
+  <button>Liskov only</button>
+  <button>Open/Closed only</button>
+  <button>Nothing</button>
+  <button data-correct>Single Responsibility</button>
+  <p class="explain">It concentrates functionality instead of dividing it.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. First refactoring step?</p>
+  <button>Delete tests</button>
+  <button>Add getters</button>
+  <button data-correct>List reasons to change</button>
+  <button>Make it static</button>
+  <p class="explain">Identify the separate responsibilities first.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. An anti-pattern is...?</p>
+  <button data-correct>A common but counterproductive solution</button>
+  <button>A design pattern</button>
+  <button>A framework</button>
+  <button>A rare bug</button>
+  <p class="explain">It is any common but counterproductive solution to some class of problem.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0022-tame-a-service.md">Exercise 22: tame a service class</a></p>
+<p>Runnable example: <a href="../examples/GodObjectDemo.java"><code>GodObjectDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a>. Short page.</p>
+<p><a href="0021-dependency-inversion-principle.html">← SOLID 5: Dependency Inversion Principle</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a> · [2] <a href="https://en.wikipedia.org/wiki/Anti-pattern">Wikipedia: Anti-pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

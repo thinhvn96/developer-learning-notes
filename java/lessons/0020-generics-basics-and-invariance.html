@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 20: Generics: why List of Integer is not List of Number</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Generics: why List of Integer is not List of Number</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0020 · step 5 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain the benefits of generics and why <code>List&lt;Integer&gt;</code> is not a <code>List&lt;Number&gt;</code>.</div>
+
+<h2>Benefits</h2>
+<p>Three: stronger type checks at compile time, elimination of casts, and the ability to write generic algorithms over different types.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">[1]</a></p>
+<pre><code>List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add("hello");
+String s = list.get(0);   // no cast</code></pre>
+<h2>Invariance</h2>
+<p>"Although Integer is a subtype of Number, List&lt;Integer&gt; is not a subtype of List&lt;Number&gt; and, in fact, these two types are not related."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a> If it were allowed you could add a <code>Double</code> through the <code>List&lt;Number&gt;</code> reference into what is really a <code>List&lt;Integer&gt;</code>, breaking type safety.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a> Wildcards give a legitimate relationship (next lesson).</p>
+<p>In <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a> the line <code>List&lt;Number&gt; nums = ints;</code> is commented out because it does not compile.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Is List of Integer a subtype of List of Number?</p>
+  <button>Yes, always</button>
+  <button data-correct>No, unrelated types</button>
+  <button>Only for lists</button>
+  <button>Only for finals</button>
+  <p class="explain">Generic types are invariant.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A benefit of generics?</p>
+  <button>Faster JIT</button>
+  <button data-correct>Compile-time type checks</button>
+  <button>No exceptions</button>
+  <button>Smaller bytecode</button>
+  <p class="explain">Stronger type checks at compile time.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What do generics remove from client code?</p>
+  <button>All interfaces</button>
+  <button>Every warning</button>
+  <button>Static methods</button>
+  <button data-correct>Explicit casts</button>
+  <p class="explain">Casting is not necessary with generics.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why is the assignment forbidden?</p>
+  <button data-correct>It breaks type safety</button>
+  <button>It skips erasure</button>
+  <button>It hides nulls</button>
+  <button>It is too slow</button>
+  <p class="explain">You could add a Double to a list that is really Integers.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0020-generic-utility.md">Exercise 0020: a generic utility</a></p>
+<p>Runnable example: <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/index.html">Java Tutorials: Generics trail</a>. Read 'Why Use Generics?' and 'Generics, Inheritance, and Subtypes'.</p>
+<p><a href="0002-choosing-a-list.html">← Choosing between ArrayList, LinkedList and ArrayDeque</a> &nbsp;|&nbsp; <a href="0021-wildcards-and-type-erasure.html">Wildcards (extends, super) and type erasure →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">Java Tutorials: Why use generics</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Java Tutorials: Generics and subtyping</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

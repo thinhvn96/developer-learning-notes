@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 19: SOLID 3: Liskov Substitution Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 3: Liskov Substitution Principle</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0019 · step 19 of 22 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> state LSP, spot a violating subclass, and repair the design.</div>
+
+<h2>The principle</h2>
+<p>"If S is a subtype of T, then objects of type T in a program may be replaced with objects of type S without altering any of the desirable properties of that program." In Martin's wording: functions using base-class references must work with derived classes without knowing it.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[2]</a> Behavioral subtyping rules: preconditions cannot be strengthened, postconditions cannot be weakened, invariants cannot be weakened, and the history constraint (a subtype cannot allow state changes the parent forbids).<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a></p>
+<h2>The classic violation</h2>
+<pre><code>java oop/examples/LspDemo.java
+Rectangle: area = 20 (expected 20)
+Square: area = 16 (expected 20)
+fixed design areas: 20, 16</code></pre>
+<p>Code written against <code>Rectangle</code> sets width 5 and height 4 and expects 20. A <code>Square</code> that overrides the setters to keep sides equal produces 16: it changed the behavior callers depended on, so it is not substitutable even though "a square is a rectangle" mathematically.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a> The fix separates the types under a common abstraction (<code>Shape2</code>) with immutable <code>Rect2</code> and <code>Sq2</code>. Source: <a href="../examples/LspDemo.java"><code>LspDemo.java</code></a>.</p>
+<div class="aside">Tests for substitutability: does the subclass throw for inputs the parent accepts (stronger preconditions), return less than the parent promised, or surprise callers? A subclass throwing <code>UnsupportedOperationException</code> for an inherited method is a red flag (see the next lesson).</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. LSP says a subtype must be...?</p>
+  <button data-correct>Substitutable for its base</button>
+  <button>Smaller than its base</button>
+  <button>Abstract</button>
+  <button>Faster than its base</button>
+  <p class="explain">Objects of T may be replaced with S without altering desirable properties.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Square extends Rectangle demo area?</p>
+  <button>20</button>
+  <button>25</button>
+  <button>9</button>
+  <button data-correct>16</button>
+  <p class="explain">The Square's setters changed both sides.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which change violates LSP?</p>
+  <button>Adding a comment</button>
+  <button data-correct>Strengthening preconditions</button>
+  <button>Adding a method</button>
+  <button>Renaming a field</button>
+  <p class="explain">Preconditions cannot be strengthened in a subtype.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A fix used in the demo?</p>
+  <button>Delete Rectangle</button>
+  <button>Use reflection</button>
+  <button>Make the field public</button>
+  <button data-correct>Separate types under a shared abstraction</button>
+  <p class="explain">Rect2 and Sq2 implement Shape2 independently.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0019-fix-the-bird.md">Exercise 19: fix the flightless bird</a></p>
+<p>Runnable example: <a href="../examples/LspDemo.java"><code>LspDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Wikipedia: Liskov substitution principle</a>. Formal statement and behavioral subtyping sections.</p>
+<p><a href="0018-open-closed-principle.html">← SOLID 2: Open/Closed Principle</a> &nbsp;|&nbsp; <a href="0020-interface-segregation-principle.html">SOLID 4: Interface Segregation Principle →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Wikipedia: Liskov substitution principle</a> · [2] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

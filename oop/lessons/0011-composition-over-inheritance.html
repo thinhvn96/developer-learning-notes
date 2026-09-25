@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 11: Composition over inheritance</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Composition over inheritance</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0011 · step 11 of 22 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain the fragile base class problem with a running example and fix it with composition and delegation.</div>
+
+<h2>The principle</h2>
+<p>Composition over inheritance achieves reuse by composing objects rather than building hierarchies: "Instead of having two child classes inherit functionality from a common parent, composition simulates inheritance by having the children include a copy of a 'pseudo-parent' class as a field." It gives flexibility and avoids tight coupling; the drawback is forwarding boilerplate.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[1]</a></p>
+<h2>A bug that inheritance causes</h2>
+<pre><code>java oop/examples/CompositionVsInheritance.java
+inheritance: added 3 elements, addCount = 6   (expected 3)
+composition: added 3 elements, addCount = 3   (expected 3)</code></pre>
+<p>The subclass of <code>HashSet</code> counts adds by overriding both <code>add</code> and <code>addAll</code>. But <code>HashSet.addAll</code> (inherited behavior) itself calls <code>add</code> for each element, so each element is counted twice: 6, not 3. The subclass depends on an internal implementation detail of its parent, which the parent may change (the <em>fragile base class</em> problem). The composed version holds a <code>Set</code> and forwards calls, so it is independent of how the wrapped class works. Source: <a href="../examples/CompositionVsInheritance.java"><code>CompositionVsInheritance.java</code></a>.</p>
+<div class="aside">Rule of thumb: inherit only for a true is-a relationship where the parent is designed and documented for extension; otherwise compose. Patterns that embody this: Strategy, Decorator, Bridge, State.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Composition reuses code by...?</p>
+  <button>Extending a class</button>
+  <button>Using static</button>
+  <button data-correct>Holding another object</button>
+  <button>Copying files</button>
+  <p class="explain">The class includes the collaborator as a field.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Count in the inheritance demo for three adds?</p>
+  <button>Three</button>
+  <button data-correct>Six</button>
+  <button>Two</button>
+  <button>Nine</button>
+  <p class="explain">addAll called add again, double-counting.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Main cost of composition?</p>
+  <button>Slower JVM</button>
+  <button>No interfaces</button>
+  <button>No polymorphism</button>
+  <button data-correct>Forwarding boilerplate</button>
+  <p class="explain">Methods may have to be forwarded by hand.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Root of the fragile base class problem?</p>
+  <button>Slow GC</button>
+  <button>Static fields</button>
+  <button data-correct>Subclass depends on parent internals</button>
+  <button>Missing generics</button>
+  <p class="explain">The subclass relied on how HashSet implements addAll.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-wrap-dont-extend.md">Exercise 11: wrap, don't extend</a></p>
+<p>Runnable example: <a href="../examples/CompositionVsInheritance.java"><code>CompositionVsInheritance.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/Composition_over_inheritance">Wikipedia: Composition over inheritance</a>. Read the overview and 'Benefits'.</p>
+<p><a href="0010-interfaces-as-contracts.html">← Interfaces as contracts</a> &nbsp;|&nbsp; <a href="0012-nested-classes.html">Nested, inner, local and anonymous classes →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/Composition_over_inheritance">Wikipedia: Composition over inheritance</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

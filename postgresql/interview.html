@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>PostgreSQL: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · PostgreSQL · 14 questions · <a href="index.html">PostgreSQL ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>PostgreSQL questions for Senior backend interviews, with the reasoning interviewers listen for. Numbers quoted (row counts, timings) come from my runs of the example scripts in a throwaway <code>postgres:18</code> container.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Why put constraints in the database instead of only in application code?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> every writer must obey them, and they are atomic with the data; app-level checks race.</p>
+<p>PostgreSQL supports <code>CHECK</code>, <code>NOT NULL</code>, <code>UNIQUE</code>, <code>PRIMARY KEY</code> (unique and not null, at most one per table) and <code>FOREIGN KEY</code> with <code>ON DELETE RESTRICT</code> or <code>CASCADE</code>.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a> My script showed each failing with a specific error. A "check then insert" in Java can be interleaved with another request; a unique constraint cannot, because the database enforces it during the write.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you handle the duplicate-key error in Java? (Catch the constraint violation and treat as 'already exists'; consider retry logic and idempotency.)</div>
+<p class="see">Learn it: <a href="lessons/0001-tables-and-constraints.html">Tables and constraints</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>What is the difference between INNER JOIN and LEFT JOIN, and what is the classic WHERE trap?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> inner keeps matches only; left keeps every left row with NULLs for the missing right side; a WHERE on right-table columns turns a left join back into an inner join.</p>
+<p>Left outer join: "the table mentioned on the left of the join operator will have each of its rows in the output at least once"; unmatched rows get NULLs for right columns.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[2]</a> In my run, an inner join gave 2 rows, the left join 3, and adding <code>WHERE cities.location IS NOT NULL</code> gave 2 again. Move the condition into <code>ON</code> to keep the left rows.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Write a query for customers with no orders. (LEFT JOIN orders and WHERE orders.id IS NULL, or NOT EXISTS.)</div>
+<p class="see">Learn it: <a href="lessons/0002-joins-inner-and-left.html">Joins</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>What is a window function and how do you get the top earner per department?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a calculation across related rows that does not collapse them; use <code>row_number() OVER (PARTITION BY dept ORDER BY salary DESC)</code> in a subquery and filter rn = 1.</p>
+<p>A window function computes across rows related to the current row without grouping them into one output row; <code>OVER</code> marks it, <code>PARTITION BY</code> splits groups, <code>ORDER BY</code> inside <code>OVER</code> orders within a partition.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[3]</a> Window functions cannot be filtered directly in <code>WHERE</code>, so wrap in a subquery. With ties (two employees at 4800) <code>row_number()</code> picks one arbitrarily; use <code>rank()</code> or <code>dense_rank()</code> when ties matter.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Difference between rank and dense_rank? (rank leaves gaps after ties, dense_rank does not; confirm in the docs' window function reference.)</div>
+<p class="see">Learn it: <a href="lessons/0003-window-functions.html">Window functions</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>When does an index help, and what does it cost?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> it speeds selective lookups, joins and search conditions; it costs write overhead and space.</p>
+<p>Without an index the system scans the whole table row by row; with one it can "walk a few levels deep into a search tree." After creation "the system has to keep it synchronized with the table. This adds overhead to data manipulation operations", so unused indexes should be removed.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[5]</a> In my test on 200,000 rows a lookup went from a sequential scan (about 5 ms, removing 199,999 rows by filter) to an index scan (about 0.03 ms). For depth on composite indexes, sorting and joins see <em>Use The Index, Luke</em>.<a class="cite" href="https://use-the-index-luke.com/">[6]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why might PostgreSQL ignore your index? (Small table or non-selective condition can make a sequential scan cheaper; the EXPLAIN docs note seq scans are efficient for small tables or large result sets.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[4]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0004-indexes-what-they-buy.html">Indexes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>How do you diagnose a slow query?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>EXPLAIN (ANALYZE)</code>, find the expensive node, compare estimated and actual rows, check scan type and indexes.</p>
+<p><code>EXPLAIN</code> shows a tree of plan nodes with startup cost, total cost, estimated rows and width; costs are arbitrary units and a parent includes its children.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[4]</a> <code>EXPLAIN ANALYZE</code> actually executes the query and adds actual time, loops, buffers and planning/execution time. For UPDATE/DELETE wrap it: <code>BEGIN; EXPLAIN ANALYZE ...; ROLLBACK;</code> (my script confirmed zero changed rows after rollback). Large gaps between estimated and actual rows suggest stale statistics (try <code>ANALYZE</code>). Plans from small test tables may not extrapolate to production.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[4]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Is EXPLAIN ANALYZE safe on production writes? (Only inside a transaction you roll back; it really runs the statement.)</div>
+<p class="see">Learn it: <a href="lessons/0005-reading-explain.html">Reading EXPLAIN</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Explain MVCC.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> readers and writers do not block each other because each statement sees a snapshot.</p>
+<p>"Reading never blocks writing and writing never blocks reading": locks acquired for querying do not conflict with locks for writing, even at the strictest isolation level (Serializable Snapshot Isolation).<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[7]</a> Each SQL statement sees a snapshot of data as of some time ago.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[7]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What is the cost of MVCC? (Old row versions must be cleaned up; the mechanics of vacuum are beyond the sources read here.)</div>
+<p class="see">Learn it: <a href="lessons/0006-mvcc-and-isolation-levels.html">MVCC and isolation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>List the isolation levels and anomalies. What is PostgreSQL's default?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Read committed by default; Repeatable read prevents non-repeatable and phantom reads in PostgreSQL; Serializable prevents everything but may require retries.</p>
+<p>Anomalies: dirty read, non-repeatable read, phantom read, serialization anomaly. PostgreSQL implements three distinct levels: Read uncommitted behaves like Read committed, and its Repeatable read does not allow phantom reads. Read committed is the default and a <code>SELECT</code> sees only data committed before the query began. Serializable can fail with "could not serialize access due to read/write dependencies", and applications "must be prepared to retry transactions."<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[8]</a> My two-session demo showed a non-repeatable read under Read committed (100 then 200) and a stable snapshot under Repeatable read (100 then 100).</p>
+<div class="follow"><strong>Likely follow-up:</strong> In Spring, how do you retry on serialization failure? (Retry the whole transaction; connect with the Spring @Transactional lessons.)</div>
+<p class="see">Learn it: <a href="lessons/0006-mvcc-and-isolation-levels.html">MVCC and isolation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Two requests both check 'does username exist?' then insert. What goes wrong and how do you fix it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a race: both see 'not exists' and both insert; fix with a UNIQUE constraint (and handle the violation).</p>
+<p>Under Read committed each statement sees data committed before it began, so two concurrent transactions can both see no row.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[8]</a> A <code>UNIQUE</code> or <code>PRIMARY KEY</code> constraint makes the second insert fail atomically.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a> Alternatively use Serializable and retry, but the constraint is simpler and cheaper.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What about INSERT ... ON CONFLICT? (A PostgreSQL feature worth knowing; check the docs before relying on details, not covered in the sources I read.)</div>
+<p class="see">Learn it: <a href="lessons/0001-tables-and-constraints.html">Tables and constraints</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>WHERE versus HAVING?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> WHERE filters rows before grouping; HAVING filters groups after aggregation.</p>
+<p>"WHERE selects input rows before groups and aggregates are computed ... whereas HAVING selects group rows after"; aggregates are not allowed in WHERE (PostgreSQL answered <code>aggregate functions are not allowed in WHERE</code> in my run); use a subquery for "rows equal to the max".<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[9]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Cities whose maximum low temperature is under 40? (GROUP BY city HAVING max(temp_lo) &lt; 40.)</div>
+<p class="see">Learn it: <a href="lessons/0007-aggregates-group-by-having.html">Aggregates</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>What does a transaction guarantee? How do you undo part of one?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> all-or-nothing; savepoints allow partial rollback.</p>
+<p>Bundled steps are all-or-nothing and intermediate states are invisible to others; statements outside <code>BEGIN</code> are implicit transactions; <code>ROLLBACK TO savepoint</code> discards only later work and the savepoint stays defined.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[10]</a> In my run an error inside a block aborted it, and the later <code>COMMIT</code> was answered with <code>ROLLBACK</code>, leaving balances unchanged.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How does Spring map NESTED propagation? (To savepoints on JDBC.)</div>
+<p class="see">Learn it: <a href="lessons/0008-transactions-commit-rollback-savepoints.html">Transactions</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>When do you use a CTE, and what is a recursive CTE?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> to name intermediate results; recursive CTEs walk hierarchies.</p>
+<p>CTEs are like temporary tables for one query; recursive ones have a non-recursive term, <code>UNION [ALL]</code>, and a recursive term, looping until no rows are produced; a side-effect-free CTE used once is inlined, <code>MATERIALIZED</code> forces separate evaluation.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[11]</a> My example listed a manager chain: dev, lead, vp, ceo.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you prevent infinite recursion on cyclic data? (Track visited ids or depth; the exercise asks for it.)</div>
+<p class="see">Learn it: <a href="lessons/0009-ctes-with-and-recursive.html">CTEs</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Which index types does PostgreSQL offer and when would you pick each? Multicolumn and partial indexes?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> B-tree default (equality and ranges), hash (equality), GIN (arrays, full-text), BRIN (physically correlated big tables), GiST/SP-GiST (geometry etc.).</p>
+<p><a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[12]</a> Multicolumn B-trees work best with equality on leading columns plus a range on the next; more than three columns is rarely helpful.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[13]</a> A partial index covers a predicate, avoiding indexing common values (mine: 64 kB versus 1352 kB for a multicolumn index).<a class="cite" href="https://www.postgresql.org/docs/current/indexes-partial.html">[14]</a> The docs also note a skip-scan optimization for few distinct leading values; my second-column-only query still used the index, consistent with that.</p>
+<div class="follow"><strong>Likely follow-up:</strong> You added an index but the planner ignores it. Why? (Low selectivity or small table; check EXPLAIN and statistics.)</div>
+<p class="see">Learn it: <a href="lessons/0011-multicolumn-and-partial-indexes.html">Multicolumn and partial indexes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>What is <code>SELECT ... FOR UPDATE</code> and how do deadlocks arise and get fixed?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> it locks the selected rows against other writers; deadlocks come from opposite lock order and are detected and aborted by PostgreSQL; fix with a consistent order and retries.</p>
+<p><a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[15]</a> My two-session run: the second writer waited about 2.1 s on the locked row; opposite update order produced <code>ERROR: deadlock detected</code> for one session while the other committed.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Implement a job queue with row locks? (Beyond the pages read here; SKIP LOCKED is not covered by the sources I fetched.)</div>
+<p class="see">Learn it: <a href="lessons/0012-row-locks-and-deadlocks.html">Row locks</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>What is VACUUM for, and what are dead tuples?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> reclaim space from old row versions, update statistics and the visibility map, and prevent transaction ID wraparound; autovacuum does it by default.</p>
+<p><a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[16]</a> MVCC keeps old row versions, so an UPDATE of every row left 100,000 dead tuples and doubled the file until VACUUM cleaned them (my run, autovacuum disabled on that table).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why should you not disable autovacuum? (It is enabled by default and highly recommended by the docs.)</div>
+<p class="see">Learn it: <a href="lessons/0013-vacuum-and-dead-tuples.html">VACUUM</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these PostgreSQL questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://www.postgresql.org/docs/current/ddl-constraints.html">PostgreSQL: Constraints</a> · [2] <a href="https://www.postgresql.org/docs/current/tutorial-join.html">PostgreSQL: Joins</a> · [3] <a href="https://www.postgresql.org/docs/current/tutorial-window.html">PostgreSQL: Window functions</a> · [4] <a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL: Using EXPLAIN</a> · [5] <a href="https://www.postgresql.org/docs/current/indexes-intro.html">PostgreSQL: Indexes intro</a> · [6] <a href="https://use-the-index-luke.com/">Use The Index, Luke</a> · [7] <a href="https://www.postgresql.org/docs/current/mvcc-intro.html">PostgreSQL: MVCC intro</a> · [8] <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL: Transaction isolation</a> · [9] <a href="https://www.postgresql.org/docs/current/tutorial-agg.html">PostgreSQL: Aggregates</a> · [10] <a href="https://www.postgresql.org/docs/current/tutorial-transactions.html">PostgreSQL: Transactions</a> · [11] <a href="https://www.postgresql.org/docs/current/queries-with.html">PostgreSQL: WITH queries</a> · [12] <a href="https://www.postgresql.org/docs/current/indexes-types.html">PostgreSQL: Index types</a> · [13] <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">PostgreSQL: Multicolumn indexes</a> · [14] <a href="https://www.postgresql.org/docs/current/indexes-partial.html">PostgreSQL: Partial indexes</a> · [15] <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: Explicit locking</a> · [16] <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html">PostgreSQL: Routine vacuuming</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 7: Filebeat: harvesters, registry and delivery guarantees</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Filebeat: harvesters, registry and delivery guarantees</h1>
+<p class="meta">ELK Stack · Lesson 0007 · step 11 of 14 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how Filebeat resumes after restart, what delivery guarantee it gives, and what happens when the output is blocked.</div>
+
+<h2>Components</h2>
+<p>"A harvester is responsible for reading the content of a single file" line by line and sending it to the output. "An input is responsible for managing the harvesters and finding all sources to read from."<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+<h2>Registry</h2>
+<p>"Filebeat keeps the state of each file and frequently flushes the state to disk in the registry file": the last offset read plus identifiers to recognize files, so it resumes where it stopped after a restart.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+<h2>Delivery</h2>
+<p>"Filebeat guarantees that events will be delivered to the configured output at least once and with no data loss." When the output is blocked and has not confirmed events, Filebeat "will keep trying to send events until the output acknowledges that it has received the events". Events not acknowledged before shutdown are resent on restart, which can create duplicates.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+<div class="aside">Compare with the other systems in this course: Filebeat, Logstash persistent queues, RabbitMQ consumer acks and Kafka consumer commits all give <em>at-least-once</em>, so all of them push you toward idempotent writes. See <a href="../../system-design/lessons/0002-retries-and-idempotency.html">retries and idempotency</a>.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Where does Filebeat remember file progress?</p>
+  <button>Logstash queue</button>
+  <button>The Kibana index</button>
+  <button data-correct>The registry file</button>
+  <button>Kafka topic</button>
+  <p class="explain">State is flushed to the registry file.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Filebeat's delivery guarantee?</p>
+  <button data-correct>At least once</button>
+  <button>Best effort</button>
+  <button>At most once</button>
+  <button>Exactly once</button>
+  <p class="explain">Events are delivered at least once with no data loss.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Output is blocked. Filebeat does what?</p>
+  <button>Deletes the file</button>
+  <button data-correct>Keeps retrying</button>
+  <button>Stops forever</button>
+  <button>Drops the events</button>
+  <p class="explain">It keeps trying until the output acknowledges receipt.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why could duplicates appear after restart?</p>
+  <button data-correct>Unacked events are resent</button>
+  <button>Mappings change</button>
+  <button>Files are read twice</button>
+  <button>Shards are cloned</button>
+  <p class="explain">Events sent but unacknowledged before shutdown are resent.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-lose-no-logs.md">Exercise 0007: lose no logs</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat Docs: How Filebeat works</a>. Read the whole page.</p>
+<p><a href="0006-logstash-grok-and-persistent-queues.html">← Logstash: pipelines, grok and persistent queues</a> &nbsp;|&nbsp; <a href="0012-ingest-pipelines.html">Ingest pipelines: parse inside Elasticsearch →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat Docs: How Filebeat works</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

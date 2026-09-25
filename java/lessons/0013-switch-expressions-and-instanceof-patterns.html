@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 13: JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0013 · step 20 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> rewrite an if-else cast chain with <code>instanceof</code> patterns and a switch statement with a switch expression.</div>
+
+<h2>Switch expressions (final in JDK 14)</h2>
+<p>JEP 361 extends <code>switch</code> "so it can be used as either a statement or an expression." Arrow labels (<code>case L -&gt;</code>) do not fall through: "only the code to the right executes". A block inside a switch expression returns a value with <code>yield</code>. A switch expression must be exhaustive, so it needs cases for all values, typically via <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
+<pre><code>return switch (day) {
+    case 6, 7 -&gt; "weekend";
+    case 1, 2, 3, 4, 5 -&gt; "weekday";
+    default -&gt; { String msg = "invalid: " + day; yield msg; }
+};</code></pre>
+<h2>Pattern matching for instanceof (final in JDK 16)</h2>
+<p>JEP 394 replaces the test-then-cast idiom:</p>
+<pre><code>if (obj instanceof String s) {   // s is bound only where the match is certain
+    ...
+}</code></pre>
+<p>The binding uses flow scoping: "A pattern variable is in scope where it has definitely matched."<a class="cite" href="https://openjdk.org/jeps/394">[2]</a></p>
+<p>Both are part of what "JDK 17" means for you, since 17 includes everything finalized up to 17. Source: <a href="../examples/jdk17/Jdk17Features.java"><code>Jdk17Features.java</code></a>.</p>
+<div class="aside">Pattern matching for <em>switch</em> is a JDK 21 feature: the JDK 21 example does not compile under <code>--release 17</code> (verified while writing this lesson; the compiler says patterns in switch are not supported in -source 17). See <a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 15</a>.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Does an arrow-label switch fall through?</p>
+  <button>Only for enums</button>
+  <button>Yes, by default</button>
+  <button data-correct>No, it never does</button>
+  <button>Only with yield</button>
+  <p class="explain">Arrow labels prevent fall-through; only the code to the right executes.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Keyword that returns a value from a switch block?</p>
+  <button>return</button>
+  <button>break</button>
+  <button data-correct>yield</button>
+  <button>continue</button>
+  <p class="explain">yield returns a value from a block in a switch expression.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where is a pattern variable in scope?</p>
+  <button>Whole enclosing method</button>
+  <button>Only inside the if</button>
+  <button data-correct>Where it definitely matched</button>
+  <button>Whole class body</button>
+  <p class="explain">A pattern variable is in scope where it has definitely matched.<a class="cite" href="https://openjdk.org/jeps/394">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Must a switch expression be exhaustive?</p>
+  <button>Only for enums</button>
+  <button data-correct>Yes, always</button>
+  <button>No, never</button>
+  <button>Only with yield</button>
+  <p class="explain">The compiler requires all possible values to be handled.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-modernize-a-visitor.md">Exercise 0013: modernize a cast chain</a></p>
+<p>Runnable example: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a>. Then JEP 394.</p>
+<p><a href="0012-var-and-text-blocks.html">← JDK 10 and 15: var and text blocks (in JDK 17)</a> &nbsp;|&nbsp; <a href="0003-records-and-immutability.html">Records and shallow immutability →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> · [2] <a href="https://openjdk.org/jeps/394">JEP 394: Pattern Matching for instanceof</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

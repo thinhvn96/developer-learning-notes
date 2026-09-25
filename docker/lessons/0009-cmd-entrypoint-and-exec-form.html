@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 9: CMD, ENTRYPOINT and exec vs shell form</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>CMD, ENTRYPOINT and exec vs shell form</h1>
+<p class="meta">Docker · Lesson 0009 · step 5 of 12 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict what a container runs from ENTRYPOINT plus CMD, and what changes when you pass arguments to <code>docker run</code>.</div>
+
+<h2>The rules</h2>
+<ul><li>"There can only be one CMD instruction ... only the last one takes effect."</li>
+<li>CMD provides defaults for an ENTRYPOINT, or executes on its own; "CMD will be overridden when running the container with alternative arguments".</li>
+<li>Use ENTRYPOINT when the container acts as an executable.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></li></ul>
+<table><tr><th>Scenario</th><th>Result<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></th></tr>
+<tr><td>no ENTRYPOINT, CMD set</td><td>CMD runs</td></tr>
+<tr><td>ENTRYPOINT exec form + CMD exec form</td><td>ENTRYPOINT runs; CMD is appended as arguments</td></tr>
+<tr><td>ENTRYPOINT in shell form</td><td>CMD is ignored; runs via <code>/bin/sh -c</code></td></tr></table>
+<h2>Exec vs shell form</h2>
+<p>Exec form (<code>["executable","arg"]</code>) is JSON, does not invoke a shell and does no variable substitution; shell form always uses a shell.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a> Docker's best practices recommend exec form for <code>CMD</code>/<code>ENTRYPOINT</code> so signals are handled properly as PID 1 (see the <a href="0006-pinning-nonroot-and-signals.html">hardening lesson</a>).<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a></p>
+<pre><code>./05-cmd-entrypoint-arg-env.sh
+docker run lesson-entry                      -&gt; hello world      # ENTRYPOINT + CMD
+docker run lesson-entry Docker               -&gt; hello Docker     # args replace CMD
+docker run --entrypoint printenv lesson-entry APP_MODE -&gt; prod</code></pre>
+<p>For Java: <code>ENTRYPOINT ["java","-jar","app.jar"]</code> with <code>CMD</code> for default args, and <code>JAVA_TOOL_OPTIONS</code> in the environment for JVM flags (design suggestion; test it).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. ENTRYPOINT exec form plus CMD exec form. What runs?</p>
+  <button>Only CMD</button>
+  <button>Only ENTRYPOINT</button>
+  <button>A shell script</button>
+  <button data-correct>ENTRYPOINT with CMD args</button>
+  <p class="explain">ENTRYPOINT runs and CMD is appended as arguments.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Two CMD lines in one Dockerfile. Which counts?</p>
+  <button data-correct>The last one</button>
+  <button>Neither runs</button>
+  <button>The first one</button>
+  <button>Both run</button>
+  <p class="explain">Only the last CMD takes effect.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Arguments after the image name replace what?</p>
+  <button>FROM</button>
+  <button>ENTRYPOINT</button>
+  <button data-correct>CMD</button>
+  <button>WORKDIR</button>
+  <p class="explain">CMD is overridden by alternative arguments.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why prefer exec form?</p>
+  <button>Faster builds</button>
+  <button>Shorter Dockerfile</button>
+  <button data-correct>Signals reach the process</button>
+  <button>Smaller image</button>
+  <p class="explain">Exec form ensures proper signal handling as PID 1.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-predict-the-command.md">Exercise 0009: predict the command</a></p>
+<p>Runnable example: <a href="../examples/05-cmd-entrypoint-arg-env.sh"><code>05-cmd-entrypoint-arg-env.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference: CMD and ENTRYPOINT</a>. The 'Understand how CMD and ENTRYPOINT interact' table.</p>
+<p><a href="0002-layer-cache-and-dockerfile-order.html">← Layer cache and Dockerfile ordering</a> &nbsp;|&nbsp; <a href="0003-multi-stage-java-image.html">A multi-stage image for a Java app →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a> · [2] <a href="https://docs.docker.com/build/building/best-practices/">Building best practices</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

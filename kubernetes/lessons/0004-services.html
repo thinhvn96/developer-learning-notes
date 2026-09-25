@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 4: Services: a stable address for changing Pods</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Services: a stable address for changing Pods</h1>
+<p class="meta">Kubernetes · Lesson 0004 · step 5 of 15 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why Services exist, choose between ClusterIP, NodePort and LoadBalancer, and write <code>port</code> versus <code>targetPort</code> correctly.</div>
+
+<h2>The problem</h2>
+<p>Pods are ephemeral; they are created and destroyed and their IP addresses change. A Service is "an abstraction that exposes a set of Pods over a network" and gives clients a stable endpoint.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a> It finds its Pods with a label selector.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+<pre><code>apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80</code></pre>
+<p><code>port</code> is the port the Service exposes; <code>targetPort</code> is the container port (equal by default).<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a> File: <a href="../examples/service.yaml"><code>service.yaml</code></a>.</p>
+<h2>Types</h2>
+<table>
+<tr><th>Type</th><th>Exposure<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></th></tr>
+<tr><td>ClusterIP (default)</td><td>only inside the cluster</td></tr>
+<tr><td>NodePort</td><td>each node's IP at a static port</td></tr>
+<tr><td>LoadBalancer</td><td>externally, via a cloud provider's load balancer</td></tr>
+<tr><td>ExternalName</td><td>maps the Service to an external DNS name</td></tr>
+</table>
+<p>Kubernetes keeps EndpointSlices up to date as matching Pods come and go, so your application needs no changes.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a> The relationship to the previous lesson: the Service selector <code>app: nginx</code> matches the Pod template labels from the Deployment.</p>
+<p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default Service type?</p>
+  <button>ExternalName</button>
+  <button>LoadBalancer</button>
+  <button data-correct>ClusterIP</button>
+  <button>NodePort</button>
+  <p class="explain">ClusterIP exposes the Service only within the cluster and is the default.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which Service field is the container's port?</p>
+  <button>selector</button>
+  <button>protocol</button>
+  <button>nodeName</button>
+  <button data-correct>targetPort</button>
+  <p class="explain">targetPort is the container port; port is what the Service exposes.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. How does a Service find its Pods?</p>
+  <button>The image tag</button>
+  <button>The node name</button>
+  <button data-correct>A label selector</button>
+  <button>The Pod name</button>
+  <p class="explain">Services use labels and selectors to identify backend Pods.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why not use Pod IPs directly?</p>
+  <button data-correct>They keep changing</button>
+  <button>They are encrypted</button>
+  <button>They are read-only</button>
+  <button>They are shared</button>
+  <p class="explain">Pods are ephemeral and their IPs change over time.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-wire-a-service.md">Exercise 0004: wire a Service</a></p>
+<p>Runnable example: <a href="../examples/service.yaml"><code>service.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes Docs: Service</a>. Sections on selectors, ports and Service types.</p>
+<p><a href="0003-deployments-and-labels.html">← Deployments, ReplicaSets and labels</a> &nbsp;|&nbsp; <a href="0009-configmaps.html">ConfigMaps: configuration outside the image →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes Docs: Service</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

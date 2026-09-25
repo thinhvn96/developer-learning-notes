@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 12: Testing: @SpringBootTest and test slices</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Testing: @SpringBootTest and test slices</h1>
+<p class="meta">Spring Boot · Lesson 0012 · step 12 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose between a full <code>@SpringBootTest</code> and a test slice, and know what <code>webEnvironment</code> does.</div>
+
+<h2>@SpringBootTest</h2>
+<p>Creates the <code>ApplicationContext</code> through <code>SpringApplication</code>, so external properties, logging and profiles work. It does <strong>not</strong> start a server by default. <code>webEnvironment</code>: <code>MOCK</code> (default, mock servlet environment), <code>RANDOM_PORT</code> and <code>DEFINED_PORT</code> (real embedded server), <code>NONE</code> (no web environment).<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+<h2>Slices</h2>
+<p>Slices load only part of the configuration to run faster and focus on one layer: <code>@WebMvcTest</code> (controllers, advice, filters, converters), <code>@DataJpaTest</code> (JPA components), <code>@JsonTest</code>, <code>@RestClientTest</code>. Replace beans with <code>@MockitoBean</code>/<code>@MockitoSpyBean</code>. MockMvc tests are faster than a running server but cannot test servlet-container behavior.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+<pre><code>@WebMvcTest(PersonController.class)     // only the web layer
+class PersonControllerTest { @Autowired MockMvc mvc; ... }
+
+@SpringBootTest @AutoConfigureMockMvc   // full context + MockMvc
+class ActuatorProbesTest { ... }</code></pre>
+<p>Both styles ran in the demo project (17 tests, all passing). Note for Boot 4.x: the slice annotations live in per-technology packages, for example <code>org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest</code> (I hit this when compiling; check imports if copying older examples). Code: <a href="../examples/demo-app/src/test/java/com/example/demo/PersonControllerTest.java"><code>PersonControllerTest.java</code></a>.</p>
+<div class="aside">Rule of thumb for interviews: many fast slice tests, few full-context tests, and real-dependency integration tests for persistence (see Testcontainers next).</div><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default webEnvironment for @SpringBootTest?</p>
+  <button>DEFINED_PORT</button>
+  <button data-correct>MOCK</button>
+  <button>NONE</button>
+  <button>RANDOM_PORT</button>
+  <p class="explain">MOCK is the default; no server starts.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which annotation tests only controllers?</p>
+  <button>@JsonTest</button>
+  <button>@SpringBootApplication</button>
+  <button data-correct>@WebMvcTest</button>
+  <button>@DataJpaTest</button>
+  <p class="explain">@WebMvcTest scans controllers and web components.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why prefer slices?</p>
+  <button>They replace JUnit</button>
+  <button data-correct>Faster, focused tests</button>
+  <button>They test everything</button>
+  <button>They start a server</button>
+  <p class="explain">Slices load only relevant configuration, reducing startup time.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Annotation to replace a bean with a mock?</p>
+  <button>@Primary</button>
+  <button data-correct>@MockitoBean</button>
+  <button>@Scope</button>
+  <button>@Profile</button>
+  <p class="explain">@MockitoBean defines Mockito mocks in the context.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-test-pyramid.md">Exercise 0012: a test pyramid</a></p>
+<p>Runnable example: <a href="../examples/demo-app/src/test/java/com/example/demo/PersonControllerTest.java"><code>demo-app/src/test/java/com/example/demo/PersonControllerTest.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot: Testing Spring Boot Applications</a>. @SpringBootTest and test slices sections.</p>
+<p><a href="0011-actuator-and-kubernetes-probes.html">← Actuator and Kubernetes probes</a> &nbsp;|&nbsp; <a href="0013-testcontainers-and-service-connection.html">Testcontainers and @ServiceConnection →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot: Testing Spring Boot Applications</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

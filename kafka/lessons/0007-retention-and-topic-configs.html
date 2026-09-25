@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 7: Retention and topic configuration</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Retention and topic configuration</h1>
+<p class="meta">Kafka · Lesson 0007 · step 3 of 10 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how long Kafka keeps data, which topic configs control it, and why 'consumed' does not mean 'deleted'.</div>
+
+<h2>Retention, not consumption</h2>
+<p>"Events are not deleted after consumption"; retention is set per topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[2]</a> The topic configs that decide (defaults from the 4.3 docs):<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+<table><tr><th>Config</th><th>Meaning and default<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></th></tr>
+<tr><td><code>cleanup.policy</code></td><td><code>delete</code> (default) discards old segments when their time or size limit is reached</td></tr>
+<tr><td><code>retention.ms</code></td><td>maximum time to keep a log: 604800000 (7 days)</td></tr>
+<tr><td><code>retention.bytes</code></td><td>maximum partition size before old segments are discarded: -1 (no limit)</td></tr>
+<tr><td><code>segment.bytes</code></td><td>segment file size: 1073741824 (1 GiB); "retention and cleaning is always done a file at a time"</td></tr>
+<tr><td><code>min.insync.replicas</code></td><td>minimum in-sync replicas for a write to succeed when <code>acks=all</code>: 1</td></tr>
+<tr><td><code>max.message.bytes</code></td><td>largest record batch: 1048588</td></tr></table>
+<pre><code>cd kafka/examples &amp;&amp; ./02-retention-and-compaction.sh
+cleanup.policy=delete   retention.ms=604800000   retention.bytes=-1</code></pre>
+<p>That output is <code>kafka-configs.sh --describe --all</code> on a fresh topic. Note the retention granularity: because deletion works per segment file, data can outlive <code>retention.ms</code> until its segment is closed and eligible (derived from the segment note above). Source: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default cleanup.policy?</p>
+  <button>archive</button>
+  <button>none</button>
+  <button>compact</button>
+  <button data-correct>delete</button>
+  <p class="explain">The delete policy is the default.<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default retention.ms?</p>
+  <button>Forever</button>
+  <button>One minute</button>
+  <button>One hour</button>
+  <button data-correct>Seven days</button>
+  <p class="explain">604800000 ms is seven days.<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. After a consumer reads an event...?</p>
+  <button>It is deleted</button>
+  <button>It is moved</button>
+  <button>It is duplicated</button>
+  <button data-correct>It stays until retention</button>
+  <p class="explain">Events are not deleted after consumption.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Retention deletion works on what unit?</p>
+  <button>Whole topics</button>
+  <button>Single partitions</button>
+  <button>Single records</button>
+  <button data-correct>Whole segment files</button>
+  <p class="explain">Retention and cleaning are done a file at a time.<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-set-retention.md">Exercise 0007: set retention</a></p>
+<p>Runnable example: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka Topic Configs</a>. cleanup.policy, retention.ms, retention.bytes, segment.bytes.</p>
+<p><a href="0002-producers-keys-and-acks.html">← Producers, keys and acks</a> &nbsp;|&nbsp; <a href="0003-consumers-groups-and-offsets.html">Consumers, consumer groups and offsets →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka Topic Configs</a> · [2] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka Introduction</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

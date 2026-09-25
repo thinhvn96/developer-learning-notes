@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 6: Rate limiting and the token bucket</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Rate limiting and the token bucket</h1>
+<p class="meta">System Design · Lesson 0006 · step 5 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain rate limiting as a client-side discipline and run a token bucket.</div>
+
+<h2>The problem</h2>
+<p>Hammering a throttled service and retrying rejected requests multiplies traffic: the docs' example ingests 10,000 records into a service that accepts 2,000 per pass and ends up sending 30,000 records in total.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a> The Rate Limiting pattern controls "the rate at which your application sends requests to a service so that you stay within the service's throttling limits".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+<h2>How</h2>
+<ul><li>Throttle on operations per second, data per minute, or cost of operations.</li>
+<li>Prefer sending smaller batches more often (even out the flow) rather than one burst per period.</li>
+<li>Put records into a durable messaging system and have job processors read at a controlled rate.</li>
+<li>Coordinate retries with rate limiting: avoid retry storms, propagate back-pressure such as HTTP 429 with <code>Retry-After</code>, and use a limited number of retries with small random delays.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></li></ul>
+<h2>A token bucket (my implementation of a common algorithm)</h2>
+<pre><code>java system-design/examples/TokenBucketDemo.java     # burst 5, refill 10/s
+20 requests fired instantly -&gt; allowed=5 rejected=15
+1 s of attempts every 10 ms -&gt; allowed=9 (about the refill rate)</code></pre>
+<p>The Azure page describes the pattern; the token bucket is one common algorithm and is my example, not the docs'. Source: <a href="../examples/TokenBucketDemo.java"><code>TokenBucketDemo.java</code></a>. Not suitable when the operation needs immediate synchronous completion with very low latency, or when the bottleneck is concurrency rather than request rate.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a> See <a href="0002-retries-and-idempotency.html">retries</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Rate limiting controls what?</p>
+  <button>Thread names</button>
+  <button>Log level</button>
+  <button data-correct>Requests sent to a service</button>
+  <button>Disk size</button>
+  <p class="explain">It controls the rate at which the application sends requests.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What do naive retries on throttling cause?</p>
+  <button>Nothing</button>
+  <button>Faster completion</button>
+  <button>Less traffic</button>
+  <button data-correct>Extra traffic</button>
+  <p class="explain">The docs' example sent 30,000 records for 10,000 real ones.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Server signal to slow down?</p>
+  <button data-correct>HTTP 429 with Retry-After</button>
+  <button>HTTP 301</button>
+  <button>HTTP 404</button>
+  <button>HTTP 200</button>
+  <p class="explain">Propagate back-pressure such as 429 with Retry-After.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Token bucket burst of 5. Instant 20 requests. Allowed?</p>
+  <button data-correct>Five</button>
+  <button>Ten</button>
+  <button>Zero</button>
+  <button>Twenty</button>
+  <p class="explain">The demo allowed 5 and rejected 15.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-limit-an-api.md">Exercise 0006: limit an API</a></p>
+<p>Runnable example: <a href="../examples/TokenBucketDemo.java"><code>TokenBucketDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">Azure: Rate Limiting pattern</a>. Context, solution, considerations.</p>
+<p><a href="0005-bulkhead.html">← The bulkhead pattern</a> &nbsp;|&nbsp; <a href="0007-queue-based-load-leveling.html">Queue-based load leveling →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">Azure: Rate Limiting pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

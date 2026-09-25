@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 8: Log compaction and tombstones</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Log compaction and tombstones</h1>
+<p class="meta">Kafka · Lesson 0008 · step 6 of 10 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain log compaction's guarantees, when to use it instead of time-based retention, and what a tombstone does.</div>
+
+<h2>The guarantee</h2>
+<p>"Log compaction ensures that Kafka will always retain at least the last known value for each message key within the log of data for a single topic partition." Unlike time or size retention, which discard <em>all</em> old data, compaction removes only records that have a newer update for the same key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+<h2>Guarantees</h2>
+<ul><li>Consumers that keep up see every message with sequential offsets.</li><li>Message order is never changed; only removal occurs.</li><li>Offsets of remaining messages never change.</li><li>A consumer reading from the start sees the final state of every record, in original write order.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li></ul>
+<p>Uses: database change subscriptions, event sourcing, journaling for local state recovery.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> <strong>Tombstones:</strong> a message with a null payload deletes prior messages with that key, and is itself cleaned after <code>delete.retention.ms</code> (default 24 hours).<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+<h2>Watch it (aggressive settings so it finishes in a minute)</h2>
+<pre><code>cleanup.policy=compact  segment.ms=1000  min.cleanable.dirty.ratio=0.01  delete.retention.ms=100
+produce u1:v1 u2:a u1:v2 u1:v3 u2:b
+before compaction: u1 v1 | u1 v2 | u1 v3 | u2 a | u2 b
+after  compaction: u1 v3 | u2 b            (plus later filler keys)
+produce u2:&lt;null&gt; (tombstone), more records, wait
+after  tombstone : u1 v3                     (u2 is gone)</code></pre>
+<p>Compaction runs in the background on closed segments, so it is not instant; the demo forces segment rolls with filler records. Do not use these aggressive values in production. Source: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does compaction always keep?</p>
+  <button>All records</button>
+  <button data-correct>Last value per key</button>
+  <button>Nothing</button>
+  <button>First record only</button>
+  <p class="explain">At least the last known value for each key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Do offsets change after compaction?</p>
+  <button>Only in follower replicas</button>
+  <button data-correct>No, they are stable</button>
+  <button>Yes, renumbered</button>
+  <button>Only for tombstones</button>
+  <p class="explain">Offsets remain permanently stable identifiers.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What is a tombstone?</p>
+  <button>An expired topic</button>
+  <button>A full segment</button>
+  <button>A stopped broker</button>
+  <button data-correct>A null-value record</button>
+  <p class="explain">Null payloads act as deletion markers for their key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Good use of compaction?</p>
+  <button data-correct>Latest state per key</button>
+  <button>Audit history of all events</button>
+  <button>Ephemeral metrics</button>
+  <button>Large file storage</button>
+  <p class="explain">Change subscriptions and state restoration need only the latest value per key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-compact-a-profile-topic.md">Exercise 0008: compact a profile topic</a></p>
+<p>Runnable example: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Design: Log Compaction</a>. Read 'Log Compaction' fully.</p>
+<p><a href="0004-delivery-semantics.html">← Delivery semantics: at most, at least, exactly once</a> &nbsp;|&nbsp; <a href="0005-replication-isr-and-durability.html">Replication, ISR and durability →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: Log Compaction</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

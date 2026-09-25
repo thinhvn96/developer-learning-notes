@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 7: Queue-based load leveling</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Queue-based load leveling</h1>
+<p class="meta">System Design · Lesson 0007 · step 6 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how a queue levels load between a producer and a service, and its limits.</div>
+
+<h2>Idea</h2>
+<p>Place a queue between the task and the service: "The queue acts as a buffer and stores the message until the service retrieves it." Tasks and service run asynchronously; the service handles messages "at its own pace even when concurrent tasks generate a high volume of requests". Benefits: availability (service delays do not immediately affect the app), scalability, cost control (provision for average, not peak).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+<pre><code>java system-design/examples/LoadLevelingDemo.java
+burst of 100 accepted in 0 ms; queue length now ~98
+all processed after 5015 ms; max concurrent work at the service = 2</code></pre>
+<p>The burst was accepted instantly; the two workers (100 ms per task) drained it at their own pace and the service never saw more than 2 concurrent tasks. Source: <a href="../examples/LoadLevelingDemo.java"><code>LoadLevelingDemo.java</code></a>.</p>
+<h2>Considerations</h2>
+<ul><li>If the average producer rate exceeds the consumer rate, the queue grows and latency increases: monitor depth and scale within safe limits or shed work.</li>
+<li>Queues are one-way; a caller expecting a reply needs another mechanism.</li>
+<li>Durability matters: a broker that does not persist can lose enqueued work.</li>
+<li>At-least-once delivery means idempotent consumers; route poison messages to a dead-letter queue.</li>
+<li>Ordering is not preserved under parallel consumers.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></li></ul>
+<p>Not for low-latency synchronous responses.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a> Implementations in this course: <a href="../../rabbitmq/index.html">RabbitMQ</a> and <a href="../../kafka/index.html">Kafka</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does the queue buffer between?</p>
+  <button data-correct>Task and service</button>
+  <button>Disk and memory</button>
+  <button>Two databases</button>
+  <button>Client and DNS</button>
+  <p class="explain">It sits between a task and the service it invokes.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Producers faster than consumers on average. Result?</p>
+  <button>Messages vanish</button>
+  <button>Consumers speed up</button>
+  <button>Nothing changes</button>
+  <button data-correct>Queue and latency grow</button>
+  <p class="explain">The queue continues to grow and latency increases.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Poor fit when...?</p>
+  <button>Consumers scale</button>
+  <button>Load is bursty</button>
+  <button>Service is slow</button>
+  <button data-correct>A low-latency reply is needed</button>
+  <p class="explain">It is not suitable when the caller needs a low-latency synchronous response.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cost benefit?</p>
+  <button>No servers needed</button>
+  <button>Provision for peak load</button>
+  <button>Free queues</button>
+  <button data-correct>Provision for average load</button>
+  <p class="explain">You need enough instances for average rather than peak load.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-size-a-queue.md">Exercise 0007: size a queue</a></p>
+<p>Runnable example: <a href="../examples/LoadLevelingDemo.java"><code>LoadLevelingDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">Azure: Queue-Based Load Leveling</a>. Solution and considerations.</p>
+<p><a href="0006-rate-limiting.html">← Rate limiting and the token bucket</a> &nbsp;|&nbsp; <a href="0008-competing-consumers.html">Competing consumers →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">Azure: Queue-Based Load Leveling</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

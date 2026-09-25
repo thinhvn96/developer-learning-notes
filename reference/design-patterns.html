@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>main{max-width:60rem} td,th{font-size:.8rem}</style>
+</head>
+<body>
+<main>
+<h1>Design patterns cheat sheet</h1>
+<p class="meta"><a href="../index.html">Home</a> · Reference · print-friendly · <a href="../design-patterns/index.html">Design Patterns ladder</a> · <a href="../design-patterns/interview.html">Interview Q&amp;A</a> · <a href="../oop/index.html">OOP ladder</a></p>
+<p>Intent lines paraphrase the patterns' pages on <a href="https://refactoring.guru/design-patterns/catalog">Refactoring.Guru</a>; JDK examples were run in the lessons (my classification where a Javadoc does not name the pattern).</p>
+<table>
+<tr><th>Category</th><th>Pattern</th><th>Intent</th><th>Use when</th><th>JDK example</th></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0004-factory-method.html">Factory Method</a></td><td>superclass method lets subclasses choose the product type</td><td>not knowing exact types up front; framework extension</td><td>List.of, Integer.valueOf</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0005-abstract-factory.html">Abstract Factory</a></td><td>produce families of related objects without naming concrete classes</td><td>matching product families (themes, platforms)</td><td>-</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0006-builder.html">Builder</a></td><td>construct complex objects step by step</td><td>many optional parameters (telescoping constructor)</td><td>StringBuilder</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0007-prototype.html">Prototype</a></td><td>copy existing objects without depending on their classes</td><td>cloning configured templates; watch shallow vs deep</td><td>Cloneable/clone</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0008-singleton.html">Singleton</a></td><td>one instance plus global access point</td><td>exactly one shared resource; prefer DI scope</td><td>Runtime.getRuntime()</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0009-adapter.html">Adapter</a></td><td>make incompatible interfaces collaborate</td><td>reuse a class with a mismatched interface</td><td>Arrays.asList</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0010-bridge.html">Bridge</a></td><td>split abstraction and implementation into two hierarchies</td><td>several orthogonal dimensions of variation</td><td>-</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0011-composite.html">Composite</a></td><td>tree structures treated as single objects</td><td>part-whole hierarchies</td><td>-</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0012-decorator.html">Decorator</a></td><td>attach behavior by wrapping objects</td><td>add responsibilities at runtime, stackable</td><td>BufferedReader, unmodifiableList</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0013-facade.html">Facade</a></td><td>simplified interface to a complex subsystem</td><td>layering; hiding subsystem complexity</td><td>-</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0014-flyweight.html">Flyweight</a></td><td>share common state to save RAM</td><td>huge numbers of similar objects</td><td>Integer.valueOf cache</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0015-proxy.html">Proxy</a></td><td>substitute controlling access to another object</td><td>lazy load, access control, logging, caching</td><td>java.lang.reflect.Proxy</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0016-chain-of-responsibility.html">Chain of Responsibility</a></td><td>pass requests along a chain of handlers</td><td>ordered, changeable handling steps</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0017-command.html">Command</a></td><td>request as an object</td><td>queue, schedule, undo</td><td>Runnable</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0018-iterator.html">Iterator</a></td><td>traverse without exposing representation</td><td>uniform traversal</td><td>Iterator/Iterable</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0019-mediator.html">Mediator</a></td><td>reduce chaotic dependencies via one coordinator</td><td>many tightly coupled components</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0020-memento.html">Memento</a></td><td>save and restore state without exposing it</td><td>undo, rollback snapshots</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0021-observer.html">Observer</a></td><td>subscription to notify many objects of events</td><td>dynamic set of dependents</td><td>Flow (Observable deprecated)</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0022-state.html">State</a></td><td>behavior changes with internal state</td><td>many states, big conditionals</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0023-strategy.html">Strategy</a></td><td>interchangeable algorithm family</td><td>switch algorithms at runtime</td><td>Comparator</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0024-template-method.html">Template Method</a></td><td>algorithm skeleton, subclasses fill steps</td><td>share near-identical algorithms</td><td>AbstractList</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0025-visitor.html">Visitor</a></td><td>separate algorithms from object structure</td><td>many operations over a stable hierarchy</td><td>FileVisitor</td></tr>
+</table>
+<h2>SOLID in one line each</h2>
+<ul>
+<li><a href="../oop/lessons/0017-single-responsibility-principle.html">SRP</a>: one reason to change per class.</li>
+<li><a href="../oop/lessons/0018-open-closed-principle.html">OCP</a>: open for extension, closed for modification.</li>
+<li><a href="../oop/lessons/0019-liskov-substitution-principle.html">LSP</a>: subtypes substitutable for their base types.</li>
+<li><a href="../oop/lessons/0020-interface-segregation-principle.html">ISP</a>: do not depend on methods you do not use.</li>
+<li><a href="../oop/lessons/0021-dependency-inversion-principle.html">DIP</a>: depend on abstractions, not concretes.</li></ul>
+<h2>Look-alikes</h2>
+<ul><li>Strategy (client picks, no transitions) vs State (states trigger transitions).</li><li>Decorator/Proxy (same interface) vs Adapter (different) vs Facade (simplified subsystem interface).</li><li>Template Method (inheritance) vs Strategy (composition).</li><li>Mediator (central coordinator) vs Observer (one-way subscriptions).</li></ul>
+<p>More: <a href="../design-patterns/lessons/0026-choosing-between-similar-patterns.html">choosing between similar patterns</a>.</p>
+<footer><p><strong>Ask your teacher</strong> to quiz you on which pattern fits a scenario.</p></footer>
+</main>
+</body>
+</html>

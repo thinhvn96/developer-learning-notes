@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 8: Dockerfile instructions: ENV vs ARG, COPY vs ADD, EXPOSE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Dockerfile instructions: ENV vs ARG, COPY vs ADD, EXPOSE</h1>
+<p class="meta">Docker · Lesson 0008 · step 3 of 12 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose between ENV and ARG, COPY and ADD, and know that EXPOSE does not publish a port.</div>
+
+<h2>The instructions, one line each</h2>
+<table><tr><th>Instruction</th><th>Meaning<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></th></tr>
+<tr><td><code>FROM</code></td><td>create a new build stage from a base image; the first instruction (after optional <code>ARG</code>)</td></tr>
+<tr><td><code>RUN</code></td><td>execute build commands; creates a layer</td></tr>
+<tr><td><code>COPY</code> / <code>ADD</code></td><td>COPY transfers files from the build context; ADD is similar but also handles remote URLs and tar extraction</td></tr>
+<tr><td><code>ENV</code></td><td>environment variables that persist in the final image and are available to later instructions</td></tr>
+<tr><td><code>ARG</code></td><td>build-time variables passed with <code>--build-arg</code>; not embedded in the final image</td></tr>
+<tr><td><code>EXPOSE</code></td><td>describes which ports the app listens on; documents, does not publish</td></tr>
+<tr><td><code>USER</code>, <code>WORKDIR</code>, <code>VOLUME</code>, <code>HEALTHCHECK</code></td><td>user/group, working directory, mount points, health probe</td></tr></table>
+<h2>Check it</h2>
+<pre><code>cd docker/examples &amp;&amp; ./05-cmd-entrypoint-arg-env.sh
+ARG is not visible at runtime, ENV is
+APP_MODE=prod BUILD_ID=&lt;unset&gt;</code></pre>
+<p>Practical rule: prefer <code>COPY</code> unless you need what <code>ADD</code> adds (a common recommendation; the reference page only states the difference). Never pass secrets as <code>ARG</code> or <code>ENV</code> if the image is shared (my inference from "persists in the final image"). Files: <a href="../examples/entrypoint-demo/Dockerfile"><code>entrypoint-demo/Dockerfile</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which variable exists only at build time?</p>
+  <button>USER</button>
+  <button>PATH</button>
+  <button>ENV</button>
+  <button data-correct>ARG</button>
+  <p class="explain">ARG values are passed at build time and not embedded in the final image.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does EXPOSE do?</p>
+  <button>Publishes the port</button>
+  <button>Opens the firewall</button>
+  <button>Starts the service</button>
+  <button data-correct>Documents a port</button>
+  <p class="explain">It describes the ports the app listens on without publishing them.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. COPY vs ADD: what does ADD also handle?</p>
+  <button>Symbolic links</button>
+  <button>User creation</button>
+  <button>Environment variables</button>
+  <button data-correct>URLs and tar files</button>
+  <p class="explain">ADD also handles remote URLs and tar extraction.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Where must FROM appear?</p>
+  <button>Anywhere</button>
+  <button>Last line</button>
+  <button>After RUN</button>
+  <button data-correct>First, after ARG</button>
+  <p class="explain">FROM is the first instruction, apart from optional ARG or parser directives.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-review-a-dockerfile.md">Exercise 0008: review a Dockerfile</a></p>
+<p>Runnable example: <a href="../examples/entrypoint-demo/Dockerfile"><code>entrypoint-demo/Dockerfile</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a>. Read the instruction summaries for FROM, RUN, CMD, ENTRYPOINT, COPY, ENV, ARG, EXPOSE.</p>
+<p><a href="0007-run-flags-and-container-lifecycle.html">← docker run: flags and the container lifecycle</a> &nbsp;|&nbsp; <a href="0002-layer-cache-and-dockerfile-order.html">Layer cache and Dockerfile ordering →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

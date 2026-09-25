@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 12: JDK 10 and 15: var and text blocks (in JDK 17)</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 10 and 15: var and text blocks (in JDK 17)</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0012 · step 19 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use <code>var</code> and text blocks correctly, and state where <code>var</code> is not allowed.</div>
+
+<h2>var (delivered in JDK 10, so present in 17 and 21)</h2>
+<p>JEP 286 "extend[s] type inference to declarations of local variables with initializers."<a class="cite" href="https://openjdk.org/jeps/286">[1]</a> It applies to local variables with initializers and for-loop indexes. It is <em>not</em> available for method parameters, constructor parameters, return types, fields or catch parameters; nor for variables without an initializer.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a> It stays statically typed: <code>var list = new ArrayList&lt;String&gt;();</code> is still an <code>ArrayList&lt;String&gt;</code>.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a></p>
+<h2>Text blocks (final in JDK 15)</h2>
+<p>"A text block is a multi-line string literal that avoids the need for most escape sequences, automatically formats the string in a predictable way, and gives the developer control over the format when desired."<a class="cite" href="https://openjdk.org/jeps/378">[2]</a> It opens with <code>"""</code> followed by a line terminator. Double quotes inside need no escaping. Leading indentation common to all lines is stripped, and trailing whitespace is removed.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a> Two escapes arrived with the feature: <code>\&lt;line-terminator&gt;</code> suppresses a newline and <code>\s</code> is a space.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a></p>
+<pre><code>var json = """
+        {
+          "name": "orders",
+          "port": 8080
+        }
+        """;</code></pre>
+<p>Run it via <a href="../examples/jdk17/Jdk17Features.java"><code>Jdk17Features.java</code></a> (compiled with <code>--release 17</code>).</p>
+<div class="aside">JDK 8 to 17 migration note: neither feature exists on 8. Code using them compiles only at <code>--release 10</code>+ (var) or <code>15</code>+ (text blocks).</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Where is <code>var</code> NOT allowed?</p>
+  <button>For-loop indexes</button>
+  <button data-correct>Method parameters</button>
+  <button>Local variables</button>
+  <button>Initialized locals</button>
+  <p class="explain">It is not available for method formals, fields, return types or catch formals.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A var-declared list is typed how?</p>
+  <button>Dynamically at runtime</button>
+  <button>As raw ArrayList</button>
+  <button>As Object always</button>
+  <button data-correct>Statically inferred</button>
+  <p class="explain">Type safety is kept; the compiler infers the static type.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Text blocks open with what?</p>
+  <button>Single quote pair</button>
+  <button>Backtick and newline</button>
+  <button data-correct>Triple quote and newline</button>
+  <button>Double quote and tab</button>
+  <p class="explain">The opening delimiter must be followed by a line terminator.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Release that made text blocks final?</p>
+  <button data-correct>JDK 15</button>
+  <button>JDK 11</button>
+  <button>JDK 8</button>
+  <button>JDK 21</button>
+  <p class="explain">Text blocks became permanent in Java 15 after previews in 13 and 14.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-var-and-text-block-review.md">Exercise 0012: review with var and text blocks</a></p>
+<p>Runnable example: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a>. JEPs are the primary source for what each release changed.</p>
+<p><a href="0007-heap-and-garbage-collection.html">← Heap sizing and garbage collection</a> &nbsp;|&nbsp; <a href="0013-switch-expressions-and-instanceof-patterns.html">JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17) →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a> · [2] <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

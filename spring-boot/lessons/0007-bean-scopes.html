@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 7: Bean scopes: singleton vs prototype</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bean scopes: singleton vs prototype</h1>
+<p class="meta">Spring Boot · Lesson 0007 · step 3 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> state the six bean scopes, the default, and why a prototype injected into a singleton stops being 'new'.</div>
+
+<h2>Scopes</h2>
+<table><tr><th>Scope</th><th>Meaning<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></th></tr>
+<tr><td>singleton (default)</td><td>one shared instance per container</td></tr>
+<tr><td>prototype</td><td>a new instance each time it is requested</td></tr>
+<tr><td>request, session, application, websocket</td><td>web-aware scopes</td></tr></table>
+<p>Spring's singleton "differs from the GoF singleton": it is per container and per bean, not per class loader. Use prototype for stateful beans, singleton for stateless ones. For prototypes the container does not call destruction callbacks; the client must clean up.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+<h2>The trap</h2>
+<p>"When a singleton bean has a dependency on a prototype bean, the prototype bean is injected only once at singleton instantiation time." To get a new instance at runtime you need something like method injection, or an <code>ObjectProvider</code>.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+<pre><code>RESULT singleton getBean twice, same instance: true
+RESULT prototype getBean twice, ids: 2 and 3
+RESULT injected prototype ids: 1, 1   ObjectProvider ids: 4, 5</code></pre>
+<p>Code: <a href="../examples/demo-app/src/main/java/com/example/demo/config/Scopes.java"><code>Scopes.java</code></a>, <a href="../examples/demo-app/src/test/java/com/example/demo/ScopeTest.java"><code>ScopeTest.java</code></a>. Interview consequence: singleton beans must be thread-safe, since many requests share them.</p><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default bean scope?</p>
+  <button>session</button>
+  <button>prototype</button>
+  <button>request</button>
+  <button data-correct>singleton</button>
+  <p class="explain">Singleton is the default scope.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Prototype injected into a singleton. New instance per call?</p>
+  <button>Only in tests</button>
+  <button data-correct>No, injected once</button>
+  <button>Yes, every call</button>
+  <button>Yes, per thread</button>
+  <p class="explain">It is injected only once at singleton instantiation (the test showed ids 1 and 1).<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Spring singleton means...?</p>
+  <button>One per JVM class</button>
+  <button data-correct>One per container per bean</button>
+  <button>One per request</button>
+  <button>One per thread</button>
+  <p class="explain">It is per-container and per-bean, not per class loader.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Who cleans up prototype beans?</p>
+  <button>The container</button>
+  <button>Nobody</button>
+  <button>The GC only</button>
+  <button data-correct>The client code</button>
+  <p class="explain">Destruction callbacks are not called for prototypes; the client cleans up.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-thread-safe-singleton.md">Exercise 0007: a thread-safe singleton</a></p>
+<p>Runnable example: <a href="../examples/demo-app/src/main/java/com/example/demo/config/Scopes.java"><code>demo-app/src/main/java/com/example/demo/config/Scopes.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a>. Singleton, Prototype and 'Singleton beans with prototype-bean dependencies'.</p>
+<p><a href="0002-constructor-injection.html">← Constructor versus setter injection</a> &nbsp;|&nbsp; <a href="0003-auto-configuration.html">Auto-configuration and how to see it →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

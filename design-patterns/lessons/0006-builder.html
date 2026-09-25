@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 6: Builder</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Builder</h1>
+<p class="meta">Design Patterns · Lesson 0006 · step 6 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> replace a telescoping constructor with a builder and validate in <code>build()</code>.</div>
+
+<h2>Intent</h2>
+<p>Builder is "a creational design pattern that lets you construct complex objects step by step." It addresses the telescoping-constructor problem (many optional parameters), constructs different representations with the same steps, and builds composite trees without exposing incomplete products.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/BuilderDemo.java
+Pizza(large, cheese=true, pepperoni=false, mushrooms=true, olives=false, extra=2)
+Pizza(large, cheese=true, pepperoni=false, mushrooms=true, olives=false, extra=2)
+StringBuilder is the JDK&#x27;s best-known builder: a1!
+build() validates: size is required</code></pre><p>Compare the constructor call with the fluent builder: only the steps you want are written, and <code>build()</code> is the single place to validate. Source: <a href="../examples/BuilderDemo.java"><code>BuilderDemo.java</code></a>. The builder is a static nested class (<a href="../../oop/lessons/0012-nested-classes.html">OOP lesson</a>). In the JDK: <code>StringBuilder</code> and <code>HttpRequest.newBuilder()</code>; for simple immutable data, records plus a compact constructor (<a href="../../java/lessons/0003-records-and-immutability.html">lesson</a>) are often enough.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Step-by-step construction, deferrable or recursive</li><li>Reuses construction code across representations</li><li>Isolates complex construction logic (Single Responsibility)</li></ul>
+<p><strong>Cons</strong></p><ul><li>More classes and code complexity</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a> Factory Method is simpler but less flexible; Abstract Factory returns products immediately while Builder allows extra steps; Builder pairs with Composite to build trees.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Builder solves which problem?</p>
+  <button>Slow loops</button>
+  <button data-correct>Telescoping constructors</button>
+  <button>Deep copies</button>
+  <button>Global access</button>
+  <p class="explain">Constructors that accumulate many optional parameters.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Where do you validate?</p>
+  <button>Nowhere</button>
+  <button>In toString</button>
+  <button>In every setter only</button>
+  <button data-correct>In build()</button>
+  <p class="explain">The demo threw from build() when size was blank.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Builder vs Abstract Factory?</p>
+  <button>Builder is faster</button>
+  <button>Same thing</button>
+  <button>Builder needs no class</button>
+  <button data-correct>Builder allows extra steps</button>
+  <p class="explain">Abstract Factory returns products immediately; Builder allows additional steps.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cost?</p>
+  <button>Static state</button>
+  <button>No immutability</button>
+  <button data-correct>More classes</button>
+  <button>Slow reads</button>
+  <p class="explain">It increases code complexity through new classes.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-build-an-http-request.md">Exercise 6: build a request</a></p>
+<p>Runnable example: <a href="../examples/BuilderDemo.java"><code>BuilderDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/builder">Builder (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0005-abstract-factory.html">← Abstract Factory</a> &nbsp;|&nbsp; <a href="0007-prototype.html">Prototype →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/builder">Builder (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

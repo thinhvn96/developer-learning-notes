@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 8: Namespaces: isolating groups of resources</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Namespaces: isolating groups of resources</h1>
+<p class="meta">Kubernetes · Lesson 0008 · step 3 of 15 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what a namespace isolates, name the four default namespaces, and set a default namespace for <code>kubectl</code>.</div>
+
+<h2>What namespaces do</h2>
+<p>"Namespaces provide a mechanism for isolating groups of resources within a single cluster. Names of resources need to be unique within a namespace, but not across namespaces." Scoping applies to namespaced objects (Deployments, Services...), not cluster-wide ones (StorageClass, Nodes, PersistentVolumes). Namespaces cannot be nested, and each resource lives in exactly one.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+<table><tr><th>Initial namespace</th><th>Purpose<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></th></tr>
+<tr><td><code>default</code></td><td>where you land when you specify none</td></tr>
+<tr><td><code>kube-system</code></td><td>objects created by Kubernetes itself</td></tr>
+<tr><td><code>kube-public</code></td><td>readable by all clients; reserved for cluster use</td></tr>
+<tr><td><code>kube-node-lease</code></td><td>Lease objects for node heartbeats</td></tr></table>
+<p>Not for minor differences: "use labels to distinguish resources within the same namespace" rather than a namespace per software version.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+<h2>Try it</h2>
+<pre><code>kubectl apply -f examples/namespace-demo.yaml     # Namespace demo + Pod demo/hello
+kubectl -n demo logs hello                 -&gt; hello from hello
+kubectl get pod hello                      -&gt; Error: pods "hello" not found     # wrong namespace
+kubectl config set-context --current --namespace=demo   # change the default</code></pre>
+<p>The "not found" error is the everyday symptom of forgetting <code>-n</code>. File: <a href="../examples/namespace-demo.yaml"><code>namespace-demo.yaml</code></a>.</p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Names must be unique where?</p>
+  <button>Across images</button>
+  <button data-correct>Within a namespace</button>
+  <button>Across nodes</button>
+  <button>Across the cluster</button>
+  <p class="explain">Names need to be unique within a namespace, not across namespaces.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Can namespaces be nested?</p>
+  <button>Only for Nodes</button>
+  <button>Yes, unlimited</button>
+  <button>Yes, two levels</button>
+  <button data-correct>No</button>
+  <p class="explain">Namespaces are not nested.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which object is cluster-scoped?</p>
+  <button>Pod</button>
+  <button>Service</button>
+  <button data-correct>PersistentVolume</button>
+  <button>Deployment</button>
+  <p class="explain">PersistentVolumes, Nodes and StorageClasses are not namespaced.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. To tell app versions apart, use...?</p>
+  <button>Nodes</button>
+  <button data-correct>Labels</button>
+  <button>Namespaces</button>
+  <button>Secrets</button>
+  <p class="explain">Use labels to distinguish slightly different resources in the same namespace.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-two-environments.md">Exercise 0008: two environments</a></p>
+<p>Runnable example: <a href="../examples/namespace-demo.yaml"><code>namespace-demo.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">Kubernetes Docs: Namespaces</a>. Short page.</p>
+<p><a href="0002-pods.html">← Pods: the smallest deployable unit</a> &nbsp;|&nbsp; <a href="0003-deployments-and-labels.html">Deployments, ReplicaSets and labels →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">Kubernetes Docs: Namespaces</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

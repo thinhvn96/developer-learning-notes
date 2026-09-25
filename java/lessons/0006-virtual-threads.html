@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 6: Virtual threads: scale, not speed</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Virtual threads: scale, not speed</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0006 · step 26 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what a virtual thread is, when it helps, and the two rules: don't pool them, and use a Semaphore to limit concurrency.</div>
+
+<h2>What they are</h2>
+<p>"Like a platform thread, a virtual thread is also an instance of <code>java.lang.Thread</code>. However, a virtual thread isn't tied to a specific OS thread." When code in a virtual thread calls a blocking I/O operation, the runtime suspends it and frees the OS thread for other virtual threads.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
+<h2>Scale, not speed</h2>
+<p>"Virtual threads are not faster threads; they do not run code any faster than platform threads. They exist to provide scale (higher throughput), not speed (lower latency)."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a> They suit thread-per-request servers with lots of blocking I/O; write simple blocking code.</p>
+<h2>Two rules</h2>
+<ul>
+<li>"Never pool virtual threads." One virtual thread per task: <code>Executors.newVirtualThreadPerTaskExecutor()</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></li>
+<li>To limit concurrency (say, calls to a downstream service), use a <code>Semaphore</code>, not a pool.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></li>
+</ul>
+<p>Caveat: virtual threads can be <em>pinned</em> to their carrier, for example in native calls, which hurts scalability but not correctness.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
+<pre><code>java java/examples/VirtualThreadsDemo.java
+10,000 one-second tasks finished in 1041 ms</code></pre>
+<p>Ten thousand one-second sleeps finish in about one second. With a fixed pool of 200 platform threads the same job would take about 50 seconds (10,000 / 200 x 1 s); try it in the exercise.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Main benefit of virtual threads?</p>
+  <button>Faster CPU-bound loops</button>
+  <button>Smaller compiled bytecode</button>
+  <button>Lower latency per call</button>
+  <button data-correct>Higher overall throughput</button>
+  <p class="explain">They provide scale (throughput), not speed.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How should you manage virtual threads?</p>
+  <button>Reuse a single one</button>
+  <button>Share one per core</button>
+  <button data-correct>Create one per task</button>
+  <button>Pool them in 200</button>
+  <p class="explain">Represent every task as a virtual thread; never pool them.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. How do you cap concurrent downstream calls?</p>
+  <button>Disable blocking I/O</button>
+  <button data-correct>Use a Semaphore</button>
+  <button>Use daemon threads</button>
+  <button>Shrink the thread pool</button>
+  <p class="explain">The docs recommend a Semaphore to limit concurrency.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which workload gains least from virtual threads?</p>
+  <button>Waiting on queues</button>
+  <button data-correct>Pure CPU number crunching</button>
+  <button>Blocking HTTP calls</button>
+  <button>Blocking JDBC calls</button>
+  <p class="explain">CPU-bound work does not block, so unmounting brings no benefit; they run code no faster.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-pool-vs-virtual.md">Exercise 0006: pool vs virtual</a></p>
+<p>Runnable example: <a href="../examples/VirtualThreadsDemo.java"><code>VirtualThreadsDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Virtual Threads (Oracle Java core libraries guide)</a>. Read the whole page; it is short.</p>
+<p><a href="0016-sequenced-collections.html">← JDK 21: sequenced collections</a> &nbsp;|&nbsp; <a href="0017-generational-zgc.html">JDK 21: generational ZGC →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Java core libraries: Virtual Threads</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

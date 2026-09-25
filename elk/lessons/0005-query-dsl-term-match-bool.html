@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 5: Query DSL: term, match and bool</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Query DSL: term, match and bool</h1>
+<p class="meta">ELK Stack · Lesson 0005 · step 7 of 14 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pick <code>match</code> versus <code>term</code> correctly, and structure a <code>bool</code> query with <code>filter</code> for exact conditions.</div>
+
+<h2>text versus keyword, term versus match</h2>
+<p>"Avoid using the <code>term</code> query for <code>text</code> fields." By default Elasticsearch changes text values during analysis, which "can make finding exact matches for text field values difficult"; use <code>match</code> for text fields.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[1]</a> Exact values such as ids or usernames belong in <code>keyword</code> fields, searched with <code>term</code>.</p>
+<pre><code>term  'Timeout' (exact token):            0 hits
+term  'timeout' (lowercased token):       1 hit
+match 'Timeout' (query is analyzed too):  1 hit</code></pre>
+<p>The message <code>Connection Timeout to payment-service</code> was analyzed into lowercase tokens, so a <code>term</code> for <code>Timeout</code> misses and <code>match</code> finds it (results from the script).</p>
+<h2>bool</h2>
+<ul>
+<li><code>must</code> and <code>should</code> contribute to the relevance score.</li>
+<li><code>filter</code> and <code>must_not</code> run in filter context: scoring is ignored and they are cached.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[2]</a></li>
+</ul>
+<pre><code>{ "query": { "bool": {
+    "filter": [ { "term":  { "level": "ERROR" } } ],
+    "must":   [ { "match": { "message": "payment" } } ] } } }</code></pre>
+<p>Use <code>filter</code> for yes/no conditions (level, service, time range) and <code>must</code> for the full-text relevance part. The script's bool query returns 1 hit for ERROR logs mentioning payment.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which query suits an analyzed text field?</p>
+  <button>term</button>
+  <button>exists</button>
+  <button data-correct>match</button>
+  <button>ids</button>
+  <p class="explain">Use match for text fields; term does no analysis.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which bool clause ignores scoring?</p>
+  <button>all three</button>
+  <button>must</button>
+  <button data-correct>filter</button>
+  <button>should</button>
+  <p class="explain">filter ignores the score; must and should contribute.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Best field type for a user id?</p>
+  <button data-correct>keyword</button>
+  <button>analyzed text</button>
+  <button>long text</button>
+  <button>text</button>
+  <p class="explain">Exact-value fields are keyword fields searched with term.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which bool clauses are cached?</p>
+  <button>must and should</button>
+  <button>only should</button>
+  <button>none of them</button>
+  <button data-correct>filter and must_not</button>
+  <p class="explain">filter and must_not run in filter context and are cached.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-write-the-error-query.md">Exercise 0005: write the error query</a></p>
+<p>Runnable example: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">Elasticsearch Docs: Boolean query</a>. Then the match query page.</p>
+<p><a href="0004-near-real-time-search-and-refresh.html">← Near real-time search and refresh</a> &nbsp;|&nbsp; <a href="0010-bulk-api.html">The bulk API and per-item errors →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">Elasticsearch Docs: Term query</a> · [2] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">Elasticsearch Docs: Boolean query</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

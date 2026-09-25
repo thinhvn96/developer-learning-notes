@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 8: Searching in Kibana: Discover and KQL</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Searching in Kibana: Discover and KQL</h1>
+<p class="meta">ELK Stack · Lesson 0008 · step 2 of 14 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write KQL to find errors for one service, and say what KQL cannot do.</div>
+
+<h2>Discover</h2>
+<p>"Discover is the primary tool for exploring your Elasticsearch data in Kibana": search and filter documents, analyze field structures, visualize patterns, save findings and reuse them in dashboards. It supports KQL, Lucene or ES|QL.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[2]</a></p>
+<h2>KQL basics</h2>
+<p>KQL is "a text-based query language for filtering data"; it "does not aggregate, transform, or sort data".<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+<table><tr><th>Need</th><th>KQL<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></th></tr>
+<tr><td>field matches value</td><td><code>http.request.method: GET</code></td></tr>
+<tr><td>exact phrase</td><td><code>http.request.body.content: "null pointer"</code></td></tr>
+<tr><td>boolean logic</td><td><code>AND</code>, <code>OR</code>, <code>NOT</code> (case-insensitive)</td></tr>
+<tr><td>wildcard</td><td><code>machine.os: win*</code></td></tr>
+<tr><td>range</td><td><code>http.response.bytes &gt; 10000 and http.response.bytes &lt;= 20000</code></td></tr></table>
+<pre><code>(http.request.method: GET OR http.request.method: POST) AND http.response.status_code: 400</code></pre>
+<p>For a log search: <code>level: ERROR and service: orders and message: "timeout"</code> (assuming <code>level</code> and <code>service</code> are keyword fields and <code>message</code> is text, as in the <a href="0002-documents-indices-and-mappings.html">mapping lesson</a>). KQL is filtering only, so counts and percentiles belong to <a href="0011-aggregations.html">aggregations</a> and dashboards.</p>
+<div class="aside">I did not run Kibana in this course (it needs a larger stack than the throwaway single-node examples), so this lesson is from the docs only. Ask your teacher to add a Kibana container walk-through if you want it.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which query language filters but does not aggregate?</p>
+  <button>Grok</button>
+  <button data-correct>KQL</button>
+  <button>Painless</button>
+  <button>SQL</button>
+  <p class="explain">KQL does not aggregate, transform or sort data.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. KQL for exact phrase?</p>
+  <button data-correct>Quoted text</button>
+  <button>Braces</button>
+  <button>Backticks</button>
+  <button>Angle brackets</button>
+  <p class="explain">Quoted phrases match the exact term order.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Boolean operators in KQL?</p>
+  <button data-correct>AND, OR, NOT</button>
+  <button>&& and ||</button>
+  <button>PLUS and MINUS</button>
+  <button>None</button>
+  <p class="explain">AND, OR and NOT, case-insensitive.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Discover is for...?</p>
+  <button data-correct>Exploring data</button>
+  <button>Parsing with grok</button>
+  <button>Sizing shards</button>
+  <button>Shipping logs</button>
+  <p class="explain">It is the primary tool for exploring Elasticsearch data in Kibana.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-write-five-queries.md">Exercise 0008: five KQL queries</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/reference/query-languages/kql">Kibana: Kibana Query Language</a>. Short reference page.</p>
+<p><a href="0001-elk-overview-and-pipeline.html">← The ELK pipeline: ship, parse, store, explore</a> &nbsp;|&nbsp; <a href="0002-documents-indices-and-mappings.html">Documents, indices and mappings →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/reference/query-languages/kql">Kibana: Kibana Query Language</a> · [2] <a href="https://www.elastic.co/docs/explore-analyze/discover">Kibana: Discover</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

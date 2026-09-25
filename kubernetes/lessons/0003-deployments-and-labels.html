@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 3: Deployments, ReplicaSets and labels</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Deployments, ReplicaSets and labels</h1>
+<p class="meta">Kubernetes · Lesson 0003 · step 4 of 15 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a Deployment, and explain how labels tie the Deployment, its ReplicaSet and its Pods together.</div>
+
+<h2>What a Deployment does</h2>
+<p>A Deployment "manages a set of Pods to run an application workload, usually one that doesn't maintain state." You describe a desired state and the Deployment controller "changes the actual state to the desired state at a controlled rate."<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a> It creates and manages ReplicaSets, which keep the requested number of Pods running.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+<h2>The label contract</h2>
+<pre><code>spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx          # must match...
+  template:
+    metadata:
+      labels:
+        app: nginx        # ...the Pod template labels
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2</code></pre>
+<p>"<code>.spec.selector.matchLabels</code> must match the labels" in the Pod template.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a> Full file: <a href="../examples/deployment.yaml"><code>deployment.yaml</code></a>. Labels are also what Services select on (next lesson); the docs list labels and selectors among the object-management basics.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/">[2]</a></p>
+<div class="aside">Interview angle: "Why did my Pods not get created?" A selector that does not match the template labels is a classic answer, and the API server rejects it.</div>
+<p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does a Deployment manage?</p>
+  <button>etcd snapshots</button>
+  <button data-correct>ReplicaSets and Pods</button>
+  <button>Only nodes</button>
+  <button>Image registries</button>
+  <p class="explain">It provides declarative updates for Pods and ReplicaSets.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Selector and Pod template labels must...?</p>
+  <button data-correct>Match each other</button>
+  <button>Be different</button>
+  <button>Both be empty</button>
+  <button>Name the node</button>
+  <p class="explain">The selector's matchLabels must match the Pod template labels.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. You state <code>replicas: 3</code>. That is...?</p>
+  <button data-correct>Desired state</button>
+  <button>Actual state</button>
+  <button>A probe</button>
+  <button>A rollback</button>
+  <p class="explain">You describe desired state; the controller reconciles toward it.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Best fit for a Deployment?</p>
+  <button data-correct>A stateless web app</button>
+  <button>A one-off batch job</button>
+  <button>A node agent</button>
+  <button>A database with disks</button>
+  <p class="explain">Deployments suit workloads that usually do not maintain state; Jobs and StatefulSets fit the others.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-break-the-selector.md">Exercise 0003: break the selector</a></p>
+<p>Runnable example: <a href="../examples/deployment.yaml"><code>deployment.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a>. Sections 'Creating a Deployment' and 'Updating a Deployment'.</p>
+<p><a href="0008-namespaces.html">← Namespaces: isolating groups of resources</a> &nbsp;|&nbsp; <a href="0004-services.html">Services: a stable address for changing Pods →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a> · [2] <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/">Kubernetes Docs: Labels and selectors</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 1: The ELK pipeline: ship, parse, store, explore</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The ELK pipeline: ship, parse, store, explore</h1>
+<p class="meta">ELK Stack · Lesson 0001 · step 1 of 14 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> name the role of each ELK component and draw the path a log line takes from a file to a dashboard.</div>
+
+<h2>The four roles</h2>
+<table>
+<tr><th>Component</th><th>Role</th></tr>
+<tr><td>Filebeat (a Beat)</td><td>reads log files and ships them: "A harvester is responsible for reading the content of a single file"; an input manages harvesters and finds sources<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></td></tr>
+<tr><td>Logstash</td><td>processing pipeline with three stages: "inputs &rarr; filters &rarr; outputs"<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[2]</a></td></tr>
+<tr><td>Elasticsearch</td><td>stores JSON documents in indices, distributed across shards<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a></td></tr>
+<tr><td>Kibana</td><td>Discover is "the primary tool for exploring your Elasticsearch data in Kibana"; search and filter with KQL, Lucene or ES|QL<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[4]</a></td></tr>
+</table>
+<h2>The path</h2>
+<pre><code>app log file --Filebeat--&gt; Logstash (grok parse) --&gt; Elasticsearch index --&gt; Kibana Discover</code></pre>
+<p>Logstash is optional when logs are already well structured; Beats can also send to Elasticsearch directly. Which layout you choose is a design decision (buffering, parsing needs), which the later lessons return to.</p>
+<h2>Run the two middle pieces</h2>
+<pre><code>cd elk/examples &amp;&amp; ./02-logstash-grok.sh      # parse a log line
+cd elk/examples &amp;&amp; ./01-elasticsearch-basics.sh   # index, search, shards</code></pre>
+<p>Both start throwaway containers (Logstash and Elasticsearch 9.0.0). Elasticsearch runs with security disabled for the demo only.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which component reads a single file line by line?</p>
+  <button data-correct>A harvester</button>
+  <button>A data view</button>
+  <button>A shard</button>
+  <button>A codec</button>
+  <p class="explain">A harvester reads the content of a single file.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Logstash pipeline stages in order?</p>
+  <button data-correct>Inputs, filters, outputs</button>
+  <button>Filters, inputs, outputs</button>
+  <button>Inputs, outputs, filters</button>
+  <button>Outputs, filters, inputs</button>
+  <p class="explain">The pipeline has three stages: inputs, filters, outputs.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where do documents live?</p>
+  <button>Logstash codecs</button>
+  <button data-correct>Indices in Elasticsearch</button>
+  <button>Filebeat registry</button>
+  <button>Kibana dashboards</button>
+  <p class="explain">An index is the fundamental unit of storage in Elasticsearch.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Kibana's main tool for exploring data?</p>
+  <button>Grok</button>
+  <button>Refresh</button>
+  <button data-correct>Discover</button>
+  <button>Harvester</button>
+  <p class="explain">Discover is the primary tool for exploring your Elasticsearch data.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[4]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-draw-the-pipeline.md">Exercise 0001: draw the pipeline</a></p>
+<p>Runnable example: <a href="../examples/02-logstash-grok.sh"><code>02-logstash-grok.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash Docs: How Logstash works</a>. Then the Elasticsearch documents-and-indices page.</p>
+<p> &nbsp;|&nbsp; <a href="0008-kql-and-discover.html">Searching in Kibana: Discover and KQL →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat Docs: How Filebeat works</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash Docs: How Logstash works</a> · [3] <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch Docs: Indices, documents and mappings</a> · [4] <a href="https://www.elastic.co/docs/explore-analyze/discover">Kibana Docs: Discover</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 17: SOLID 1: Single Responsibility Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 1: Single Responsibility Principle</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0017 · step 17 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> state SRP as 'one reason to change' and split a class along its reasons to change.</div>
+
+<h2>The principle</h2>
+<p>SOLID comes from Robert C. Martin's 2000 paper "Design Principles and Design Patterns"; Michael Feathers coined the acronym. The <strong>Single Responsibility Principle</strong>: "There should never be more than one reason for a class to change."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+<h2>Applied</h2>
+<p>An invoice class that calculates tax, formats text and saves to storage has three reasons to change (tax rules, layout, storage). Split it:</p>
+<pre><code>java oop/examples/SrpDemo.java
+INVOICE amount=200
+saved invoice 200
+tax: 20</code></pre>
+<p><code>TaxCalculator</code>, <code>InvoicePrinter</code> and <code>InvoiceStore</code> each change for exactly one reason. Source: <a href="../examples/SrpDemo.java"><code>SrpDemo.java</code></a>. Signals you are violating it: a class name ending in Manager or Util, many unrelated imports, tests that need heavy setup. Do not over-split: a "responsibility" is a reason to change, not one method per class. The anti-pattern at the other end is the <a href="0022-god-objects-and-refactoring.html">God object</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. SRP in one phrase?</p>
+  <button>One field per class</button>
+  <button>One method per class</button>
+  <button data-correct>One reason to change</button>
+  <button>One class per file</button>
+  <p class="explain">There should never be more than one reason for a class to change.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Who introduced SOLID?</p>
+  <button>Linus Torvalds</button>
+  <button data-correct>Robert C. Martin</button>
+  <button>Ada Lovelace</button>
+  <button>James Gosling</button>
+  <p class="explain">Martin's 2000 paper; Feathers coined the acronym.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. The invoice class had how many reasons to change?</p>
+  <button>One</button>
+  <button>Five</button>
+  <button>Zero</button>
+  <button data-correct>Three</button>
+  <p class="explain">Tax, layout and storage.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A symptom of an SRP violation?</p>
+  <button data-correct>A Manager class doing everything</button>
+  <button>Tests</button>
+  <button>Interfaces</button>
+  <button>Small classes</button>
+  <p class="explain">Broad names and unrelated imports are typical signs.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0017-split-by-reason.md">Exercise 17: split by reason to change</a></p>
+<p>Runnable example: <a href="../examples/SrpDemo.java"><code>SrpDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. The SOLID overview page.</p>
+<p><a href="0016-law-of-demeter.html">← The Law of Demeter</a> &nbsp;|&nbsp; <a href="0018-open-closed-principle.html">SOLID 2: Open/Closed Principle →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

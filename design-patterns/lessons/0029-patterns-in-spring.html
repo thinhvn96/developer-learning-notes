@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 29: Patterns in Spring</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Patterns in Spring</h1>
+<p class="meta">Design Patterns · Lesson 0029 · step 29 of 30 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> recognize proxy, singleton/prototype scope, factory and IoC in Spring, backed by what we verified earlier.</div>
+
+<table><tr><th>Spring feature</th><th>Pattern</th><th>Evidence</th></tr>
+<tr><td>Singleton bean scope (default)</td><td>Singleton, but per container: "Spring's singleton differs from the GoF singleton: it is per-container and per-bean, not per ClassLoader"<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></td><td>Demo: <code>getBean</code> twice returned the same instance.</td></tr>
+<tr><td>Prototype scope</td><td>Prototype/Factory: a new instance each time it is requested<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></td><td>Demo: ids 2 and 3. A singleton holding a prototype got it injected only once (1, 1); <code>ObjectProvider</code> gave 4, 5.</td></tr>
+<tr><td>Dependency injection</td><td>Dependency Inversion in practice: the container instantiates, assembles and manages beans and injects dependencies<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[2]</a></td><td><a href="../../oop/lessons/0021-dependency-inversion-principle.html">DIP lesson</a>.</td></tr>
+<tr><td><code>@Transactional</code></td><td>Proxy: "in the default proxy mode only external method calls through the proxy are intercepted"<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[3]</a></td><td>Demo: self-invocation saved 2 accounts instead of rolling back; through the proxy: 0.</td></tr>
+<tr><td><code>ObjectProvider</code>, <code>BeanFactory</code></td><td>Factory: the container creates objects on request<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[2]</a></td><td>Scope demo.</td></tr></table>
+<p>Everything in the Evidence column comes from the tests in <code>spring-boot/examples/demo-app</code> (17 passing tests): see the <a href="../../spring-boot/lessons/0007-bean-scopes.html">scopes</a> and <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">@Transactional</a> lessons. Other Spring features people map to patterns (template classes like <code>JdbcTemplate</code>, application events as Observer, filters as Chain of Responsibility) were not part of the pages I read, so treat them as leads to verify, not facts from this course.</p>
+<div class="aside">Why it matters in interviews: "Why does calling a @Transactional method from the same class not start a transaction?" is a Proxy-pattern answer.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Spring's singleton scope is per...?</p>
+  <button>Thread</button>
+  <button>JVM</button>
+  <button data-correct>Container</button>
+  <button>Class loader</button>
+  <p class="explain">It is per-container and per-bean, not per ClassLoader.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Why did self-invocation skip the transaction?</p>
+  <button>Wrong bean</button>
+  <button>Java bug</button>
+  <button>Missing @Bean</button>
+  <button data-correct>Proxy bypassed</button>
+  <p class="explain">Only calls through the proxy are intercepted.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. How do you get a fresh prototype in a singleton?</p>
+  <button data-correct>ObjectProvider</button>
+  <button>Static access</button>
+  <button>Field access</button>
+  <button>Thread local</button>
+  <p class="explain">The demo's ObjectProvider produced ids 4 and 5.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Who instantiates and injects beans?</p>
+  <button>The JIT</button>
+  <button>The OS</button>
+  <button>The compiler</button>
+  <button data-correct>The IoC container</button>
+  <p class="explain">The container instantiates, assembles and manages beans.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0029-explain-a-transactional-bug.md">Exercise 29: explain a @Transactional bug</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a>. Then re-read the @Transactional method visibility rules.</p>
+<p><a href="0028-patterns-in-modern-java.html">← Patterns in modern Java: lambdas, records, sealed types</a> &nbsp;|&nbsp; <a href="0030-talking-about-patterns-in-interviews.html">Talking about patterns in interviews →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a> · [2] <a href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">Spring Framework Reference: IoC container</a> · [3] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring Framework Reference: @Transactional</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

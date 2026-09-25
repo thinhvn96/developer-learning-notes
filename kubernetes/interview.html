@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kubernetes: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · Kubernetes · 15 questions · <a href="index.html">Kubernetes ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Kubernetes questions for Senior backend interviews, framed around running a Java service. Note: no cluster was available while writing this course, so the manifests were syntax-checked but not applied.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Describe the Kubernetes architecture.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a control plane (API server, etcd, scheduler, controller manager) and nodes (kubelet, kube-proxy, container runtime).</p>
+<ul>
+<li><strong>kube-apiserver:</strong> exposes the Kubernetes HTTP API.</li>
+<li><strong>etcd:</strong> consistent, highly available key-value store for all API server data.</li>
+<li><strong>kube-scheduler:</strong> assigns Pods not yet bound to a node to a suitable node.</li>
+<li><strong>kube-controller-manager:</strong> runs controllers implementing API behavior.</li>
+<li><strong>kubelet:</strong> ensures Pods and their containers are running.</li>
+<li><strong>kube-proxy:</strong> maintains network rules on nodes to implement Services.</li>
+<li><strong>Container runtime:</strong> runs containers.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[1]</a></li>
+</ul>
+<p>Kubernetes is declarative: you state desired state, controllers work toward it.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/">[2]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Walk me through what happens on <code>kubectl apply</code>. (API server stores the object in etcd; controllers create dependent objects; scheduler binds Pods to nodes; kubelet starts containers via the runtime.)</div>
+<p class="see">Learn it: <a href="lessons/0001-cluster-components.html">Cluster components</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>What is a Pod? Why not run bare Pods?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the smallest deployable unit: one or more co-located containers sharing storage and network; Pods are disposable, so use a workload resource.</p>
+<p>A Pod's contents are always co-located and co-scheduled and run in a shared context. Pods are "relatively ephemeral, disposable entities"; they stay on their node until finished, deleted, evicted for lack of resources, or the node fails. "You rarely create Pods directly": use Deployments, Jobs or StatefulSets.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[3]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> When would you use a multi-container Pod? (Tightly coupled helper containers, an advanced pattern; most Pods have one container.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[3]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0002-pods.html">Pods</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>How do Deployments, ReplicaSets and Pods relate? What ties them together?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a Deployment manages ReplicaSets, which manage Pods; labels and selectors tie them.</p>
+<p>A Deployment provides declarative updates for Pods and ReplicaSets; you describe desired state and the controller moves actual state toward it at a controlled rate. <code>.spec.selector.matchLabels</code> must match the labels in the Pod template.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[4]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Deployment vs StatefulSet? (Deployments suit workloads that usually do not maintain state; StatefulSets are for stateful ones.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[4]</a><a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[3]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0003-deployments-and-labels.html">Deployments and labels</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>How do Services work, and what are the types?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a Service is a stable endpoint for a changing set of Pods, selected by labels.</p>
+<p>Pods are ephemeral with changing IPs; a Service exposes them over the network and finds them by selector, keeping EndpointSlices up to date. Types: <code>ClusterIP</code> (default, in-cluster only), <code>NodePort</code> (each node's IP at a static port), <code>LoadBalancer</code> (cloud load balancer), <code>ExternalName</code> (maps to an external DNS name). <code>port</code> is what the Service exposes; <code>targetPort</code> is the container port.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[6]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Service can't reach Pods. What do you check? (Labels versus selector, endpoints list, port and targetPort, and readiness state; readiness failure removes a Pod from endpoints.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[5]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0004-services.html">Services</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Requests vs limits: what happens when a container exceeds each?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> requests drive scheduling; limits are enforced at runtime; CPU over limit is throttled, memory over limit can be OOM-killed.</p>
+<p>Requests are what a container is guaranteed and what the scheduler uses to choose a node; limits are the maximum, enforced by the kubelet. CPU is enforced by throttling; memory by OOM kills, reactively when the kernel detects memory pressure. CPU uses cores or millicores (<code>500m</code>), memory bytes (<code>256Mi</code>). If you set a limit but no request, the limit becomes the request.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[7]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Should request equal limit? (Discuss predictability versus utilization; equal memory values give predictable footprints. State the trade-off, not a slogan.)</div>
+<p class="see">Learn it: <a href="lessons/0005-requests-limits-and-the-jvm.html">Requests, limits and the JVM</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>How do you configure a Java service's memory in Kubernetes?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> set memory request and limit, and set the JVM heap as a percentage of the limit below 100.</p>
+<p>The JVM detects container limits on Linux by default and <code>-XX:MaxRAMPercentage</code> sizes the heap as a percentage of the memory it sees (default 25 percent).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[8]</a> With a 512Mi limit and <code>MaxRAMPercentage=70</code> the heap can reach about 358 MiB, leaving the rest for metaspace, thread stacks and buffers. Verify under load; the memory limit is enforced by OOM kill.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[7]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Pod restarts with OOMKilled but heap dumps look small. Why? (Non-heap memory pushed total above the limit.)</div>
+<p class="see">Learn it: <a href="lessons/0005-requests-limits-and-the-jvm.html">Requests, limits and the JVM</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Explain liveness, readiness and startup probes. What goes wrong with a slow-starting Spring Boot app?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> liveness failure restarts the container; readiness failure removes it from Service endpoints; startup delays the other two.</p>
+<p>Liveness detects broken states that cannot recover except by restart; readiness controls traffic without restarting; startup protects slow-starting containers. HTTP probes succeed on status 200 to 399.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[5]</a> If liveness begins before the JVM finishes starting, the kubelet restarts the container repeatedly (a crash loop); a startup probe with a generous failure threshold fixes it. Keep liveness cheap and independent of downstream dependencies; use readiness for "can I serve now?".</p>
+<div class="follow"><strong>Likely follow-up:</strong> Should liveness check the database? (Generally no: restarting the app cannot fix a database outage; use readiness.)</div>
+<p class="see">Learn it: <a href="lessons/0006-probes.html">Probes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>How does a rolling update work and how do you roll back?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the Deployment scales a new ReplicaSet up while scaling the old one down within <code>maxSurge</code> and <code>maxUnavailable</code> (both 25 percent by default); <code>kubectl rollout undo</code> reverts.</p>
+<p>These defaults and the command come from the Deployment docs.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[4]</a> Readiness probes decide when new Pods receive traffic, so a broken release stalls instead of taking traffic (the probe docs define the readiness behavior<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[5]</a>). For zero-downtime Java deploys also handle SIGTERM gracefully (exec-form CMD, shutdown hooks) and size <code>maxUnavailable</code> deliberately.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you release a risky change safely? (Beyond the sources read here: canary/blue-green are common answers; check the Deployment docs and your platform tooling.)</div>
+<p class="see">Learn it: <a href="lessons/0007-rolling-updates-and-rollbacks.html">Rolling updates and rollbacks</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>How do you pass configuration and secrets to a Pod? Are Secrets secure?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> ConfigMaps for non-confidential settings, Secrets for confidential ones, both as env vars or mounted files; Secrets are only base64 by default, so add encryption at rest and RBAC.</p>
+<p>ConfigMaps (1 MiB max) can be consumed as command args, env vars or volume files; env vars do not update in running containers, mounted files eventually do.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[9]</a> Secrets are "by default, stored unencrypted in ... etcd", base64 is not encryption; enable encryption at rest, least-privilege RBAC, restrict access, consider external secret stores.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/secret/">[10]</a> Verified on kind: the Pod printed <code>DB_PASSWORD=s3cret</code> and <code>base64 -d</code> decoded the stored value.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you roll out a config change to env-var consumers? (Restart the Pods, for example by a Deployment rollout.)</div>
+<p class="see">Learn it: <a href="lessons/0009-configmaps.html">ConfigMaps</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>What is a namespace for, and what is not a good use of one?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> isolating groups of resources; not for distinguishing versions (use labels).</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[11]</a> Names are unique per namespace; namespaces are not nested; PersistentVolumes and Nodes are cluster-scoped. Everyday symptom: <code>kubectl get pod hello</code> said "not found" because the Pod was in <code>demo</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you limit what a team can consume? (Resource quotas per namespace; not covered by the pages read here.)</div>
+<p class="see">Learn it: <a href="lessons/0008-namespaces.html">Namespaces</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Job versus CronJob, and what must you remember about scheduled work?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Job runs Pods to completion with retries; CronJob creates Jobs on a schedule; make the work idempotent.</p>
+<p>Jobs need <code>restartPolicy</code> Never or OnFailure, default <code>backoffLimit</code> 6.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[12]</a> CronJobs use cron syntax and <code>concurrencyPolicy</code> Allow/Forbid/Replace, and can still create concurrent Jobs in some circumstances, so Jobs "should be idempotent".<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[13]</a> I tested a manual run with <code>kubectl create job --from=cronjob/nightly</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> A nightly job overruns into the next night. What do you set? (concurrencyPolicy Forbid or Replace.)</div>
+<p class="see">Learn it: <a href="lessons/0011-jobs-and-cronjobs.html">Jobs and CronJobs</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Explain PersistentVolume, PersistentVolumeClaim and StorageClass. What happens to data when a Pod is deleted?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a PVC requests storage that a PV (often dynamically provisioned via a StorageClass) satisfies; data outlives Pods; the reclaim policy decides what happens when the claim is deleted.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[14]</a> Access modes ReadWriteOnce, ReadOnlyMany, ReadWriteMany, ReadWriteOncePod; reclaim Retain or Delete. On kind, a PVC bound dynamically (StorageClass <code>standard</code>) and a second Pod on the same claim read the first Pod's data.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Which reclaim policy for production databases? (Discuss Retain versus Delete trade-offs.)</div>
+<p class="see">Learn it: <a href="lessons/0012-persistent-volumes-and-claims.html">Persistent volumes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Deployment versus StatefulSet?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> StatefulSets add stable identity, stable storage and ordered operations; Deployments suit stateless workloads.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[15]</a> Requires a headless Service; scaling down or deleting does not delete volumes. On kind: Pods came up in order (web-0 then web-1), each had its own PVC, deleting web-0 recreated it with the same name and its data, and scale-down kept <code>data-web-1</code>. It does not replicate data by itself.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Would you run PostgreSQL in a StatefulSet? (Discuss operators and replication; beyond the sources read.)</div>
+<p class="see">Learn it: <a href="lessons/0013-statefulsets.html">StatefulSets</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>How do you expose HTTP services outside the cluster?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Service types (NodePort, LoadBalancer) or an Ingress with a controller; the docs now recommend the Gateway API.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[16]</a> Ingress rules match host and path to Service backends; without a controller "creating an Ingress resource has no effect": my Ingress had an empty ADDRESS on a cluster with no controller. The Ingress API has been frozen since v1.19.</p>
+<div class="follow"><strong>Likely follow-up:</strong> TLS termination? (Ingress can provide it; details beyond the excerpts.)</div>
+<p class="see">Learn it: <a href="lessons/0014-ingress.html">Ingress</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>How does the Horizontal Pod Autoscaler compute replicas and what does it need?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>ceil(current x currentMetric / desiredMetric)</code>; needs resource requests and a metrics source.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[17]</a> Example: 3 Pods at 90 percent against a 70 percent target gives ceil(3 x 90/70) = 4. On kind without a metrics server, the HPA showed <code>cpu: &lt;unknown&gt;/70%</code> and did nothing.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why is CPU request important for HPA? (Utilization is computed against the request.)</div>
+<p class="see">Learn it: <a href="lessons/0015-horizontal-pod-autoscaler.html">HPA</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Kubernetes questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://kubernetes.io/docs/concepts/overview/components/">Kubernetes: Components</a> · [2] <a href="https://kubernetes.io/docs/concepts/overview/">Kubernetes: Overview</a> · [3] <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Kubernetes: Pods</a> · [4] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes: Deployments</a> · [5] <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes: Probes</a> · [6] <a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes: Service</a> · [7] <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes: Resource management</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · [9] <a href="https://kubernetes.io/docs/concepts/configuration/configmap/">Kubernetes: ConfigMaps</a> · [10] <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Kubernetes: Secrets</a> · [11] <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">Kubernetes: Namespaces</a> · [12] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">Kubernetes: Jobs</a> · [13] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">Kubernetes: CronJob</a> · [14] <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">Kubernetes: Persistent Volumes</a> · [15] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes: StatefulSets</a> · [16] <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Kubernetes: Ingress</a> · [17] <a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">Kubernetes: Horizontal Pod Autoscaling</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

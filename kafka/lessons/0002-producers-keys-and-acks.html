@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 2: Producers, keys and acks</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Producers, keys and acks</h1>
+<p class="meta">Kafka · Lesson 0002 · step 2 of 10 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose <code>acks</code>, batching and retry settings for a producer and say what each trades off.</div>
+
+<h2>acks: how much confirmation to wait for</h2>
+<table>
+<tr><th>acks</th><th>Meaning<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></th></tr>
+<tr><td><code>0</code></td><td>"the producer will not wait for any acknowledgment from the server at all"; the record is considered sent once in the socket buffer</td></tr>
+<tr><td><code>1</code></td><td>the leader writes to its local log and responds "without awaiting full acknowledgement from all followers"</td></tr>
+<tr><td><code>all</code> / <code>-1</code></td><td>the leader waits for "the full set of in-sync replicas"; the record will not be lost "as long as at least one in-sync replica remains alive"</td></tr>
+</table>
+<h2>Batching and timeouts</h2>
+<ul>
+<li><code>batch.size</code> (default 16384 bytes): the producer batches records for the same partition into fewer requests.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+<li><code>linger.ms</code> (default 5 ms in these 4.3 docs): a small artificial delay so more records join a batch.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+<li><code>delivery.timeout.ms</code> (default 120000): an upper bound on the whole send including retries.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+<li><code>enable.idempotence</code>: default true, so retries do not create duplicate records.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+</ul>
+<p>Config sketch: <a href="../examples/reliable-producer.properties"><code>reliable-producer.properties</code></a> (not run here).</p>
+<div class="aside">Interview answer: "For data I cannot lose: <code>acks=all</code> with idempotence on, and <code>min.insync.replicas</code> set on the topic (see the replication lesson). For fire-and-forget metrics I might accept <code>acks=1</code> or lower and buy latency."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which acks value risks silent loss the most?</p>
+  <button>acks equals -1</button>
+  <button data-correct>acks equals zero</button>
+  <button>acks equals all</button>
+  <button>acks equals one</button>
+  <p class="explain">With 0 the producer does not wait for any acknowledgment.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does acks=all wait for?</p>
+  <button data-correct>All in-sync replicas</button>
+  <button>Only the leader</button>
+  <button>One random follower</button>
+  <button>No acknowledgment</button>
+  <p class="explain">The leader waits for the full set of in-sync replicas.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does linger.ms do?</p>
+  <button>Sets retry count</button>
+  <button>Deletes old records</button>
+  <button>Encrypts payloads</button>
+  <button data-correct>Delays sends to batch</button>
+  <p class="explain">It adds a small artificial delay so sends can be batched.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Default for enable.idempotence in 4.3 docs?</p>
+  <button data-correct>True</button>
+  <button>False</button>
+  <button>Unset</button>
+  <button>Only with acks 0</button>
+  <p class="explain">The docs list the default as true.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-choose-acks.md">Exercise 0002: choose acks</a></p>
+<p>Runnable example: <a href="../examples/reliable-producer.properties"><code>reliable-producer.properties</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a>. Read acks, retries, delivery.timeout.ms, linger.ms, batch.size.</p>
+<p><a href="0001-events-topics-partitions.html">← Events, topics and partitions</a> &nbsp;|&nbsp; <a href="0007-retention-and-topic-configs.html">Retention and topic configuration →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

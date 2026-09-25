@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 21: SOLID 5: Dependency Inversion Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 5: Dependency Inversion Principle</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0021 · step 21 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> invert a dependency so high-level policy depends on an abstraction it owns, and wire concrete classes at the edge.</div>
+
+<h2>The principle</h2>
+<p>"One should depend upon abstractions, not concretes."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a> High-level modules (policy) should not depend on low-level modules (details); both depend on abstractions.</p>
+<pre><code>java oop/examples/DipDemo.java
+email -&gt; ALERT: disk full
+sms   -&gt; ALERT: disk full
+[test double] ALERT: disk full</code></pre>
+<p><code>AlertService</code> depends on the <code>Notifier</code> interface, which lives with the high-level policy. Email, SMS and a test double are details plugged in at the edge (<code>main</code>). Compare the tight service in <a href="0015-coupling-and-cohesion.html">coupling and cohesion</a>. Source: <a href="../examples/DipDemo.java"><code>DipDemo.java</code></a>.</p>
+<h2>DIP, DI and IoC</h2>
+<p>Dependency <em>inversion</em> is the design principle; dependency <em>injection</em> is a technique for supplying the abstraction; an IoC container (Spring) automates the wiring: "objects define their dependencies only through constructor arguments ... The IoC container then injects those dependencies" (<a href="../../spring-boot/lessons/0001-ioc-and-beans.html">Spring IoC lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. DIP says depend on...?</p>
+  <button data-correct>Abstractions</button>
+  <button>Statics</button>
+  <button>Globals</button>
+  <button>Concrete classes</button>
+  <p class="explain">Depend upon abstractions, not concretes.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Where should the Notifier interface live?</p>
+  <button>With email code</button>
+  <button>In main only</button>
+  <button>In tests only</button>
+  <button data-correct>With the high-level policy</button>
+  <p class="explain">The high-level module owns the abstraction.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where do concrete classes get chosen?</p>
+  <button data-correct>At the edge (main)</button>
+  <button>In the interface</button>
+  <button>Inside AlertService</button>
+  <button>At compile time only</button>
+  <p class="explain">main wired email, sms and a test double.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. DI is...?</p>
+  <button>A thread pool</button>
+  <button>The same as DIP</button>
+  <button data-correct>A technique to supply dependencies</button>
+  <button>A database</button>
+  <p class="explain">Injection supplies the abstraction; inversion is the principle.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0021-invert-the-dependency.md">Exercise 21: invert the dependency</a></p>
+<p>Runnable example: <a href="../examples/DipDemo.java"><code>DipDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. The SOLID overview page.</p>
+<p><a href="0020-interface-segregation-principle.html">← SOLID 4: Interface Segregation Principle</a> &nbsp;|&nbsp; <a href="0022-god-objects-and-refactoring.html">God objects and refactoring toward SOLID →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

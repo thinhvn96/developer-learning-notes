@@ -1,0 +1,66 @@
+/* Shared course stylesheet. Tufte-inspired: narrow measure, serif body, generous whitespace. */
+:root {
+  --bg: #fffff8; --fg: #1d1d1b; --muted: #6b6b64; --rule: #dcdcd0;
+  --accent: #b5400f; --ok: #2f7a3e; --bad: #b3261e; --code-bg: #f4f3e8;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #16161a; --fg: #e8e6df; --muted: #9a988f; --rule: #33333a;
+          --accent: #f08a5d; --ok: #6fcf7f; --bad: #ff8a80; --code-bg: #202027; }
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); margin: 0;
+  font: 18px/1.6 "et-book", Palatino, "Palatino Linotype", Georgia, serif; }
+main { max-width: 42rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 .3rem; font-weight: 400; }
+h2 { font-size: 1.35rem; font-weight: 400; font-style: italic; margin: 2.4rem 0 .6rem; }
+.meta { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
+.meta a, a { color: var(--accent); }
+code, pre { font: .85rem/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--code-bg); }
+code { padding: .1em .3em; border-radius: 3px; }
+pre { padding: .9rem 1rem; overflow-x: auto; border-left: 3px solid var(--rule); }
+pre code { padding: 0; background: none; }
+.aside { color: var(--muted); font-size: .9rem; border-left: 3px solid var(--rule); padding-left: 1rem; margin: 1.2rem 0; }
+.win { border: 1px solid var(--rule); padding: .8rem 1rem; margin: 1.5rem 0; }
+.win b { color: var(--accent); }
+.cite { font-size: .8rem; vertical-align: super; }
+footer { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .9rem; }
+/* quiz component (see quiz.js) */
+.quiz { margin: 1.5rem 0; padding: 1rem 1.2rem; border: 1px solid var(--rule); }
+.quiz .prompt { margin: 0 0 .7rem; font-weight: 600; }
+.quiz button { display: block; width: 100%; text-align: left; margin: .35rem 0; padding: .55rem .8rem;
+  background: none; color: inherit; border: 1px solid var(--rule); font: inherit; font-size: .95rem; cursor: pointer; }
+.quiz button:hover:not([disabled]) { border-color: var(--accent); }
+.quiz button.right { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.quiz button.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 15%, transparent); }
+.quiz .explain { display: none; margin: .7rem 0 0; font-size: .92rem; color: var(--muted); }
+.quiz.done .explain { display: block; }
+.score { font-size: .9rem; color: var(--muted); }
+@media print { body { background: #fff; color: #000; } .quiz button { border-color: #999; } }
+/* tables */
+table { border-collapse: collapse; width: 100%; font-size: .85rem; margin: 1rem 0; }
+th, td { border-bottom: 1px solid var(--rule); padding: .35rem .5rem; text-align: left; vertical-align: top; }
+/* interview Q&A component (see each stack's interview.html) */
+details.qa { border: 1px solid var(--rule); margin: .7rem 0; padding: .1rem .9rem; }
+details.qa[open] { padding-bottom: .7rem; }
+details.qa > summary { cursor: pointer; font-weight: 600; padding: .55rem 0; list-style-position: outside; }
+details.qa > summary .n { color: var(--accent); margin-right: .4rem; }
+details.qa .ans p { margin: .5rem 0; }
+details.qa .follow { color: var(--muted); font-size: .92rem; border-left: 3px solid var(--rule); padding-left: .8rem; margin-top: .7rem; }
+details.qa .see { font-size: .85rem; color: var(--muted); }
+.controls { margin: 1rem 0; font-size: .9rem; }
+.controls button { font: inherit; font-size: .85rem; background: none; color: inherit; border: 1px solid var(--rule); padding: .25rem .7rem; cursor: pointer; margin-right: .4rem; }
+.controls button:hover { border-color: var(--accent); }
+@media print { details.qa { break-inside: avoid; } details.qa > *:not(summary) { display: block !important; } }
+/* home page and stack indexes */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.card { border: 1px solid var(--rule); padding: .9rem 1rem; display: block; text-decoration: none; color: inherit; }
+.card:hover { border-color: var(--accent); }
+.card h3 { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 600; color: var(--accent); }
+.card p { margin: .2rem 0; font-size: .85rem; color: var(--muted); }
+.card .links { margin-top: .6rem; font-size: .85rem; }
+.card .links a { margin-right: .7rem; }
+.bar { height: 5px; background: var(--rule); margin-top: .6rem; }
+.bar > i { display: block; height: 100%; background: var(--accent); width: 0; }
+ol.steps li.done > a { color: var(--muted); text-decoration: line-through; }
+ol.steps li input { margin-right: .5rem; accent-color: var(--accent); }
+.grouptitle { display: flex; justify-content: space-between; align-items: baseline; }

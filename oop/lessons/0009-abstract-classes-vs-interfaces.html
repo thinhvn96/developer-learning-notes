@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 9: Abstract classes versus interfaces</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Abstract classes versus interfaces</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0009 · step 9 of 22 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose an abstract class or an interface using the tutorial's criteria.</div>
+
+<h2>Abstract classes</h2>
+<p>An abstract class "cannot be instantiated" but can be subclassed, and may contain both abstract and non-abstract methods. A class with an abstract method must itself be abstract; a subclass usually implements them, otherwise it must also be abstract.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+<table><tr><th></th><th>Abstract class</th><th>Interface<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></th></tr>
+<tr><td>Fields</td><td>non-static, non-final allowed</td><td>public static final only</td></tr>
+<tr><td>Methods</td><td>public, protected, private concrete methods</td><td>all public</td></tr>
+<tr><td>Inheritance</td><td>extend only one class</td><td>implement many</td></tr></table>
+<h2>When to use which (tutorial guidance)</h2>
+<ul><li><strong>Abstract class:</strong> share code among closely related classes; need non-public members or non-static, non-final fields.</li>
+<li><strong>Interface:</strong> unrelated classes will implement it; specify behavior without dictating implementation; want multiple inheritance of type.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></li></ul>
+<pre><code>java oop/examples/AbstractVsInterface.java
+robot r2 reporting
+r2 started, running=true
+charging from level 42
+Robot is a Machine: true, is Chargeable: true, is Swimmer: false</code></pre>
+<p><code>Robot</code> extends one abstract class (shared code and state) and implements an interface with a default method (a capability). Source: <a href="../examples/AbstractVsInterface.java"><code>AbstractVsInterface.java</code></a>. The template-method pattern is built on the abstract-class shape (<a href="../../design-patterns/lessons/0024-template-method.html">pattern lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Can you instantiate an abstract class?</p>
+  <button>Only in tests</button>
+  <button data-correct>No</button>
+  <button>Yes</button>
+  <button>Only if empty</button>
+  <p class="explain">Abstract classes cannot be instantiated.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How many classes can one class extend?</p>
+  <button data-correct>One</button>
+  <button>Zero</button>
+  <button>Any number</button>
+  <button>Two</button>
+  <p class="explain">Only one, but many interfaces can be implemented.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Need shared state fields. Which?</p>
+  <button>Record</button>
+  <button>Interface</button>
+  <button>Enum only</button>
+  <button data-correct>Abstract class</button>
+  <p class="explain">Interfaces allow only public static final fields.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Unrelated classes must share a capability. Which?</p>
+  <button>Final class</button>
+  <button>Abstract class</button>
+  <button data-correct>Interface</button>
+  <button>Inner class</button>
+  <p class="explain">Use an interface when unrelated classes implement it.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-abstract-or-interface.md">Exercise 9: abstract or interface</a></p>
+<p>Runnable example: <a href="../examples/AbstractVsInterface.java"><code>AbstractVsInterface.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">Java Tutorials: Abstract Methods and Classes</a>. Read the comparison section.</p>
+<p><a href="0008-polymorphism.html">← Polymorphism and virtual method invocation</a> &nbsp;|&nbsp; <a href="0010-interfaces-as-contracts.html">Interfaces as contracts →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">Java Tutorials: Abstract Methods and Classes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 5: @Transactional: proxies and rollback rules</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>@Transactional: proxies and rollback rules</h1>
+<p class="meta">Spring Boot · Lesson 0005 · step 9 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict whether a <code>@Transactional</code> method actually runs in a transaction and whether it rolls back, for the three classic traps.</div>
+
+<h2>Defaults to memorize</h2>
+<table>
+<tr><th>Property</th><th>Default<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></th></tr>
+<tr><td>Propagation</td><td>REQUIRED</td></tr>
+<tr><td>Isolation</td><td>the database's default (ISOLATION_DEFAULT)</td></tr>
+<tr><td>Read-write?</td><td>read-write</td></tr>
+<tr><td>Rollback on</td><td>RuntimeException and Error; <strong>not</strong> checked exceptions</td></tr>
+</table>
+<h2>Three traps</h2>
+<ol>
+<li><strong>Checked exceptions commit.</strong> Throwing a checked <code>Exception</code> does not roll back by default. Use <code>@Transactional(rollbackFor = Exception.class)</code>.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></li>
+<li><strong>Self-invocation is ignored.</strong> In the default proxy mode only external calls through the proxy are intercepted; a method calling another method on the same object does not trigger transaction handling.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></li>
+<li><strong>Visibility.</strong> Private methods are never transactional; with interface-based proxies only public methods are.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></li>
+</ol>
+<p>The reference names AspectJ mode as the alternative if you need self-invocation to work.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a> Snippets: <a href="../examples/TransactionalPitfalls.java"><code>TransactionalPitfalls.java</code></a>.</p>
+<h2>Verified</h2>
+<pre><code>RESULT checked exception, default rules         -&gt; accounts saved: 1
+RESULT checked exception, rollbackFor=Exception -&gt; accounts saved: 0
+RESULT runtime exception, default rules         -&gt; accounts saved: 0
+RESULT external call through the proxy          -&gt; accounts saved: 0
+RESULT self-invocation (this.method())          -&gt; accounts saved: 2</code></pre>
+<p>Code: <a href="../examples/demo-app/src/main/java/com/example/demo/bank/BankService.java"><code>BankService.java</code></a> and <a href="../examples/demo-app/src/test/java/com/example/demo/TransactionBehaviourTest.java"><code>TransactionBehaviourTest.java</code></a>. The last two lines are the same method: called through the proxy both saves roll back; called as <code>this.createTwoThenFail(...)</code> both stay committed.</p>
+<div class="aside">Connect to PostgreSQL: the <em>isolation</em> attribute maps to the levels from the <a href="../../postgresql/lessons/0006-mvcc-and-isolation-levels.html">PostgreSQL isolation lesson</a>, and the default is the database's own default (Read committed on PostgreSQL).</div><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default rollback triggers?</p>
+  <button data-correct>Runtime exceptions and Errors</button>
+  <button>Only SQLException</button>
+  <button>All checked exceptions</button>
+  <button>Only Error</button>
+  <p class="explain">RuntimeException and Error trigger rollback; checked exceptions do not.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Method calls another method on <code>this</code>. Transaction applied?</p>
+  <button>Yes, always applied</button>
+  <button data-correct>No, proxy is bypassed</button>
+  <button>Only if it is private</button>
+  <button>Only in tests</button>
+  <p class="explain">Self-invocation does not trigger transaction management in proxy mode.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Make checked exceptions roll back with?</p>
+  <button>noRollbackFor</button>
+  <button>timeout 0</button>
+  <button data-correct>rollbackFor Exception.class</button>
+  <button>readOnly true</button>
+  <p class="explain">rollbackFor = Exception.class makes all exceptions trigger rollback.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Default propagation?</p>
+  <button>NESTED</button>
+  <button>REQUIRES_NEW</button>
+  <button data-correct>REQUIRED</button>
+  <button>NEVER</button>
+  <p class="explain">PROPAGATION_REQUIRED is the default.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-predict-the-commit.md">Exercise 0005: predict the commit</a></p>
+<p>Runnable example: <a href="../examples/TransactionalPitfalls.java"><code>TransactionalPitfalls.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring Framework Reference: Using @Transactional</a>. Read the whole page including the method-visibility section.</p>
+<p><a href="0010-validation-and-400-errors.html">← Bean Validation and 400 responses</a> &nbsp;|&nbsp; <a href="0006-transaction-propagation.html">Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring Framework Reference: Using @Transactional</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

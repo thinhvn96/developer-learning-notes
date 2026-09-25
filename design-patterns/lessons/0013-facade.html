@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 13: Facade</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Facade</h1>
+<p class="meta">Design Patterns · Lesson 0013 · step 13 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> offer one simple entry point in front of a complex subsystem and avoid turning it into a god object.</div>
+
+<h2>Intent</h2>
+<p>Facade is "a structural design pattern that provides a simplified interface to a library, a framework, or any other complex set of classes." Use it for a limited but straightforward interface to a complex subsystem, or to structure a subsystem into layers.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/FacadeDemo.java
+lights dim 10%
+amp on
+amp volume 7
+projector on
+playing Alien
+---
+projector off
+amp off
+lights full</code></pre><p><code>watchMovie</code> hides six coordinated calls on three subsystem classes. Source: <a href="../examples/FacadeDemo.java"><code>FacadeDemo.java</code></a>. A service layer over repositories, or a client library over a REST API, often plays this role. The cons line links back to the <a href="../../oop/lessons/0022-god-objects-and-refactoring.html">God object</a> lesson.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Isolates your code from a subsystem's complexity</li></ul>
+<p><strong>Cons</strong></p><ul><li>A facade can become a god object coupled to all classes of an app</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a> Adapter usually wraps one object while Facade works with a subsystem; Abstract Factory is an alternative when you only want to hide creation; Mediator centralizes communication actively while Facade only simplifies access; a facade is often a Singleton.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Facade provides...?</p>
+  <button>A stack</button>
+  <button data-correct>A simplified interface</button>
+  <button>A copy</button>
+  <button>A tree</button>
+  <p class="explain">A simplified interface to a complex set of classes.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Risk?</p>
+  <button data-correct>Becoming a god object</button>
+  <button>Slow JIT</button>
+  <button>Global state only</button>
+  <button>Missing interfaces</button>
+  <p class="explain">It can become a god object coupled to all classes.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Facade vs Mediator?</p>
+  <button data-correct>Facade adds no new functionality</button>
+  <button>Neither</button>
+  <button>Same</button>
+  <button>Mediator adds none</button>
+  <p class="explain">Facade simplifies access; Mediator centralizes communication.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Calls in the demo for watchMovie?</p>
+  <button>Six calls by client</button>
+  <button>No calls</button>
+  <button data-correct>One call hides many</button>
+  <button>Two calls</button>
+  <p class="explain">The client called one method; the facade made five subsystem calls.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-api-client-facade.md">Exercise 13: an API client facade</a></p>
+<p>Runnable example: <a href="../examples/FacadeDemo.java"><code>FacadeDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/facade">Facade (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0012-decorator.html">← Decorator</a> &nbsp;|&nbsp; <a href="0014-flyweight.html">Flyweight →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/facade">Facade (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

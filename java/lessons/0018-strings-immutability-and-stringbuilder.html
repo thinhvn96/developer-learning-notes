@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 18: Strings: immutability, the pool and StringBuilder</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Strings: immutability, the pool and StringBuilder</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0018 · step 1 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why <code>==</code> on strings is a trap and when to use <code>StringBuilder</code>.</div>
+
+<h2>Immutable</h2>
+<p>"Strings are constant; their values cannot be changed after they are created." Because they are immutable they can be shared safely between references.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a> Methods such as <code>concat</code> return a <em>new</em> string.</p>
+<h2>Literals and the pool</h2>
+<p>String literals are <code>String</code> instances, and <code>intern()</code> returns a canonical representation so equal contents can share one object.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a> Identical literals therefore refer to the same object, but <code>new String("abc")</code> creates another.</p>
+<pre><code>java java/examples/StringDemo.java
+a == b          : true      # same literal
+a == c          : false     # new String(...)
+a.equals(c)     : true
+a == c.intern() : true</code></pre>
+<p><strong>Rule:</strong> compare contents with <code>equals</code>, never <code>==</code>.</p>
+<h2>Concatenation</h2>
+<p>How <code>+</code> is compiled is left to the compiler: it may use <code>StringBuffer</code>, <code>StringBuilder</code> or <code>StringConcatFactory</code> depending on the JDK version.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a> In a loop, build with an explicit <code>StringBuilder</code> instead of repeated <code>+=</code>, since each <code>+=</code> creates a new string (derived from immutability; measure before optimizing).</p>
+<p>Source: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Are Java strings mutable?</p>
+  <button>Yes, via intern</button>
+  <button data-correct>No, they are constant</button>
+  <button>Only literals are</button>
+  <button>Yes, via concat</button>
+  <p class="explain">Strings are constant; methods return new strings.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Two identical literals compared with ==. Result?</p>
+  <button>False, always</button>
+  <button data-correct>True, shared object</button>
+  <button>Compile error</button>
+  <button>Runtime error</button>
+  <p class="explain">Literals with the same contents refer to the same instance (demo: a == b true).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does intern() return?</p>
+  <button data-correct>A canonical instance</button>
+  <button>A char array</button>
+  <button>A mutable copy</button>
+  <button>A hash code</button>
+  <p class="explain">It returns a canonical representation of the string.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Best way to compare string contents?</p>
+  <button>intern only</button>
+  <button data-correct>equals method</button>
+  <button>hashCode only</button>
+  <button>== operator</button>
+  <p class="explain">equals compares the exact character sequence.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0018-string-traps.md">Exercise 0018: string traps</a></p>
+<p>Runnable example: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">String Javadoc</a>. Class description only.</p>
+<p> &nbsp;|&nbsp; <a href="0019-exceptions-checked-unchecked-try-with-resources.html">Exceptions: checked vs unchecked and try-with-resources →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">String Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

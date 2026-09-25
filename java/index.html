@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java (JDK 8, 17, 21) Ladder</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Java (JDK 8, 17, 21): simple to advanced</h1>
+<p class="meta"><a href="../index.html">Home</a> · Stack index · <a href="interview.html">Interview Q&amp;A</a> · <a href="../reference/roadmap.html">Roadmap</a> · <span data-progress-for="java" data-total="27">27 lessons</span></p>
+<p>Collections internals, concurrency, the JVM, and what JDK 8, 17 and 21 each added. 27 lessons in reading order, tick them off as you go (saved in this browser only). Folders: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Fundamentals in every JDK</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0018-strings-immutability-and-stringbuilder"><a href="lessons/0018-strings-immutability-and-stringbuilder.html">Strings: immutability, the pool and StringBuilder</a></li>
+<li data-id="0019-exceptions-checked-unchecked-try-with-resources"><a href="lessons/0019-exceptions-checked-unchecked-try-with-resources.html">Exceptions: checked vs unchecked and try-with-resources</a></li>
+<li data-id="0001-hashmap-equals-hashcode"><a href="lessons/0001-hashmap-equals-hashcode.html">HashMap, equals and hashCode</a></li>
+<li data-id="0002-choosing-a-list"><a href="lessons/0002-choosing-a-list.html">Choosing between ArrayList, LinkedList and ArrayDeque</a></li>
+<li data-id="0020-generics-basics-and-invariance"><a href="lessons/0020-generics-basics-and-invariance.html">Generics: why List of Integer is not List of Number</a></li>
+<li data-id="0021-wildcards-and-type-erasure"><a href="lessons/0021-wildcards-and-type-erasure.html">Wildcards (extends, super) and type erasure</a></li>
+</ol>
+<h2>JDK 8: the baseline</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0008-lambdas-and-functional-interfaces"><a href="lessons/0008-lambdas-and-functional-interfaces.html">JDK 8: lambdas, method references and functional interfaces</a></li>
+<li data-id="0009-default-methods-and-conflicts"><a href="lessons/0009-default-methods-and-conflicts.html">JDK 8: default methods and conflict resolution</a></li>
+<li data-id="0004-streams-and-optional"><a href="lessons/0004-streams-and-optional.html">Streams and Optional without the traps</a></li>
+<li data-id="0022-collectors-groupingby-tomap"><a href="lessons/0022-collectors-groupingby-tomap.html">Collectors: groupingBy, partitioningBy and toMap</a></li>
+<li data-id="0011-java-time"><a href="lessons/0011-java-time.html">JDK 8: java.time, the date and time API</a></li>
+<li data-id="0010-completablefuture"><a href="lessons/0010-completablefuture.html">JDK 8: CompletableFuture and async pipelines</a></li>
+</ol>
+<h2>Concurrency and the JVM (all JDKs)</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0005-visibility-and-happens-before"><a href="lessons/0005-visibility-and-happens-before.html">Visibility and happens-before</a></li>
+<li data-id="0024-atomics-and-locks"><a href="lessons/0024-atomics-and-locks.html">Atomics and ReentrantLock: fixing lost updates</a></li>
+<li data-id="0025-concurrenthashmap"><a href="lessons/0025-concurrenthashmap.html">ConcurrentHashMap: atomic updates and weak consistency</a></li>
+<li data-id="0023-thread-pools-executors"><a href="lessons/0023-thread-pools-executors.html">Thread pools: core, max, queue and rejection</a></li>
+<li data-id="0026-deadlock-and-lock-ordering"><a href="lessons/0026-deadlock-and-lock-ordering.html">Deadlock and lock ordering</a></li>
+<li data-id="0007-heap-and-garbage-collection"><a href="lessons/0007-heap-and-garbage-collection.html">Heap sizing and garbage collection</a></li>
+</ol>
+<h2>JDK 17: what changed between 8 and 17</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0012-var-and-text-blocks"><a href="lessons/0012-var-and-text-blocks.html">JDK 10 and 15: var and text blocks (in JDK 17)</a></li>
+<li data-id="0013-switch-expressions-and-instanceof-patterns"><a href="lessons/0013-switch-expressions-and-instanceof-patterns.html">JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</a></li>
+<li data-id="0003-records-and-immutability"><a href="lessons/0003-records-and-immutability.html">Records and shallow immutability</a></li>
+<li data-id="0014-sealed-classes"><a href="lessons/0014-sealed-classes.html">JDK 17: sealed classes and interfaces</a></li>
+<li data-id="0027-helpful-nullpointerexceptions"><a href="lessons/0027-helpful-nullpointerexceptions.html">Helpful NullPointerExceptions (JDK 14+, in 17 and 21)</a></li>
+</ol>
+<h2>JDK 21: what changed between 17 and 21</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0015-pattern-matching-switch-and-record-patterns"><a href="lessons/0015-pattern-matching-switch-and-record-patterns.html">JDK 21: pattern matching for switch and record patterns</a></li>
+<li data-id="0016-sequenced-collections"><a href="lessons/0016-sequenced-collections.html">JDK 21: sequenced collections</a></li>
+<li data-id="0006-virtual-threads"><a href="lessons/0006-virtual-threads.html">Virtual threads: scale, not speed</a></li>
+<li data-id="0017-generational-zgc"><a href="lessons/0017-generational-zgc.html">JDK 21: generational ZGC</a></li>
+</ol>
+<h2>Planned</h2>
+<ul>
+<li>Java 8 to 17 migration pitfalls (needs release-note sources) <span class="meta">(planned)</span></li>
+<li>Class loading and the JVM internals (needs sources) <span class="meta">(planned)</span></li>
+</ul>
+<footer><p><strong>Ask your teacher</strong> to add, reorder or skip lessons, or to run a mock interview from the <a href="interview.html">Q&amp;A page</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

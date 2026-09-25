@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 3: Window functions</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Window functions</h1>
+<p class="meta">PostgreSQL · Lesson 0003 · step 5 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a window function that shows a group statistic beside every row, and use <code>row_number()</code> to pick the top row per group.</div>
+
+<h2>Aggregate versus window</h2>
+<p>A window function "performs a calculation across a set of table rows that are somehow related to the current row." Unlike a plain aggregate, window functions "do not cause rows to become grouped into a single output row"; the rows keep their separate identities.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></p>
+<h2>Syntax to memorize</h2>
+<ul>
+<li><code>OVER</code> always follows the function, and marks it as a window function.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></li>
+<li><code>PARTITION BY</code> splits rows into groups that share values; the function is computed within the current row's partition.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></li>
+<li><code>ORDER BY</code> inside <code>OVER</code> controls processing order within the partition (it need not match the output order).<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></li>
+</ul>
+<pre><code>SELECT depname, empno, salary,
+       row_number() OVER (PARTITION BY depname ORDER BY salary DESC)
+FROM empsalary;</code></pre>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 03-window.sql
+-- aggregate: 2 rows, window: 6 rows with the average beside each
+-- top earner per department: wrap the window query, then WHERE rn = 1</code></pre>
+<p class="aside">Interview favorite: "top N per group". Window functions cannot appear directly in <code>WHERE</code>, so compute <code>row_number()</code> in a subquery, then filter on it, as the last query of the example does.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. How does a window function treat rows?</p>
+  <button>Sorts the table</button>
+  <button>Merges into one</button>
+  <button data-correct>Keeps every row</button>
+  <button>Deletes duplicates</button>
+  <p class="explain">Rows retain their separate identities.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What splits rows into groups inside <code>OVER</code>?</p>
+  <button data-correct>PARTITION BY clause</button>
+  <button>LIMIT clause</button>
+  <button>HAVING clause</button>
+  <button>GROUP BY clause</button>
+  <p class="explain">PARTITION BY divides rows into partitions.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Six rows in, two departments. Rows out with a window average?</p>
+  <button>One row out</button>
+  <button data-correct>Six rows out</button>
+  <button>Two rows out</button>
+  <button>Three rows out</button>
+  <p class="explain">Windows do not collapse rows, so six rows return.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which finds the top earner per department?</p>
+  <button>count then filter</button>
+  <button>avg then filter</button>
+  <button data-correct>row_number then filter</button>
+  <button>sum then filter</button>
+  <p class="explain">Number rows per partition by salary descending, then keep rn = 1.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-second-highest-salary.md">Exercise 0003: second highest per department</a></p>
+<p>Runnable example: <a href="../examples/03-window.sql"><code>03-window.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-window.html">PostgreSQL Tutorial: Window Functions</a>. Section 3.5, then the window function reference.</p>
+<p><a href="0008-transactions-commit-rollback-savepoints.html">← Transactions: COMMIT, ROLLBACK and savepoints</a> &nbsp;|&nbsp; <a href="0009-ctes-with-and-recursive.html">CTEs: WITH and WITH RECURSIVE →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/tutorial-window.html">PostgreSQL Tutorial: Window Functions</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

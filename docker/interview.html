@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Docker: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · Docker · 11 questions · <a href="index.html">Docker ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Docker questions for a Senior backend interview, with Java-specific angles (images, JVM memory, hardening).</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>What is the difference between a container and a virtual machine?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> containers are isolated processes that share the host kernel; VMs each run a full guest OS.</p>
+<p>A container is an isolated process running an application component in its own environment without affecting the host or other containers. It is "more lightweight than virtual machines since multiple containers share the same kernel rather than each requiring a full operating system", and portable across dev machines, data centers and clouds.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a> The trade-off you should volunteer: sharing a kernel means weaker isolation than a hypervisor boundary and that containers need a compatible kernel (that trade-off is well known but not spelled out in the pages I read).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Can you run a Linux container on Windows? (Answer from your own experience; it typically uses a Linux VM underneath. Not covered by the sources read here.)</div>
+<p class="see">Learn it: <a href="lessons/0001-containers-images-layers.html">Containers, images and layers</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>What is the difference between an image and a container? What is a layer?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an image is an immutable package; a container is a running instance; layers are the file-system changes that make up an image.</p>
+<p>"A container image is a standardized package that includes all of the files, binaries, libraries, and configurations to run a container." Images are immutable: once created they cannot be modified, only extended by adding a new image or changes on top. "Container images are composed of layers. Each layer represents a set of file system changes that add, remove, or modify files."<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[3]</a> Data written in a running container does not change the image; that is why you use volumes for persistent data.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where should a database's data live then? (In a volume; Compose models this explicitly.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[2]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0001-containers-images-layers.html">Containers, images and layers</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>How do you make Docker builds fast?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> order Dockerfile instructions so stable layers come first and use a <code>.dockerignore</code>.</p>
+<p>Each instruction becomes a layer, and "if a layer changes, all other layers that come after it are also affected."<a class="cite" href="https://docs.docker.com/build/cache/">[5]</a> So copy the dependency descriptor and install dependencies <em>before</em> copying source; then a source edit only invalidates layers from <code>COPY src/</code> onward. A <code>.dockerignore</code> keeps irrelevant files out of the build context and layers.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a> (The ordering recipe is a consequence of the invalidation rule.)</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you force a clean build? (Docker's best practices mention combining <code>--pull</code> and <code>--no-cache</code>.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0002-layer-cache-and-dockerfile-order.html">Layer cache</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>What are multi-stage builds and how do you use them for a Java app?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> compile in a JDK stage, copy only the artifact into a smaller runtime stage.</p>
+<p>Multi-stage builds "give a cleaner separation between the building of your image and the final output." Name stages with <code>AS</code>, copy with <code>COPY --from=build</code>, stop at a stage with <code>docker build --target</code>.<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[6]</a><a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a> In my measured example a JDK single-stage image was 475 MB and the JRE-based multi-stage image 318 MB. Add: non-root <code>USER</code>, exec-form <code>CMD</code>, pinned base image.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you debug a failing intermediate stage? (<code>--target</code>.)</div>
+<p class="see">Learn it: <a href="lessons/0003-multi-stage-java-image.html">Multi-stage Java image</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Your Java container gets OOM-killed. How do you investigate and fix it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> compare the container memory limit with heap plus non-heap; size the heap deliberately.</p>
+<p>The <code>--memory</code> flag is "the maximum amount of memory the container can use"; past it, the kernel's out-of-memory handling starts killing processes.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[7]</a> The JVM detects container limits on Linux by default and sizes the heap from them; <code>MaxRAMPercentage</code> defaults to 25 percent (and 50 percent for small heaps via <code>MinRAMPercentage</code>).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[8]</a> In my run a 256 MB limit produced a 121 MB max heap; with <code>MaxRAMPercentage=75</code> it was 185 MB. The heap is not the whole footprint: metaspace, thread stacks, direct buffers and the code cache add to it, so 100 percent heap invites an OOM kill. Steps: check limit, log <code>-Xlog:os+container=trace</code>, set <code>MaxRAMPercentage</code> around 60 to 75, measure real usage, and raise the limit if needed.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What do <code>--cpus</code> limits do to the JVM? (The JVM sees the limited CPU count; in my run --cpus=1 reported 1 processor.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[7]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0005-memory-cpu-limits-and-the-jvm.html">Memory and CPU limits</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>What Dockerfile hardening practices do you apply?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> pinned digests, non-root user, exec-form CMD, minimal trusted base, one concern per container.</p>
+<p>From Docker's best practices: use trusted minimal base images; pin base images by digest because mutable tags do not guarantee the same image every build; if a service can run without privileges use <code>USER</code>; avoid <code>sudo</code>; use exec form for <code>CMD</code>/<code>ENTRYPOINT</code> so signals are handled properly as PID 1; decouple applications, one concern per container; use <code>.dockerignore</code>.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why does exec form matter for Java shutdown? (With shell form a shell is PID 1; the doc advises exec form for signal handling, so the JVM gets SIGTERM and runs shutdown hooks. Verify by experiment, as the exercise suggests.)</div>
+<p class="see">Learn it: <a href="lessons/0006-pinning-nonroot-and-signals.html">Pinned, non-root, signal-safe images</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Explain Docker Compose. How do you make an app wait for its database?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a YAML file declaring services, networks and volumes; use a health check with <code>depends_on: condition: service_healthy</code>.</p>
+<p>A Compose file configures an application's services, and one CLI command creates and starts them. A service is the same image and configuration run one or more times; services talk over networks and store persistent data in volumes.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[2]</a> A started container is not necessarily ready, so define a <code>healthcheck</code> on the database and make the app <code>depends_on</code> it with <code>service_healthy</code>. My example did this with <code>pg_isready</code> and it started the client only once the database was healthy.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Compose or Kubernetes? (Compose for local dev and simple single-host use; Kubernetes for cluster scheduling, self-healing and rollouts.)</div>
+<p class="see">Learn it: <a href="lessons/0004-compose-app-and-database.html">Compose</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>What is the difference between CMD and ENTRYPOINT? What does <code>docker run image args</code> replace?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> ENTRYPOINT is the executable, CMD its default arguments; arguments on <code>docker run</code> replace CMD only.</p>
+<p>Only the last CMD counts; CMD provides defaults for an ENTRYPOINT or runs alone; with exec-form ENTRYPOINT and exec-form CMD the CMD is appended as arguments; a shell-form ENTRYPOINT ignores CMD and runs via <code>/bin/sh -c</code>. Exec form is preferred (no shell, proper signal handling).<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[9]</a><a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a> My demo: <code>docker run lesson-entry</code> printed "hello world", <code>docker run lesson-entry Docker</code> printed "hello Docker", and <code>--entrypoint printenv</code> replaced the executable.</p>
+<div class="follow"><strong>Likely follow-up:</strong> ENV versus ARG? (ARG is build-time only; ENV persists in the image and container; I confirmed BUILD_ID was unset at runtime.)</div>
+<p class="see">Learn it: <a href="lessons/0009-cmd-entrypoint-and-exec-form.html">CMD and ENTRYPOINT</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>How do you persist container data? Volume versus bind mount?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> volumes for Docker-managed persistent data; bind mounts to share host files, mainly in development.</p>
+<p>A volume's contents "exist outside the lifecycle of a given container"; without one, the writable layer is destroyed with the container. Volumes are managed by Docker; bind mounts attach a host path and "are strongly tied to the host"; add <code>readonly</code> to protect host files.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[10]</a><a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[11]</a> My run: data without a volume was gone in a new container; the named volume kept it; a read-only bind mount rejected writes.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where should a database's files live? (A named volume, as in the Compose example.)</div>
+<p class="see">Learn it: <a href="lessons/0010-volumes-and-bind-mounts.html">Volumes and bind mounts</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Why can containers reach each other by name on one network but not another? What does <code>-p</code> do?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> user-defined bridges give automatic DNS by container name; the default bridge does not; <code>-p</code> publishes a container port on the host.</p>
+<p>User-defined bridges provide automatic DNS resolution and better isolation; default-bridge containers cannot refer to each other by name. Without <code>-p</code> ports are not reachable from outside the host or, by default, from containers on other networks.<a class="cite" href="https://docs.docker.com/engine/network/">[12]</a><a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[13]</a> My run: <code>ping</code> by name failed on the default bridge and worked on a user-defined one, and a container on the user-defined network could not resolve one on the default bridge.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How does a Compose app reach its database? (By service name on the Compose network.)</div>
+<p class="see">Learn it: <a href="lessons/0011-networks-and-port-publishing.html">Networks</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Which restart policy would you use, and what does it not do?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>unless-stopped</code> or <code>on-failure</code> for services; restart policies react to exits, not to a hung-but-running process.</p>
+<p><code>no</code> (default), <code>on-failure[:max]</code> (non-zero exit), <code>always</code>, <code>unless-stopped</code> (stays stopped if you stopped it, even after a daemon restart).<a class="cite" href="https://docs.docker.com/engine/containers/start-containers-automatically/">[14]</a> My run: <code>on-failure:3</code> on a crashing container recorded 3 restarts, then stayed exited; policy <code>no</code> recorded 0.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What handles an unhealthy but running container? (Health checks in Docker; liveness probes in Kubernetes.)</div>
+<p class="see">Learn it: <a href="lessons/0012-restart-policies.html">Restart policies</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Docker questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker: What is a container?</a> · [2] <a href="https://docs.docker.com/compose/intro/compose-application-model/">Docker: Compose application model</a> · [3] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">Docker: What is an image?</a> · [4] <a href="https://docs.docker.com/build/building/best-practices/">Docker: Building best practices</a> · [5] <a href="https://docs.docker.com/build/cache/">Docker: Build cache</a> · [6] <a href="https://docs.docker.com/build/building/multi-stage/">Docker: Multi-stage builds</a> · [7] <a href="https://docs.docker.com/engine/containers/resource_constraints/">Docker: Resource constraints</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · [9] <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a> · [10] <a href="https://docs.docker.com/engine/storage/volumes/">Docker volumes</a> · [11] <a href="https://docs.docker.com/engine/storage/bind-mounts/">Docker bind mounts</a> · [12] <a href="https://docs.docker.com/engine/network/">Docker networking</a> · [13] <a href="https://docs.docker.com/engine/network/drivers/bridge/">Docker bridge driver</a> · [14] <a href="https://docs.docker.com/engine/containers/start-containers-automatically/">Docker restart policies</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

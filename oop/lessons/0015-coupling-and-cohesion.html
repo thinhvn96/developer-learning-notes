@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 15: Coupling and cohesion</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Coupling and cohesion</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0015 · step 15 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> define coupling and cohesion and reduce coupling by injecting an abstraction.</div>
+
+<h2>Definitions</h2>
+<p>"Coupling is the degree of interdependence between software modules, a measure of how closely connected two routines or modules are." It ranges from low (loose) to high (tight). "Low coupling is often thought to be a sign of a well-structured computer system and a good design, and when combined with high cohesion, supports the general goals of high readability and maintainability."<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[1]</a> <em>Cohesion</em> is how closely a module's parts belong together (my paraphrase; the fetched page defines coupling).</p>
+<pre><code>java oop/examples/CouplingCohesion.java
+(pretend SQL INSERT book)
+tight: placed book
+loose: placed book
+fake repo received: book</code></pre>
+<p><code>TightOrderService</code> creates its own <code>SqlOrderRepo</code>: it cannot be used or tested without it. <code>LooseOrderService</code> receives an <code>OrderRepo</code>, so a fake could be injected and inspected. That injection is the idea behind Spring's DI (<a href="../../spring-boot/lessons/0002-constructor-injection.html">lesson</a>). Source: <a href="../examples/CouplingCohesion.java"><code>CouplingCohesion.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Good design tends toward...?</p>
+  <button>High coupling, low cohesion</button>
+  <button>Low both</button>
+  <button data-correct>Low coupling, high cohesion</button>
+  <button>High both</button>
+  <p class="explain">Low coupling with high cohesion supports maintainability.<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which is tighter?</p>
+  <button>Constructor-injected interface</button>
+  <button data-correct>new inside the class</button>
+  <button>Interface parameter</button>
+  <button>Lambda callback</button>
+  <p class="explain">TightOrderService hard-wired its repository.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why inject the repository?</p>
+  <button data-correct>To substitute a fake</button>
+  <button>To save memory</button>
+  <button>To use static</button>
+  <button>To avoid interfaces</button>
+  <p class="explain">The demo passed a FakeRepo and inspected it.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Coupling measures...?</p>
+  <button>Class size</button>
+  <button>Lines of code</button>
+  <button data-correct>Interdependence of modules</button>
+  <button>Thread count</button>
+  <p class="explain">It is the degree of interdependence between modules.<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0015-decouple-a-service.md">Exercise 15: decouple a service</a></p>
+<p>Runnable example: <a href="../examples/CouplingCohesion.java"><code>CouplingCohesion.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">Wikipedia: Coupling</a>. Short overview.</p>
+<p><a href="0014-immutability.html">← Immutability and defensive copies</a> &nbsp;|&nbsp; <a href="0016-law-of-demeter.html">The Law of Demeter →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">Wikipedia: Coupling</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

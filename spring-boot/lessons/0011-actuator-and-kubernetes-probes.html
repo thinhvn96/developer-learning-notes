@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 11: Actuator and Kubernetes probes</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Actuator and Kubernetes probes</h1>
+<p class="meta">Spring Boot · Lesson 0011 · step 11 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> expose health endpoints safely, and wire Spring's liveness and readiness groups into Kubernetes probes without creating cascading restarts.</div>
+
+<h2>Endpoints and exposure</h2>
+<p>Actuator endpoints let you monitor and interact with the application. "By default, only the health endpoint is exposed over HTTP and JMX", at <code>/actuator/health</code>; widen it with <code>management.endpoints.web.exposure.include</code>. Before exposing more, ensure they hold no sensitive information or are secured (firewall or Spring Security).<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+<h2>Kubernetes probes</h2>
+<p>Two health groups are provided: <code>/actuator/health/liveness</code> and <code>/actuator/health/readiness</code>; point the Kubernetes <code>livenessProbe</code>/<code>readinessProbe</code> at them. The docs' key warning: liveness "should not depend on health checks for external systems": if a database fails, Kubernetes "might restart all application instances and create cascading failures". Readiness may include shared essential dependencies.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+<pre><code>RESULT GET /actuator/health           -&gt; 200 {"groups":["liveness","readiness"],"status":"UP"}
+RESULT GET /actuator/health/liveness  -&gt; 200 {"status":"UP"}
+RESULT GET /actuator/health/readiness -&gt; 200 {"status":"UP"}
+RESULT GET /actuator/env              -&gt; 404          # not exposed
+RESULT GET /actuator/beans            -&gt; 404          # not exposed</code></pre>
+<pre><code>livenessProbe:
+  httpGet: { path: /actuator/health/liveness, port: 8080 }
+readinessProbe:
+  httpGet: { path: /actuator/health/readiness, port: 8080 }</code></pre>
+<p>The demo enables the groups with <code>management.endpoint.health.probes.enabled=true</code> (the docs say they are automatic on Kubernetes; I set it explicitly to run outside a cluster). Code: <a href="../examples/demo-app/src/test/java/com/example/demo/ActuatorProbesTest.java"><code>ActuatorProbesTest.java</code></a>. Pair with the <a href="../../kubernetes/lessons/0006-probes.html">Kubernetes probes lesson</a>.</p><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Endpoints exposed over HTTP by default?</p>
+  <button data-correct>Only health</button>
+  <button>Only env</button>
+  <button>None at all</button>
+  <button>All endpoints</button>
+  <p class="explain">Only the health endpoint is exposed by default.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Property to expose more endpoints?</p>
+  <button>spring.actuator.on</button>
+  <button data-correct>management.endpoints.web.exposure.include</button>
+  <button>management.port.all</button>
+  <button>app.expose</button>
+  <p class="explain">Use management.endpoints.web.exposure.include.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Should liveness check the database?</p>
+  <button>Only at night</button>
+  <button>Yes, always</button>
+  <button>Only for MySQL</button>
+  <button data-correct>No, avoid external systems</button>
+  <p class="explain">External failures could restart all instances and cascade.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Path of the readiness group?</p>
+  <button data-correct>/actuator/health/readiness</button>
+  <button>/status</button>
+  <button>/health/ready</button>
+  <button>/actuator/ready</button>
+  <p class="explain">Readiness is at /actuator/health/readiness.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-secure-actuator.md">Exercise 0011: secure the actuator</a></p>
+<p>Runnable example: <a href="../examples/demo-app/src/test/java/com/example/demo/ActuatorProbesTest.java"><code>demo-app/src/test/java/com/example/demo/ActuatorProbesTest.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot: Actuator Endpoints</a>. 'Kubernetes Probes' section.</p>
+<p><a href="0006-transaction-propagation.html">← Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</a> &nbsp;|&nbsp; <a href="0012-test-slices-and-springboottest.html">Testing: @SpringBootTest and test slices →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot: Actuator Endpoints</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

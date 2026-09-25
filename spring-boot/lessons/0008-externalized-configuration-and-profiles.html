@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 8: Externalized configuration, precedence and profiles</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Externalized configuration, precedence and profiles</h1>
+<p class="meta">Spring Boot · Lesson 0008 · step 5 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict which value wins when the same property is set in a file, a profile file, and a higher-precedence source.</div>
+
+<h2>Precedence (later overrides earlier)</h2>
+<ol><li>default properties</li><li><code>@PropertySource</code></li><li>config data files (<code>application.properties</code>/<code>.yaml</code>)</li><li>random values</li><li>OS environment variables</li><li>Java system properties</li><li>JNDI, servlet init params</li><li><code>SPRING_APPLICATION_JSON</code></li><li><strong>command-line arguments</strong> (highest)<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li></ol>
+<p>That is why the same JAR runs in every environment: files hold defaults, and Kubernetes ConfigMaps/env vars or command-line args override them (<a href="../../kubernetes/lessons/0009-configmaps.html">ConfigMap lesson</a>).</p>
+<h2>Profiles</h2>
+<p>Profiles "segregate parts of your application configuration and make it be available only in certain environments". Mark beans with <code>@Profile("production")</code>; activate with <code>spring.profiles.active=dev</code> (property or command line). With none active, the <code>default</code> profile is enabled.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[2]</a> A profile file such as <code>application-dev.properties</code> adds or overrides values when active (the naming convention is used in the demo project and worked in the run).</p>
+<pre><code>RESULT default profile: name=demo-app greeting=hello bean=default-profile bean
+RESULT dev profile:     name=demo-app greeting=hello from the dev profile bean=dev-profile bean
+RESULT dev profile + test property: greeting=from a higher-precedence source</code></pre>
+<p>Code: <a href="../examples/demo-app/src/test/java/com/example/demo/ConfigAndProfileTest.java"><code>ConfigAndProfileTest.java</code></a>, <a href="../examples/demo-app/src/main/resources/application-dev.properties"><code>application-dev.properties</code></a>, <a href="../examples/demo-app/src/main/java/com/example/demo/config/GreetingConfig.java"><code>GreetingConfig.java</code></a>. The last case sets the property in the test annotation (a higher-precedence source than the profile file) and it wins.</p><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Highest-precedence source?</p>
+  <button>Default properties</button>
+  <button>@PropertySource</button>
+  <button data-correct>Command-line arguments</button>
+  <button>application.properties</button>
+  <p class="explain">Command-line arguments override everything listed before them.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Env var vs application.properties. Winner?</p>
+  <button>Neither</button>
+  <button data-correct>Environment variable</button>
+  <button>The file</button>
+  <button>Random</button>
+  <p class="explain">OS environment variables come later in the order.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Property to activate a profile?</p>
+  <button>spring.profile.name</button>
+  <button data-correct>spring.profiles.active</button>
+  <button>spring.env.use</button>
+  <button>app.profile</button>
+  <p class="explain">spring.profiles.active activates profiles.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. No profile active. Which is enabled?</p>
+  <button>none</button>
+  <button data-correct>default</button>
+  <button>production</button>
+  <button>dev</button>
+  <p class="explain">A profile named default is enabled.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-override-in-docker.md">Exercise 0008: override in Docker</a></p>
+<p>Runnable example: <a href="../examples/demo-app/src/test/java/com/example/demo/ConfigAndProfileTest.java"><code>demo-app/src/test/java/com/example/demo/ConfigAndProfileTest.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration</a>. The property source order list.</p>
+<p><a href="0003-auto-configuration.html">← Auto-configuration and how to see it</a> &nbsp;|&nbsp; <a href="0009-configuration-properties-binding.html">@ConfigurationProperties: type-safe configuration →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration</a> · [2] <a href="https://docs.spring.io/spring-boot/reference/features/profiles.html">Spring Boot: Profiles</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

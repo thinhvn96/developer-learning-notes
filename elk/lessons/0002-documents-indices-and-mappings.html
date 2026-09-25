@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 2: Documents, indices and mappings</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Documents, indices and mappings</h1>
+<p class="meta">ELK Stack · Lesson 0002 · step 3 of 14 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain index, document and mapping, and why you choose explicit mappings for production.</div>
+
+<h2>Definitions</h2>
+<p>"An index is the fundamental unit of storage in Elasticsearch, and the level at which you interact with your data." An index consists of <strong>documents</strong> (JSON objects with key-value fields), <strong>mappings</strong> (field data types and how fields are indexed and queried), and <strong>settings</strong> (shards, replicas, refresh interval).<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+<p>The docs advise dynamic mapping for exploration and explicit mappings for production, and aliases to decouple queries from index names.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+<h2>An explicit mapping</h2>
+<pre><code>PUT /logs
+{ "mappings": { "properties": {
+    "message": { "type": "text" },       // analyzed: full-text search
+    "level":   { "type": "keyword" },    // exact value: filters and aggregations
+    "service": { "type": "keyword" } } } }</code></pre>
+<p>The <code>text</code> versus <code>keyword</code> choice is the one that decides whether your queries work, as <a href="0005-query-dsl-term-match-bool.html">lesson 5</a> shows. Script: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a>.</p>
+<div class="aside">Interview question: "What happens if I let dynamic mapping guess?" It infers types from the first document it sees, which may not suit your queries; mappings for existing fields cannot simply be changed, so plan them up front (the reindex approach is beyond the excerpts read here; ask your teacher).</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A mapping defines what?</p>
+  <button>User roles</button>
+  <button data-correct>Field types and indexing</button>
+  <button>Shard placement</button>
+  <button>Disk paths</button>
+  <p class="explain">Mappings specify field data types and control indexing and querying behavior.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What is a document in Elasticsearch?</p>
+  <button>A Kibana panel</button>
+  <button data-correct>A JSON object</button>
+  <button>A log file</button>
+  <button>A Java class</button>
+  <p class="explain">Documents are JSON objects containing key-value fields.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Dynamic or explicit mapping for production?</p>
+  <button>Dynamic guessing</button>
+  <button>No mappings</button>
+  <button>Random types</button>
+  <button data-correct>Explicit mappings</button>
+  <p class="explain">Use dynamic mapping for exploration, explicit for production.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which index part holds refresh interval?</p>
+  <button>Aliases</button>
+  <button data-correct>Settings</button>
+  <button>Mappings</button>
+  <button>Documents</button>
+  <p class="explain">Settings control shards, replicas and refresh intervals.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-map-an-access-log.md">Exercise 0002: map an access log</a></p>
+<p>Runnable example: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch Docs: Indices, documents and mappings</a>. Read 'Index basics' and 'Mappings'.</p>
+<p><a href="0008-kql-and-discover.html">← Searching in Kibana: Discover and KQL</a> &nbsp;|&nbsp; <a href="0009-text-analysis.html">Text analysis: analyzers and tokens →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch Docs: Indices, documents and mappings</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

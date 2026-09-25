@@ -1,0 +1,14 @@
+# A container that allocates memory until its 20Mi limit is exceeded: the kernel OOM-kills it.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: memory-hog
+spec:
+  restartPolicy: Never
+  containers:
+  - name: hog
+    image: busybox:1.36
+    command: ["sh", "-c", "tail /dev/zero"]
+    resources:
+      requests: { memory: "10Mi", cpu: "50m" }
+      limits:   { memory: "20Mi" }

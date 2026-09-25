@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 9: CTEs: WITH and WITH RECURSIVE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>CTEs: WITH and WITH RECURSIVE</h1>
+<p class="meta">PostgreSQL · Lesson 0009 · step 6 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a CTE to name intermediate results, and a recursive CTE to walk a hierarchy.</div>
+
+<h2>WITH</h2>
+<p><code>WITH</code> defines auxiliary statements (CTEs) that act like "temporary tables that exist just for one query". Each can be a <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> or <code>MERGE</code>.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a> They make long queries readable.</p>
+<h2>Recursive</h2>
+<p>A recursive query "always has a non-recursive term, then UNION (or UNION ALL), then a recursive term", where only the recursive term references its own output. It runs the non-recursive term, then repeats the recursive term on the working table until no rows are produced.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+<pre><code>WITH RECURSIVE chain AS (
+    SELECT id, name, manager_id, 0 AS level FROM emp WHERE name = 'dev'
+  UNION ALL
+    SELECT e.id, e.name, e.manager_id, c.level + 1 FROM emp e JOIN chain c ON e.id = c.manager_id
+) SELECT level, name FROM chain ORDER BY level;
+-- 0 dev, 1 lead, 2 vp, 3 ceo</code></pre>
+<h2>Inlining</h2>
+<p>A non-recursive, side-effect-free CTE referenced once is folded into the parent query by default; <code>MATERIALIZED</code> forces separate calculation (useful for expensive functions), <code>NOT MATERIALIZED</code> forces inlining.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a> Source: <a href="../examples/09-cte.sql"><code>09-cte.sql</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A CTE lives for...?</p>
+  <button>One server</button>
+  <button>One session</button>
+  <button>One database</button>
+  <button data-correct>One query</button>
+  <p class="explain">CTEs act as temporary tables just for one query.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Shape of a recursive CTE?</p>
+  <button>Two recursive terms</button>
+  <button>JOIN, GROUP, HAVING</button>
+  <button data-correct>Non-recursive, UNION, recursive</button>
+  <button>Recursive only</button>
+  <p class="explain">Non-recursive term, then UNION [ALL], then a recursive term.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. When does a recursive CTE stop?</p>
+  <button>Never stops</button>
+  <button>After 100 rows</button>
+  <button>At a timer</button>
+  <button data-correct>No new rows produced</button>
+  <p class="explain">It loops until the recursive term produces no rows.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which keyword forces separate computation?</p>
+  <button>INLINE</button>
+  <button data-correct>MATERIALIZED</button>
+  <button>CACHED</button>
+  <button>STORED</button>
+  <p class="explain">AS MATERIALIZED forces the CTE to be calculated on its own.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-org-chart.md">Exercise 0009: org chart</a></p>
+<p>Runnable example: <a href="../examples/09-cte.sql"><code>09-cte.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/queries-with.html">PostgreSQL Docs: WITH Queries</a>. Section 7.8.</p>
+<p><a href="0003-window-functions.html">← Window functions</a> &nbsp;|&nbsp; <a href="0004-indexes-what-they-buy.html">Indexes: what they buy and what they cost →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/queries-with.html">PostgreSQL Docs: WITH Queries</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

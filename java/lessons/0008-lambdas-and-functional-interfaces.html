@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 8: JDK 8: lambdas, method references and functional interfaces</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 8: lambdas, method references and functional interfaces</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0008 · step 7 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a lambda, pick the right functional interface, and explain the 'effectively final' rule.</div>
+
+<h2>What a lambda is (JDK 8)</h2>
+<p>Lambda expressions let you "treat functionality as method argument, or code as data" and express instances of single-method classes more compactly than anonymous classes.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a> They work with <em>functional interfaces</em>: interfaces with exactly one abstract method (they may also have default or static methods).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a> The JDK ships standard ones in <code>java.util.function</code>, such as <code>Predicate&lt;T&gt;</code>, <code>Consumer&lt;T&gt;</code> and <code>Function&lt;T,R&gt;</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+<h2>Syntax</h2>
+<pre><code>(a, b) -&gt; a + b                 // parameters -&gt; expression
+p -&gt; p.getAge() &gt;= 18           // one parameter: parentheses optional
+email -&gt; System.out.println(email)
+String::length                  // method reference</code></pre>
+<p>A body is a single expression or a block in braces.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+<h2>The rule interviewers ask</h2>
+<p>"A lambda expression can only access local variables and parameters of the enclosing block that are final or effectively final."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a> Effectively final means never reassigned after initialization. Lambdas are also <em>lexically scoped</em>: they introduce no new scope level, so a lambda's declarations are interpreted as in the enclosing environment.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+<pre><code>java java/examples/jdk8/Lambdas.java
+3 3 2 3        (lengths of the short names, one per line)
+15</code></pre>
+<p>Source: <a href="../examples/jdk8/Lambdas.java"><code>Lambdas.java</code></a>, compiled with <code>javac --release 8</code> to prove it uses only JDK 8 features.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A functional interface has exactly how many abstract methods?</p>
+  <button>Exactly two</button>
+  <button data-correct>Exactly one</button>
+  <button>At least two</button>
+  <button>Zero methods</button>
+  <p class="explain">It contains only one abstract method, though it may have default or static methods.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A lambda reads a local variable that is reassigned later. Result?</p>
+  <button data-correct>Compile error</button>
+  <button>Runtime exception</button>
+  <button>Runs with latest</button>
+  <button>Runs with a copy</button>
+  <p class="explain">Captured locals must be final or effectively final.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which standard interface takes T and returns boolean?</p>
+  <button>Consumer of T</button>
+  <button>Function of T,R</button>
+  <button data-correct>Predicate of T</button>
+  <button>Supplier of T</button>
+  <p class="explain">Predicate&lt;T&gt; is the boolean-returning test interface in java.util.function.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lambdas are lexically scoped. Meaning?</p>
+  <button>A separate class scope</button>
+  <button data-correct>No new name scope</button>
+  <button>Inherit supertype names</button>
+  <button>A new inner scope</button>
+  <p class="explain">They do not inherit names from a supertype or introduce a new level of scoping.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-refactor-anonymous-classes.md">Exercise 0008: replace anonymous classes</a></p>
+<p>Runnable example: <a href="../examples/jdk8/Lambdas.java"><code>jdk8/Lambdas.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a>. Read the whole page, including 'Accessing Local Variables'.</p>
+<p><a href="0021-wildcards-and-type-erasure.html">← Wildcards (extends, super) and type erasure</a> &nbsp;|&nbsp; <a href="0009-default-methods-and-conflicts.html">JDK 8: default methods and conflict resolution →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

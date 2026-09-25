@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 1: HashMap, equals and hashCode</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>HashMap, <code>equals</code> and <code>hashCode</code></h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0001 · step 3 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain, in three sentences, why overriding <code>equals</code> without <code>hashCode</code> silently breaks a <code>HashMap</code>. This is one of the most common Senior-level opening questions.</div>
+
+<h2>The contract</h2>
+<p>Two rules from the <code>Object</code> Javadoc<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">[1]</a> matter here:</p>
+<ul>
+  <li>If two objects are equal according to <code>equals</code>, calling <code>hashCode</code> on each <em>must</em> produce the same integer.</li>
+  <li>Unequal objects are <em>not required</em> to have different hash codes, though distinct ones improve hash-table performance.</li>
+</ul>
+<p>The first rule is a one-way promise: equal ⇒ same hash. It does not say same hash ⇒ equal. A collision is legal, just slower.</p>
+
+<h2>What HashMap does with it</h2>
+<p>A <code>HashMap</code> stores entries in buckets. The hash code picks the bucket; <code>equals</code> then picks the entry inside it. When entries exceed load factor × capacity (defaults 0.75 and 16), the table is rebuilt with about twice as many buckets<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a>.</p>
+<p>So a lookup is: <em>hash → bucket → equals</em>. If two equal keys hash to different buckets, the second lookup goes to the wrong bucket and never runs <code>equals</code>. Run it yourself:</p>
+<pre><code>java java/examples/LostKey.java
+BadKey  lookup: null
+GoodKey lookup: value</code></pre>
+<p>Source: <a href="../examples/LostKey.java"><code>LostKey.java</code></a>. <code>BadKey</code> overrides only <code>equals</code>, so its default identity-based <code>hashCode</code> differs between two instances with the same <code>id</code>, and the lookup misses.</p>
+
+<p class="aside">Other facts to keep ready, all from the HashMap Javadoc<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a>: it permits one <code>null</code> key and <code>null</code> values; it guarantees no iteration order; it is <strong>not synchronized</strong>; its iterators are fail-fast and throw <code>ConcurrentModificationException</code> on structural modification.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+
+<div class="quiz">
+  <p class="prompt">1. Two keys are equal by <code>equals</code>. What must be true of their hash codes?</p>
+  <button data-correct>They must be identical values</button>
+  <button>They must be different values</button>
+  <button>They may be either value freely</button>
+  <button>They must differ in lower bits</button>
+  <p class="explain">Equal objects must produce the same hash code. This is the core of the contract.</p>
+</div>
+
+<div class="quiz">
+  <p class="prompt">2. Two keys have the same hash code. What does that tell you?</p>
+  <button>They are equal by the equals method</button>
+  <button data-correct>They might not be equal at all</button>
+  <button>They are the same object reference</button>
+  <button>They will land in different buckets</button>
+  <p class="explain">The contract is one-way. Equal hash codes only mean a collision is possible; <code>equals</code> decides.</p>
+</div>
+
+<div class="quiz">
+  <p class="prompt">3. You override only <code>equals</code> on a key class. What is the typical symptom?</p>
+  <button>Compiler error on put</button>
+  <button>An exception at runtime</button>
+  <button data-correct>Silent misses on lookups</button>
+  <button>Slower but correct lookups</button>
+  <p class="explain">It compiles and runs. Equal keys usually land in different buckets, so <code>get</code> quietly returns <code>null</code>. Silent failure is what makes this bug dangerous.</p>
+</div>
+
+<div class="quiz">
+  <p class="prompt">4. Two threads write to one plain HashMap. What does the Javadoc say?</p>
+  <button>It locks internally per bucket</button>
+  <button data-correct>It must be synchronized externally</button>
+  <button>It copies itself on every write</button>
+  <button>It retries failed writes silently</button>
+  <p class="explain">HashMap is not synchronized; concurrent structural modification requires external synchronization (or a different class, which a later lesson covers).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-mutable-key.md">Exercise 0001: the key that changed</a>. Write your prediction to the teacher first, then run the code. It targets the next natural interview follow-up: "what if the key is mutable?"</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> the <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a>, class description only (five minutes). The <a href="https://dev.java/learn/">Dev.java collections tutorials</a> are the gentler alternative.</p>
+
+<p><a href="0019-exceptions-checked-unchecked-try-with-resources.html">← Exceptions: checked vs unchecked and try-with-resources</a> &nbsp;|&nbsp; <a href="0002-choosing-a-list.html">Choosing between ArrayList, LinkedList and ArrayDeque →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "why does treeification exist?", "what does <code>Objects.hash</code> cost?", "quiz me harder". Follow-ups are how this course adapts to you.</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">Object Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

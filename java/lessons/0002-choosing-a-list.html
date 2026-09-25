@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 2: Choosing between ArrayList, LinkedList and ArrayDeque</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Choosing between ArrayList, LinkedList and ArrayDeque</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0002 · step 4 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> answer 'ArrayList or LinkedList?' with the documented facts instead of folklore, and name the better queue/stack.</div>
+
+<h2>What the Javadoc actually promises</h2>
+<p><strong>ArrayList</strong> is backed by an array with a capacity that grows automatically. <code>size</code>, <code>isEmpty</code>, <code>get</code>, <code>set</code> and <code>iterator</code> run in constant time; <code>add</code> runs in <em>amortized</em> constant time; "all of the other operations run in linear time". The Javadoc adds: "The constant factor is low compared to that for the <code>LinkedList</code> implementation."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a></p>
+<p><strong>LinkedList</strong>: "Operations that index into the list will traverse the list from the beginning or the end, whichever is closer to the specified index."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">[2]</a> So <code>get(i)</code> is a walk, not a jump.</p>
+<p><strong>ArrayDeque</strong>: "likely to be faster than <code>Stack</code> when used as a stack, and faster than <code>LinkedList</code> when used as a queue." Null elements are prohibited.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a></p>
+<div class="aside">Interview shape: default to <code>ArrayList</code>. For a stack or queue, reach for <code>ArrayDeque</code>. A <code>LinkedList</code> answer needs a specific reason. Note the docs claim "amortized" for <code>add</code>: one add occasionally copies the array, but n adds cost O(n) overall.</div>
+<h2>Three pitfalls, one run</h2>
+<pre><code>java java/examples/ListPitfalls.java
+ArrayDeque rejects null: NullPointerException
+for-each + list.remove: ConcurrentModificationException
+removeIf result: [1, 3]</code></pre>
+<p>None of the three is synchronized<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">[2]</a><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a>, and <code>ArrayList</code>'s iterators are fail-fast<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a>. Use <code>removeIf</code> or the iterator's own <code>remove</code> to delete while looping.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does the ArrayList Javadoc say about <code>get(i)</code>?</p>
+  <button>It runs in random time</button>
+  <button>It runs in linear time</button>
+  <button>It runs in log time</button>
+  <button data-correct>It runs in constant time</button>
+  <p class="explain">get, set, size, isEmpty and iterator are constant time.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Best default class for a FIFO queue or a stack?</p>
+  <button>Stack with generics</button>
+  <button>Vector with locks</button>
+  <button data-correct>ArrayDeque here</button>
+  <button>LinkedList by habit</button>
+  <p class="explain">The ArrayDeque Javadoc says it is likely faster than Stack as a stack and than LinkedList as a queue.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What happens on <code>arrayDeque.addFirst(null)</code>?</p>
+  <button>It clears the deque</button>
+  <button data-correct>It throws an NPE</button>
+  <button>It ignores the call</button>
+  <button>It stores the null</button>
+  <p class="explain">Null elements are prohibited in ArrayDeque.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. You need thread-safe access to a plain ArrayList. What do the docs say?</p>
+  <button>Call ensureCapacity first</button>
+  <button>Use it single-threaded</button>
+  <button>It is already safe</button>
+  <button data-correct>Synchronize it externally</button>
+  <p class="explain">Implementations are not synchronized; concurrent structural modification requires external synchronization, e.g. Collections.synchronizedList.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-list-choice.md">Exercise 0002: pick the collection</a></p>
+<p>Runnable example: <a href="../examples/ListPitfalls.java"><code>ListPitfalls.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc, class description</a>. Five minutes; then skim ArrayList's class description.</p>
+<p><a href="0001-hashmap-equals-hashcode.html">← HashMap, equals and hashCode</a> &nbsp;|&nbsp; <a href="0020-generics-basics-and-invariance.html">Generics: why List of Integer is not List of Number →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">LinkedList Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

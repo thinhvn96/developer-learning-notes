@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 6: MVCC and isolation levels</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>MVCC and isolation levels</h1>
+<p class="meta">PostgreSQL · Lesson 0006 · step 11 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain MVCC in one sentence and show the difference between READ COMMITTED and REPEATABLE READ with two live sessions.</div>
+
+<h2>MVCC</h2>
+<p>With Multiversion Concurrency Control "reading never blocks writing and writing never blocks reading": locks taken for querying do not conflict with locks taken for writing. Each statement sees a snapshot of the data.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[1]</a></p>
+<h2>The four levels in PostgreSQL</h2>
+<table>
+<tr><th>Level</th><th>Dirty</th><th>Non-repeatable</th><th>Phantom</th><th>Serialization anomaly</th></tr>
+<tr><td>Read uncommitted</td><td>not in PG</td><td>possible</td><td>possible</td><td>possible</td></tr>
+<tr><td>Read committed</td><td>no</td><td>possible</td><td>possible</td><td>possible</td></tr>
+<tr><td>Repeatable read</td><td>no</td><td>no</td><td>not in PG</td><td>possible</td></tr>
+<tr><td>Serializable</td><td>no</td><td>no</td><td>no</td><td>no</td></tr>
+</table>
+<p>Read committed is the default. PostgreSQL's Read uncommitted "behaves like Read Committed", and its Repeatable read does not allow phantom reads.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a> Serializable transactions may fail with "could not serialize access"; applications "must be prepared to retry transactions".<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+<h2>Two sessions, live</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./06-isolation.sh
+=== session A isolation level: READ COMMITTED
+A first read : 100
+A second read: 200       # B committed in between: a non-repeatable read
+=== session A isolation level: REPEATABLE READ
+A first read : 100
+A second read: 100       # A keeps its snapshot</code></pre>
+<p>Source: <a href="../examples/06-isolation.sh"><code>06-isolation.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. MVCC principle in PostgreSQL?</p>
+  <button data-correct>Reads never block writes</button>
+  <button>Readers lock tables</button>
+  <button>Writes block all reads</button>
+  <button>Only one session runs</button>
+  <p class="explain">Reading never blocks writing and writing never blocks reading.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default PostgreSQL isolation level?</p>
+  <button>Serializable</button>
+  <button data-correct>Read committed</button>
+  <button>Repeatable read</button>
+  <button>Read uncommitted</button>
+  <p class="explain">Read committed is the default.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. A re-read sees another session's committed change. Name?</p>
+  <button data-correct>Non-repeatable read</button>
+  <button>Lost update</button>
+  <button>Deadlock</button>
+  <button>Dirty read</button>
+  <p class="explain">A non-repeatable read finds data modified by a transaction that committed since the first read.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Serializable transaction fails with a serialization error. Do what?</p>
+  <button data-correct>Retry the transaction</button>
+  <button>Lower the level</button>
+  <button>Drop the table</button>
+  <button>Ignore the error</button>
+  <p class="explain">Applications must be prepared to retry serialization failures.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-two-sessions.md">Exercise 0006: two sessions</a></p>
+<p>Runnable example: <a href="../examples/06-isolation.sh"><code>06-isolation.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL Docs: Transaction Isolation</a>. Read the intro and the Read Committed and Repeatable Read subsections.</p>
+<p><a href="0005-reading-explain.html">← Reading EXPLAIN and EXPLAIN ANALYZE</a> &nbsp;|&nbsp; <a href="0012-row-locks-and-deadlocks.html">Row locks, SELECT FOR UPDATE and deadlocks →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/mvcc-intro.html">PostgreSQL Docs: Introduction to concurrency control (MVCC)</a> · [2] <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL Docs: Transaction Isolation</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 9: Adapter</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Adapter</h1>
+<p class="meta">Design Patterns · Lesson 0009 · step 9 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> wrap an incompatible class so it fits the interface your client expects, and recognize <code>Arrays.asList</code> as an adapter.</div>
+
+<h2>Intent</h2>
+<p>Adapter is "a structural design pattern that allows objects with incompatible interfaces to collaborate." Use it when you want to use an existing class whose interface does not match your code, or reuse several subclasses that lack common functionality.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/AdapterDemo.java
+legacy printed 5 bytes: hello
+array=[x, y, c] view=[x, y, c]
+fixed-size: add() unsupported</code></pre><p><code>LegacyAdapter</code> implements the <code>Printer</code> the client expects and translates the call into the legacy class's different method and arguments. In the JDK, <code>Arrays.asList</code> "acts as bridge between array-based and collection-based APIs": a fixed-size list backed by the array, with write-through in both directions (shown above); adding throws <code>UnsupportedOperationException</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[2]</a> Source: <a href="../examples/AdapterDemo.java"><code>AdapterDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Separates interface or data conversion from business logic</li><li>New adapters can be introduced without breaking client code</li></ul>
+<p><strong>Cons</strong></p><ul><li>More interfaces and classes; sometimes simpler to change the service class directly</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a> Adapter retrofits existing classes (Bridge is designed up front); Decorator keeps or extends the interface while Adapter changes it; Proxy keeps it identical; Facade defines a new interface for a whole subsystem, where an Adapter usually wraps one object.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Adapter's purpose?</p>
+  <button>Hide creation</button>
+  <button>Add responsibilities</button>
+  <button>Copy objects</button>
+  <button data-correct>Make incompatible interfaces collaborate</button>
+  <p class="explain">Objects with incompatible interfaces collaborate.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Arrays.asList is a...?</p>
+  <button>Deep copy</button>
+  <button>Immutable copy</button>
+  <button>Growable list</button>
+  <button data-correct>Write-through view of the array</button>
+  <p class="explain">Changes pass through to the array (shown in the run).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Adapter vs Facade?</p>
+  <button>Facade wraps one object</button>
+  <button>Same thing</button>
+  <button>Neither wraps</button>
+  <button data-correct>Adapter wraps one object</button>
+  <p class="explain">Adapter usually wraps a single object; Facade a subsystem.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A cost of Adapter?</p>
+  <button>No inheritance</button>
+  <button>Static state</button>
+  <button data-correct>More classes</button>
+  <button>Slower JIT</button>
+  <p class="explain">Overall complexity increases.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-adapt-a-payment-sdk.md">Exercise 9: adapt a payment SDK</a></p>
+<p>Runnable example: <a href="../examples/AdapterDemo.java"><code>AdapterDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/adapter">Adapter (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0008-singleton.html">← Singleton</a> &nbsp;|&nbsp; <a href="0010-bridge.html">Bridge →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/adapter">Adapter (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

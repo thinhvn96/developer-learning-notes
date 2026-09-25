@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 12: Row locks, SELECT FOR UPDATE and deadlocks</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Row locks, SELECT FOR UPDATE and deadlocks</h1>
+<p class="meta">PostgreSQL · Lesson 0012 · step 12 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use <code>SELECT ... FOR UPDATE</code>, explain how a deadlock forms between two transactions, and prevent it.</div>
+
+<h2>Row locks</h2>
+<p><code>SELECT ... FOR UPDATE</code> locks the selected rows "as though for update": other transactions trying to <code>UPDATE</code>, <code>DELETE</code> or lock those rows are blocked until this transaction ends.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+<h2>Deadlocks</h2>
+<p>A deadlock occurs when two transactions each hold locks the other wants. PostgreSQL detects it and aborts one transaction. The best defense is to "acquire locks on multiple objects in a consistent order across all applications"; otherwise retry the aborted transaction.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./11-locking.sh
+=== 1. SELECT ... FOR UPDATE makes another writer wait
+second session UPDATE waited about 2.1 s for the row lock
+=== 2. deadlock: opposite update order
+ERROR:  deadlock detected
+final balances: 1|91   2|110      # one transaction committed, one was aborted</code></pre>
+<p>Compare Java's <a href="../../java/lessons/0026-deadlock-and-lock-ordering.html">deadlock lesson</a>: same cause, same cure. In Spring, the aborted transaction surfaces as an exception you should retry outside the transactional boundary. Source: <a href="../examples/11-locking.sh"><code>11-locking.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does FOR UPDATE do to other writers?</p>
+  <button>Copies rows</button>
+  <button data-correct>Blocks them until end</button>
+  <button>Ignores them</button>
+  <button>Cancels them</button>
+  <p class="explain">Other transactions attempting UPDATE or DELETE on those rows are blocked.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Two transactions wait on each other. PostgreSQL...?</p>
+  <button>Ignores it</button>
+  <button data-correct>Aborts one</button>
+  <button>Waits forever</button>
+  <button>Aborts both</button>
+  <p class="explain">It detects deadlocks and aborts one of the transactions.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Best prevention?</p>
+  <button>Bigger tables</button>
+  <button>More connections</button>
+  <button>Longer sleeps</button>
+  <button data-correct>Consistent lock order</button>
+  <p class="explain">Acquire locks in a consistent order across applications.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. After a deadlock error, what should the app do?</p>
+  <button>Drop the table</button>
+  <button data-correct>Retry the transaction</button>
+  <button>Commit anyway</button>
+  <button>Increase isolation</button>
+  <p class="explain">Handle deadlocks by retrying the aborted transaction.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-avoid-the-deadlock.md">Exercise 0012: avoid the deadlock</a></p>
+<p>Runnable example: <a href="../examples/11-locking.sh"><code>11-locking.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL Docs: Explicit Locking</a>. Read 'Row-Level Locks' and 'Deadlocks'.</p>
+<p><a href="0006-mvcc-and-isolation-levels.html">← MVCC and isolation levels</a> &nbsp;|&nbsp; <a href="0013-vacuum-and-dead-tuples.html">VACUUM, dead tuples and autovacuum →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL Docs: Explicit Locking</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 1: Events, topics and partitions</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Events, topics and partitions</h1>
+<p class="meta">Kafka · Lesson 0001 · step 1 of 10 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what Kafka stores, why a topic has partitions, and what ordering Kafka does and does not guarantee.</div>
+
+<h2>What Kafka is</h2>
+<p>Event streaming is "the practice of capturing data in real-time from event sources ... in the form of streams of events." Kafka combines three functions: publish and subscribe to event streams, store them durably, and process them as they occur or retrospectively.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+<h2>Topics and partitions</h2>
+<p>Events are organized in <em>topics</em>. A topic is "spread over a number of 'buckets' located on different Kafka brokers": these are <em>partitions</em>, which is how Kafka scales. Events with the same key go to the same partition, and consumers read a partition's events in the order they were written.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+<p>Ordering is therefore <strong>per partition</strong>, not per topic. The key is how you get ordering for one entity (say, all events for one user).</p>
+<h2>Not a classic queue</h2>
+<p>"Events are not deleted after consumption." Retention is set per topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> Consuming does not remove events, so many consumers can read the same data independently.</p>
+<h2>Run it</h2>
+<pre><code>cd kafka/examples &amp;&amp; ./01-topics-keys-groups.sh
+Topic: orders PartitionCount: 3 ReplicationFactor: 1
+Partition:0   u2 b
+Partition:0   u2 f
+Partition:1   u1 a
+Partition:1   u1 c
+Partition:1   u1 e
+Partition:1   u3 d</code></pre>
+<p>All three <code>u1</code> events landed in partition 1, and both <code>u2</code> events in partition 0 (same key, same partition). Which partition each key maps to is decided by Kafka; only the "same key, same partition" property is the guarantee. Source: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a> (starts a throwaway <code>apache/kafka</code> container).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Where does Kafka guarantee event order?</p>
+  <button>Across all topics</button>
+  <button>Across a whole topic</button>
+  <button data-correct>Within one partition</button>
+  <button>Across all brokers</button>
+  <p class="explain">Events with the same key go to the same partition and are read in written order.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A consumer reads an event. What happens to it?</p>
+  <button data-correct>It stays in the topic</button>
+  <button>It is compressed away</button>
+  <button>It is deleted at once</button>
+  <button>It moves to a DLQ</button>
+  <p class="explain">Events are not deleted after consumption; retention is configured per topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why do topics have partitions?</p>
+  <button>Order all events</button>
+  <button>Skip replication</button>
+  <button>Encrypt the events</button>
+  <button data-correct>Spread load over brokers</button>
+  <p class="explain">A topic is spread over buckets on different brokers for scalability.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Common production replication factor per docs?</p>
+  <button>Seven copies</button>
+  <button>No copies</button>
+  <button data-correct>Three copies</button>
+  <button>One copy</button>
+  <p class="explain">A common production setting is a replication factor of 3.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-partitions-and-keys.md">Exercise 0001: partitions and keys</a></p>
+<p>Runnable example: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/getting-started/introduction/">Apache Kafka Documentation: Introduction</a>. Read 'Main Concepts and Terminology'.</p>
+<p> &nbsp;|&nbsp; <a href="0002-producers-keys-and-acks.html">Producers, keys and acks →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Apache Kafka Documentation: Introduction</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

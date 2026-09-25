@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 13: Data streams and rollover</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Data streams and rollover</h1>
+<p class="meta">ELK Stack · Lesson 0013 · step 13 of 14 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain a data stream, why it needs <code>@timestamp</code>, what rollover does, and when to use an alias instead.</div>
+
+<h2>What it is</h2>
+<p>A data stream is "a layer of abstraction over a set of indices that are optimized for storing append-only time series data": you use one name, and it manages hidden, auto-generated <em>backing indices</em>. Every document needs a <code>@timestamp</code> field (date or date_nanos). The newest backing index is the <em>write index</em>; a <em>rollover</em> creates a new one, automatically through ILM or manually.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+<p><strong>Not for:</strong> workloads that repeatedly send documents with the same <code>_id</code> expecting last-write-wins; use an index alias with a write index instead.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+<pre><code>PUT _index_template/logs-app {"index_patterns":["logs-app*"],"data_stream":{}}
+POST logs-app/_doc {"@timestamp":"...","message":"first"}
+  -&gt; indexed into backing index .ds-logs-app-2026.09.24-000001
+POST logs-app/_doc {"message":"no timestamp"}
+  -&gt; failed to parse: data stream timestamp field [@timestamp] is missing
+POST logs-app/_rollover
+  -&gt; rolled_over true; new index .ds-logs-app-2026.09.24-000002
+GET _data_stream/logs-app -&gt; backing indices: [...-000001, ...-000002]</code></pre>
+<p>Logs and metrics are the natural fit; Filebeat and Logstash can write to data streams (I did not test that here). Script: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a>. Next: automating rollover and deletion with <a href="0014-index-lifecycle-management.html">ILM</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which field must every data stream document have?</p>
+  <button>_id only</button>
+  <button data-correct>@timestamp</button>
+  <button>host</button>
+  <button>level</button>
+  <p class="explain">Documents must include @timestamp; the run rejected one without it.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What is the write index?</p>
+  <button>The oldest backing index</button>
+  <button>Every index</button>
+  <button>The template</button>
+  <button data-correct>The newest backing index</button>
+  <p class="explain">The most recent backing index serves as the write index.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Rollover does what?</p>
+  <button>Changes mappings</button>
+  <button>Merges shards</button>
+  <button>Deletes old data</button>
+  <button data-correct>Creates a new write index</button>
+  <p class="explain">A rollover creates a new backing index that becomes the write index.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Poor fit for a data stream?</p>
+  <button>Traces</button>
+  <button>Metrics</button>
+  <button>Application logs</button>
+  <button data-correct>Updating docs by same _id</button>
+  <p class="explain">Same-_id last-write-wins workloads should use an alias instead.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-log-data-stream.md">Exercise 0013: a log data stream</a></p>
+<p>Runnable example: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/manage-data/data-store/data-streams">Elasticsearch: Data streams</a>. Overview and 'When to use'.</p>
+<p><a href="0012-ingest-pipelines.html">← Ingest pipelines: parse inside Elasticsearch</a> &nbsp;|&nbsp; <a href="0014-index-lifecycle-management.html">Index lifecycle management (ILM) →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/manage-data/data-store/data-streams">Elasticsearch: Data streams</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

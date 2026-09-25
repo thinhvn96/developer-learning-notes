@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 22: State</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>State</h1>
+<p class="meta">Design Patterns · Lesson 0022 · step 22 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> replace state-dependent conditionals with state objects that trigger their own transitions.</div>
+
+<h2>Intent</h2>
+<p>State is "a behavioral design pattern that lets an object alter its behavior when its internal state changes." It relates to finite-state machines: put each state's behavior into its own class and let the context delegate to the current state object. Use it when an object behaves differently in many states or a class is polluted with large conditionals.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/StateDemo.java
+draft: sending to moderation
+  state -&gt; Moderation
+moderation: approved, publishing
+  state -&gt; Published
+published: already public, ignoring
+published: already public, ignoring
+published: cannot reject a public document</code></pre><p>The same <code>publish()</code> call does different things in <code>Draft</code>, <code>Moderation</code> and <code>Published</code>, and each state decides the next one. Source: <a href="../examples/StateDemo.java"><code>StateDemo.java</code></a>. Key difference from Strategy: "particular states may be aware of each other and initiate transitions from one state to another, whereas strategies almost never know about each other."<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a> For a small fixed set of states, an <a href="../../oop/lessons/0013-enums-as-classes.html">enum with constant-specific behavior</a> is a lighter option.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Single Responsibility and Open/Closed</li><li>Eliminates bulky conditionals</li></ul>
+<p><strong>Cons</strong></p><ul><li>Overkill for a few states or rare changes</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a> State, Strategy and Bridge share a composition-based structure but solve different problems.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. State changes what?</p>
+  <button>Threads</button>
+  <button data-correct>Behavior with internal state</button>
+  <button>Interfaces</button>
+  <button>Class names</button>
+  <p class="explain">An object alters its behavior when its state changes.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. State vs Strategy?</p>
+  <button>Neither</button>
+  <button>Same</button>
+  <button>Strategies know each other</button>
+  <button data-correct>States know each other</button>
+  <p class="explain">States may initiate transitions; strategies almost never know each other.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Replaces...?</p>
+  <button>Threads</button>
+  <button>Interfaces</button>
+  <button>Inheritance only</button>
+  <button data-correct>Bulky conditionals</button>
+  <p class="explain">It eliminates state-dependent if/switch.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Published document publish() in the demo?</p>
+  <button>Moves to Draft</button>
+  <button data-correct>Ignored</button>
+  <button>Deletes it</button>
+  <button>Throws</button>
+  <p class="explain">The demo printed 'already public, ignoring'.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0022-order-lifecycle.md">Exercise 22: an order lifecycle</a></p>
+<p>Runnable example: <a href="../examples/StateDemo.java"><code>StateDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/state">State (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0021-observer.html">← Observer</a> &nbsp;|&nbsp; <a href="0023-strategy.html">Strategy →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/state">State (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

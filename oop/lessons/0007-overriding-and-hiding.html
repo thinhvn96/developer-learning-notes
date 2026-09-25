@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 7: Overriding versus hiding</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Overriding versus hiding</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0007 · step 7 of 22 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> say which of instance methods, static methods and fields override and which hide, and why <code>@Override</code> matters.</div>
+
+<h2>The rules</h2>
+<ul><li>An instance method with the same signature and return type as a superclass instance method <strong>overrides</strong> it; it may return a subtype (a <em>covariant return type</em>).</li>
+<li><code>@Override</code> makes the compiler error if nothing is actually overridden.</li>
+<li>A static method with the same signature <strong>hides</strong> the superclass's; which version runs depends on whether it is invoked from the superclass or subclass.</li>
+<li>The overriding method may allow <em>more, but not less</em> access; changing instance to static or back is a compile error.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></li></ul>
+<table><tr><th></th><th>Superclass instance</th><th>Superclass static</th></tr>
+<tr><td><strong>Subclass instance</strong></td><td>overrides</td><td>compile error</td></tr>
+<tr><td><strong>Subclass static</strong></td><td>compile error</td><td>hides</td></tr></table>
+<p><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+<pre><code>java oop/examples/OverridingVsHiding.java
+instance method : woof
+static method   : Animal.kind / Dog.kind
+static via ref  : Animal.kind
+field           : animal (static type) vs dog (cast)
+covariant return: Dog</code></pre>
+<p>The instance method used the runtime type (<code>woof</code>), but the static call and the field were chosen by the <em>static type</em> (<code>Animal</code>): hiding is not polymorphic. Source: <a href="../examples/OverridingVsHiding.java"><code>OverridingVsHiding.java</code></a>. Related: default-method conflicts (<a href="../../java/lessons/0009-default-methods-and-conflicts.html">JDK 8 lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. An instance method with the same signature in a subclass...?</p>
+  <button>Overloads</button>
+  <button>Hides</button>
+  <button data-correct>Overrides</button>
+  <button>Fails always</button>
+  <p class="explain">It overrides the superclass method.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A static method with the same signature...?</p>
+  <button data-correct>Hides</button>
+  <button>Overrides</button>
+  <button>Is inherited unchanged</button>
+  <button>Is deleted</button>
+  <p class="explain">Static methods hide.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does @Override guarantee?</p>
+  <button>Thread safety</button>
+  <button data-correct>A compile error if nothing is overridden</button>
+  <button>Faster calls</button>
+  <button>Public access</button>
+  <p class="explain">The compiler errors when the method does not exist in a superclass.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Overriding method access may be...?</p>
+  <button>Less but not more</button>
+  <button>Any level</button>
+  <button>Always private</button>
+  <button data-correct>More but not less</button>
+  <p class="explain">It can allow more, but not less, access.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-predict-the-output.md">Exercise 7: predict the output</a></p>
+<p>Runnable example: <a href="../examples/OverridingVsHiding.java"><code>OverridingVsHiding.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">Java Tutorials: Overriding and Hiding Methods</a>. Instance methods, static methods, access modifiers.</p>
+<p><a href="0005-initialization-order.html">← Initialization order: static blocks, fields, constructors</a> &nbsp;|&nbsp; <a href="0008-polymorphism.html">Polymorphism and virtual method invocation →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">Java Tutorials: Overriding and Hiding Methods</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

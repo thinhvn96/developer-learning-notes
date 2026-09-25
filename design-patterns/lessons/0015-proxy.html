@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 15: Proxy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Proxy</h1>
+<p class="meta">Design Patterns · Lesson 0015 · step 15 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> provide a stand-in with the same interface (lazy, logging, protection) and write a JDK dynamic proxy.</div>
+
+<h2>Intent</h2>
+<p>Proxy is "a structural design pattern that lets you provide a substitute or placeholder for another object." Kinds: lazy initialization (virtual proxy), access control (protection proxy), remote proxy, logging proxy, caching proxy, smart reference.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/ProxyDemo.java
+--- virtual (lazy) proxy
+proxy created, nothing loaded yet
+  loading big.png from disk (expensive)
+  showing image
+  showing image
+--- JDK dynamic proxy adding logging to ANY interface
+  -&gt; calling compute[20, 22]
+  &lt;- returned 42
+proxy class name starts with: $Proxy</code></pre><p>The <code>LazyImage</code> proxy loads the real image on first <code>show()</code>. The JDK can create proxies at runtime: "A proxy class is a class created at runtime that implements a specified list of interfaces"; each call is dispatched to an <code>InvocationHandler</code>'s <code>invoke</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[2]</a> Here one handler adds logging to <em>any</em> interface. Source: <a href="../examples/ProxyDemo.java"><code>ProxyDemo.java</code></a>.</p>
+<p><strong>You have already met this:</strong> Spring's <code>@Transactional</code> works through a proxy, which is why calling a transactional method on <code>this</code> bypasses the transaction (verified in the <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">Spring lesson</a>: 2 accounts saved instead of rolled back).</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Controls the service object without clients knowing</li><li>Manages the service's lifecycle</li><li>Works even when the service is unavailable</li><li>Open/Closed: new proxies without changing service or clients</li></ul>
+<p><strong>Cons</strong></p><ul><li>More classes and complexity</li><li>May delay responses</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a> Adapter gives a different interface; Facade wraps subsystems; Decorator's composition is controlled by the client, while a proxy usually manages its service object's whole lifecycle.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A proxy has...?</p>
+  <button>Only static methods</button>
+  <button>A different interface</button>
+  <button data-correct>The same interface as the service</button>
+  <button>No interface</button>
+  <p class="explain">It is a substitute for another object.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lazy proxy delays...?</p>
+  <button>Garbage collection</button>
+  <button>Compiling</button>
+  <button data-correct>Creating the real object</button>
+  <button>Loading the JVM</button>
+  <p class="explain">Lazy initialization creates the service object when needed.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. JDK class for runtime proxies?</p>
+  <button>Thread</button>
+  <button>java.util.Proxy</button>
+  <button data-correct>java.lang.reflect.Proxy</button>
+  <button>java.net.Proxy only</button>
+  <p class="explain">Proxy.newProxyInstance creates them.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why did self-invocation skip @Transactional?</p>
+  <button data-correct>It bypassed the proxy</button>
+  <button>Missing bean</button>
+  <button>JDK bug</button>
+  <button>Wrong isolation</button>
+  <p class="explain">The call did not go through the proxy object.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0015-caching-proxy.md">Exercise 15: a caching proxy</a></p>
+<p>Runnable example: <a href="../examples/ProxyDemo.java"><code>ProxyDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/proxy">Proxy (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0014-flyweight.html">← Flyweight</a> &nbsp;|&nbsp; <a href="0016-chain-of-responsibility.html">Chain of Responsibility →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/proxy">Proxy (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">Proxy Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

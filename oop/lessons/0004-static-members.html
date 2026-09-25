@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 4: Static members: shared state and constants</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Static members: shared state and constants</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0004 · step 4 of 22 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> say what a static field and static method are, and why a static method cannot use <code>this</code>.</div>
+
+<h2>Class variables</h2>
+<p>"Fields that have the <code>static</code> modifier in their declaration are called <em>static fields</em> or <em>class variables</em>. They are associated with the class, rather than with any object. Every instance of the class shares a class variable, which is in one fixed location in memory."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+<h2>Class methods</h2>
+<p>"Class methods cannot access instance variables or instance methods directly; they must use an object reference. Also, class methods cannot use the <code>this</code> keyword as there is no instance for <code>this</code> to refer to."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a> Constants combine <code>static</code> and <code>final</code>, conventionally UPPER_CASE.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+<pre><code>java oop/examples/StaticMembers.java
+before: 0
+after 3 objects, shared count = 3
+instance ids: 1, 2, 3
+constant: 100</code></pre>
+<p>One shared counter, but a separate <code>id</code> per object. Source: <a href="../examples/StaticMembers.java"><code>StaticMembers.java</code></a>. Design warning: mutable static state is global state, which makes code hard to test (see the <a href="../../design-patterns/lessons/0008-singleton.html">Singleton lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. How many copies of a static field exist?</p>
+  <button>Zero</button>
+  <button>One per thread</button>
+  <button>One per object</button>
+  <button data-correct>One</button>
+  <p class="explain">Every instance shares the class variable.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Can a static method use this?</p>
+  <button>Only in enums</button>
+  <button>Only in main</button>
+  <button data-correct>No</button>
+  <button>Yes</button>
+  <p class="explain">There is no instance for this to refer to.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. A constant is declared with...?</p>
+  <button>volatile</button>
+  <button>abstract</button>
+  <button>private only</button>
+  <button data-correct>static final</button>
+  <p class="explain">static final defines a constant.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Static counter after creating 3 objects?</p>
+  <button>Nine</button>
+  <button>Zero</button>
+  <button>One</button>
+  <button data-correct>Three</button>
+  <p class="explain">The demo printed a shared count of 3.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-id-generator.md">Exercise 4: an id generator</a></p>
+<p>Runnable example: <a href="../examples/StaticMembers.java"><code>StaticMembers.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">Java Tutorials: Understanding Class Members</a>. Class variables and class methods.</p>
+<p><a href="0003-access-levels.html">← Access levels: hiding what should be hidden</a> &nbsp;|&nbsp; <a href="0006-inheritance.html">Inheritance: extends, super and is-a →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">Java Tutorials: Understanding Class Members</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

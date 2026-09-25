@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 8: Competing consumers</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Competing consumers</h1>
+<p class="meta">System Design · Lesson 0008 · step 7 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain competing consumers and distinguish them from publish-subscribe.</div>
+
+<h2>Idea</h2>
+<p>"Enable multiple concurrent consumers to process messages received on the same messaging channel." The queue ensures each message goes to one consumer; the pool can grow and shrink with load. It differs from publish-subscribe: with competing consumers "one consumer receives each message"; with pub-sub "all consumers receive every message".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+<h2>Benefits and cautions</h2>
+<ul><li>Load-leveled, more reliable (a failed instance does not block others), scales, no complex coordination; "the message queue ensures that each message is delivered at least once".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></li>
+<li><strong>Ordering</strong> is not guaranteed: design for idempotent processing.</li>
+<li><strong>Poison messages</strong> need capture (dead letter queue / delivery limit).</li>
+<li><strong>Results</strong> need a reply channel and correlation.</li>
+<li>A single queue can become a bottleneck; partition or balance across queues.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></li></ul>
+<p>Where you have seen it in this course: RabbitMQ consumers on one queue with acks and prefetch (<a href="../../rabbitmq/lessons/0003-acks-prefetch-redelivery.html">lesson</a>), and a Kafka <a href="../../kafka/lessons/0003-consumers-groups-and-offsets.html">consumer group</a> (each partition to one consumer in the group). Not suitable when tasks depend on each other or must run in a strict sequence.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Competing consumers: how many get each message?</p>
+  <button data-correct>One</button>
+  <button>None</button>
+  <button>All</button>
+  <button>Two</button>
+  <p class="explain">One consumer receives each message.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Pub-sub: how many get each message?</p>
+  <button>One</button>
+  <button>Half</button>
+  <button>None</button>
+  <button data-correct>All subscribers</button>
+  <p class="explain">All consumers receive every message.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Ordering across competing consumers?</p>
+  <button>Reversed</button>
+  <button data-correct>Not guaranteed</button>
+  <button>Sorted</button>
+  <button>Guaranteed</button>
+  <p class="explain">Processing order is not guaranteed.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Consumer keeps crashing on a message. Use...?</p>
+  <button data-correct>Dead-letter handling</button>
+  <button>Fanout</button>
+  <button>More retries forever</button>
+  <button>Larger queue</button>
+  <p class="explain">Poison messages should be captured elsewhere, for example a dead-letter queue.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-scale-consumers.md">Exercise 0008: scale consumers</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">Azure: Competing Consumers</a>. Solution and considerations.</p>
+<p><a href="0007-queue-based-load-leveling.html">← Queue-based load leveling</a> &nbsp;|&nbsp; <a href="0003-queue-versus-log.html">Queue versus log: choosing RabbitMQ or Kafka →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">Azure: Competing Consumers</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

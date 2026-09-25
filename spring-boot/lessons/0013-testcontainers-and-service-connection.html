@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 13: Testcontainers and @ServiceConnection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Testcontainers and @ServiceConnection</h1>
+<p class="meta">Spring Boot · Lesson 0013 · step 13 of 13 · Senior · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how Testcontainers and <code>@ServiceConnection</code> let integration tests use a real database container.</div>
+
+<h2>Idea</h2>
+<p>"The Testcontainers library provides a way to manage services running inside Docker containers. It integrates with JUnit, allowing you to write a test class that can start up a container before any of the tests run. Testcontainers is especially useful for writing integration tests that talk to a real backend service."<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+<h2>@ServiceConnection</h2>
+<p>"A service connection is a connection to any remote service." Annotating a container field with <code>@ServiceConnection</code> defines the connection details automatically, and they "take precedence over any connection-related configuration properties".<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+<pre><code>@Testcontainers
+@SpringBootTest
+class MyIntegrationTests {
+    @Container
+    @ServiceConnection
+    static Neo4jContainer neo4j = new Neo4jContainer("neo4j:5");
+    ...
+}</code></pre>
+<p>(The docs' example uses Neo4j; the same shape applies to a PostgreSQL container. <strong>I did not run this lesson's pattern</strong>: the demo project uses in-memory H2, and running Testcontainers inside my Maven container would need Docker access I did not set up.) Why it matters: H2 can behave differently from PostgreSQL (isolation, locking, SQL dialect), so Senior teams test persistence against the real engine; see the <a href="../../postgresql/lessons/0006-mvcc-and-isolation-levels.html">PostgreSQL isolation lesson</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Testcontainers manages what?</p>
+  <button>JVM heap</button>
+  <button>Git branches</button>
+  <button data-correct>Docker-run services</button>
+  <button>Maven plugins</button>
+  <p class="explain">It manages services running inside Docker containers.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does @ServiceConnection provide?</p>
+  <button>A profile</button>
+  <button>A new database</button>
+  <button>A mock bean</button>
+  <button data-correct>Connection details automatically</button>
+  <p class="explain">It defines ConnectionDetails for the container's service.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which wins: connection details or properties?</p>
+  <button data-correct>Connection details</button>
+  <button>Neither</button>
+  <button>Random</button>
+  <button>Properties</button>
+  <p class="explain">Connection details take precedence over connection properties.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Best use of Testcontainers?</p>
+  <button>Build caching</button>
+  <button>Unit tests of getters</button>
+  <button data-correct>Integration tests on real backends</button>
+  <button>UI screenshots</button>
+  <p class="explain">It is especially useful for integration tests against real services.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-postgres-integration-test.md">Exercise 0013: a PostgreSQL integration test</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">Spring Boot: Testcontainers</a>. Read 'Service Connections'.</p>
+<p><a href="0012-test-slices-and-springboottest.html">← Testing: @SpringBootTest and test slices</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">Spring Boot: Testcontainers</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

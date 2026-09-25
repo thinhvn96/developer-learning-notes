@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 11: JDK 8: java.time, the date and time API</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 8: java.time, the date and time API</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0011 · step 11 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pick the right java.time class for a requirement (birth date, meeting time, timestamp, elapsed time).</div>
+
+<h2>The classes (JDK 8, package <code>java.time</code>)</h2>
+<table>
+<tr><th>Need</th><th>Class<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[1]</a></th></tr>
+<tr><td>Date only, no zone (a birth date)</td><td><code>LocalDate</code></td></tr>
+<tr><td>Time of day only</td><td><code>LocalTime</code></td></tr>
+<tr><td>Date and time, no zone</td><td><code>LocalDateTime</code></td></tr>
+<tr><td>Date, time and zone (a meeting)</td><td><code>ZonedDateTime</code> (or <code>OffsetDateTime</code> for a fixed offset)</td></tr>
+<tr><td>Machine timestamp on the timeline</td><td><code>Instant</code> (nanosecond resolution from the epoch)</td></tr>
+<tr><td>Amount of time in seconds and nanos</td><td><code>Duration</code></td></tr>
+<tr><td>Amount of time in years, months, days</td><td><code>Period</code></td></tr>
+</table>
+<p>The tutorial's guidance: human time uses the Local classes, machine time uses <code>Instant</code>, and zone-aware needs use <code>ZonedDateTime</code> or <code>OffsetDateTime</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[1]</a></p>
+<h2>Run it</h2>
+<pre><code>java java/examples/jdk8/JavaTime.java
+1990-05-17 -&gt; 1990-06-16 (original unchanged)
+Duration: PT3H30M
+Period:   P36Y3D
+Same instant in Tokyo: 2026-01-01T09:00+09:00[Asia/Tokyo]</code></pre>
+<p>The example shows that <code>plusDays</code> returns a <em>new</em> object: these types are immutable (observed in the run; the overview page lists the classes but the immutability point is best confirmed in the class Javadoc). Source: <a href="../examples/jdk8/JavaTime.java"><code>JavaTime.java</code></a>.</p>
+<div class="aside">Senior rule: store and transmit timestamps as <code>Instant</code> (UTC), convert to a zone only for display, and keep <code>Duration</code> and <code>Period</code> distinct: a "month" is not a fixed number of seconds.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Best type for a machine timestamp?</p>
+  <button data-correct>Instant</button>
+  <button>LocalDate</button>
+  <button>Period</button>
+  <button>LocalTime</button>
+  <p class="explain">Instant measures a continuous timeline from the epoch in nanoseconds.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Best type for a birthday without a zone?</p>
+  <button>Instant</button>
+  <button>Duration</button>
+  <button data-correct>LocalDate</button>
+  <button>ZonedDateTime</button>
+  <p class="explain">The tutorial's example for a birth date ignoring timezone is LocalDate.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which measures years, months and days?</p>
+  <button>Instant</button>
+  <button>Duration</button>
+  <button data-correct>Period</button>
+  <button>LocalTime</button>
+  <p class="explain">Period is date-based; Duration is seconds and nanoseconds.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which carries date, time and a zone ID?</p>
+  <button data-correct>ZonedDateTime</button>
+  <button>LocalDateTime</button>
+  <button>Year</button>
+  <button>OffsetTime</button>
+  <p class="explain">ZonedDateTime holds date, time, offset and zone ID.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-schedule-across-zones.md">Exercise 0011: schedule across zones</a></p>
+<p>Runnable example: <a href="../examples/jdk8/JavaTime.java"><code>jdk8/JavaTime.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Oracle Java Tutorials: Date-Time</a>. Then the 'Instant' and 'Parsing and Formatting' pages.</p>
+<p><a href="0022-collectors-groupingby-tomap.html">← Collectors: groupingBy, partitioningBy and toMap</a> &nbsp;|&nbsp; <a href="0010-completablefuture.html">JDK 8: CompletableFuture and async pipelines →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Oracle Java Tutorials: Date-Time Overview</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

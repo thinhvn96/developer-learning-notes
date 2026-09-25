@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 14: Flyweight</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Flyweight</h1>
+<p class="meta">Design Patterns · Lesson 0014 · step 14 of 30 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> separate intrinsic (shared) from extrinsic (contextual) state to save memory, and explain the Integer cache.</div>
+
+<h2>Intent</h2>
+<p>Flyweight is "a structural design pattern that lets you fit more objects into the available amount of RAM by sharing common parts of state between multiple objects instead of keeping all of the data in each object." <em>Intrinsic</em> state is constant data kept in the flyweight; <em>extrinsic</em> state is contextual and stored outside. Apply it only when you have a huge number of similar objects that consume significant RAM.<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/FlyweightDemo.java
+Integer cache: valueOf(127)==valueOf(127) is true, valueOf(1000)==valueOf(1000) is false
+characters placed: 11, distinct glyph objects created: 8</code></pre><p>Eleven characters share eight distinct <code>Glyph</code> objects; the position (extrinsic state) lives in <code>Placed</code>. The JDK's <code>Integer.valueOf</code> "will always cache values in the range -128 to 127, inclusive": so <code>valueOf(127) == valueOf(127)</code> but <code>valueOf(1000) != valueOf(1000)</code>, and the <code>Integer(int)</code> constructor is deprecated in favor of it.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a> Lesson: compare boxed values with <code>equals</code> (<a href="../../java/lessons/0001-hashmap-equals-hashcode.html">equals/hashCode</a>). Source: <a href="../examples/FlyweightDemo.java"><code>FlyweightDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Substantial RAM savings for many similar objects</li></ul>
+<p><strong>Cons</strong></p><ul><li>Trades memory for CPU (recomputing context)</li><li>More complex code</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a> Flyweights are immutable and can be many, unlike a Singleton; it complements Composite (shared leaf nodes).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Intrinsic state is...?</p>
+  <button data-correct>Shared and constant</button>
+  <button>Random</button>
+  <button>Per-object and changing</button>
+  <button>Stored outside</button>
+  <p class="explain">It stays in the flyweight, shareable.<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Integer cache range?</p>
+  <button>Any</button>
+  <button data-correct>-128 to 127</button>
+  <button>0 to 255</button>
+  <button>-1000 to 1000</button>
+  <p class="explain">valueOf always caches -128 to 127.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cost of Flyweight?</p>
+  <button>No reads</button>
+  <button>No objects</button>
+  <button data-correct>More CPU and complexity</button>
+  <button>More RAM</button>
+  <p class="explain">It trades memory efficiency for CPU cycles.<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. valueOf(1000) == valueOf(1000)?</p>
+  <button>Null</button>
+  <button data-correct>False in the run</button>
+  <button>Compile error</button>
+  <button>True</button>
+  <p class="explain">The demo printed false: outside the guaranteed cache range.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0014-cache-tile-objects.md">Exercise 14: tile objects</a></p>
+<p>Runnable example: <a href="../examples/FlyweightDemo.java"><code>FlyweightDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/flyweight">Flyweight (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0013-facade.html">← Facade</a> &nbsp;|&nbsp; <a href="0015-proxy.html">Proxy →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/flyweight">Flyweight (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">Integer Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

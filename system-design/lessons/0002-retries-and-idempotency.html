@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 2: Retries, backoff and idempotency</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Retries, backoff and idempotency</h1>
+<p class="meta">System Design · Lesson 0002 · step 2 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain when a retry helps, when it makes an outage worse, and why idempotency is a precondition.</div>
+
+<h2>When to retry</h2>
+<p>Transient faults (momentary network loss, a busy service) "are typically self-correcting", so retrying after a suitable delay is likely to succeed. The pattern lists three strategies: <strong>cancel</strong> if the fault is not transient, <strong>retry immediately</strong> if it is rare, and <strong>retry after a delay</strong> for common busy or connectivity failures.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+<h2>How to retry safely</h2>
+<ul>
+<li><strong>Space out the retries</strong>: increase the delay incrementally or exponentially, up to a maximum number of attempts, and choose delays "to spread requests from multiple instances of the application as evenly as possible".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a> Randomizing the delay (jitter) is how the example below achieves that spreading; the term itself is my label, the goal is from the docs.</li>
+<li><strong>Do not hammer</strong>: "An aggressive retry policy with minimal delay between attempts, and a large number of retries, could further degrade a busy service".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a> After many failures, stop sending requests and probe occasionally: the Circuit Breaker pattern.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></li>
+<li><strong>Idempotency</strong>: "If so, it's inherently safe to retry. Otherwise, retries could cause the operation to be executed more than once." A server may process a request but fail to respond.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></li>
+<li><strong>One layer only</strong>: nested retry policies multiply delays; fail fast at lower levels.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></li>
+</ul>
+<pre><code>java system-design/examples/RetryDemo.java
+attempt 1 failed; sleeping 72 ms (cap 100)
+attempt 2 failed; sleeping 136 ms (cap 200)
+attempt 3 failed; sleeping 123 ms (cap 400)
+result: ok after 4 calls
+attempt 1 failed; sleeping 27 ms (cap 100)
+attempt 2 failed; sleeping 133 ms (cap 200)
+gave up after 3 attempts: transient</code></pre>
+<p>Source: <a href="../examples/RetryDemo.java"><code>RetryDemo.java</code></a> (seeded random, so the delays repeat).</p>
+<p class="aside">Not for: long-lasting faults, business-logic errors, or as a substitute for scaling a service that keeps reporting busy.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Fault is not transient. Best strategy?</p>
+  <button data-correct>Cancel the operation</button>
+  <button>Retry forever</button>
+  <button>Double the timeout</button>
+  <button>Retry immediately</button>
+  <p class="explain">If retrying is unlikely to succeed, cancel and report the exception.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Why space retries with growing delays?</p>
+  <button>Bypass idempotency</button>
+  <button data-correct>Avoid overloading service</button>
+  <button>Save client memory</button>
+  <button>Skip the timeout</button>
+  <p class="explain">Aggressive retries can further degrade a busy service.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which operations are inherently safe to retry?</p>
+  <button data-correct>Idempotent operations</button>
+  <button>Any POST request</button>
+  <button>Only DELETE calls</button>
+  <button>Only reads on a cache</button>
+  <p class="explain">If the operation is idempotent it is inherently safe to retry.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. After many failures, which pattern helps?</p>
+  <button>Read replicas</button>
+  <button data-correct>Circuit Breaker</button>
+  <button>Cache-Aside</button>
+  <button>Sharding</button>
+  <p class="explain">Stop requests to the failing resource and probe occasionally, as in Circuit Breaker.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-retry-budget.md">Exercise 0002: a retry budget</a></p>
+<p>Runnable example: <a href="../examples/RetryDemo.java"><code>RetryDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">Azure Architecture Center: Retry pattern</a>. Then the linked Circuit Breaker and Idempotent Consumer patterns.</p>
+<p><a href="0001-cache-aside.html">← The cache-aside pattern</a> &nbsp;|&nbsp; <a href="0004-circuit-breaker.html">The circuit breaker pattern →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">Azure Architecture Center: Retry pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

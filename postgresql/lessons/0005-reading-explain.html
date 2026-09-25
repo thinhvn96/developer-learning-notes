@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 5: Reading EXPLAIN and EXPLAIN ANALYZE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Reading EXPLAIN and EXPLAIN ANALYZE</h1>
+<p class="meta">PostgreSQL · Lesson 0005 · step 10 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> read a plan node (type, cost, rows), tell estimates from actuals, and use <code>EXPLAIN ANALYZE</code> safely on writes.</div>
+
+<h2>What EXPLAIN prints</h2>
+<p>A plan is a tree of nodes. Each shows a node type (Seq Scan, Index Scan...), a startup cost, a total cost, estimated rows, and estimated row width.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a> Costs are "arbitrary units"; by convention a sequential page fetch costs 1.0. A parent node's cost includes its children's costs.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+<pre><code>Seq Scan on tenk1  (cost=0.00..445.00 rows=10000 width=244)</code></pre>
+<h2>EXPLAIN ANALYZE runs the query</h2>
+<p><code>EXPLAIN ANALYZE</code> "actually executes the query" and adds real numbers: <code>actual time</code>, <code>loops</code>, buffer statistics, planning and execution time.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a> For data-changing statements, wrap it in a transaction and roll back:</p>
+<pre><code>BEGIN;
+EXPLAIN ANALYZE UPDATE test1 SET content = 'changed' WHERE id &lt; 100;
+ROLLBACK;</code></pre>
+<p>The example script does exactly this and then counts rows still equal to 'changed': zero.</p>
+<h2>How to read one in an interview</h2>
+<ol>
+<li>Find the most expensive node (costs accumulate upward).</li>
+<li>Compare <code>rows=</code> estimated with actual <code>rows=</code>; big gaps mean stale statistics or a poor estimate.</li>
+<li>Check the scan type: Seq Scan on a big table with a selective filter suggests a missing index; the docs note sequential scans are fine for small tables or large result sets.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></li>
+</ol>
+<p class="aside">Caveat from the docs: plans from a small test table do not necessarily extrapolate to production scale.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What unit are plan costs measured in?</p>
+  <button>Seconds per node</button>
+  <button>Bytes per page</button>
+  <button data-correct>Arbitrary cost units</button>
+  <button>Milliseconds per row</button>
+  <p class="explain">Costs are in arbitrary units set by planner cost parameters.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Does <code>EXPLAIN ANALYZE</code> run the statement?</p>
+  <button>No, it only plans</button>
+  <button>Only for SELECT</button>
+  <button data-correct>Yes, it executes it</button>
+  <button>Only in a replica</button>
+  <p class="explain">It actually executes the query, including INSERT/UPDATE/DELETE.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Safe way to analyze an UPDATE?</p>
+  <button>Skip the WHERE</button>
+  <button data-correct>Wrap in ROLLBACK</button>
+  <button>Add a LIMIT</button>
+  <button>Run it on prod</button>
+  <p class="explain">Use BEGIN, EXPLAIN ANALYZE, ROLLBACK.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Estimated rows 10, actual rows 100000. Suspect?</p>
+  <button>A slow network</button>
+  <button>A missing semicolon</button>
+  <button>Too many indexes</button>
+  <button data-correct>Stale statistics</button>
+  <p class="explain">Large estimate gaps point to bad statistics or estimation (senior-level reading habit; try ANALYZE).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-explain-three-queries.md">Exercise 0005: explain three queries</a></p>
+<p>Runnable example: <a href="../examples/04-index-explain.sql"><code>04-index-explain.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL Docs: Using EXPLAIN</a>. Sections 14.1.1 and 14.1.2.</p>
+<p><a href="0011-multicolumn-and-partial-indexes.html">← Multicolumn and partial indexes</a> &nbsp;|&nbsp; <a href="0006-mvcc-and-isolation-levels.html">MVCC and isolation levels →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL Docs: Using EXPLAIN</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

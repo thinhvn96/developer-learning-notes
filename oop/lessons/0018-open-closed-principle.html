@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 18: SOLID 2: Open/Closed Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 2: Open/Closed Principle</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0018 · step 18 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> extend behavior by adding a class instead of editing a <code>switch</code>.</div>
+
+<h2>The principle</h2>
+<p>"Software entities should be open for extension, but closed for modification."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a> New behavior arrives by adding code, not editing tested code.</p>
+<pre><code>java oop/examples/OcpDemo.java
+switch version: 90
+NoDiscount -&gt; 100
+StudentDiscount -&gt; 90
+VipDiscount -&gt; 80</code></pre>
+<p><code>priceWithSwitch</code> must be edited to add a "vip" case, risking the existing ones. With the <code>Discount</code> interface, <code>VipDiscount</code> was added without touching anything else: polymorphism (<a href="0008-polymorphism.html">lesson</a>) does the dispatch. Source: <a href="../examples/OcpDemo.java"><code>OcpDemo.java</code></a>. This is the <a href="../../design-patterns/lessons/0023-strategy.html">Strategy pattern</a> in disguise; Refactoring.Guru lists "adheres to the Open/Closed Principle" as a benefit of Factory Method, Strategy, Decorator, Observer and others.</p>
+<div class="aside">Do not abstract prematurely: introduce the extension point when the second or third variant appears (a pragmatic rule, not from the sources).</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Open for extension means...?</p>
+  <button>Code is editable</button>
+  <button>Classes are abstract</button>
+  <button data-correct>New behavior can be added</button>
+  <button>Fields are public</button>
+  <p class="explain">Extension by addition.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Closed for modification means...?</p>
+  <button>No new classes</button>
+  <button data-correct>Existing code stays untouched</button>
+  <button>No interfaces</button>
+  <button>No tests</button>
+  <p class="explain">You do not edit tested code to add features.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which design needed no edit for vip?</p>
+  <button>If-else chain</button>
+  <button>Static method</button>
+  <button data-correct>Interface implementations</button>
+  <button>Switch statement</button>
+  <p class="explain">VipDiscount was a new class.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Mechanism that makes it work?</p>
+  <button>Static fields</button>
+  <button data-correct>Polymorphism</button>
+  <button>Serialization</button>
+  <button>Reflection only</button>
+  <p class="explain">Callers use the interface; the object supplies behavior.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0018-add-a-payment-type.md">Exercise 18: add a payment type</a></p>
+<p>Runnable example: <a href="../examples/OcpDemo.java"><code>OcpDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. The SOLID overview page.</p>
+<p><a href="0017-single-responsibility-principle.html">← SOLID 1: Single Responsibility Principle</a> &nbsp;|&nbsp; <a href="0019-liskov-substitution-principle.html">SOLID 3: Liskov Substitution Principle →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

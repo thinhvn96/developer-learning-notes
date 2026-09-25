@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 16: JDK 21: sequenced collections</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 21: sequenced collections</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0016 · step 25 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use <code>getFirst</code>, <code>getLast</code> and <code>reversed</code> on lists, deques and ordered sets and maps, and name the three new interfaces.</div>
+
+<h2>The gap it fills (final in JDK 21)</h2>
+<p>JEP 431 introduces "new interfaces to represent collections with a defined encounter order". Before it, reverse iteration and end-element access differed across <code>List</code>, <code>Deque</code>, <code>SortedSet</code> and <code>LinkedHashSet</code>.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
+<table>
+<tr><th>Interface</th><th>Key methods<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></th></tr>
+<tr><td><code>SequencedCollection&lt;E&gt;</code></td><td><code>reversed()</code>, <code>addFirst</code>, <code>addLast</code>, <code>getFirst</code>, <code>getLast</code>, <code>removeFirst</code>, <code>removeLast</code></td></tr>
+<tr><td><code>SequencedSet&lt;E&gt;</code></td><td>extends Set and SequencedCollection; covariant <code>reversed()</code></td></tr>
+<tr><td><code>SequencedMap&lt;K,V&gt;</code></td><td><code>reversed()</code>, <code>putFirst</code>, <code>putLast</code>, <code>firstEntry</code>, <code>lastEntry</code>, <code>pollFirstEntry</code>, <code>pollLastEntry</code>, sequenced views</td></tr>
+</table>
+<pre><code>java java/examples/jdk21/Jdk21Features.java
+a c [c, b, a]                       # list.getFirst(), getLast(), reversed()
+one=1 two=2 {two=2, one=1}          # firstEntry(), lastEntry(), reversed() of a LinkedHashMap</code></pre>
+<p class="aside">This is why <a href="0002-choosing-a-list.html">lesson 2</a> mentions <code>getFirst</code> and <code>getLast</code> in the ArrayList Javadoc: those methods are documented there in the current API. On JDK 17 you would write <code>list.get(list.size() - 1)</code>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which interface adds putFirst and putLast?</p>
+  <button>Deque</button>
+  <button>SequencedSet</button>
+  <button>Collection</button>
+  <button data-correct>SequencedMap</button>
+  <p class="explain">SequencedMap has putFirst, putLast and related methods.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Method returning a reverse-ordered view?</p>
+  <button data-correct>reversed</button>
+  <button>flip</button>
+  <button>reverse</button>
+  <button>backwards</button>
+  <p class="explain">reversed() returns a reverse-ordered view.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which JDK finalized sequenced collections?</p>
+  <button>JDK 17</button>
+  <button data-correct>JDK 21</button>
+  <button>JDK 8</button>
+  <button>JDK 11</button>
+  <p class="explain">Finalized in Java 21.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Does a plain HashSet have an encounter order guarantee?</p>
+  <button>Yes, sorted</button>
+  <button>Yes, reversed</button>
+  <button data-correct>No, none</button>
+  <button>Yes, insertion</button>
+  <p class="explain">Only collections with a defined encounter order are sequenced; HashSet is not one (see the HashMap lesson on ordering).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0016-last-element-refactor.md">Exercise 0016: last-element refactor</a></p>
+<p>Runnable example: <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a>. Read Summary and Description.</p>
+<p><a href="0015-pattern-matching-switch-and-record-patterns.html">← JDK 21: pattern matching for switch and record patterns</a> &nbsp;|&nbsp; <a href="0006-virtual-threads.html">Virtual threads: scale, not speed →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

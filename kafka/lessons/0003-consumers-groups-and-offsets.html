@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 3: Consumers, consumer groups and offsets</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Consumers, consumer groups and offsets</h1>
+<p class="meta">Kafka · Lesson 0003 · step 4 of 10 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain consumer groups, partition assignment, offsets and rebalancing, and why more consumers than partitions does not help.</div>
+
+<h2>Consumer groups</h2>
+<p>Consumers that share a <code>group.id</code> divide the work: "each partition is assigned to exactly one consumer in the group."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> Membership is dynamic; when consumers join or leave, partitions are rebalanced.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> A consequence (derived from the exactly-one rule, not quoted): with 3 partitions, a 4th consumer in the same group sits idle. Different groups each receive all events.</p>
+<h2>Offsets</h2>
+<p>"The position of a consumer in each partition is just a single integer, the offset of the next message to consume."<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> The consumer has a current position (next record to fetch) and a committed position (last offset stored safely).<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> Group state is visible with <code>kafka-consumer-groups.sh --describe</code>: current offset, log-end offset and lag.</p>
+<pre><code>GROUP  TOPIC   PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
+g1     orders  0          2               2               0
+g1     orders  1          4               4               0
+g1     orders  2          0               0               0</code></pre>
+<p>That output is from <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a>: group <code>g1</code> read all six events, so lag is zero.</p>
+<h2>Config that bites</h2>
+<ul>
+<li><code>enable.auto.commit</code> defaults to true: offsets are committed periodically in the background.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></li>
+<li><code>auto.offset.reset</code> (default <code>latest</code>) only applies when there is no valid committed offset.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></li>
+<li><code>session.timeout.ms</code>: without heartbeats the broker removes the client from the group and starts a rebalance; <code>max.poll.interval.ms</code> bounds the delay between <code>poll()</code> calls.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></li>
+<li>"The consumer is not thread-safe."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> One consumer instance per thread.</li>
+</ul>
+<p>Config sketch: <a href="../examples/manual-commit-consumer.properties"><code>manual-commit-consumer.properties</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Within one group, a partition goes to how many consumers?</p>
+  <button>None until asked</button>
+  <button data-correct>Exactly one</button>
+  <button>All of them</button>
+  <button>Two at least</button>
+  <p class="explain">Each partition is assigned to exactly one consumer in the group.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Consumer offset is what?</p>
+  <button data-correct>Next message to consume</button>
+  <button>Total message count</button>
+  <button>Broker id number</button>
+  <button>Partition leader id</button>
+  <p class="explain">It is the offset of the next message to consume.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Consumer stops heartbeating. Broker action?</p>
+  <button data-correct>Removes it, rebalances</button>
+  <button>Doubles partitions</button>
+  <button>Ignores the silence</button>
+  <button>Deletes the topic</button>
+  <p class="explain">After session.timeout.ms the broker removes the client and initiates a rebalance.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Is a KafkaConsumer instance thread-safe?</p>
+  <button>Only for reads</button>
+  <button>Only in groups</button>
+  <button data-correct>No, it is not</button>
+  <button>Yes, fully</button>
+  <p class="explain">The Javadoc says the consumer is not thread-safe.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-scale-a-consumer-group.md">Exercise 0003: scale a consumer group</a></p>
+<p>Runnable example: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a>. Read 'Consumer Groups and Topic Subscriptions' and 'Offsets and Consumer Position'.</p>
+<p><a href="0007-retention-and-topic-configs.html">← Retention and topic configuration</a> &nbsp;|&nbsp; <a href="0004-delivery-semantics.html">Delivery semantics: at most, at least, exactly once →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [2] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: consumer position</a> · [3] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka Consumer Configs</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

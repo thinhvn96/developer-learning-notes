@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 12: PersistentVolumes, claims and StorageClasses</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>PersistentVolumes, claims and StorageClasses</h1>
+<p class="meta">Kubernetes · Lesson 0012 · step 12 of 15 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> distinguish PersistentVolume, PersistentVolumeClaim and StorageClass, and show data outliving a Pod.</div>
+
+<h2>Three objects</h2>
+<ul><li><strong>PersistentVolume (PV)</strong>: a piece of storage provisioned by an admin or dynamically, a cluster resource with a lifecycle independent of any Pod.</li>
+<li><strong>PersistentVolumeClaim (PVC)</strong>: a user's request for storage (size, access mode), a "claim check" to a PV.</li>
+<li><strong>StorageClass</strong>: lets admins offer different kinds of storage without exposing implementation details.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></li></ul>
+<p><em>Dynamic provisioning</em> creates a PV automatically when a PVC names a StorageClass that is set up for it.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p>
+<h2>Access modes and reclaim</h2>
+<p><code>ReadWriteOnce</code> (one node), <code>ReadOnlyMany</code>, <code>ReadWriteMany</code>, <code>ReadWriteOncePod</code> (one Pod). Reclaim policy when the claim is deleted: <code>Retain</code> (manual), <code>Delete</code> (PV removed); <code>Recycle</code> is deprecated.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p>
+<pre><code>kubectl apply -f examples/pvc-pod.yaml
+data-claim  Bound  pvc-2582...  100Mi  RWO  standard        # dynamically provisioned
+writer  logs: persisted-1790275692
+# delete the Pod, start another one on the same claim:
+writer2 logs: persisted-1790275692
+              persisted-1790275698          # earlier data still there</code></pre>
+<p>File: <a href="../examples/pvc-pod.yaml"><code>pvc-pod.yaml</code></a>. Compare Docker volumes (<a href="../../docker/lessons/0010-volumes-and-bind-mounts.html">lesson</a>). Deleting the Pod did not delete the claim; whether the data survives claim deletion depends on the reclaim policy.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A PVC is...?</p>
+  <button>A node disk</button>
+  <button>A Secret type</button>
+  <button>A backup job</button>
+  <button data-correct>A request for storage</button>
+  <p class="explain">A PersistentVolumeClaim is a user's request for storage.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which object describes classes of storage?</p>
+  <button>PodTemplate</button>
+  <button>Ingress</button>
+  <button>Namespace</button>
+  <button data-correct>StorageClass</button>
+  <p class="explain">StorageClass offers varying PVs without exposing implementation details.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. ReadWriteOnce means...?</p>
+  <button>Any number of writers</button>
+  <button data-correct>One node read-write</button>
+  <button>One Pod only</button>
+  <button>Many nodes read-only</button>
+  <p class="explain">ReadWriteOnce mounts read-write by a single node.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Reclaim policy Retain means...?</p>
+  <button>Encrypt the volume</button>
+  <button>Recycle the volume</button>
+  <button>Delete the volume</button>
+  <button data-correct>Manual reclamation</button>
+  <p class="explain">Retain requires manual reclamation.<a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-survive-a-pod-delete.md">Exercise 0012: survive a Pod delete</a></p>
+<p>Runnable example: <a href="../examples/pvc-pod.yaml"><code>pvc-pod.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">Kubernetes Docs: Persistent Volumes</a>. Read Introduction, Lifecycle, Access modes, Reclaim policy.</p>
+<p><a href="0007-rolling-updates-and-rollbacks.html">← Rolling updates and rollbacks</a> &nbsp;|&nbsp; <a href="0013-statefulsets.html">StatefulSets: stable identity and storage →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">Kubernetes Docs: Persistent Volumes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

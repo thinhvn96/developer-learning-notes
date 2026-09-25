@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 12: Ingest pipelines: parse inside Elasticsearch</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ingest pipelines: parse inside Elasticsearch</h1>
+<p class="meta">ELK Stack · Lesson 0012 · step 12 of 14 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> do light parsing inside Elasticsearch with an ingest pipeline, test it with simulate, and know its limits versus Logstash.</div>
+
+<h2>What they are</h2>
+<p>Ingest pipelines "let you perform common transformations on your data before indexing", such as removing fields, extracting text values and enriching data. A pipeline is a series of <em>processors</em> that run sequentially; then the document is indexed. Use one with the <code>pipeline</code> query parameter, or as the index's <code>index.default_pipeline</code>; test with the <em>simulate</em> API.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+<p><strong>Limits:</strong> pipelines work one document at a time as it is indexed, so they cannot split documents, aggregate across documents or modify already-indexed data (the <code>enrich</code> processor gives limited lookup).<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+<pre><code>PUT _ingest/pipeline/access   {grok, lowercase, set}
+simulate "10.0.0.7 GET /orders/42 200"
+  -&gt; {client: 10.0.0.7, method: get, path: /orders/42, status: 200, pipeline: access}
+simulate "garbage"
+  -&gt; Provided Grok expressions do not match field value: [garbage]
+PUT weblogs/_doc/1?pipeline=access   then   q=status:200  -&gt; found</code></pre>
+<p>The same grok syntax <code>%{SYNTAX:SEMANTIC}</code> works here as in Logstash.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a> Choosing between them is a design trade-off: an ingest pipeline needs no extra service; Logstash offers more inputs/outputs and buffering (<a href="0006-logstash-grok-and-persistent-queues.html">Logstash lesson</a>); the docs pages I read do not give a comparison, so state your reasoning. Script: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Ingest pipelines run...?</p>
+  <button>After searching</button>
+  <button>During merges</button>
+  <button data-correct>Before indexing</button>
+  <button>Only in Kibana</button>
+  <p class="explain">They transform data before indexing.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A pipeline is made of...?</p>
+  <button>Segments</button>
+  <button data-correct>Processors</button>
+  <button>Shards</button>
+  <button>Aliases</button>
+  <p class="explain">A pipeline is a series of configurable processors.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. How do you test a pipeline safely?</p>
+  <button>Delete the index</button>
+  <button>Restart the node</button>
+  <button data-correct>Simulate API</button>
+  <button>Enable replicas</button>
+  <p class="explain">The simulate pipeline API tests with sample documents.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A pipeline cannot...?</p>
+  <button>Remove a field</button>
+  <button data-correct>Aggregate across documents</button>
+  <button>Rename a field</button>
+  <button>Extract text</button>
+  <p class="explain">It works one document at a time.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-write-a-pipeline.md">Exercise 0012: write a pipeline</a></p>
+<p>Runnable example: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">Elasticsearch: Ingest pipelines</a>. Processors, simulate, limitations.</p>
+<p><a href="0007-filebeat-delivery-and-backpressure.html">← Filebeat: harvesters, registry and delivery guarantees</a> &nbsp;|&nbsp; <a href="0013-data-streams.html">Data streams and rollover →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">Elasticsearch: Ingest pipelines</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">Logstash: Grok filter</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

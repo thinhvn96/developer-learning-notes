@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 1: Tables and constraints</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Tables and constraints</h1>
+<p class="meta">PostgreSQL · Lesson 0001 · step 1 of 13 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use constraints to make bad data impossible, and name what each one prevents.</div>
+
+<h2>Let the database say no</h2>
+<p>Constraints move data rules out of application code and into the schema, where every writer must obey them. The PostgreSQL docs define them as follows.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+<ul>
+<li><strong>CHECK</strong>: a value must satisfy a Boolean expression, e.g. <code>price numeric CHECK (price &gt; 0)</code>.</li>
+<li><strong>NOT NULL</strong>: a column must not assume the null value.</li>
+<li><strong>UNIQUE</strong>: data is unique among all rows, for a column or a group of columns.</li>
+<li><strong>PRIMARY KEY</strong>: unique and not null; "a table can have at most one primary key".</li>
+<li><strong>FOREIGN KEY</strong>: values must match a row in another table (referential integrity). <code>ON DELETE RESTRICT</code> prevents deleting a referenced row; <code>ON DELETE CASCADE</code> deletes the referencing rows too.</li>
+</ul>
+<h2>Watch each one fire</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 01-constraints.sql
+ERROR:  new row for relation "products" violates check constraint "products_price_check"
+ERROR:  duplicate key value violates unique constraint "products_pkey"
+ERROR:  insert or update on table "orders" violates foreign key constraint "orders_product_no_fkey"
+ERROR:  update or delete on table "products" violates RESTRICT setting of foreign key constraint ...
+ERROR:  null value in column "name" of relation "products" violates not-null constraint</code></pre>
+<p>Source: <a href="../examples/01-constraints.sql"><code>01-constraints.sql</code></a>. The runner starts a throwaway <code>postgres:18</code> container (Docker required) and removes it afterwards.</p>
+<p class="aside">Interview angle: "Where do you enforce uniqueness, the app or the database?" The database. An app-level check races with concurrent writers (see the <a href="0006-mvcc-and-isolation-levels.html">isolation lesson</a>); a unique constraint does not.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which constraint stops <code>price = 0</code> if price must be positive?</p>
+  <button>A PRIMARY KEY</button>
+  <button data-correct>A CHECK constraint</button>
+  <button>A NOT NULL rule</button>
+  <button>A UNIQUE constraint</button>
+  <p class="explain">CHECK requires a Boolean expression to hold.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How many primary keys can a table have?</p>
+  <button data-correct>At most one</button>
+  <button>Only for text</button>
+  <button>Any number</button>
+  <button>Exactly two</button>
+  <p class="explain">A table can have at most one primary key.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Delete a product referenced by orders with <code>ON DELETE RESTRICT</code>?</p>
+  <button>Orders are deleted too</button>
+  <button>Orders become null</button>
+  <button>The delete is delayed</button>
+  <button data-correct>The delete is refused</button>
+  <p class="explain">RESTRICT prevents deletion of a referenced row.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which option deletes the referencing rows automatically?</p>
+  <button>ON DELETE RESTRICT</button>
+  <button>A CHECK constraint</button>
+  <button>A UNIQUE constraint</button>
+  <button data-correct>ON DELETE CASCADE</button>
+  <p class="explain">CASCADE deletes rows that reference the deleted row.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-model-a-library.md">Exercise 0001: model a library</a></p>
+<p>Runnable example: <a href="../examples/01-constraints.sql"><code>01-constraints.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/ddl-constraints.html">PostgreSQL Docs: Constraints</a>. Read sections 5.5.1 to 5.5.5.</p>
+<p> &nbsp;|&nbsp; <a href="0007-aggregates-group-by-having.html">Aggregates, GROUP BY and HAVING →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/ddl-constraints.html">PostgreSQL Docs: Constraints</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

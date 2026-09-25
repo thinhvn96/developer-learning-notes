@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 10: Volumes and bind mounts</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Volumes and bind mounts</h1>
+<p class="meta">Docker · Lesson 0010 · step 7 of 12 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> keep data beyond a container's life with a volume, share host files with a bind mount, and choose between them.</div>
+
+<h2>Volumes</h2>
+<p>"Volumes are persistent data stores for containers, created and managed by Docker." A volume's contents "exist outside the lifecycle of a given container"; when a container is destroyed its writable layer is destroyed with it.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a> Create with <code>docker volume create</code>, list with <code>docker volume ls</code>, remove with <code>docker volume rm</code>; mount with <code>-v myvolume:/app</code> or the more explicit <code>--mount source=myvolume,target=/app</code>.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a></p>
+<h2>Bind mounts</h2>
+<p>A bind mount attaches a file or directory of the host. Good for development (share source code or build artifacts) and distributing config files. Downside: "Containers with bind mounts are strongly tied to the host" because they depend on its directory layout. Add <code>readonly</code> to stop the container writing.<a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[2]</a></p>
+<h2>See both</h2>
+<pre><code>cd docker/examples &amp;&amp; ./03-volumes-and-bind-mounts.sh
+without a volume: cat: can't open '/data.txt': No such file or directory
+named volume    : persisted
+bind mount      : from host
+readonly bind   : sh: can't create /mnt/new.txt: Read-only file system</code></pre>
+<p>Choose a <strong>volume</strong> for data Docker should manage (databases; see <a href="0004-compose-app-and-database.html">the Compose lesson</a>); a <strong>bind mount</strong> when you need to access the files from the host.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a> Source: <a href="../examples/03-volumes-and-bind-mounts.sh"><code>03-volumes-and-bind-mounts.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Container is removed. What about its named volume?</p>
+  <button>Volume becomes read-only</button>
+  <button data-correct>Data persists</button>
+  <button>Data is deleted</button>
+  <button>Data is encrypted</button>
+  <p class="explain">A volume's contents exist outside the container's lifecycle.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which mount depends on host directory layout?</p>
+  <button>Neither one</button>
+  <button>Named volume</button>
+  <button data-correct>Bind mount</button>
+  <button>Both equally</button>
+  <p class="explain">Containers with bind mounts are strongly tied to the host.<a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. How do you make a bind mount read-only?</p>
+  <button>Use -d</button>
+  <button>Add --rm</button>
+  <button>Use EXPOSE</button>
+  <button data-correct>Add readonly</button>
+  <p class="explain">The readonly option prevents the container from modifying host files.<a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Where does data written without a mount live?</p>
+  <button data-correct>Writable layer</button>
+  <button>The image layers</button>
+  <button>A named volume</button>
+  <button>Host home dir</button>
+  <p class="explain">The writable layer is destroyed with the container.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-persist-postgres.md">Exercise 0010: persist a database</a></p>
+<p>Runnable example: <a href="../examples/03-volumes-and-bind-mounts.sh"><code>03-volumes-and-bind-mounts.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/engine/storage/volumes/">Docker volumes</a>. Then the bind mounts page.</p>
+<p><a href="0003-multi-stage-java-image.html">← A multi-stage image for a Java app</a> &nbsp;|&nbsp; <a href="0011-networks-and-port-publishing.html">Networks, DNS by name and port publishing →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/engine/storage/volumes/">Docker volumes</a> · [2] <a href="https://docs.docker.com/engine/storage/bind-mounts/">Docker bind mounts</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

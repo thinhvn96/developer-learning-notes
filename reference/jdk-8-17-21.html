@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JDK 8, 17, 21 Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 8, 17 and 21 cheat sheet</h1>
+<p class="meta"><a href="../index.html">Home</a> · Reference · print-friendly · <a href="../java/index.html">Java ladder</a> · <a href="../java/interview.html">Java interview Q&amp;A</a></p>
+<p>A feature is listed under the JDK that <em>finalized</em> it. JDK 17 includes everything finalized in 9 through 17; JDK 21 includes everything through 21. LTS releases per Oracle: 8, 11, 17, 21, 25 (<a href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">support roadmap</a>).</p>
+
+<h2>JDK 8 baseline</h2>
+<table>
+<tr><th>Feature</th><th>One-liner</th><th>Lesson</th></tr>
+<tr><td>Lambdas, method references</td><td><code>(a, b) -&gt; a + b</code>, <code>String::length</code>; captured locals must be effectively final. <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Tutorial</a></td><td><a href="../java/lessons/0008-lambdas-and-functional-interfaces.html">8</a></td></tr>
+<tr><td>Functional interfaces</td><td>one abstract method; <code>Predicate</code>, <code>Function</code>, <code>Consumer</code>, <code>Supplier</code> in <code>java.util.function</code></td><td><a href="../java/lessons/0008-lambdas-and-functional-interfaces.html">8</a></td></tr>
+<tr><td>Default methods</td><td>class wins; two conflicting defaults require an override using <code>X.super.m()</code>. <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Tutorial</a></td><td><a href="../java/lessons/0009-default-methods-and-conflicts.html">9</a></td></tr>
+<tr><td>Streams</td><td>lazy; terminal op triggers; single use; avoid side effects. <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">Docs</a></td><td><a href="../java/lessons/0004-streams-and-optional.html">4</a></td></tr>
+<tr><td>Optional</td><td>return type for "no result"; <code>orElseGet</code> is lazy, <code>orElse</code> is not</td><td><a href="../java/lessons/0004-streams-and-optional.html">4</a></td></tr>
+<tr><td>java.time</td><td><code>LocalDate</code>, <code>Instant</code>, <code>ZonedDateTime</code>, <code>Duration</code>, <code>Period</code>. <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Tutorial</a></td><td><a href="../java/lessons/0011-java-time.html">11</a></td></tr>
+<tr><td>CompletableFuture</td><td>async chains on <code>ForkJoinPool.commonPool()</code> by default; <code>join</code> vs <code>get</code> exceptions</td><td><a href="../java/lessons/0010-completablefuture.html">10</a></td></tr>
+</table>
+
+<h2>What arrived by JDK 17</h2>
+<table>
+<tr><th>Feature</th><th>Release</th><th>One-liner</th><th>Lesson</th></tr>
+<tr><td><code>var</code> (<a href="https://openjdk.org/jeps/286">JEP 286</a>)</td><td>10</td><td>locals with initializers only</td><td><a href="../java/lessons/0012-var-and-text-blocks.html">12</a></td></tr>
+<tr><td>Switch expressions (<a href="https://openjdk.org/jeps/361">JEP 361</a>)</td><td>14</td><td><code>case X -&gt; ...</code>, <code>yield</code>, exhaustive</td><td><a href="../java/lessons/0013-switch-expressions-and-instanceof-patterns.html">13</a></td></tr>
+<tr><td>Text blocks (<a href="https://openjdk.org/jeps/378">JEP 378</a>)</td><td>15</td><td><code>"""</code> multi-line strings</td><td><a href="../java/lessons/0012-var-and-text-blocks.html">12</a></td></tr>
+<tr><td>instanceof patterns (<a href="https://openjdk.org/jeps/394">JEP 394</a>)</td><td>16</td><td><code>if (o instanceof String s)</code></td><td><a href="../java/lessons/0013-switch-expressions-and-instanceof-patterns.html">13</a></td></tr>
+<tr><td>Records</td><td>16</td><td>shallowly immutable carriers; compact constructor. <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Javadoc</a></td><td><a href="../java/lessons/0003-records-and-immutability.html">3</a></td></tr>
+<tr><td>Sealed classes (<a href="https://openjdk.org/jeps/409">JEP 409</a>)</td><td>17</td><td><code>sealed ... permits</code>; subclasses <code>final</code>, <code>sealed</code> or <code>non-sealed</code></td><td><a href="../java/lessons/0014-sealed-classes.html">14</a></td></tr>
+</table>
+
+<h2>What arrived by JDK 21</h2>
+<table>
+<tr><th>Feature</th><th>One-liner</th><th>Lesson</th></tr>
+<tr><td>Pattern matching for switch (<a href="https://openjdk.org/jeps/441">JEP 441</a>)</td><td>type patterns, <code>when</code> guards, <code>case null</code>, exhaustive on sealed, dominance rule</td><td><a href="../java/lessons/0015-pattern-matching-switch-and-record-patterns.html">15</a></td></tr>
+<tr><td>Record patterns (<a href="https://openjdk.org/jeps/440">JEP 440</a>)</td><td><code>case Circle(Point(var x, var y), var r)</code></td><td><a href="../java/lessons/0015-pattern-matching-switch-and-record-patterns.html">15</a></td></tr>
+<tr><td>Sequenced collections (<a href="https://openjdk.org/jeps/431">JEP 431</a>)</td><td><code>getFirst</code>, <code>getLast</code>, <code>reversed</code>; <code>SequencedCollection/Set/Map</code></td><td><a href="../java/lessons/0016-sequenced-collections.html">16</a></td></tr>
+<tr><td>Virtual threads (<a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">docs</a>)</td><td>scale not speed; one per task; never pool; limit with <code>Semaphore</code></td><td><a href="../java/lessons/0006-virtual-threads.html">6</a></td></tr>
+<tr><td>Generational ZGC (<a href="https://openjdk.org/jeps/439">JEP 439</a>)</td><td><code>-XX:+UseZGC -XX:+ZGenerational</code></td><td><a href="../java/lessons/0017-generational-zgc.html">17</a></td></tr>
+</table>
+
+<h2>Verified boundaries</h2>
+<p>Compiled while writing this course: the JDK 8 examples with <code>javac --release 8</code>, the JDK 17 example with <code>--release 17</code>, the JDK 21 example with <code>--release 21</code>. Compiling the JDK 21 example with <code>--release 17</code> fails ("patterns in switch statements are not supported in -source 17").</p>
+<h2>Version-independent must-knows</h2>
+<ul>
+<li><code>equals</code>/<code>hashCode</code> contract; HashMap defaults (capacity 16, load factor 0.75), not synchronized. <a href="../java/lessons/0001-hashmap-equals-hashcode.html">Lesson 1</a></li>
+<li>Happens-before: monitor unlock/lock, volatile write/read, <code>Thread.start</code>, <code>join</code>. <a href="../java/lessons/0005-visibility-and-happens-before.html">Lesson 5</a></li>
+<li>GC defaults: G1 on server-class machines, else Serial; max heap 1/4 of RAM. <a href="../java/lessons/0007-heap-and-garbage-collection.html">Lesson 7</a></li>
+</ul>
+<footer><p><strong>Ask your teacher</strong> to quiz you on which JDK introduced what.</p></footer>
+</main>
+</body>
+</html>

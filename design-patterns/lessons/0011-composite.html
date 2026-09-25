@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 11: Composite</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Composite</h1>
+<p class="meta">Design Patterns · Lesson 0011 · step 11 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> treat a leaf and a group of leaves through one interface, and compute over a tree recursively.</div>
+
+<h2>Intent</h2>
+<p>Composite is "a structural design pattern that lets you compose objects into tree structures and then work with these structures as if they were individual objects." Use it for tree-like object structures and when client code should treat simple and complex elements uniformly.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/CompositeDemo.java
+total size = 75
+root/ (75)
+  a.txt (10)
+  src/ (65)
+    Main.java (40)
+    Util.java (25)
+  empty/ (0)</code></pre><p><code>Folder.size()</code> sums its children through the same <code>Node</code> interface; the client calls <code>tree.size()</code> without knowing whether it holds a file or a folder. Source: <a href="../examples/CompositeDemo.java"><code>CompositeDemo.java</code></a>. The same shape appears in expression trees, UI component trees and org charts (compare the recursive CTE in <a href="../../postgresql/lessons/0009-ctes-with-and-recursive.html">PostgreSQL</a>).</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Complex hierarchies via polymorphism and recursion</li><li>Open/Closed: new element types fit in</li></ul>
+<p><strong>Cons</strong></p><ul><li>Hard to define a common interface when components differ a lot</li><li>Over-general interfaces reduce clarity</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a> Builder can construct Composite trees, Iterator and Visitor traverse them, Flyweight can share leaves; Decorator is similar recursively but adds a responsibility to one child, while Composite aggregates children's results.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Composite treats...?</p>
+  <button>Only leaves</button>
+  <button>Only groups</button>
+  <button>Only roots</button>
+  <button data-correct>Leaves and groups uniformly</button>
+  <p class="explain">Client code treats simple and complex elements uniformly.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Typical structure?</p>
+  <button>A stack</button>
+  <button>A hash</button>
+  <button>A queue</button>
+  <button data-correct>A tree</button>
+  <p class="explain">Tree-like object structures.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Operation on a folder uses...?</p>
+  <button data-correct>Recursion over children</button>
+  <button>A cache</button>
+  <button>A thread</button>
+  <button>A global</button>
+  <p class="explain">Folder.size sums children via the same interface.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Composite vs Decorator?</p>
+  <button>Decorator aggregates children</button>
+  <button>Same</button>
+  <button>Neither</button>
+  <button data-correct>Composite aggregates children</button>
+  <p class="explain">Composite sums children's results; Decorator adds behavior to one wrapped object.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-menu-tree.md">Exercise 11: a menu tree</a></p>
+<p>Runnable example: <a href="../examples/CompositeDemo.java"><code>CompositeDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/composite">Composite (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0010-bridge.html">← Bridge</a> &nbsp;|&nbsp; <a href="0012-decorator.html">Decorator →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/composite">Composite (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

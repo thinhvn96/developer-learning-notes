@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ELK Stack: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · ELK Stack · 13 questions · <a href="index.html">ELK Stack ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Elasticsearch, Logstash, Kibana and Filebeat questions for Senior backend interviews. Outputs quoted come from the example scripts against throwaway Elasticsearch and Logstash 9.0.0 containers.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Explain the ELK stack and the path of a log line.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Filebeat ships logs, Logstash parses them, Elasticsearch indexes them, Kibana explores them.</p>
+<p>Filebeat harvesters read files line by line and inputs manage them.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a> Logstash has three stages, inputs, filters, outputs, with codecs at the edges.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[2]</a> Elasticsearch stores JSON documents in indices distributed across shards.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a> Kibana's Discover is the primary tool for exploring the data, with KQL, Lucene or ES|QL.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[4]</a> Logstash is optional when logs are already structured.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where would you add Kafka? (As a buffer between shippers and Logstash so an Elasticsearch outage does not lose logs; design choice, not covered by the docs read.)</div>
+<p class="see">Learn it: <a href="lessons/0001-elk-overview-and-pipeline.html">ELK overview</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>What are an index, a document and a mapping? Dynamic vs explicit mapping?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> index = unit of storage; document = JSON object; mapping = field types and indexing behavior.</p>
+<p>An index consists of documents, mappings and settings (shards, replicas, refresh interval). Use dynamic mapping for exploration and explicit mappings for production; use aliases to decouple queries from index names.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> text vs keyword? (text is analyzed for full-text search; keyword holds exact values for filters and aggregations; see term vs match.)</div>
+<p class="see">Learn it: <a href="lessons/0002-documents-indices-and-mappings.html">Mappings</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>How do shards and replicas work? What can you change after creation?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> each document lives in one primary shard; replicas are copies for resilience and read capacity; primary count is fixed, replica count is not.</p>
+<p>"Each document in an index belongs to one primary shard. A replica shard is a copy of a primary shard." Replicas protect against hardware failure and increase read capacity. "The number of primary shards in an index is fixed at the time that an index is created, but the number of replica shards can be changed at any time."<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[5]</a> On a single node my index went yellow: the primary started, the replica stayed unassigned.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How would you pick a shard count? (Estimate data volume and growth; the sizing guidance goes beyond the pages read, so check the docs and say so.)</div>
+<p class="see">Learn it: <a href="lessons/0003-shards-and-replicas.html">Shards and replicas</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Why is a document not searchable right after indexing?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> search is near real-time; documents become visible after a refresh.</p>
+<p>"A refresh makes all operations performed on an index since the last refresh available for search." By default indices refresh every second, but only those that received a search request in the last 30 seconds.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[6]</a> In my run the count was 0 before a manual refresh and 2 after.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you speed up bulk indexing? (Raise or disable refresh_interval during the load; test it, see the exercise.)</div>
+<p class="see">Learn it: <a href="lessons/0004-near-real-time-search-and-refresh.html">Near real-time search</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>term vs match query? What is the difference between must and filter in bool?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>match</code> analyzes the query for text fields; <code>term</code> is exact and belongs on keyword fields. <code>filter</code> does not score and is cached; <code>must</code> scores.</p>
+<p>"Avoid using the <code>term</code> query for <code>text</code> fields": analysis changes the stored tokens, so exact matches are hard; use <code>match</code>.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[7]</a> In <code>bool</code>, <code>must</code> and <code>should</code> contribute to score; <code>filter</code> and <code>must_not</code> run in filter context: score ignored, results cached.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[8]</a> Put yes/no conditions in <code>filter</code> and relevance text in <code>must</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why did my term query for 'Timeout' return nothing? (The text field was lowercased at index time; my run: term 'Timeout' 0 hits, term 'timeout' 1 hit, match 'Timeout' 1 hit.)</div>
+<p class="see">Learn it: <a href="lessons/0005-query-dsl-term-match-bool.html">Query DSL</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>What does grok do and how do you find parsing failures?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> it parses unstructured text into fields using named patterns; failures are tagged.</p>
+<p>Patterns use <code>%{SYNTAX:SEMANTIC}</code>; unmatched events get the <code>_grokparsefailure</code> tag by default.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[9]</a> In my run an access-log line produced client, method, path, status and duration fields, while a non-matching line was tagged. Search Kibana for that tag to find bad patterns.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Multi-line stack traces? (Needs a multiline codec or shipper setting; find it in the docs, see the exercise.)</div>
+<p class="see">Learn it: <a href="lessons/0006-logstash-grok-and-persistent-queues.html">Logstash and grok</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>What delivery guarantees do Filebeat and Logstash give?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> at-least-once for both (Filebeat always; Logstash with persistent queues).</p>
+<p>Filebeat keeps each file's state in a registry and "guarantees that events will be delivered to the configured output at least once and with no data loss"; unacknowledged events are resent after restart, possibly duplicating.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a> Logstash persistent queues store in-flight events on disk and deliver "until delivery succeeds at least once", absorbing bursts and applying backpressure when full.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[10]</a> So design for duplicates, for example by assigning a document id from the event.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What does backpressure mean here? (Inputs are stalled until the queue drains.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[10]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0007-filebeat-delivery-and-backpressure.html">Filebeat delivery</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>What is text analysis, and how do you see what tokens a field produces?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> converting text into tokens optimized for search at index and search time; use the <code>_analyze</code> API.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[11]</a> The standard analyzer turned "Connection Timeout to payment-service!" into connection, timeout, to, payment, service; the keyword analyzer kept one token.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why does exact-match search on a text field fail? (Analysis lowercases and splits; use keyword.)</div>
+<p class="see">Learn it: <a href="lessons/0009-text-analysis.html">Text analysis</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>How do you index large volumes efficiently and detect failures?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the bulk API with NDJSON; inspect per-item results.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[12]</a> The response has an <code>errors</code> flag and per-item statuses; my bulk call returned 201s and a 409 <code>version_conflict_engine_exception</code> for a duplicate <code>create</code>. Also tune refresh for bulk loads.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[6]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Which failures are retriable? (Discuss 429/5xx vs 4xx; exercise.)</div>
+<p class="see">Learn it: <a href="lessons/0010-bulk-api.html">Bulk API</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Explain aggregations and give an example.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> metric, bucket and pipeline aggregations; a terms bucket with average and max metrics gives per-service latency.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[13]</a> Aggregating on a text field fails ("Fielddata is disabled"); use a keyword field.</p>
+<div class="follow"><strong>Likely follow-up:</strong> SQL equivalent? (GROUP BY with aggregates.)</div>
+<p class="see">Learn it: <a href="lessons/0011-aggregations.html">Aggregations</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Ingest pipeline versus Logstash?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> ingest pipelines transform one document at a time inside Elasticsearch; Logstash is a separate pipeline with many inputs/outputs and buffering.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[14]</a> Pipelines cannot split or aggregate across documents; test with simulate. My grok pipeline parsed an access-log line and reported a failure for a non-matching one.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When would you keep Logstash? (Multiple sources/sinks, persistent queue, heavier transformations.)</div>
+<p class="see">Learn it: <a href="lessons/0012-ingest-pipelines.html">Ingest pipelines</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>What is a data stream and how does ILM manage it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an abstraction over hidden backing indices for append-only time series; ILM automates rollover, phases and deletion.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[15]</a> Requires <code>@timestamp</code>; rollover creates a new write index. <a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[16]</a> Phases hot, warm, cold, frozen, delete. My run: a document without <code>@timestamp</code> was rejected, a rollover made <code>...-000002</code>, and an ILM policy with hot rollover and delete after 30 days was accepted.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Need to update documents by id? (Use an alias with a write index, per the docs.)</div>
+<p class="see">Learn it: <a href="lessons/0013-data-streams.html">Data streams</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>What does KQL do?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> filters documents in Kibana; it does not aggregate or sort.</p><p><a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[17]</a> <code>field:value</code>, quoted phrases, AND/OR/NOT, wildcards, ranges.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where do counts come from? (Aggregations and dashboards.)</div>
+<p class="see">Learn it: <a href="lessons/0008-kql-and-discover.html">KQL</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these ELK Stack questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat: How it works</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash: How it works</a> · [3] <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch: Indices, documents, mappings</a> · [4] <a href="https://www.elastic.co/docs/explore-analyze/discover">Kibana: Discover</a> · [5] <a href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">Elasticsearch: Clusters, nodes, shards</a> · [6] <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">Elasticsearch: Near real-time search</a> · [7] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">Elasticsearch: Term query</a> · [8] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">Elasticsearch: Bool query</a> · [9] <a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">Logstash: Grok filter</a> · [10] <a href="https://www.elastic.co/docs/reference/logstash/persistent-queues">Logstash: Persistent queues</a> · [11] <a href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">Elasticsearch: Text analysis</a> · [12] <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">Elasticsearch: Bulk API</a> · [13] <a href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">Elasticsearch: Aggregations</a> · [14] <a href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">Elasticsearch: Ingest pipelines</a> · [15] <a href="https://www.elastic.co/docs/manage-data/data-store/data-streams">Elasticsearch: Data streams</a> · [16] <a href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">Elasticsearch: ILM</a> · [17] <a href="https://www.elastic.co/docs/reference/query-languages/kql">Kibana: KQL</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

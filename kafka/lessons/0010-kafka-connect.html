@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 10: Kafka Connect: moving data in and out</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka Connect: moving data in and out</h1>
+<p class="meta">Kafka · Lesson 0010 · step 10 of 10 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what Kafka Connect is, the source/sink split, tasks and converters, and move data through Kafka with two connectors.</div>
+
+<h2>What it is</h2>
+<p>A framework for "scalably and reliably streaming data between Kafka and other systems". <strong>Connectors</strong> are plugins that manage data movement and spawn <strong>tasks</strong> that do the work in parallel. A <strong>source</strong> connector reads an external system into Kafka topics; a <strong>sink</strong> connector writes topics to an external system. <strong>Converters</strong> translate between Connect's internal format and serialized data (JSON, Avro...).<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+<h2>Modes and management</h2>
+<p><strong>Standalone:</strong> one process, no fault tolerance or scaling. <strong>Distributed:</strong> automatic load balancing, dynamic scaling and fault tolerance; offsets, configs and task statuses are stored in Kafka topics. A REST API (port 8083 by default) creates, updates, monitors and deletes connectors.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+<h2>Run it</h2>
+<pre><code>cd kafka/examples &amp;&amp; ./03-connect-file.sh
+source connector: /tmp/in.txt  -&gt; topic connect-demo
+sink connector  : topic connect-demo -&gt; /tmp/out.txt     (line one / line two / line three)
+GET :8083/connectors  -&gt; ["demo-file-source","demo-file-sink"]
+append "line four" to the source file -&gt; it appears in the sink and in the topic</code></pre>
+<p>The FileStream connectors ship with Kafka for demonstration; real pipelines use connectors for databases, object stores and search (for example feeding Elasticsearch, see the <a href="../../elk/index.html">ELK ladder</a>). Source: <a href="../examples/03-connect-file.sh"><code>03-connect-file.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A source connector moves data...?</p>
+  <button>Between consumers</button>
+  <button>Between brokers</button>
+  <button data-correct>Into Kafka</button>
+  <button>Out of Kafka</button>
+  <p class="explain">Source connectors read from external systems into Kafka.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which mode gives fault tolerance?</p>
+  <button>Both equally</button>
+  <button data-correct>Distributed</button>
+  <button>Neither</button>
+  <button>Standalone</button>
+  <p class="explain">Distributed mode provides load balancing and fault tolerance.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Converters do what?</p>
+  <button>Compact logs</button>
+  <button>Elect leaders</button>
+  <button>Assign partitions</button>
+  <button data-correct>Serialize and deserialize data</button>
+  <p class="explain">They translate between Connect's internal format and serialized data.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Connect's management interface?</p>
+  <button data-correct>REST API</button>
+  <button>Email</button>
+  <button>gRPC only</button>
+  <button>SQL shell</button>
+  <p class="explain">A REST API manages connectors (port 8083 by default).<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-design-a-cdc-pipeline.md">Exercise 0010: design a pipeline</a></p>
+<p>Runnable example: <a href="../examples/03-connect-file.sh"><code>03-connect-file.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect User Guide</a>. 'Running Kafka Connect' and 'Connector Development Guide' intro.</p>
+<p><a href="0009-kafka-streams-basics.html">← Kafka Streams: streams, tables and state</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect User Guide</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

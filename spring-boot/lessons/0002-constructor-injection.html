@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 2: Constructor versus setter injection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Constructor versus setter injection</h1>
+<p class="meta">Spring Boot · Lesson 0002 · step 2 of 13 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> justify constructor injection for mandatory dependencies using the Spring team's own reasons.</div>
+
+<h2>Two variants</h2>
+<p><strong>Constructor-based</strong> DI: the container calls a constructor whose arguments are the dependencies. <strong>Setter-based</strong> DI: the container calls setters after a no-argument constructor.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+<h2>The recommendation</h2>
+<p>"Use constructors for mandatory dependencies and setter methods or configuration methods for optional dependencies." The Spring team generally advocates constructor injection because it lets you build components as <em>immutable objects</em>, ensures required dependencies are not null, and returns components in a fully initialized state.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+<pre><code>@Service
+public class OrderService {
+    private final PaymentGateway payments;
+    public OrderService(PaymentGateway payments) { this.payments = payments; }
+}</code></pre>
+<p>File: <a href="../examples/OrderService.java"><code>OrderService.java</code></a>. Setter injection is for optional dependencies with sensible defaults, or third-party classes you cannot constrain.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+<h2>Circular dependencies</h2>
+<p>They are possible with constructor injection and raise <code>BeanCurrentlyInCreationException</code>; using setter injection for one of the beans can resolve it.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a> Prefer redesigning to remove the cycle.</p>
+<p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which injection style is advised for mandatory dependencies?</p>
+  <button>Field reflection</button>
+  <button>Static lookups</button>
+  <button data-correct>Constructor injection</button>
+  <button>Setter injection</button>
+  <p class="explain">Use constructors for mandatory dependencies.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does constructor injection let you do?</p>
+  <button>Skip the container</button>
+  <button data-correct>Use final fields</button>
+  <button>Disable startup checks</button>
+  <button>Avoid interfaces</button>
+  <p class="explain">It lets you implement components as immutable objects.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Circular constructor dependency raises what?</p>
+  <button>ClassCastException</button>
+  <button data-correct>BeanCurrentlyInCreationException</button>
+  <button>NullPointerException</button>
+  <button>OutOfMemoryError</button>
+  <p class="explain">Circular dependencies with constructor injection throw BeanCurrentlyInCreationException.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Setter injection suits which case?</p>
+  <button>Every dependency</button>
+  <button>Static utilities</button>
+  <button>Required dependencies</button>
+  <button data-correct>Optional dependencies</button>
+  <p class="explain">Setters are for optional dependencies that can have reasonable defaults.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-refactor-to-constructor.md">Exercise 0002: refactor to constructor injection</a></p>
+<p>Runnable example: <a href="../examples/OrderService.java"><code>OrderService.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring Framework Reference: Dependency Injection</a>. Constructor-based and setter-based DI sections.</p>
+<p><a href="0001-ioc-and-beans.html">← Inversion of control and beans</a> &nbsp;|&nbsp; <a href="0007-bean-scopes.html">Bean scopes: singleton vs prototype →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring Framework Reference: Dependency Injection</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

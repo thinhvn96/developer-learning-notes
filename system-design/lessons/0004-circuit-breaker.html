@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 4: The circuit breaker pattern</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The circuit breaker pattern</h1>
+<p class="meta">System Design · Lesson 0004 · step 3 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain the three states of a circuit breaker and how it differs from retry.</div>
+
+<h2>Purpose</h2>
+<p>The pattern helps prevent an application from repeatedly trying an operation that is likely to fail, so it can continue without waiting for the fault to be fixed and detect when it is resolved. It differs from Retry: "The Retry pattern enables an application to retry an operation with the expectation that it eventually succeeds. The Circuit Breaker pattern prevents an application from performing an operation that's likely to fail." You can combine them by retrying <em>through</em> a breaker.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+<h2>States</h2>
+<ul><li><strong>Closed:</strong> requests pass through; a failure counter is kept; too many failures within a period trips it to Open and starts a timeout timer.</li>
+<li><strong>Open:</strong> requests "fail immediately and an exception is returned".</li>
+<li><strong>Half-Open:</strong> after the timeout, a limited number of requests pass; success closes the breaker and resets the counter; any failure reopens it. This prevents a recovering service from being flooded.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></li></ul>
+<pre><code>java system-design/examples/CircuitBreakerDemo.java
+call 1-2 -&gt; fallback state=CLOSED  real calls=1,2
+call 3   -&gt; fallback state=OPEN    real calls=3       # threshold of 3 failures reached
+call 4-8 -&gt; fallback state=OPEN    real calls=3       # service not touched
+-- service recovers, wait for the timeout
+call 9   -&gt; ok       state=CLOSED  real calls=4</code></pre>
+<p>Source: <a href="../examples/CircuitBreakerDemo.java"><code>CircuitBreakerDemo.java</code></a> (my minimal implementation of the documented states, not production code; use a library). Considerations from the docs: handle the exceptions it raises (degrade, use an alternative, or tell the user), monitor state changes, tune timeouts, and remember that a long external timeout can still tie up threads.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a> Not needed when a message-driven design already routes failures to a dead letter queue.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which state rejects requests immediately?</p>
+  <button>Closed</button>
+  <button>Half-Open</button>
+  <button>Reset</button>
+  <button data-correct>Open</button>
+  <p class="explain">In the Open state requests fail immediately.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does Half-Open do?</p>
+  <button>Blocks everything</button>
+  <button data-correct>Lets a few trial requests through</button>
+  <button>Retries forever</button>
+  <button>Deletes the counter</button>
+  <p class="explain">A limited number of requests may invoke the operation.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Circuit breaker vs retry?</p>
+  <button>Retry stops calls</button>
+  <button>They are identical</button>
+  <button data-correct>Breaker stops likely-failing calls</button>
+  <button>Breaker adds retries</button>
+  <p class="explain">The breaker prevents an operation that is likely to fail.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Trial fails in Half-Open. Next state?</p>
+  <button>Removed</button>
+  <button data-correct>Open</button>
+  <button>Half-Open again</button>
+  <button>Closed</button>
+  <p class="explain">Any failure reverts to Open and restarts the timer.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-tune-a-breaker.md">Exercise 0004: tune a breaker</a></p>
+<p>Runnable example: <a href="../examples/CircuitBreakerDemo.java"><code>CircuitBreakerDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">Azure: Circuit Breaker pattern</a>. Solution and considerations.</p>
+<p><a href="0002-retries-and-idempotency.html">← Retries, backoff and idempotency</a> &nbsp;|&nbsp; <a href="0005-bulkhead.html">The bulkhead pattern →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">Azure: Circuit Breaker pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

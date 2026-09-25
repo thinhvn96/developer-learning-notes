@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 9: Kafka Streams: streams, tables and state</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka Streams: streams, tables and state</h1>
+<p class="meta">Kafka · Lesson 0009 · step 9 of 10 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain streams versus tables, state stores and event-time processing, and run a word count on Kafka Streams.</div>
+
+<h2>What it is</h2>
+<p>Kafka Streams is "a client library for processing and analyzing data stored in Kafka", embedded in ordinary Java applications with no external dependencies beyond Kafka.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a> You do not deploy a separate cluster: you run more instances of your app.</p>
+<h2>Core ideas</h2>
+<ul><li><strong>KStream:</strong> an unbounded, continuously updating data set of immutable key-value records. <strong>KTable:</strong> a table snapshot, enabling joins and aggregations. The <em>stream-table duality</em>: a stream is a changelog, a table is a stream at a point in time.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>Topology:</strong> a graph of processors; source processors read topics, sink processors write results back to Kafka or elsewhere.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>State stores</strong> back stateful operations (windowed joins, aggregations) with automatic fault tolerance and recovery.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>Time:</strong> event time (when it occurred), processing time, ingestion time; a <code>TimestampExtractor</code> assigns timestamps.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>Exactly-once processing</strong> since 0.11.0.0: atomic commits across input offsets, state updates and output writes.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li></ul>
+<pre><code>cd kafka/examples &amp;&amp; ./04-streams-wordcount.sh
+input: "all streams lead to kafka", "hello kafka streams"
+all 1 | streams 1 | lead 1 | to 1 | kafka 1 | hello 1 | kafka 2 | streams 2</code></pre>
+<p>The output is the changelog of a KTable of counts: <code>kafka</code> appears with 1 then 2. The script runs the <code>WordCountDemo</code> bundled with Kafka; on the Alpine-based image I had to install <code>libstdc++</code> first because the RocksDB state store failed to load without it (found by running it). Source: <a href="../examples/04-streams-wordcount.sh"><code>04-streams-wordcount.sh</code></a>. Idempotent-consumer thinking still applies for side effects outside Kafka (see <a href="0006-idempotence-and-transactions.html">transactions</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Kafka Streams is...?</p>
+  <button>A database</button>
+  <button>A separate cluster</button>
+  <button>A broker plugin only</button>
+  <button data-correct>A client library</button>
+  <p class="explain">It is a client library embedded in your application.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A KTable represents...?</p>
+  <button>A topic partition</button>
+  <button data-correct>A table snapshot</button>
+  <button>An unbounded log of immutable records</button>
+  <button>A consumer group</button>
+  <p class="explain">KTable captures table snapshots; KStream is the record stream.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where does stateful operation data live?</p>
+  <button>Only in memory</button>
+  <button data-correct>State stores</button>
+  <button>The producer</button>
+  <button>The broker log only</button>
+  <p class="explain">State stores hold data for stateful processing with fault tolerance.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which time is when an event occurred?</p>
+  <button data-correct>Event time</button>
+  <button>Ingestion time</button>
+  <button>Poll time</button>
+  <button>Processing time</button>
+  <p class="explain">Event time is when the event occurred.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-word-count-with-windows.md">Exercise 0009: read the word count</a></p>
+<p>Runnable example: <a href="../examples/04-streams-wordcount.sh"><code>04-streams-wordcount.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams Core Concepts</a>. Stream-table duality, time, state.</p>
+<p><a href="0006-idempotence-and-transactions.html">← Idempotent producers and transactions</a> &nbsp;|&nbsp; <a href="0010-kafka-connect.html">Kafka Connect: moving data in and out →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams Core Concepts</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

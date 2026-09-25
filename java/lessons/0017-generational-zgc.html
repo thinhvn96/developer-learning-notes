@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 17: JDK 21: generational ZGC</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 21: generational ZGC</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0017 · step 27 of 27 · Senior · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> say what generational ZGC is, how to enable it on JDK 21, and what workload it targets.</div>
+
+<h2>What it is (JDK 21)</h2>
+<p>JEP 439 aims to "improve application performance by extending the Z Garbage Collector to maintain separate generations for young and old objects."<a class="cite" href="https://openjdk.org/jeps/439">[1]</a> Its goals: lower risk of allocation stalls, lower heap memory overhead, lower GC CPU overhead, pause times under one millisecond, heaps from hundreds of megabytes to multiple terabytes, and little manual tuning.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
+<h2>Enabling it on JDK 21</h2>
+<pre><code>java -XX:+UseZGC -XX:+ZGenerational -jar app.jar</code></pre>
+<p>Both flags together enable the generational mode in JDK 21.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a> Without them the default collector rules apply: G1 on server-class machines, Serial otherwise.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
+<h2>Try it</h2>
+<pre><code>java -XX:+UseZGC -XX:+ZGenerational -Xmx64m -Xlog:gc java/examples/GcDemo.java</code></pre>
+<p>Compare the log with the G1 run from <a href="0007-heap-and-garbage-collection.html">lesson 7</a>. I ran the G1 version there; the ZGC comparison is your exercise.</p>
+<div class="aside">Interview answer shape: "Default G1 for balanced throughput. If the SLA is sub-millisecond pauses on large heaps, evaluate generational ZGC on JDK 21, measured against my workload's GC logs, not by folklore."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What did JDK 21 add to ZGC?</p>
+  <button>A JIT compiler</button>
+  <button>Native threads</button>
+  <button data-correct>Separate generations</button>
+  <button>A new language</button>
+  <p class="explain">Generational ZGC maintains separate young and old generations.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How is generational ZGC enabled on JDK 21?</p>
+  <button>Xmx flag alone</button>
+  <button data-correct>UseZGC plus ZGenerational</button>
+  <button>UseG1GC alone</button>
+  <button>UseSerialGC alone</button>
+  <p class="explain">Both -XX:+UseZGC and -XX:+ZGenerational are used together.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Stated pause-time goal?</p>
+  <button>No pause goal</button>
+  <button>Under one second</button>
+  <button data-correct>Under one millisecond</button>
+  <button>Under ten seconds</button>
+  <p class="explain">The JEP targets pause times under one millisecond.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Default collector on a server-class machine?</p>
+  <button data-correct>G1</button>
+  <button>Epsilon</button>
+  <button>Serial</button>
+  <button>ZGC</button>
+  <p class="explain">G1 on server-class machines, Serial otherwise.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0017-compare-g1-and-zgc.md">Exercise 0017: compare G1 and ZGC</a></p>
+<p>Runnable example: <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a>. Read the Summary, Goals and 'Description'.</p>
+<p><a href="0006-virtual-threads.html">← Virtual threads: scale, not speed</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

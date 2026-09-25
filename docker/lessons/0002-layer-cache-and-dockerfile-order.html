@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 2: Layer cache and Dockerfile ordering</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Layer cache and Dockerfile ordering</h1>
+<p class="meta">Docker · Lesson 0002 · step 4 of 12 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> order a Dockerfile so dependency installation stays cached when only source code changes.</div>
+
+<h2>The rule</h2>
+<p>"Each instruction in this Dockerfile translates to a layer in your final image." When a layer changes, its cache is invalidated, and "If a layer changes, all other layers that come after it are also affected."<a class="cite" href="https://docs.docker.com/build/cache/">[1]</a></p>
+<h2>What follows from it</h2>
+<p>Put instructions that change rarely first, and those that change often last. The build-cache page states the invalidation rule; the ordering advice is the practical consequence of it (the docs page does not spell out the ordering recipe in the section I read, so treat this as derived reasoning, not a quote).</p>
+<pre><code># slow: any source edit invalidates the dependency download
+COPY . .
+RUN ./download-dependencies.sh
+
+# better: dependency descriptor first, source afterwards
+COPY pom.xml .
+RUN ./download-dependencies.sh
+COPY src/ src/</code></pre>
+<p>With the second order, editing a file under <code>src/</code> only invalidates layers from <code>COPY src/</code> onward; the expensive dependency layer is reused.</p>
+<p class="aside">A <code>.dockerignore</code> keeps files such as <code>.git/</code> and build output out of the build context, so unrelated edits do not invalidate <code>COPY</code> layers either.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A layer changes. What about later layers?</p>
+  <button>They are deleted</button>
+  <button data-correct>They also rebuild</button>
+  <button>They are reused</button>
+  <button>They merge together</button>
+  <p class="explain">If a layer changes, all layers after it are affected.<a class="cite" href="https://docs.docker.com/build/cache/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which instruction should come earliest?</p>
+  <button>A timestamp writer</button>
+  <button data-correct>Rarely changed setup</button>
+  <button>Random build ids</button>
+  <button>Frequently edited source</button>
+  <p class="explain">Stable layers first keeps them cached.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. You edit one source file only. Which layer reruns first?</p>
+  <button>The final CMD line</button>
+  <button>The dependency install</button>
+  <button>The base image pull</button>
+  <button data-correct>The COPY of source</button>
+  <p class="explain">Cache invalidation starts at the first changed layer, the source COPY, and continues downward.<a class="cite" href="https://docs.docker.com/build/cache/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why add a <code>.dockerignore</code>?</p>
+  <button>Faster JVM startup</button>
+  <button data-correct>Smaller, steadier context</button>
+  <button>Automatic vulnerability fix</button>
+  <button>Enables multi-stage builds</button>
+  <p class="explain">It excludes irrelevant files from the build context and layers.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-order-the-dockerfile.md">Exercise 0002: order the Dockerfile</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/build/cache/">Docker Docs: Build cache</a>. Then read the linked cache invalidation page.</p>
+<p><a href="0008-dockerfile-instructions.html">← Dockerfile instructions: ENV vs ARG, COPY vs ADD, EXPOSE</a> &nbsp;|&nbsp; <a href="0009-cmd-entrypoint-and-exec-form.html">CMD, ENTRYPOINT and exec vs shell form →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/build/cache/">Docker Docs: Build cache</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

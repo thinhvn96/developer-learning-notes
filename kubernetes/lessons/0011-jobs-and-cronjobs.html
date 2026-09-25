@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 11: Jobs and CronJobs</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Jobs and CronJobs</h1>
+<p class="meta">Kubernetes · Lesson 0011 · step 8 of 15 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose Job versus CronJob, set <code>restartPolicy</code> and <code>backoffLimit</code>, and explain why scheduled jobs must be idempotent.</div>
+
+<h2>Job</h2>
+<p>A Job "creates one or more Pods and will continue to retry execution of the Pods until a specified number of them successfully terminate". Requirements: <code>restartPolicy</code> must be <code>Never</code> or <code>OnFailure</code>; <code>backoffLimit</code> defaults to 6; <code>completions</code> and <code>parallelism</code> default to 1.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[1]</a></p>
+<h2>CronJob</h2>
+<p>"Creates Jobs on a repeating schedule", one object per crontab line, with standard cron syntax (<code>0 3 * * 1</code> = Mondays at 03:00). <code>concurrencyPolicy</code>: <code>Allow</code> (default), <code>Forbid</code> (skip if the previous run is still going), <code>Replace</code>.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+<p><strong>Caveat:</strong> "in certain circumstances, a single CronJob can create multiple concurrent Jobs, even with Forbid", so Jobs "should be idempotent".<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+<pre><code>kubectl apply -f examples/job-cronjob.yaml
+hello-job  Complete  1/1  3s          logs: job ran on hello-job-pr6rb
+nightly    0 3 * * *   SUSPEND False  ACTIVE 0
+kubectl create job manual-run --from=cronjob/nightly   -&gt; logs: generating report</code></pre>
+<p>The last command is the handy way to test a CronJob without waiting for its schedule. File: <a href="../examples/job-cronjob.yaml"><code>job-cronjob.yaml</code></a>. Same idempotency theme as <a href="../../system-design/lessons/0002-retries-and-idempotency.html">retries</a>.</p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Allowed restartPolicy for a Job?</p>
+  <button>Only Always</button>
+  <button data-correct>Never or OnFailure</button>
+  <button>Always</button>
+  <button>None</button>
+  <p class="explain">restartPolicy must be Never or OnFailure.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default backoffLimit?</p>
+  <button data-correct>Six</button>
+  <button>One</button>
+  <button>Zero</button>
+  <button>Unlimited</button>
+  <p class="explain">The default backoffLimit is 6.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which policy skips a run if the last is active?</p>
+  <button>Allow</button>
+  <button>Skip</button>
+  <button>Replace</button>
+  <button data-correct>Forbid</button>
+  <p class="explain">Forbid does not allow concurrent runs.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why must CronJob work be idempotent?</p>
+  <button data-correct>Duplicates can occur</button>
+  <button>Pods are immutable</button>
+  <button>Cron is slow</button>
+  <button>Jobs are large</button>
+  <p class="explain">A CronJob can create multiple concurrent Jobs in some circumstances.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-nightly-report.md">Exercise 0011: a nightly report</a></p>
+<p>Runnable example: <a href="../examples/job-cronjob.yaml"><code>job-cronjob.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">Kubernetes Docs: CronJob</a>. Then the Job page.</p>
+<p><a href="0010-secrets.html">← Secrets: what they protect and what they do not</a> &nbsp;|&nbsp; <a href="0005-requests-limits-and-the-jvm.html">Requests, limits and the JVM →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">Kubernetes Docs: Jobs</a> · [2] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">Kubernetes Docs: CronJob</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

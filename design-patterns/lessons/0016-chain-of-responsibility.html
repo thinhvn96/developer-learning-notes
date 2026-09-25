@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 16: Chain of Responsibility</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Chain of Responsibility</h1>
+<p class="meta">Design Patterns · Lesson 0016 · step 16 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pass a request through handlers that each decide to handle it or pass it on.</div>
+
+<h2>Intent</h2>
+<p>Chain of Responsibility is "a behavioral design pattern that lets you pass requests along a chain of handlers." Use it when requests are processed in different ways and the types and order are unknown beforehand, when several handlers run in a given order, or when handlers and order change at runtime.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/ChainDemo.java
+200 did buy for ann
+401 not authenticated
+429 too many requests
+unhandled</code></pre><p>Authentication, rate limiting and business logic are separate handlers; each either returns a result (ending the chain) or passes on. The last line shows the drawback: a chain with no handler for the request returns "unhandled". Servlet filters and middleware pipelines have this shape (my general observation; the pattern page describes the idea). Source: <a href="../examples/ChainDemo.java"><code>ChainDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Control over the order of handling</li><li>Decouples invokers from performers (Single Responsibility)</li><li>New handlers without breaking clients (Open/Closed)</li></ul>
+<p><strong>Cons</strong></p><ul><li>Some requests may end up unhandled</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a> Chain of Responsibility, Command, Mediator and Observer are different ways of connecting senders and receivers; it works well with Composite and shares structure with Decorator (which does not stop the chain).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Chain of Responsibility passes requests along...?</p>
+  <button>A cache</button>
+  <button data-correct>A chain of handlers</button>
+  <button>A queue of threads</button>
+  <button>A tree of copies</button>
+  <p class="explain">Requests are passed along a chain of handlers.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Handler result null in the demo means...?</p>
+  <button>Stop</button>
+  <button>Retry</button>
+  <button data-correct>Pass to next handler</button>
+  <button>Error</button>
+  <p class="explain">check returns null to pass on.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Drawback?</p>
+  <button>No order</button>
+  <button>Global state</button>
+  <button>No polymorphism</button>
+  <button data-correct>Unhandled requests</button>
+  <p class="explain">Some requests may end up unhandled.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Benefit?</p>
+  <button data-correct>Control handling order</button>
+  <button>Fewer classes</button>
+  <button>Faster GC</button>
+  <button>No interfaces</button>
+  <p class="explain">You can control the order of request handling.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0016-validation-chain.md">Exercise 16: a validation chain</a></p>
+<p>Runnable example: <a href="../examples/ChainDemo.java"><code>ChainDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/chain-of-responsibility">Chain of Responsibility (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0015-proxy.html">← Proxy</a> &nbsp;|&nbsp; <a href="0017-command.html">Command →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/chain-of-responsibility">Chain of Responsibility (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

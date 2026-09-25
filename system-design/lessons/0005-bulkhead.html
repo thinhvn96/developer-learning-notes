@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 5: The bulkhead pattern</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The bulkhead pattern</h1>
+<p class="meta">System Design · Lesson 0005 · step 4 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain the bulkhead pattern and show a slow dependency starving a shared pool.</div>
+
+<h2>Idea</h2>
+<p>"Isolate the elements of an application into pools so that if one element fails, the others continue to function." Named for a ship's partitioned hull. Problem: a consumer calling an unresponsive service can exhaust its connection pool, and then its calls to <em>other</em> services fail too.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+<h2>How</h2>
+<p>Give each dependency its own pool (connection, thread, or semaphore); partition service instances by consumer load and availability needs. Benefits: isolates cascading failures, preserves some functionality, allows different quality-of-service levels. Consider combining with retry, circuit breaker and throttling; use containers or processes for service partitions; prefer platform limits (for example Kubernetes resource limits) over re-inventing them.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+<pre><code>java system-design/examples/BulkheadDemo.java
+shared pool of 4 threads   : healthy calls took 2010 ms (stuck behind the slow service)
+separate pools (bulkheads) : healthy calls took 20 ms</code></pre>
+<p>Four 2-second calls to a slow service filled the shared pool, so four 10 ms calls to a healthy service waited about 2 seconds. Separate pools kept them at about 20 ms. Source: <a href="../examples/BulkheadDemo.java"><code>BulkheadDemo.java</code></a>. Related: <a href="../../java/lessons/0023-thread-pools-executors.html">thread pools</a> and Kubernetes <a href="../../kubernetes/lessons/0005-requests-limits-and-the-jvm.html">requests and limits</a> as container-level bulkheads.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Bulkhead isolates...?</p>
+  <button>Only databases</button>
+  <button data-correct>Resources per dependency</button>
+  <button>Only queues</button>
+  <button>Logs</button>
+  <p class="explain">Elements are isolated into pools so failure does not cascade.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Slow service and shared pool. Effect on healthy calls?</p>
+  <button data-correct>They are delayed too</button>
+  <button>They are unaffected</button>
+  <button>They fail fast</button>
+  <button>They are faster</button>
+  <p class="explain">The demo's healthy calls took about 2 seconds in the shared pool.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Mechanisms to build bulkheads?</p>
+  <button>Only firewalls</button>
+  <button data-correct>Thread pools, semaphores, containers</button>
+  <button>Only DNS</button>
+  <button>Only caches</button>
+  <p class="explain">Processes, thread pools, semaphores and containers are named.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cost of bulkheads?</p>
+  <button>Slower builds</button>
+  <button>Weaker security</button>
+  <button data-correct>Less efficient resource use</button>
+  <button>No monitoring</button>
+  <p class="explain">The pattern may not suit when less efficient resource use is unacceptable.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-size-the-bulkheads.md">Exercise 0005: size the bulkheads</a></p>
+<p>Runnable example: <a href="../examples/BulkheadDemo.java"><code>BulkheadDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">Azure: Bulkhead pattern</a>. Solution and considerations.</p>
+<p><a href="0004-circuit-breaker.html">← The circuit breaker pattern</a> &nbsp;|&nbsp; <a href="0006-rate-limiting.html">Rate limiting and the token bucket →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">Azure: Bulkhead pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

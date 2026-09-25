@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 13: StatefulSets: stable identity and storage</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>StatefulSets: stable identity and storage</h1>
+<p class="meta">Kubernetes · Lesson 0013 · step 13 of 15 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what a StatefulSet guarantees that a Deployment does not, and prove stable identity and storage on a cluster.</div>
+
+<h2>Guarantees</h2>
+<p>A StatefulSet "manages the deployment and scaling of a set of Pods, and provides guarantees about the ordering and uniqueness of these Pods": stable unique network identifiers, stable persistent storage, ordered graceful deployment and scaling, ordered rolling updates.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a> For stateless apps use a Deployment.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+<h2>Requirements and limits</h2>
+<ul><li>A <strong>headless Service</strong> (<code>clusterIP: None</code>) must be created by you to own the Pods' network identity.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></li>
+<li>"Deleting and/or scaling a StatefulSet down will <em>not</em> delete the volumes" - data safety over automatic purge.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></li>
+<li>No guarantee of ordered termination on delete; scale to 0 first for an ordered shutdown.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></li></ul>
+<h2>Verified on a cluster</h2>
+<pre><code>kubectl apply -f examples/statefulset.yaml      # 2 replicas + volumeClaimTemplates
+web-0  1/1 Running  19s          web-1  1/1 Running  4s         # created in order
+data-web-0  Bound ...            data-web-1  Bound ...         # one PVC per Pod
+kubectl exec web-0 -- sh -c 'echo "page from web-0" &gt; /usr/share/nginx/html/index.html'
+kubectl delete pod web-0     # recreated with the SAME name and a new uid
+kubectl exec web-0 -- cat /usr/share/nginx/html/index.html   -&gt; page from web-0
+web-0.web.default.svc.cluster.local resolves to the Pod IP
+kubectl scale statefulset web --replicas=1   -&gt; data-web-1 still exists</code></pre>
+<p>File: <a href="../examples/statefulset.yaml"><code>statefulset.yaml</code></a>. Interview line: StatefulSets give identity and storage, not data replication; a database still needs its own replication (my inference, consistent with the guarantees above).</p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What must exist for a StatefulSet's network identity?</p>
+  <button>An Ingress</button>
+  <button>A LoadBalancer</button>
+  <button>A CronJob</button>
+  <button data-correct>A headless Service</button>
+  <p class="explain">StatefulSets require a headless Service that you create.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Scale a StatefulSet down. Volumes?</p>
+  <button>Encrypted</button>
+  <button>Copied</button>
+  <button data-correct>Not deleted</button>
+  <button>Deleted</button>
+  <p class="explain">Scaling down does not delete the volumes.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Pods are created in what manner?</p>
+  <button>Reverse only</button>
+  <button>All at once</button>
+  <button>Random</button>
+  <button data-correct>Ordered</button>
+  <p class="explain">Deployment and scaling are ordered.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Pod web-0 is deleted. What comes back?</p>
+  <button>Random name</button>
+  <button>New volume</button>
+  <button data-correct>Same name, same volume</button>
+  <button>No Pod</button>
+  <p class="explain">The run showed web-0 recreated with its data intact.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-run-a-replicated-store.md">Exercise 0013: run a stateful store</a></p>
+<p>Runnable example: <a href="../examples/statefulset.yaml"><code>statefulset.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes Docs: StatefulSets</a>. Read 'Using StatefulSets' and 'Limitations'.</p>
+<p><a href="0012-persistent-volumes-and-claims.html">← PersistentVolumes, claims and StorageClasses</a> &nbsp;|&nbsp; <a href="0014-ingress.html">Ingress: HTTP routing into the cluster →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes Docs: StatefulSets</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

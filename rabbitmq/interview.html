@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>RabbitMQ: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · RabbitMQ · 10 questions · <a href="index.html">RabbitMQ ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>RabbitMQ questions for Senior backend interviews, from the AMQP model to reliability. Outputs quoted come from the example script run against a throwaway <code>rabbitmq:4-management</code> container.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Explain the RabbitMQ (AMQP 0-9-1) model.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> publishers send to exchanges; exchanges route copies to queues via bindings; consumers read from queues.</p>
+<p>"Messages are published to exchanges ... Exchanges then distribute message copies to queues using rules called bindings." Consumers get messages from queues by subscription (push) or polling (discouraged). The default exchange is a nameless direct exchange that binds each new queue with the queue name as routing key.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What happens to an unroutable message? (My example's API returned <code>routed:false</code>; publishers should detect it. See publisher confirms and handling in the docs.)</div>
+<p class="see">Learn it: <a href="lessons/0001-amqp-model-exchanges-queues-bindings.html">AMQP model</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Direct vs fanout vs topic vs headers exchanges?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> exact key, broadcast, pattern, header values.</p>
+<p>Direct routes by exact routing-key match (unicast); fanout copies to all bound queues ignoring the key; topic matches routing-key patterns; headers routes on header values.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> In my run: a direct binding <code>error</code> received only <code>error</code>; fanout copied to both queues; topic pattern <code>orders.eu.*</code> received <code>orders.eu.created</code> but not <code>orders.us.created</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Design routing for audit + regional queues. (Fanout for audit, topic for regions.)</div>
+<p class="see">Learn it: <a href="lessons/0002-exchange-types.html">Exchange types</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>How do acknowledgements work? What if a consumer crashes?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the consumer acks after processing; un-acked deliveries are requeued if the consumer disconnects.</p>
+<p><code>basic.ack</code>, <code>basic.nack</code>, <code>basic.reject</code> identify deliveries by tag; <code>multiple=true</code> acknowledges all outstanding tags up to that one. "Any delivery that was not acked is automatically requeued", flagged <code>redelivered</code>, so consumers "be implemented with idempotence in mind". Automatic ack "should be considered unsafe".<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[2]</a> My run: first get <code>redelivered=false</code>, after requeue <code>redelivered=true</code>.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What is prefetch and what value do you pick? (Limits unacked messages; 0 is unlimited; docs suggest 100 to 300 for throughput, lower for fairness.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[2]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0003-acks-prefetch-redelivery.html">Acks and prefetch</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>How do you make sure a message is not lost?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> durable queue + persistent message + publisher confirms + manual consumer acks (+ replicated queue).</p>
+<p>"Both the queue and messages must be marked durable" to avoid data loss on restart.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> Publisher confirms make the broker acknowledge receipt asynchronously with <code>basic.ack</code> (or <code>basic.nack</code> if it cannot take responsibility).<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[2]</a> On the consumer side use manual acks. For node failure use a replicated queue: quorum queues, based on Raft, are the recommended default for replicated queues.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[3]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What about messages published to a non-existent binding? (Unroutable; detect with return or confirm handling.)</div>
+<p class="see">Learn it: <a href="lessons/0004-publisher-confirms-and-durability.html">Publisher confirms</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>What is a dead letter exchange and when is a message dead-lettered?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an exchange that receives messages a queue gave up on: rejected with requeue=false, TTL expired, queue length exceeded, or quorum delivery limit exceeded.</p>
+<p>Configure with a policy (<code>dead-letter-exchange</code>, optional routing key) or queue arguments (<code>x-dead-letter-exchange</code>); policies are preferred because they can change without redeploying applications.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[4]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you build a delayed retry? (TTL retry queue that dead-letters back to the main exchange; guard against infinite loops.)</div>
+<p class="see">Learn it: <a href="lessons/0005-dead-letter-exchanges.html">Dead letter exchanges</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Quorum queues vs classic queues? How do you handle poison messages?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> quorum queues are replicated (Raft) and the default choice for HA; use a delivery limit and DLX for poison messages.</p>
+<p>"Quorum queues should be considered the default choice when needing a replicated, highly available queue"; classic mirroring was removed in RabbitMQ 4.0. They track redeliveries in <code>x-delivery-count</code> and apply a default delivery limit of 20; past it a message is discarded or dead-lettered if a DLX is configured. At-least-once dead lettering retains dead-lettered messages until acknowledged.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[3]</a><a class="cite" href="https://www.rabbitmq.com/docs/dlx">[4]</a> Consumers still need to be idempotent.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Where do quorum queues not fit? (Temporary queues and some transient use cases per the docs.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[3]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0006-quorum-queues-and-poison-messages.html">Quorum queues</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>RabbitMQ versus Kafka?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> queue of work items versus durable log of events.</p>
+<p>See the system-design comparison: RabbitMQ has exchanges, acks and DLX; Kafka retains events after consumption and lets consumers rewind offsets. Pick by the semantics you need and back it with a benchmark.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Can you use both? (Yes; typical when you need routing/tasks and an event log.)</div>
+<p class="see">Learn it: <a href="../system-design/lessons/0003-queue-versus-log.html">Queue versus log</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>How does message TTL work?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>x-message-ttl</code> per queue or <code>expiration</code> per message; the lower wins; expired messages can be dead-lettered.</p>
+<p><a class="cite" href="https://www.rabbitmq.com/docs/ttl">[5]</a> Caveat for classic queues with per-message TTL: expired messages behind live ones are only discarded at the head. My run: a queue with TTL 2000 ms and a DLX moved both messages to the dead-letter queue within 4 s.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Build a delayed retry? (TTL queue dead-lettering back to the main exchange.)</div>
+<p class="see">Learn it: <a href="lessons/0007-message-ttl.html">Message TTL</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>What is a RabbitMQ stream and how is it different from a queue?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an append-only replicated log with non-destructive reads and replay from an offset.</p>
+<p><a class="cite" href="https://www.rabbitmq.com/docs/streams">[6]</a> Good for large fan-outs, replay, throughput and large backlogs; consumers choose <code>x-stream-offset</code> (first, last, offset, timestamp). In my run <code>basic.get</code> was rejected for a stream queue.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Stream or Kafka topic? (They overlap; compare operational fit and ecosystem.)</div>
+<p class="see">Learn it: <a href="lessons/0008-streams.html">Streams</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>How does RabbitMQ clustering work, and why odd node counts?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> nodes share definitions; classic queues live on one node unless you use a replicated type; odd node counts give a majority for consensus.</p>
+<p><a class="cite" href="https://www.rabbitmq.com/docs/clustering">[7]</a> In my three-node run, stopping the node hosting both queues left the classic queue unavailable while the quorum queue still held its 3 messages.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why avoid two-node clusters? (No majority after a partition.)</div>
+<p class="see">Learn it: <a href="lessons/0009-clustering-and-replicated-queues.html">Clustering</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these RabbitMQ questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP model</a> · [2] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Acks and confirms</a> · [3] <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum queues</a> · [4] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead letter exchanges</a> · [5] <a href="https://www.rabbitmq.com/docs/ttl">RabbitMQ: TTL</a> · [6] <a href="https://www.rabbitmq.com/docs/streams">RabbitMQ: Streams</a> · [7] <a href="https://www.rabbitmq.com/docs/clustering">RabbitMQ: Clustering</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

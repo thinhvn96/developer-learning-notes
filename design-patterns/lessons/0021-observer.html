@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 21: Observer</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Observer</h1>
+<p class="meta">Design Patterns · Lesson 0021 · step 21 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> implement publish/subscribe, know why <code>java.util.Observable</code> is deprecated, and use the JDK's <code>Flow</code> API.</div>
+
+<h2>Intent</h2>
+<p>Observer is "a behavioral design pattern that lets you define a subscription mechanism to notify multiple objects about any events that happen to the object they're observing." Use it when a change in one object may require changing others whose set is unknown or dynamic, for GUI hooks, and for temporary observation.<a class="cite" href="https://refactoring.guru/design-patterns/observer">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/ObserverDemo.java
+A sees 10
+B sees 10
+A sees 11
+--- Flow API (Publisher/Subscriber with back-pressure)
+Flow got 1
+Flow got 2
+Flow got 3</code></pre><p>A subscriber list, subscribe/unsubscribe at runtime. The JDK's original <code>Observable</code>/<code>Observer</code> are deprecated: "the event model ... is quite limited, the order of notifications delivered by <code>Observable</code> is unspecified, and state changes are not in one-for-one correspondence with notifications", with <code>java.beans</code>, <code>java.util.concurrent</code> and the <code>Flow</code> API as alternatives.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[2]</a> <code>Flow</code> defines "Publishers produce items consumed by one or more Subscribers, each managed by a Subscription", and flow control through <code>request(n)</code> "to avoid resource management problems in push based systems".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[3]</a> Source: <a href="../examples/ObserverDemo.java"><code>ObserverDemo.java</code></a>. Messaging systems are Observer at architecture scale (<a href="../../kafka/index.html">Kafka</a>, <a href="../../rabbitmq/index.html">RabbitMQ</a>).</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Open/Closed: add subscribers without changing the publisher</li><li>Relations between objects at runtime</li></ul>
+<p><strong>Cons</strong></p><ul><li>Subscribers are notified in random order</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/observer">[1]</a> Chain of Responsibility, Command, Mediator and Observer connect senders and receivers in different ways; Mediator can be built with Observer.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Observer defines...?</p>
+  <button>A copy mechanism</button>
+  <button data-correct>A subscription mechanism</button>
+  <button>A sort</button>
+  <button>A cache</button>
+  <p class="explain">Notify multiple objects about events.<a class="cite" href="https://refactoring.guru/design-patterns/observer">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Why is Observable deprecated?</p>
+  <button>Too big</button>
+  <button data-correct>Limited event model, unspecified order</button>
+  <button>Too fast</button>
+  <button>Removed from JVM</button>
+  <p class="explain">The Javadoc lists limited events and unspecified notification order.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Modern JDK alternative?</p>
+  <button>Hashtable</button>
+  <button>Stack</button>
+  <button data-correct>Flow API</button>
+  <button>Vector</button>
+  <p class="explain">The Flow API is suggested for reactive-streams style programming.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Flow's back-pressure method?</p>
+  <button>Subscriber.kill</button>
+  <button data-correct>Subscription.request</button>
+  <button>Publisher.stop</button>
+  <button>Processor.reset</button>
+  <p class="explain">Flow control relies on request(long).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0021-event-bus.md">Exercise 21: an event bus</a></p>
+<p>Runnable example: <a href="../examples/ObserverDemo.java"><code>ObserverDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/observer">Observer (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0020-memento.html">← Memento</a> &nbsp;|&nbsp; <a href="0022-state.html">State →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/observer">Observer (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">Observable Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">Flow Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

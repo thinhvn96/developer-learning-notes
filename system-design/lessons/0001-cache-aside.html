@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 1: The cache-aside pattern</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The cache-aside pattern</h1>
+<p class="meta">System Design · Lesson 0001 · step 1 of 11 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> describe the cache-aside read and write flows, the order of steps on write, and the staleness that remains.</div>
+
+<h2>The flow</h2>
+<ol>
+<li>The application tries to read from the cache.</li>
+<li>On a <em>cache miss</em> it reads from the data store.</li>
+<li>It adds the item to the cache and returns it.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+</ol>
+<p>On update: "it writes the change to the data store and then invalidates the corresponding item in the cache."<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a> Order matters: "Update the data store <em>before</em> removing the item from the cache"; otherwise a reader can re-cache the outdated item in the gap.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+<pre><code>java system-design/examples/CacheAsideDemo.java
+read: v1  (store reads so far: 1)
+read: v1  (store reads so far: 1)         # hit
+after write+invalidate: v2  (store reads: 2)
+after out-of-band change, cache still says: v2  (stale)</code></pre>
+<p>Source: <a href="../examples/CacheAsideDemo.java"><code>CacheAsideDemo.java</code></a>.</p>
+<h2>What it does not give you</h2>
+<ul>
+<li><strong>Consistency:</strong> "doesn't guarantee consistency between the data store and the cache"; an outside change appears only when the item loads again.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+<li><strong>Expiration and eviction:</strong> too short causes repeated misses, too long causes stale data; caches evict, often least-recently-used.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+<li><strong>Local caches:</strong> each instance has its own copy, so they diverge; consider a shared distributed cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+</ul>
+<p>Not suitable when most requests miss, or for sensitive data in a shared cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. On a cache miss, what does the app do?</p>
+  <button>Clears the cache</button>
+  <button data-correct>Reads the data store</button>
+  <button>Writes to the cache only</button>
+  <button>Fails the request</button>
+  <p class="explain">It retrieves the item from the data store and adds it to the cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. On a write, correct order?</p>
+  <button>Invalidate then update store</button>
+  <button data-correct>Update store then invalidate</button>
+  <button>Only invalidate the cache</button>
+  <button>Only update the cache</button>
+  <p class="explain">Update the data store before removing the cached item.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Does cache-aside guarantee consistency?</p>
+  <button>Only for reads</button>
+  <button>Yes, always</button>
+  <button>Only with LRU</button>
+  <button data-correct>No, it does not</button>
+  <p class="explain">The pattern does not guarantee consistency between the store and the cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Expiry set far too long causes what?</p>
+  <button>Smaller data store</button>
+  <button data-correct>Stale data served</button>
+  <button>Constant cache misses</button>
+  <button>Faster eviction</button>
+  <p class="explain">Too long an expiration lets cached data become stale.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-break-the-write-order.md">Exercise 0001: break the write order</a></p>
+<p>Runnable example: <a href="../examples/CacheAsideDemo.java"><code>CacheAsideDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">Azure Architecture Center: Cache-Aside pattern</a>. Vendor-neutral pattern; the examples use Azure Redis but the flows are general.</p>
+<p> &nbsp;|&nbsp; <a href="0002-retries-and-idempotency.html">Retries, backoff and idempotency →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">Azure Architecture Center: Cache-Aside pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

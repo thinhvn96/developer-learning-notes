@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 9: @ConfigurationProperties: type-safe configuration</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>@ConfigurationProperties: type-safe configuration</h1>
+<p class="meta">Spring Boot · Lesson 0009 · step 6 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> bind a group of properties to an immutable typed object with defaults and validation.</div>
+
+<h2>Why not <code>@Value</code></h2>
+<p><code>@ConfigurationProperties</code> provides type-safe binding of externalized configuration to strongly typed beans, and suits hierarchical or complex properties better than scattered <code>@Value</code> injection.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+<h2>An immutable record</h2>
+<pre><code>@ConfigurationProperties("app")
+@Validated
+public record AppProperties(@NotBlank String name, @DefaultValue("hello") String greeting) { }
+
+@SpringBootApplication
+@EnableConfigurationProperties(AppProperties.class)
+class DemoApplication { ... }</code></pre>
+<ul><li><strong>Constructor binding</strong> gives immutable beans and works with records; <code>@DefaultValue</code> supplies defaults.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li>
+<li><strong>Relaxed binding:</strong> <code>my-project</code>, <code>myProject</code> and env var <code>MY_PROJECT</code> all bind to the same property.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li>
+<li><strong>Validation:</strong> add <code>@Validated</code> and constraint annotations; a missing required value fails startup.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li>
+<li>Enable with <code>@EnableConfigurationProperties</code> or <code>@ConfigurationPropertiesScan</code>.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li></ul>
+<p>Verified: <code>app.name=demo-app</code> and the default greeting bound as <code>name=demo-app greeting=hello</code> (RESULT line in the <a href="0008-externalized-configuration-and-profiles.html">previous lesson</a>). Code: <a href="../examples/demo-app/src/main/java/com/example/demo/config/AppProperties.java"><code>AppProperties.java</code></a>. I did not run the "missing required value" failure case; the docs state it as a benefit of <code>@Validated</code>.</p><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Type-safe grouped config uses...?</p>
+  <button>@Profile</button>
+  <button>@Value only</button>
+  <button data-correct>@ConfigurationProperties</button>
+  <button>@Scope</button>
+  <p class="explain">It binds externalized configuration to strongly typed beans.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How do you get an immutable properties object?</p>
+  <button>Field injection</button>
+  <button data-correct>Constructor binding</button>
+  <button>Setter binding</button>
+  <button>Static fields</button>
+  <p class="explain">Constructor binding works for immutable beans and records.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Env var MY_SERVICE_PORT binds to which property?</p>
+  <button>port</button>
+  <button>MY_SERVICE_PORT only</button>
+  <button>service.my.port</button>
+  <button data-correct>my.service.port</button>
+  <p class="explain">Relaxed binding maps underscores in env vars to property names.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What makes a properties class validate?</p>
+  <button>@Scope</button>
+  <button data-correct>@Validated</button>
+  <button>@Lazy</button>
+  <button>@Async</button>
+  <p class="explain">@Validated enables JSR-303 validation of the bound values.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-typed-config.md">Exercise 0009: typed config</a></p>
+<p>Runnable example: <a href="../examples/demo-app/src/main/java/com/example/demo/config/AppProperties.java"><code>demo-app/src/main/java/com/example/demo/config/AppProperties.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration</a>. 'Type-safe Configuration Properties'.</p>
+<p><a href="0008-externalized-configuration-and-profiles.html">← Externalized configuration, precedence and profiles</a> &nbsp;|&nbsp; <a href="0004-rest-controllers.html">REST controllers and request mapping →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration (type-safe binding)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

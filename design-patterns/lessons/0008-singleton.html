@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 8: Singleton</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Singleton</h1>
+<p class="meta">Design Patterns · Lesson 0008 · step 8 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> implement a thread-safe singleton in Java, and explain why it hurts testing and when not to use it.</div>
+
+<h2>Intent</h2>
+<p>Singleton is "a creational design pattern that lets you ensure that a class has only one instance, while providing a global access point to this instance." It solves two problems at once: control over the number of instances, and safe global access.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/SingletonDemo.java
+enum singleton same instance      : true
+holder singleton same instance    : true
+JDK Runtime.getRuntime() same     : true
+distinct holder instances across 8 threads: 1
+test B sees leftover state         : test-A</code></pre><p>Two safe idioms: a one-element <code>enum</code> (the JVM guarantees single initialization) and the lazy holder class (class initialization is thread-safe). The JDK's <code>Runtime</code> is documented as "a single instance of class Runtime" obtained with <code>getRuntime()</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[2]</a> The last line is the price: mutable global state leaks between tests ("test B sees leftover state"). Prefer passing a single instance through the constructor (dependency injection) and letting a container manage the scope: Spring's singleton scope is per container, not per class loader (<a href="../../spring-boot/lessons/0007-bean-scopes.html">bean scopes lesson</a>). Source: <a href="../examples/SingletonDemo.java"><code>SingletonDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Guarantees a single instance</li><li>A controlled global access point</li><li>Lazy initialization possible</li></ul>
+<p><strong>Cons</strong></p><ul><li>Violates the Single Responsibility Principle (solves two problems)</li><li>Can mask bad design and create inappropriate coupling</li><li>Needs special handling in multithreaded code</li><li>Hard to unit test</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a> Facade, Flyweight, Abstract Factory, Builder and Prototype can all be implemented as Singletons.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Singleton guarantees...?</p>
+  <button data-correct>One instance and a global access point</button>
+  <button>Immutability</button>
+  <button>Many instances</button>
+  <button>Speed</button>
+  <p class="explain">One instance plus global access.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A safe Java idiom?</p>
+  <button>Static counter</button>
+  <button>Public constructor</button>
+  <button>Cloneable</button>
+  <button data-correct>Single-element enum</button>
+  <p class="explain">The demo used an enum and a lazy holder.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Main testing problem?</p>
+  <button>Slow start</button>
+  <button>Missing methods</button>
+  <button>No interfaces</button>
+  <button data-correct>Global state leaks</button>
+  <p class="explain">Shared mutable state remained between tests.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which principle does it violate?</p>
+  <button data-correct>Single Responsibility</button>
+  <button>Liskov</button>
+  <button>None</button>
+  <button>Interface Segregation</button>
+  <p class="explain">It solves two problems at once.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-replace-a-singleton.md">Exercise 8: replace a singleton</a></p>
+<p>Runnable example: <a href="../examples/SingletonDemo.java"><code>SingletonDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/singleton">Singleton (Refactoring.Guru)</a>. Read Intent and Pros and cons.</p>
+<p><a href="0007-prototype.html">← Prototype</a> &nbsp;|&nbsp; <a href="0009-adapter.html">Adapter →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/singleton">Singleton (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">Runtime Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

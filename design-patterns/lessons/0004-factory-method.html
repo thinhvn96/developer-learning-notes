@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 4: Factory Method</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Factory Method</h1>
+<p class="meta">Design Patterns · Lesson 0004 · step 4 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain how a creator delegates the choice of concrete product to subclasses, and recognize static factory methods in the JDK.</div>
+
+<h2>Intent</h2>
+<p>Factory Method is "a creational design pattern that provides an interface for creating objects in a superclass, but allows subclasses to alter the type of objects that will be created." Use it when you do not know beforehand the exact types your code should work with, when you want to let library or framework users extend internal components, or to reuse existing objects.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+<h2>Example</h2><p><code>Dialog.render()</code> is written once against the <code>Button</code> interface; each subclass overrides <code>createButton()</code> to choose the product.</p><pre><code>java design-patterns/examples/FactoryMethodDemo.java
+WindowsDialog renders [Windows button]
+WebDialog renders &lt;button&gt;
+List.of(...) returns a List; concrete class chosen by the JDK: List12</code></pre><p>Source: <a href="../examples/FactoryMethodDemo.java"><code>FactoryMethodDemo.java</code></a>. Everyday cousin: static factory methods such as <code>List.of(..)</code> and <code>Integer.valueOf</code>, where the caller gets an interface type and the JDK picks the class (my run showed a <code>List12</code>).</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Loose coupling between the creator and concrete products</li><li>Single Responsibility: creation code in one place</li><li>Open/Closed: new product types without changing existing code</li></ul>
+<p><strong>Cons</strong></p><ul><li>Code gets more complicated: many new subclasses</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a> It often evolves into Abstract Factory, Prototype or Builder, and relates to Template Method (a factory method is often a step in a template method).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Who decides the concrete product in Factory Method?</p>
+  <button>The JVM</button>
+  <button data-correct>The subclass</button>
+  <button>The client</button>
+  <button>The compiler</button>
+  <p class="explain">Subclasses alter the type of objects created.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Benefit?</p>
+  <button>Faster startup</button>
+  <button>Fewer classes</button>
+  <button data-correct>Decouples creator from products</button>
+  <button>No interfaces</button>
+  <p class="explain">It eliminates tight coupling between creator and concrete products.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Drawback?</p>
+  <button data-correct>Many subclasses</button>
+  <button>Slow calls</button>
+  <button>No polymorphism</button>
+  <button>Needs reflection</button>
+  <p class="explain">Code complexity grows with new subclasses.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. JDK example of a factory method?</p>
+  <button data-correct>List.of</button>
+  <button>new Object</button>
+  <button>System.exit</button>
+  <button>Thread.sleep</button>
+  <p class="explain">List.of returns a List whose class the JDK chooses.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-add-a-product.md">Exercise 4: add a product</a></p>
+<p>Runnable example: <a href="../examples/FactoryMethodDemo.java"><code>FactoryMethodDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/factory-method">Factory Method (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0003-criticism-and-anti-patterns.html">← Criticism of patterns, and anti-patterns</a> &nbsp;|&nbsp; <a href="0005-abstract-factory.html">Abstract Factory →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/factory-method">Factory Method (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

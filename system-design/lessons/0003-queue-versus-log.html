@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 3: Queue versus log: choosing RabbitMQ or Kafka</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Queue versus log: choosing RabbitMQ or Kafka</h1>
+<p class="meta">System Design · Lesson 0003 · step 8 of 11 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pick RabbitMQ or Kafka for a requirement and defend the choice with documented behavior.</div>
+
+<h2>Two different models</h2>
+<table>
+<tr><th></th><th>RabbitMQ</th><th>Kafka</th></tr>
+<tr><td>Shape</td><td>Publishers send to <strong>exchanges</strong>, which route copies to <strong>queues</strong> by bindings; consumers take from queues<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></td><td>Events are appended to <strong>partitions</strong> of a topic; consumers read at an offset<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a><a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+<tr><td>After consumption</td><td>Consumers acknowledge deliveries; un-acked messages are requeued if the consumer dies<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a></td><td>"Events are not deleted after consumption"; retention is configured per topic<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></td></tr>
+<tr><td>Ordering</td><td>Queue-level delivery to consumers (see the RabbitMQ docs for the exact guarantees under concurrency)</td><td>Per partition; same key goes to the same partition<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></td></tr>
+<tr><td>Position</td><td>Broker tracks acks per delivery<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a></td><td>Consumer position is "a single integer, the offset of the next message to consume", so consumers can rewind and reprocess<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+<tr><td>Routing</td><td>Rich: direct, fanout, topic, headers exchanges<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></td><td>By topic and partition key</td></tr>
+<tr><td>Scaling consumers</td><td>Add competing consumers on a queue</td><td>Up to one consumer per partition in a group<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+<tr><td>Failure handling</td><td>Dead letter exchanges, delivery limits on quorum queues</td><td>Consumer decides: commit order gives at-most or at-least once<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+</table>
+<h2>Rules of thumb (my synthesis of the rows above)</h2>
+<ul>
+<li>Choose <strong>RabbitMQ</strong> for task queues and flexible routing where each message is a unit of work to be handled once and then gone, with per-message retry and dead-lettering.</li>
+<li>Choose <strong>Kafka</strong> when the stream itself is the asset: many independent consumers, replay after a bug fix, high throughput, per-key ordering, event sourcing.</li>
+<li>Both give at-least-once in the common configuration, so make consumers idempotent regardless (<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a>, <a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a>).</li>
+</ul>
+<div class="aside">The "rules of thumb" are interpretation, not quotes. In an interview, name the documented behavior first (retention versus ack-and-remove, offsets versus acks), then your conclusion. Throughput claims need your own benchmark; I have not cited any here.</div>
+<p>Compare hands-on: <a href="../../kafka/index.html">Kafka ladder</a> and <a href="../../rabbitmq/index.html">RabbitMQ ladder</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which system keeps events after they are read?</p>
+  <button>Acked queues</button>
+  <button>Default exchange</button>
+  <button data-correct>Kafka topics</button>
+  <button>Fanout copies</button>
+  <p class="explain">Events are not deleted after consumption in Kafka; retention is per topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Where do you get rich routing rules?</p>
+  <button>Consumer groups</button>
+  <button>Kafka retention</button>
+  <button>Kafka offsets</button>
+  <button data-correct>RabbitMQ exchanges</button>
+  <p class="explain">Exchanges route copies to queues via bindings and several exchange types.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Replay after a consumer bug fix is easiest with?</p>
+  <button>Direct exchanges</button>
+  <button>Nack and drop</button>
+  <button>Auto-acked queues</button>
+  <button data-correct>Kafka offsets</button>
+  <p class="explain">Kafka consumers can rewind because position is just an offset.<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Both deliver at least once commonly. Consumers need?</p>
+  <button>Fanout exchanges</button>
+  <button>More partitions</button>
+  <button>Faster networks</button>
+  <button data-correct>Idempotent handling</button>
+  <p class="explain">Redelivery is expected in both, so repeated processing must be safe.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-choose-a-broker.md">Exercise 0003: choose a broker</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka Introduction</a>. Then the RabbitMQ AMQP model page; compare in your own words.</p>
+<p><a href="0008-competing-consumers.html">← Competing consumers</a> &nbsp;|&nbsp; <a href="0009-saga.html">The saga pattern: distributed work without distributed transactions →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka Introduction</a> · [2] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model</a> · [3] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Acknowledgements and Confirms</a> · [4] <a href="https://kafka.apache.org/43/design/design/">Kafka Design</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

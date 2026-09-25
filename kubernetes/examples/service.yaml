@@ -1,0 +1,12 @@
+# Selects the Pods created by deployment.yaml (label app=nginx) and gives them one stable address.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 24: Atomics and ReentrantLock: fixing lost updates</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Atomics and ReentrantLock: fixing lost updates</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0024 · step 14 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> show that <code>volatile</code> <code>count++</code> loses updates and fix it with an atomic or a lock.</div>
+
+<h2>The bug</h2>
+<p>Lesson 5 said <code>volatile</code> gives visibility and ordering,<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[3]</a> not atomic read-modify-write. Four threads doing 200,000 increments each:</p>
+<pre><code>java java/examples/AtomicDemo.java
+expected       : 800000
+volatile int   : 798358  (lost updates: 1642)   # varies run to run
+AtomicInteger  : 800000
+ReentrantLock  : 800000</code></pre>
+<h2>Atomics</h2>
+<p>The atomic package is "a small toolkit of classes that support lock-free thread-safe programming on single variables", with <code>compareAndSet</code> and higher-level methods like <code>getAndUpdate</code>; operations have volatile access semantics. For heavy contention on counters there are <code>LongAdder</code> and friends.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">[1]</a></p>
+<h2>ReentrantLock</h2>
+<p>A reentrant mutual-exclusion lock with the same basic semantics as <code>synchronized</code> but extended: fairness option, <code>tryLock</code>, <code>lockInterruptibly</code>, conditions. Idiom: <code>lock()</code> right before <code>try</code>, <code>unlock()</code> first in <code>finally</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[2]</a></p>
+<pre><code>lock.lock();
+try { count++; } finally { lock.unlock(); }</code></pre>
+<p>Source: <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does volatile int count++ risk?</p>
+  <button>Compile errors</button>
+  <button>Deadlocks</button>
+  <button>Stale class files</button>
+  <button data-correct>Lost updates</button>
+  <p class="explain">count++ is read-modify-write, not atomic; the demo lost updates.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which class gives lock-free atomic increments?</p>
+  <button>Thread</button>
+  <button>ReentrantLock</button>
+  <button data-correct>AtomicInteger</button>
+  <button>Semaphore</button>
+  <p class="explain">Atomic classes support lock-free thread-safe updates on single variables.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where should unlock() go?</p>
+  <button>Anywhere at all</button>
+  <button>After the try</button>
+  <button>In the catch</button>
+  <button data-correct>First in finally</button>
+  <p class="explain">The documented idiom puts unlock as the first statement in finally.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which method tries the lock without blocking?</p>
+  <button>newCondition</button>
+  <button>lock</button>
+  <button>getOwner</button>
+  <button data-correct>tryLock</button>
+  <p class="explain">tryLock is a non-blocking attempt to acquire.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0024-fix-the-counter.md">Exercise 0024: fix the counter</a></p>
+<p>Runnable example: <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a>. Package description.</p>
+<p><a href="0005-visibility-and-happens-before.html">← Visibility and happens-before</a> &nbsp;|&nbsp; <a href="0025-concurrenthashmap.html">ConcurrentHashMap: atomic updates and weak consistency →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock Javadoc</a> · [3] <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">JLS chapter 17</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

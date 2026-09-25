@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 13: VACUUM, dead tuples and autovacuum</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>VACUUM, dead tuples and autovacuum</h1>
+<p class="meta">PostgreSQL · Lesson 0013 · step 13 of 13 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why UPDATEs leave dead tuples, what VACUUM does, and why autovacuum is on by default.</div>
+
+<h2>Why vacuum exists</h2>
+<p>PostgreSQL's MVCC keeps old row versions so readers do not block writers.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[2]</a> Those versions must be cleaned. The docs give four reasons to vacuum: recover or reuse space of updated or deleted rows; update planner statistics; update the visibility map (speeds index-only scans); protect against transaction ID wraparound.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+<h2>Autovacuum</h2>
+<p>An optional but "highly recommended" feature that automates <code>VACUUM</code> and <code>ANALYZE</code>; in the default configuration it is enabled with appropriate parameters.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+<h2>Watch dead tuples appear</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 12-vacuum.sql     # autovacuum disabled on the table for the demo
+after 100k inserts:            n_dead_tup = 0
+after UPDATE of every row:     n_live_tup = 100000, n_dead_tup = 100000   size 7872 kB
+after VACUUM:                  n_dead_tup = 0
+after DELETE + VACUUM FULL:    size 48 kB</code></pre>
+<p>Plain <code>VACUUM</code> marks dead space reusable; <code>VACUUM FULL</code> rewrites the table and shrinks the file (the size drop is from the run; its locking costs are beyond the pages read here, so check the docs before using it in production). Source: <a href="../examples/12-vacuum.sql"><code>12-vacuum.sql</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Why do updates create dead tuples?</p>
+  <button data-correct>Old versions are kept</button>
+  <button>Locks leak</button>
+  <button>Indexes rebuild</button>
+  <button>Caches expire</button>
+  <p class="explain">MVCC keeps old row versions until they can be cleaned.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. One reason to VACUUM?</p>
+  <button>Rename tables</button>
+  <button data-correct>Reuse space of dead rows</button>
+  <button>Create users</button>
+  <button>Change data types</button>
+  <p class="explain">To recover or reuse disk space of updated or deleted rows.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Autovacuum default state?</p>
+  <button>Manual only</button>
+  <button>Disabled</button>
+  <button data-correct>Enabled</button>
+  <button>Removed</button>
+  <p class="explain">In the default configuration autovacuuming is enabled.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. VACUUM also protects against what?</p>
+  <button>Bad passwords</button>
+  <button data-correct>ID wraparound</button>
+  <button>Slow joins</button>
+  <button>Deadlocks</button>
+  <p class="explain">It protects against transaction ID wraparound.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-watch-bloat.md">Exercise 0013: watch bloat</a></p>
+<p>Runnable example: <a href="../examples/12-vacuum.sql"><code>12-vacuum.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html">PostgreSQL Docs: Routine Vacuuming</a>. Section 24.1.</p>
+<p><a href="0012-row-locks-and-deadlocks.html">← Row locks, SELECT FOR UPDATE and deadlocks</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html">PostgreSQL Docs: Routine Vacuuming</a> · [2] <a href="https://www.postgresql.org/docs/current/mvcc-intro.html">PostgreSQL Docs: MVCC intro</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

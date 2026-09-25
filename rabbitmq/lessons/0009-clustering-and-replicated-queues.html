@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 9: Clustering: nodes, odd numbers and replicated queues</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Clustering: nodes, odd numbers and replicated queues</h1>
+<p class="meta">RabbitMQ · Lesson 0009 · step 9 of 9 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what a cluster shares, why queue contents are not replicated by default, why odd node counts matter, and prove a quorum queue survives losing its leader node.</div>
+
+<h2>What a cluster is</h2>
+<p>"A logical grouping of one or more (three, five, seven, or more) nodes, each sharing users, virtual hosts, queues, streams, exchanges, bindings, runtime parameters and other distributed state." All state is replicated across nodes "an exception to this are message queues, which by default reside on one node, though they are visible and reachable from all nodes."<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a> To replicate queue contents use a replicated type such as quorum queues.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+<h2>Odd numbers</h2>
+<p>"Odd numbers of cluster nodes are highly recommended", and two-node clusters are "highly recommended against" since nodes cannot identify a majority after connectivity loss. Quorum queues need consensus among members.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a> Quorum queues are built on Raft and are the default choice for replicated, highly available queues.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[2]</a></p>
+<h2>Try a real cluster</h2>
+<pre><code>cd rabbitmq/examples &amp;&amp; ./03-cluster-quorum.sh     # 3 containers: rmq1, rmq2, rmq3
+Running Nodes: rabbit@rmq1 rabbit@rmq2 rabbit@rmq3
+q.classic  classic  leader rmq1  members [rmq1]                    messages 3
+q.quorum   quorum   leader rmq1  members [rmq1, rmq2, rmq3]        messages 3
+docker stop rmq1                     # the node hosting both queues' leaders
+asked via rmq2:  q.classic  rabbit_classic_queue  (no message count: unavailable)
+                 q.quorum   quorum  3               (still available, 3 messages)</code></pre>
+<p>The classic queue lived on one node and became unavailable when that node stopped; the quorum queue kept its 3 messages on the surviving members. Source: <a href="../examples/03-cluster-quorum.sh"><code>03-cluster-quorum.sh</code></a>. Network partitions and split-brain handling go beyond the pages read; the clustering guide covers them. Kafka's equivalent is replication with ISR: <a href="../../kafka/lessons/0005-replication-isr-and-durability.html">replication lesson</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Where does a classic queue live by default?</p>
+  <button>In etcd</button>
+  <button>On all nodes</button>
+  <button>On the client</button>
+  <button data-correct>On one node</button>
+  <p class="explain">Message queues by default reside on one node.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Recommended node counts?</p>
+  <button>Even numbers</button>
+  <button>Exactly two</button>
+  <button data-correct>Odd numbers</button>
+  <button>Any number</button>
+  <p class="explain">Odd numbers are highly recommended.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why avoid two-node clusters?</p>
+  <button>Too slow</button>
+  <button>Unsupported ports</button>
+  <button>Too costly</button>
+  <button data-correct>No majority possible</button>
+  <p class="explain">Two nodes cannot identify a majority after connectivity loss.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What kept the queue alive in my run?</p>
+  <button>Message TTL</button>
+  <button>A larger heap</button>
+  <button data-correct>Quorum replication</button>
+  <button>Publisher confirms</button>
+  <p class="explain">The quorum queue had replicas on all three nodes.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-lose-two-nodes.md">Exercise 0009: lose two nodes</a></p>
+<p>Runnable example: <a href="../examples/03-cluster-quorum.sh"><code>03-cluster-quorum.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/clustering">RabbitMQ: Clustering Guide</a>. Overview, node count and consensus sections.</p>
+<p><a href="0008-streams.html">← Streams: an append-only log inside RabbitMQ</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/clustering">RabbitMQ: Clustering Guide</a> · [2] <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum Queues</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

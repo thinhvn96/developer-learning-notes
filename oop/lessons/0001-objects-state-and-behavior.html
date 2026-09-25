@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 1: Objects: state, behavior and encapsulation</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Objects: state, behavior and encapsulation</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0001 · step 1 of 22 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> define object, state, behavior and encapsulation, and show encapsulation protecting an invariant.</div>
+
+<h2>State and behavior</h2>
+<p>"Real-world objects share two characteristics: They all have <em>state</em> and <em>behavior</em>." A software object stores its state in <em>fields</em> and exposes its behavior through <em>methods</em>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+<h2>Encapsulation</h2>
+<p>"Hiding internal state and requiring all interaction to be performed through an object's methods is known as <em>data encapsulation</em>": a fundamental principle of OOP.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a> The tutorial lists the payoffs of bundling code into objects: modularity, information hiding, code re-use, and pluggability and debugging ease.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+<h2>See it protect an invariant</h2>
+<p>The <code>BankAccount</code> keeps <code>balance</code> private, so the rule "balance is never negative" is enforced in exactly two methods, and nothing outside can break it.</p>
+<pre><code>java oop/examples/BankAccountDemo.java
+ann has 120
+rejected: insufficient funds
+rejected: deposit must be positive</code></pre>
+<p>Source: <a href="../examples/BankAccountDemo.java"><code>BankAccountDemo.java</code></a>. The commented-out line <code>a.balance = -1_000_000</code> does not compile. Compare to the <a href="../../java/lessons/0003-records-and-immutability.html">records lesson</a>: records make the "transparent data carrier" case cheap.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What two things does every object have?</p>
+  <button>Fields and files</button>
+  <button data-correct>State and behavior</button>
+  <button>Heap and stack</button>
+  <button>Name and type</button>
+  <p class="explain">Objects have state (fields) and behavior (methods).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What is data encapsulation?</p>
+  <button>Copying objects</button>
+  <button data-correct>Hiding state behind methods</button>
+  <button>Compressing data</button>
+  <button>Encrypting fields</button>
+  <p class="explain">Hiding internal state and requiring interaction through methods.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where is the balance rule enforced in the demo?</p>
+  <button>In every caller</button>
+  <button>In a comment</button>
+  <button data-correct>Inside the account's methods</button>
+  <button>In main only</button>
+  <p class="explain">The private field can only change through deposit and withdraw.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A benefit of bundling code into objects?</p>
+  <button>No exceptions</button>
+  <button>Faster hardware</button>
+  <button>Fewer classes</button>
+  <button data-correct>Information hiding</button>
+  <p class="explain">Modularity, information-hiding, re-use and pluggability.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-model-a-thermostat.md">Exercise 1: model a thermostat</a></p>
+<p>Runnable example: <a href="../examples/BankAccountDemo.java"><code>BankAccountDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">Java Tutorials: What Is an Object?</a>. Read the whole page (five minutes).</p>
+<p> &nbsp;|&nbsp; <a href="0002-classes-and-instances.html">Classes, instances and constructors →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">Java Tutorials: What Is an Object?</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 1: Containers, images and layers</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Containers, images and layers</h1>
+<p class="meta">Docker · Lesson 0001 · step 1 of 12 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain in three sentences what a container, an image and a layer are, and why a container is not a VM.</div>
+
+<h2>Container</h2>
+<p>Per Docker's docs, a container is an isolated process that runs an application component "in their own environments without affecting the host system or other containers". It is self-contained and portable, and "more lightweight than virtual machines since multiple containers share the same kernel rather than each requiring a full operating system".<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a></p>
+<h2>Image</h2>
+<p>"A container image is a standardized package that includes all of the files, binaries, libraries, and configurations to run a container." Images are immutable: "Once an image is created, it can't be modified. You can only make a new image or add changes on top of it."<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a></p>
+<h2>Layer</h2>
+<p>"Container images are composed of layers. Each layer represents a set of file system changes that add, remove, or modify files."<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a> Your Java app image is a base layer (OS plus JRE) with your application layers stacked on top.</p>
+<div class="aside">Interview one-liner: an <strong>image</strong> is the immutable recipe-output, a <strong>container</strong> is a running (isolated) process started from it, and containers on one host share the host kernel.</div>
+<h2>See it</h2>
+<pre><code>docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}'
+docker history hello-multi      # one row per layer</code></pre>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What do containers on one host share?</p>
+  <button>A hypervisor each</button>
+  <button>A guest OS each</button>
+  <button>Their own kernel</button>
+  <button data-correct>The host kernel</button>
+  <p class="explain">Multiple containers share the same kernel; that is why they are lighter than VMs.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. An image is best described as...?</p>
+  <button>A mutable folder</button>
+  <button>A virtual machine</button>
+  <button data-correct>An immutable package</button>
+  <button>A running process</button>
+  <p class="explain">Images are immutable; changes make a new image or add layers.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does one layer represent?</p>
+  <button>A network interface</button>
+  <button data-correct>A set of file changes</button>
+  <button>A running container</button>
+  <button>A whole operating system</button>
+  <p class="explain">Each layer is a set of file system changes that add, remove, or modify files.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A container's key isolation property?</p>
+  <button data-correct>Runs as its own process</button>
+  <button>Runs a separate kernel</button>
+  <button>Needs the same image</button>
+  <button>Cannot use networking</button>
+  <p class="explain">Containers are isolated processes on the host.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-inspect-layers.md">Exercise 0001: inspect layers</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker Docs: Docker concepts, the basics</a>. Read the container and image pages.</p>
+<p> &nbsp;|&nbsp; <a href="0007-run-flags-and-container-lifecycle.html">docker run: flags and the container lifecycle →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker Docs: What is a container?</a> · [2] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">Docker Docs: What is an image?</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 6: Logstash: pipelines, grok and persistent queues</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Logstash: pipelines, grok and persistent queues</h1>
+<p class="meta">ELK Stack · Lesson 0006 · step 10 of 14 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a Logstash pipeline with a grok filter, spot a parse failure, and explain what persistent queues guarantee.</div>
+
+<h2>Pipeline</h2>
+<p>Inputs (file, syslog, beats...), filters (grok, mutate, drop, geoip...) and outputs (elasticsearch, file...). Codecs act as stream filters attached to inputs or outputs, such as <code>json</code> or <code>multiline</code>.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[1]</a></p>
+<h2>Grok</h2>
+<p>Grok is "a great way to parse unstructured log data into something structured and queryable." Patterns use <code>%{SYNTAX:SEMANTIC}</code>, for example <code>%{NUMBER:duration}</code>. When nothing matches, the event is tagged <code>_grokparsefailure</code> by default.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a></p>
+<pre><code>grok { match =&gt; { "message" =&gt; "%{IP:client} %{WORD:method} %{URIPATH:path} %{NUMBER:status:int} %{NUMBER:duration_ms:int}" } }</code></pre>
+<pre><code>cd elk/examples &amp;&amp; ./02-logstash-grok.sh
+"10.0.0.7 GET /orders/42 200 35"  -&gt; client=10.0.0.7 method=GET path=/orders/42 status=200 duration_ms=35
+"this is not an access log"       -&gt; tags: [ "_grokparsefailure" ]</code></pre>
+<p>Files: <a href="../examples/logstash-grok.conf"><code>logstash-grok.conf</code></a>, <a href="../examples/02-logstash-grok.sh"><code>02-logstash-grok.sh</code></a>.</p>
+<h2>Persistent queues</h2>
+<p>A persistent queue "helps protect against data loss during abnormal termination by storing the in-flight message queue to disk." After a restart Logstash "attempts to deliver messages stored in the persistent queue until delivery succeeds at least once." It can absorb bursts without an external buffer like Redis or Kafka, and applies backpressure to inputs when full.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[3]</a></p>
+<div class="aside">Note "at least once": duplicates are possible, so give events a stable id if duplicates matter downstream.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Grok pattern syntax?</p>
+  <button>XPath only</button>
+  <button data-correct>SYNTAX colon SEMANTIC</button>
+  <button>regex only</button>
+  <button>key equals value</button>
+  <p class="explain">Patterns are written %{SYNTAX:SEMANTIC}.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Grok fails to match. What happens?</p>
+  <button>Logstash stops</button>
+  <button>Event is duplicated</button>
+  <button data-correct>Tag _grokparsefailure added</button>
+  <button>Event is dropped</button>
+  <p class="explain">By default the _grokparsefailure tag is added.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Persistent queue delivery guarantee?</p>
+  <button>No guarantee</button>
+  <button>At most once</button>
+  <button>Exactly once</button>
+  <button data-correct>At least once</button>
+  <p class="explain">Logstash delivers stored events until delivery succeeds at least once.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Queue is full. What does Logstash do?</p>
+  <button>Drops all events</button>
+  <button data-correct>Applies backpressure</button>
+  <button>Restarts itself</button>
+  <button>Deletes the queue</button>
+  <p class="explain">It stalls inputs until the queue drains.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-parse-a-java-stack-trace.md">Exercise 0006: parse a Java log</a></p>
+<p>Runnable example: <a href="../examples/02-logstash-grok.sh"><code>02-logstash-grok.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/reference/logstash/persistent-queues">Logstash Docs: Persistent queues</a>. Read 'Benefits of persistent queues'.</p>
+<p><a href="0011-aggregations.html">← Aggregations: buckets and metrics</a> &nbsp;|&nbsp; <a href="0007-filebeat-delivery-and-backpressure.html">Filebeat: harvesters, registry and delivery guarantees →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash Docs: How Logstash works</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">Logstash Docs: Grok filter plugin</a> · [3] <a href="https://www.elastic.co/docs/reference/logstash/persistent-queues">Logstash Docs: Persistent queues</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

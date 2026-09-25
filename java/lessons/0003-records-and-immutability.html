@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 3: Records and shallow immutability</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Records and shallow immutability</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0003 · step 21 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> say what a record generates, and why <code>record</code> does not automatically mean immutable data.</div>
+
+<h2>What a record is</h2>
+<p>Per the Javadoc: "A <em>record class</em> is a shallowly immutable, transparent carrier for a fixed set of values, called the <em>record components</em>."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a> A record has a canonical constructor, a private final field per component, and a public accessor per component. Its <code>equals</code>, <code>hashCode</code> and <code>toString</code> "are derived from all of the component fields."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
+<p>That connects to <a href="0001-hashmap-equals-hashcode.html">lesson 1</a>: a record honours the equals/hashCode contract<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">[2]</a> for free, which makes it a good <code>HashMap</code> key, as long as its components are themselves safe.</p>
+<h2>The word that matters: shallow</h2>
+<p>The fields are final, but a final field pointing at an <code>ArrayList</code> still points at a mutable list. Fix it in a compact constructor with a defensive copy:</p>
+<pre><code>record Team(String name, List&lt;String&gt; members) {
+    Team {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("name");
+        members = List.copyOf(members);
+    }
+}</code></pre>
+<pre><code>java java/examples/RecordDemo.java
+LeakyTeam sees outside change: [ann, bob]
+Team (copyOf) is protected:    [ann]</code></pre>
+<p class="aside">The <code>Record</code> Javadoc is the source for what is generated. The compact-constructor pattern is standard practice; the demo above shows it working rather than citing it.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What is a record's equals based on?</p>
+  <button>The first component</button>
+  <button data-correct>All component values</button>
+  <button>The memory address only</button>
+  <button>The hash code alone</button>
+  <p class="explain">equals is derived from all components: same record class and each component equal.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Fields of a record are which of these?</p>
+  <button>Public and volatile</button>
+  <button data-correct>Private and final</button>
+  <button>Public and mutable</button>
+  <button>Private and mutable</button>
+  <p class="explain">Mandated members include a private final field for each component.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Record holds an <code>ArrayList</code> component. Immutable?</p>
+  <button>Yes, after first use</button>
+  <button>Yes, fully immutable</button>
+  <button>No, it cannot compile</button>
+  <button data-correct>No, only shallowly so</button>
+  <p class="explain">Records are shallowly immutable; the referenced list can still change unless you copy it.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Best fix for the leaky list component?</p>
+  <button>Override toString only</button>
+  <button data-correct>Copy it in constructor</button>
+  <button>Mark the list static</button>
+  <button>Make the record abstract</button>
+  <p class="explain">A compact constructor with <code>List.copyOf</code> stores an unmodifiable copy.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-record-as-key.md">Exercise 0003: a record as a map key</a></p>
+<p>Runnable example: <a href="../examples/RecordDemo.java"><code>RecordDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record class Javadoc</a>. Read the class description only.</p>
+<p><a href="0013-switch-expressions-and-instanceof-patterns.html">← JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</a> &nbsp;|&nbsp; <a href="0014-sealed-classes.html">JDK 17: sealed classes and interfaces →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">Object Javadoc (equals/hashCode)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

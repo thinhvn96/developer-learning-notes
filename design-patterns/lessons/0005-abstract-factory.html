@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 5: Abstract Factory</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Abstract Factory</h1>
+<p class="meta">Design Patterns · Lesson 0005 · step 5 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> create families of related objects that always match, without naming concrete classes.</div>
+
+<h2>Intent</h2>
+<p>Abstract Factory is "a creational design pattern that lets you produce families of related objects without specifying their concrete classes." Use it when code must work with various families of related products, or when a class has several factory methods that blur its main responsibility.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+<h2>Example</h2><p>A <code>GuiFactory</code> creates a button and a checkbox. Each factory makes a matching pair, so a dark button can never be combined with a light checkbox through the interface.</p><pre><code>java design-patterns/examples/AbstractFactoryDemo.java
+dark-button + dark-checkbox
+light-button + light-checkbox</code></pre><p>Source: <a href="../examples/AbstractFactoryDemo.java"><code>AbstractFactoryDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Products from one factory are compatible with each other</li><li>Client code is decoupled from concrete products</li><li>Single Responsibility and Open/Closed benefits</li></ul>
+<p><strong>Cons</strong></p><ul><li>Considerable complexity: many interfaces and classes</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a> Abstract Factory is based on a set of Factory Methods, pairs well with Bridge, and its factories are often Singletons; it is an alternative to Facade when you only want to hide object creation.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Abstract Factory produces...?</p>
+  <button>Iterators</button>
+  <button>Copies</button>
+  <button data-correct>Families of related objects</button>
+  <button>One product</button>
+  <p class="explain">Families of related objects.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Guarantee it gives?</p>
+  <button data-correct>Products are compatible</button>
+  <button>Products are cloned</button>
+  <button>Products are immutable</button>
+  <button>Products are lazy</button>
+  <p class="explain">Products from a factory match each other.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cost?</p>
+  <button data-correct>More interfaces and classes</button>
+  <button>Static state</button>
+  <button>Slower JVM</button>
+  <button>No polymorphism</button>
+  <p class="explain">It adds considerable complexity.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Client depends on...?</p>
+  <button>Reflection</button>
+  <button data-correct>Interfaces only</button>
+  <button>Threads</button>
+  <button>Concrete classes</button>
+  <p class="explain">Client code is decoupled from concrete products.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-add-a-family.md">Exercise 5: add a family</a></p>
+<p>Runnable example: <a href="../examples/AbstractFactoryDemo.java"><code>AbstractFactoryDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/abstract-factory">Abstract Factory (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0004-factory-method.html">← Factory Method</a> &nbsp;|&nbsp; <a href="0006-builder.html">Builder →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/abstract-factory">Abstract Factory (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

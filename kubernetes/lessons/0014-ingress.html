@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 14: Ingress: HTTP routing into the cluster</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ingress: HTTP routing into the cluster</h1>
+<p class="meta">Kubernetes · Lesson 0014 · step 14 of 15 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what Ingress does, why you need a controller, and why the docs now point to the Gateway API.</div>
+
+<h2>What it is</h2>
+<p>"Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster." Rules on the Ingress control routing. It can provide load balancing, TLS termination and name-based virtual hosting.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a> Each rule has an optional host and a list of paths, each with a backend Service name and port; host and path must both match.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+<pre><code>spec:
+  ingressClassName: nginx-example
+  rules:
+  - http:
+      paths:
+      - path: /testpath
+        pathType: Prefix
+        backend: { service: { name: nginx-service, port: { number: 80 } } }</code></pre>
+<h2>The controller requirement</h2>
+<p>"You must have an Ingress controller to satisfy an Ingress. Simply creating an Ingress resource has no effect."<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+<pre><code>kubectl apply -f examples/ingress.yaml
+NAME              CLASS           HOSTS   ADDRESS   PORTS   AGE
+minimal-ingress   nginx-example   *                 80      20s      # ADDRESS empty: no controller</code></pre>
+<p>The object was accepted but got no address on my cluster, which has no Ingress controller installed. Also note: the docs recommend the <a href="https://gateway-api.sigs.k8s.io/">Gateway API</a> instead, saying the Ingress API "has been frozen since Kubernetes v1.19".<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a> Compare <a href="0004-services.html">Services</a>: Ingress routes HTTP to Services. File: <a href="../examples/ingress.yaml"><code>ingress.yaml</code></a>.</p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does an Ingress route?</p>
+  <button>Only TCP</button>
+  <button data-correct>HTTP and HTTPS</button>
+  <button>Node logs</button>
+  <button>Only UDP</button>
+  <p class="explain">It exposes HTTP and HTTPS routes to Services.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What is required for an Ingress to work?</p>
+  <button>A CronJob</button>
+  <button data-correct>An Ingress controller</button>
+  <button>A StatefulSet</button>
+  <button>A Secret</button>
+  <p class="explain">Creating the resource alone has no effect.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Ingress rule matching needs...?</p>
+  <button>Only the image</button>
+  <button>Only the Pod name</button>
+  <button>Only the port</button>
+  <button data-correct>Host and path match</button>
+  <p class="explain">Both host and path must match the request.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Recommended successor per the docs?</p>
+  <button>ExternalName</button>
+  <button>NodePort</button>
+  <button>HostPath</button>
+  <button data-correct>Gateway API</button>
+  <p class="explain">The project recommends Gateway API; Ingress has been frozen since v1.19.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0014-route-two-services.md">Exercise 0014: route two services</a></p>
+<p>Runnable example: <a href="../examples/ingress.yaml"><code>ingress.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Kubernetes Docs: Ingress</a>. Read 'What is Ingress?' and 'Ingress rules'.</p>
+<p><a href="0013-statefulsets.html">← StatefulSets: stable identity and storage</a> &nbsp;|&nbsp; <a href="0015-horizontal-pod-autoscaler.html">Horizontal Pod Autoscaler →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Kubernetes Docs: Ingress</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

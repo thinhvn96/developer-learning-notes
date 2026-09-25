@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 15: Horizontal Pod Autoscaler</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Horizontal Pod Autoscaler</h1>
+<p class="meta">Kubernetes · Lesson 0015 · step 15 of 15 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> compute the desired replica count from the HPA formula and state the prerequisites for it to work.</div>
+
+<h2>What it does</h2>
+<p>The HorizontalPodAutoscaler updates a workload (Deployment, StatefulSet) to match demand by adding or removing Pods; it does not apply to objects that cannot be scaled, such as DaemonSets.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+<p>The algorithm:</p>
+<pre><code>desiredReplicas = ceil[ currentReplicas x ( currentMetricValue / desiredMetricValue ) ]</code></pre>
+<p>Example from the docs: a current value of 200m against a target of 100m doubles the replica count.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a> The controller re-evaluates every 15 seconds by default.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a> Worked example: 3 Pods at 90 percent average CPU with a 70 percent target gives ceil(3 x 90/70) = ceil(3.86) = 4 Pods (my arithmetic with the documented formula).</p>
+<h2>Prerequisites</h2>
+<ul><li>For utilization targets, containers must define <strong>resource requests</strong>; otherwise CPU utilization is undefined and the autoscaler takes no action for that metric.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></li>
+<li>A metrics source, typically the Metrics Server add-on, launched separately.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></li></ul>
+<pre><code>kubectl apply -f examples/hpa.yaml
+NAME        REFERENCE                     TARGETS              MINPODS MAXPODS REPLICAS
+nginx-hpa   Deployment/nginx-deployment   cpu: &lt;unknown&gt;/70%   2       6       3</code></pre>
+<p><code>&lt;unknown&gt;</code> is what you see with no metrics server (and no requests on the nginx Deployment): the HPA exists but cannot act. Connect to the <a href="0005-requests-limits-and-the-jvm.html">requests lesson</a>: without requests there is nothing to compute utilization against. File: <a href="../examples/hpa.yaml"><code>hpa.yaml</code></a>.</p><p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Formula uses which ratio?</p>
+  <button>Requests over limits</button>
+  <button>Nodes over Pods</button>
+  <button>Desired over current</button>
+  <button data-correct>Current over desired metric</button>
+  <p class="explain">desired = ceil(current replicas x current metric / desired metric).<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Utilization targets need what on containers?</p>
+  <button data-correct>Resource requests</button>
+  <button>Labels only</button>
+  <button>Resource limits only</button>
+  <button>Probes</button>
+  <p class="explain">Without requests the CPU utilization is undefined.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where does HPA get resource metrics?</p>
+  <button data-correct>A Metrics Server</button>
+  <button>etcd directly</button>
+  <button>The kubelet log</button>
+  <button>The scheduler</button>
+  <p class="explain">It typically needs the metrics API from a Metrics Server add-on.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which workload can HPA not scale?</p>
+  <button>ReplicaSet</button>
+  <button>StatefulSet</button>
+  <button>Deployment</button>
+  <button data-correct>DaemonSet</button>
+  <p class="explain">HPA does not apply to objects that cannot be scaled, like DaemonSets.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0015-autoscale-math.md">Exercise 0015: autoscale math</a></p>
+<p>Runnable example: <a href="../examples/hpa.yaml"><code>hpa.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">Kubernetes Docs: Horizontal Pod Autoscaling</a>. Read 'How does a HorizontalPodAutoscaler work?' and the algorithm section.</p>
+<p><a href="0014-ingress.html">← Ingress: HTTP routing into the cluster</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">Kubernetes Docs: Horizontal Pod Autoscaling</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

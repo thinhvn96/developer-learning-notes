@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 10: The bulk API and per-item errors</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>The bulk API and per-item errors</h1>
+<p class="meta">ELK Stack · Lesson 0010 · step 8 of 14 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> index many documents in one request, and read per-item results instead of trusting the HTTP status.</div>
+
+<h2>Why bulk</h2>
+<p>The bulk API performs multiple indexing or delete operations in one call; it "reduces overhead and can greatly increase indexing speed". The body is <strong>NDJSON</strong>: an action line, then (for index/create/update) a source line; the last line must end with a newline. Actions: <code>index</code> (add or replace), <code>create</code> (only if absent), <code>update</code> (partial), <code>delete</code>.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+<h2>Errors are per item</h2>
+<p>The response has an <code>errors</code> flag and a status for each item, so a request can succeed as a whole while some items fail.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+<pre><code>POST _bulk   (4 index actions, then create of an existing _id)
+errors flag: True
+  index 1 201 ... index 4 201
+  create 1 409 version_conflict_engine_exception</code></pre>
+<p>Always inspect each item; never assume "HTTP 200" means everything was indexed. Script: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a>. Pairs with <a href="0004-near-real-time-search-and-refresh.html">refresh tuning</a>: bulk loads usually raise <code>refresh_interval</code> while running (see exercise).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Bulk request body format?</p>
+  <button>YAML</button>
+  <button data-correct>NDJSON</button>
+  <button>CSV</button>
+  <button>XML</button>
+  <p class="explain">The API requires newline-delimited JSON.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Action that fails if the document exists?</p>
+  <button>update</button>
+  <button>index</button>
+  <button>delete</button>
+  <button data-correct>create</button>
+  <p class="explain">create indexes only if the document does not exist (the run returned 409).<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. HTTP 200 on a bulk call means...?</p>
+  <button>The index is green</button>
+  <button>Nothing was indexed</button>
+  <button>All items succeeded</button>
+  <button data-correct>Check every item</button>
+  <p class="explain">Per-item statuses and the errors flag report failures.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Main benefit of bulk?</p>
+  <button data-correct>Less overhead</button>
+  <button>More replicas</button>
+  <button>Smaller mappings</button>
+  <button>Stronger analysis</button>
+  <p class="explain">It reduces overhead and increases indexing speed.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-bulk-error-handling.md">Exercise 0010: bulk error handling</a></p>
+<p>Runnable example: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">Elasticsearch: Bulk API</a>. Request body and response sections.</p>
+<p><a href="0005-query-dsl-term-match-bool.html">← Query DSL: term, match and bool</a> &nbsp;|&nbsp; <a href="0011-aggregations.html">Aggregations: buckets and metrics →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">Elasticsearch: Bulk API</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

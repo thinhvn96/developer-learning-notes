@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 4: Delivery semantics: at most, at least, exactly once</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Delivery semantics: at most, at least, exactly once</h1>
+<p class="meta">Kafka · Lesson 0004 · step 5 of 10 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> decide which delivery guarantee you get from the order of 'process' and 'commit offset', and how to make consumers safe under redelivery.</div>
+
+<h2>Three guarantees</h2>
+<ul>
+<li><strong>At most once:</strong> messages may be lost but are never redelivered.</li>
+<li><strong>At least once:</strong> messages are never lost but may be redelivered.</li>
+<li><strong>Exactly once:</strong> each message is processed once only.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+</ul>
+<h2>The order decides it</h2>
+<p>"If the consumer reads messages, then saves its position, and finally processes messages" you get at-most-once: crash after saving but before processing loses the message. Process first, then save the position, and you get at-least-once.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> The consumer Javadoc says the same about <code>commitSync()</code>: if a process fails after committing but before finishing downstream work, another consumer re-reads from the last committed offset (its own wording is about at-least-once with commit after work).<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+<pre><code>while (true) {
+    var records = consumer.poll(Duration.ofMillis(500));
+    for (var r : records) process(r);   // 1. do the work
+    consumer.commitSync();              // 2. then commit: at-least-once
+}</code></pre>
+<h2>What that means for your code</h2>
+<p>At-least-once means duplicates happen, so processing must be <em>idempotent</em> (safe to repeat), for example by using a unique event id as a database key. The exactly-once options inside Kafka (idempotent producer, transactions) are the next lesson.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Commit offset, then process, then crash. Guarantee?</p>
+  <button data-correct>At most once</button>
+  <button>Exactly once</button>
+  <button>At least once</button>
+  <button>No guarantee</button>
+  <p class="explain">Saving the position before processing gives at-most-once.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Process, then commit. Guarantee?</p>
+  <button>No guarantee</button>
+  <button>Exactly once</button>
+  <button>At most once</button>
+  <button data-correct>At least once</button>
+  <p class="explain">Processing before saving the position gives at-least-once.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. At-least-once requires consumers to be...?</p>
+  <button data-correct>Idempotent</button>
+  <button>Single threaded</button>
+  <button>Stateless only</button>
+  <button>Synchronized</button>
+  <p class="explain">Duplicates can be redelivered, so repeating work must be safe.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. After a crash post-commit, pre-work, who reprocesses?</p>
+  <button>The producer</button>
+  <button>The broker</button>
+  <button>Another consumer</button>
+  <button data-correct>Nobody, work is lost</button>
+  <p class="explain">With commit before processing the records are not re-read, so the work is lost (at most once).<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-crash-timeline.md">Exercise 0004: crash timeline</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design, Message Delivery Semantics</a>. Read the whole 'Message Delivery Semantics' section.</p>
+<p><a href="0003-consumers-groups-and-offsets.html">← Consumers, consumer groups and offsets</a> &nbsp;|&nbsp; <a href="0008-log-compaction.html">Log compaction and tombstones →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: message delivery semantics</a> · [2] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 25: Visitor</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Visitor</h1>
+<p class="meta">Design Patterns · Lesson 0025 · step 25 of 30 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> add operations to a class hierarchy without changing it, and compare classic double dispatch with JDK 21 pattern matching.</div>
+
+<h2>Intent</h2>
+<p>Visitor is "a behavioral design pattern that lets you separate algorithms from the objects on which they operate." It uses double dispatch to run operations on objects of different classes without modifying them. Use it for operations on complex object structures, to extract auxiliary behavior, or for behavior that only applies to some classes.<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/VisitorDemo.java
+Circle area=3.14 perimeter=6.28
+Rect area=6.00 perimeter=10.00
+switch: Circle area=3.14
+switch: Rect area=6.00</code></pre><p><code>accept(visitor)</code> calls the right <code>visit</code> overload (double dispatch); <code>AreaVisitor</code> and <code>PerimeterVisitor</code> add operations without editing the shapes. The last two lines do the same with a sealed interface and a pattern-matching <code>switch</code> (JDK 21), where the compiler checks that all cases are covered ("Pattern switches must be exhaustive" for sealed types: <a href="../../java/lessons/0015-pattern-matching-switch-and-record-patterns.html">JDK 21 lesson</a>). In the JDK, <code>FileVisitor</code> is "a visitor of files ... provided to the <code>Files.walkFileTree</code> methods" with <code>preVisitDirectory</code>, <code>visitFile</code>, <code>visitFileFailed</code> and <code>postVisitDirectory</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">[2]</a> Source: <a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Open/Closed: add behaviors without changing element classes</li><li>Single Responsibility: related operations in one visitor</li><li>Visitors can accumulate state while traversing</li></ul>
+<p><strong>Cons</strong></p><ul><li>Every visitor must be updated when element types change</li><li>Visitors may lack access to private members</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a> Visitor works with Composite (operate on a whole tree), Iterator (navigation) and Command.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Visitor separates...?</p>
+  <button>Data from code</button>
+  <button>Threads from tasks</button>
+  <button data-correct>Algorithms from objects</button>
+  <button>Classes from files</button>
+  <p class="explain">Algorithms are separated from the objects they operate on.<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Double dispatch means...?</p>
+  <button>Two classes</button>
+  <button data-correct>Call depends on both types</button>
+  <button>Two files</button>
+  <button>Two threads</button>
+  <p class="explain">accept picks the visit overload from the element's type.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Drawback?</p>
+  <button>No polymorphism</button>
+  <button>No interfaces</button>
+  <button data-correct>Update all visitors when elements change</button>
+  <button>Static state</button>
+  <p class="explain">Adding element types forces visitor updates.<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Modern Java alternative?</p>
+  <button data-correct>Sealed types plus pattern switch</button>
+  <button>Static methods</button>
+  <button>Reflection only</button>
+  <button>Threads</button>
+  <p class="explain">The demo's switch over a sealed interface.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0025-expression-visitor.md">Exercise 25: an expression visitor</a></p>
+<p>Runnable example: <a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/visitor">Visitor (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0024-template-method.html">← Template Method</a> &nbsp;|&nbsp; <a href="0026-choosing-between-similar-patterns.html">Choosing between similar patterns →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/visitor">Visitor (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">FileVisitor Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

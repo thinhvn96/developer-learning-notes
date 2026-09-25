@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 3: Access levels: hiding what should be hidden</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Access levels: hiding what should be hidden</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0003 · step 3 of 22 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> pick the most restrictive access level, and read the four-row access table from memory.</div>
+
+<h2>The table</h2>
+<table><tr><th>Modifier</th><th>Class</th><th>Package</th><th>Subclass</th><th>World</th></tr>
+<tr><td><code>public</code></td><td>Y</td><td>Y</td><td>Y</td><td>Y</td></tr>
+<tr><td><code>protected</code></td><td>Y</td><td>Y</td><td>Y</td><td>N</td></tr>
+<tr><td>(none, package-private)</td><td>Y</td><td>Y</td><td>N</td><td>N</td></tr>
+<tr><td><code>private</code></td><td>Y</td><td>N</td><td>N</td><td>N</td></tr></table>
+<p><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a> The tutorial's tips: "Use the most restrictive access level that makes sense for a particular member. Use <code>private</code> unless you have a good reason not to." and "Avoid <code>public</code> fields except for constants": public fields "tend to link you to a particular implementation and limit your flexibility in changing your code."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+<h2>Why it matters</h2>
+<pre><code>java oop/examples/AccessLevels.java
+celsius=25.0 fahrenheit=77.0
+rejected: below absolute zero: -300.0</code></pre>
+<p>Because <code>celsius</code> is private, the rule "not below absolute zero" lives in one setter, and <code>fahrenheit()</code> is computed rather than stored, so it can never go stale. Source: <a href="../examples/AccessLevels.java"><code>AccessLevels.java</code></a>. (Package-level access needs multiple packages to demonstrate; the table is from the tutorial.)</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which level is visible only inside the class?</p>
+  <button>public</button>
+  <button data-correct>private</button>
+  <button>package-private</button>
+  <button>protected</button>
+  <p class="explain">private: class only.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Does protected allow subclasses outside the package?</p>
+  <button data-correct>Yes</button>
+  <button>Only for static</button>
+  <button>Only in tests</button>
+  <button>No</button>
+  <p class="explain">The table shows Y for subclass under protected.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Guideline for choosing a modifier?</p>
+  <button>Always protected</button>
+  <button data-correct>Most restrictive that works</button>
+  <button>Always public</button>
+  <button>Random</button>
+  <p class="explain">Use private unless you have a good reason not to.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Public fields are okay for...?</p>
+  <button>Passwords</button>
+  <button>Counters</button>
+  <button data-correct>Constants</button>
+  <button>Mutable state</button>
+  <p class="explain">Avoid public fields except for constants.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-tighten-a-class.md">Exercise 3: tighten a class</a></p>
+<p>Runnable example: <a href="../examples/AccessLevels.java"><code>AccessLevels.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">Java Tutorials: Controlling Access</a>. Table and tips.</p>
+<p><a href="0002-classes-and-instances.html">← Classes, instances and constructors</a> &nbsp;|&nbsp; <a href="0004-static-members.html">Static members: shared state and constants →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">Java Tutorials: Controlling Access to Members of a Class</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

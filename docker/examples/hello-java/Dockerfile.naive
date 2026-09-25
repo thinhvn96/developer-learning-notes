@@ -1,0 +1,6 @@
+# Single stage: ships the whole JDK and the source. Simple, but large.
+FROM eclipse-temurin:21-jdk
+WORKDIR /app
+COPY src/ src/
+RUN mkdir out && javac -d out src/Hello.java
+CMD ["java", "-cp", "out", "Hello"]

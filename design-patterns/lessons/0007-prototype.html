@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 7: Prototype</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Prototype</h1>
+<p class="meta">Design Patterns · Lesson 0007 · step 7 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> copy an existing configured object, and choose between shallow and deep copies.</div>
+
+<h2>Intent</h2>
+<p>Prototype is "a creational design pattern that lets you copy existing objects without making your code dependent on their classes." Use it when your code should not depend on concrete classes it copies, or to avoid subclasses that differ only in initialization by cloning pre-built configured objects.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/PrototypeDemo.java
+template : orc(hp=100, items=[club, shield])
+shallow  : orc-2(hp=100, items=[club, shield])   &lt;- shares the SAME list object
+deep     : orc-3(hp=100, items=[club])   &lt;- has its own list</code></pre><p>The <em>shallow</em> copy shares the template's list, so a later change to the template appears in the copy; the <em>deep</em> copy owns its list. Java's built-in mechanism is <code>Cloneable</code>/<code>Object.clone</code>; copy constructors or copy methods (as here) are usually clearer (my recommendation; the pattern page is language-neutral). Source: <a href="../examples/PrototypeDemo.java"><code>PrototypeDemo.java</code></a>. Link: <a href="../../oop/lessons/0014-immutability.html">immutability and defensive copies</a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Clone objects independently of their concrete class</li><li>Avoid repeated initialization by cloning templates</li><li>Alternative to inheritance for configuration presets</li></ul>
+<p><strong>Cons</strong></p><ul><li>Copying complex objects with circular references is hard</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a> It can replace Memento for simple state snapshots, help Command keep history, and speed up Composite/Decorator-heavy designs by cloning structures.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Prototype creates objects by...?</p>
+  <button>Calling a factory</button>
+  <button data-correct>Copying an existing one</button>
+  <button>Using threads</button>
+  <button>Parsing text</button>
+  <p class="explain">It copies existing objects without depending on their classes.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Shallow copy of a list field shares...?</p>
+  <button>The class</button>
+  <button>Nothing</button>
+  <button data-correct>The same list</button>
+  <button>A new list</button>
+  <p class="explain">The demo's shallow copy saw the template's later addition.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Hard case for prototype?</p>
+  <button>Strings</button>
+  <button data-correct>Circular references</button>
+  <button>Enums</button>
+  <button>Ints</button>
+  <p class="explain">Duplicating complex objects with circular references is challenging.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Benefit?</p>
+  <button>Faster GC</button>
+  <button>No classes</button>
+  <button>Fewer fields</button>
+  <button data-correct>Avoid repeated initialization</button>
+  <p class="explain">Cloning pre-built templates removes repeated initialization.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-copy-a-document.md">Exercise 7: copy a document</a></p>
+<p>Runnable example: <a href="../examples/PrototypeDemo.java"><code>PrototypeDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/prototype">Prototype (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0006-builder.html">← Builder</a> &nbsp;|&nbsp; <a href="0008-singleton.html">Singleton →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/prototype">Prototype (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

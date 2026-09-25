@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 5: Replication, ISR and durability</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Replication, ISR and durability</h1>
+<p class="meta">Kafka · Lesson 0005 · step 7 of 10 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain leaders, followers, the ISR and <code>min.insync.replicas</code>, and pick settings so an acknowledged write survives a broker failure.</div>
+
+<h2>The replication model</h2>
+<ul>
+<li>Each partition has one <strong>leader</strong> that takes all writes; <strong>followers</strong> pull and replicate like consumers.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li>The leader tracks the <strong>in-sync replicas (ISR)</strong>.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li>A message is <strong>committed</strong> once all in-sync replicas have received it, and "only committed messages are ever given out to the consumer".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><code>min.insync.replicas</code> makes a write acknowledged only by "at least this many in-sync replicas", trading availability for consistency.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><strong>Unclean leader election</strong>: by default Kafka waits for an ISR member to recover; the override picks the first replica that comes back, favoring availability over consistency and risking lost data.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+</ul>
+<h2>Putting it together</h2>
+<p>A common recipe: replication factor 3 (the introduction page calls it a common production setting), producer <code>acks=all</code> ("will not be lost as long as at least one in-sync replica remains alive"<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a>), and topic <code>min.insync.replicas=2</code> so a write needs two copies. With only 1 replica in sync, <code>acks=all</code> writes are rejected rather than accepted with weak durability. (The specific value 2 is a conventional choice, not a documented rule; check the design page for the exact semantics before you defend it.)</p>
+<p>In the throwaway broker of this course (<code>--replication-factor 1</code>), <code>describe</code> shows <code>Replicas: 1 Isr: 1</code> per partition: one copy, no fault tolerance, which is fine for learning and wrong for production.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Who receives all writes for a partition?</p>
+  <button>A random broker</button>
+  <button data-correct>The leader</button>
+  <button>Every follower</button>
+  <button>The consumer group</button>
+  <p class="explain">Each partition has one leader that receives all writes.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. When is a message committed?</p>
+  <button>The producer retries</button>
+  <button data-correct>All in-sync replicas have it</button>
+  <button>The leader has it</button>
+  <button>One follower has it</button>
+  <p class="explain">A message is committed once all in-sync replicas received the write.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Unclean leader election favors what?</p>
+  <button>Lower latency only</button>
+  <button data-correct>Availability over consistency</button>
+  <button>Consistency over availability</button>
+  <button>Smaller messages</button>
+  <p class="explain">It lets an out-of-sync replica lead, prioritizing availability.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What does min.insync.replicas enforce?</p>
+  <button data-correct>Minimum acknowledging replicas</button>
+  <button>Maximum topic size</button>
+  <button>Consumer count limit</button>
+  <button>Retention period</button>
+  <p class="explain">Writes are acknowledged by at least that many in-sync replicas.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-survive-a-broker.md">Exercise 0005: survive a broker failure</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design, Replication</a>. Read 'Replication' end to end.</p>
+<p><a href="0008-log-compaction.html">← Log compaction and tombstones</a> &nbsp;|&nbsp; <a href="0006-idempotence-and-transactions.html">Idempotent producers and transactions →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: replication</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

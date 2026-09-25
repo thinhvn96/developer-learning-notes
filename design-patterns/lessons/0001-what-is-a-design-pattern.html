@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 1: What is a design pattern?</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>What is a design pattern?</h1>
+<p class="meta">Design Patterns · Lesson 0001 · step 1 of 30 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> define a design pattern, say what it is not, and name the parts of a pattern description.</div>
+
+<h2>Definition</h2>
+<p>"Design patterns are typical solutions to commonly occurring problems in software design." They are customizable blueprints, not ready-made code you copy. Unlike an algorithm, which "always defines a clear set of actions that can achieve some goal", "a pattern is a more high-level description of a solution": the same pattern can look very different in different programs.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+<h2>How a pattern is described</h2>
+<ul><li><strong>Intent</strong>: the problem and solution in brief.</li><li><strong>Motivation</strong>: the problem in depth and how the pattern solves it.</li><li><strong>Structure</strong>: classes and their relationships.</li><li><strong>Code example</strong> in a real language.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></li></ul>
+<p>This course follows that shape: each lesson gives the intent, a runnable Java example (verified on JDK 21), pros and cons, related patterns, and where you meet it in the JDK.</p>
+<h2>Prerequisites</h2>
+<p>Patterns are built from OOP basics: interfaces, polymorphism, composition, encapsulation. If those feel shaky, do the <a href="../../oop/index.html">OOP ladder</a> first, especially <a href="../../oop/lessons/0010-interfaces-as-contracts.html">interfaces</a>, <a href="../../oop/lessons/0011-composition-over-inheritance.html">composition</a> and the <a href="../../oop/lessons/0017-single-responsibility-principle.html">SOLID</a> lessons.</p>
+<div class="aside">Try the JDK map first: run <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a> to see twelve patterns you already use.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A design pattern is...?</p>
+  <button>A syntax rule</button>
+  <button>A finished algorithm</button>
+  <button data-correct>A typical solution to a common problem</button>
+  <button>A library</button>
+  <p class="explain">Typical solutions to commonly occurring problems in software design.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Can you copy a pattern as ready-made code?</p>
+  <button>Yes, always</button>
+  <button data-correct>No, it is a blueprint</button>
+  <button>Only in Java</button>
+  <button>Only for GUIs</button>
+  <p class="explain">Patterns are customizable blueprints.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Pattern vs algorithm?</p>
+  <button>Lower-level</button>
+  <button>Runtime only</button>
+  <button data-correct>Higher-level description</button>
+  <button>Identical</button>
+  <p class="explain">A pattern is a more high-level description of a solution.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which part shows classes and relationships?</p>
+  <button data-correct>Structure</button>
+  <button>Motivation</button>
+  <button>Code example</button>
+  <button>Intent</button>
+  <p class="explain">Structure is the visual representation of classes and relationships.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0001-spot-patterns.md">Exercise 1: spot patterns</a></p>
+<p>Runnable example: <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern? (Refactoring.Guru)</a>. Short page.</p>
+<p> &nbsp;|&nbsp; <a href="0002-classification-and-catalog.html">The catalog: creational, structural, behavioral →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern? (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

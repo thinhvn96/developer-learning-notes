@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Object-Oriented Programming (Java) Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Object-Oriented Programming (Java): interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · OOP · 14 questions · <a href="index.html">OOP ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>OOP questions for Senior Java interviews, from the pillars to SOLID, each with a runnable example in the OOP ladder.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>What are the four pillars of OOP and how does Java support each?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> encapsulation, inheritance, polymorphism, abstraction.</p>
+<p><strong>Encapsulation:</strong> "hiding internal state and requiring all interaction to be performed through an object's methods".<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a> Java support: private fields, access levels.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[2]</a> <strong>Inheritance:</strong> one direct superclass with <code>extends</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[3]</a> <strong>Polymorphism:</strong> the JVM calls the method of the object referred to, not of the variable's type (virtual method invocation).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[4]</a> <strong>Abstraction:</strong> interfaces as contracts enforced at build time, and abstract classes.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[5]</a><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[6]</a> (The four-pillars framing is the usual interview wording; the tutorial pages define each idea separately.)</p>
+<div class="follow"><strong>Likely follow-up:</strong> Which pillar do people over-use? (Inheritance; prefer composition.)</div>
+<p class="see">Learn it: <a href="lessons/0001-objects-state-and-behavior.html">Objects and encapsulation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Encapsulation versus abstraction?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> encapsulation protects state by hiding it behind methods; abstraction hides complexity behind a simpler contract.</p>
+<p>Encapsulation is about data hiding and invariants: my <code>BankAccount</code> made <code>balance</code> private so "never negative" is enforced in two methods.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a> Abstraction is what an interface or abstract class gives: callers depend on the contract, not the implementation.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[5]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Give an example where encapsulation is broken but abstraction is fine. (A getter returning a mutable internal list.)</div>
+<p class="see">Learn it: <a href="lessons/0003-access-levels.html">Access levels</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Explain method overriding versus overloading, and hiding.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> overriding is runtime dispatch on the object's class; overloading is compile-time selection by declared parameter types; static methods and fields hide, they do not override.</p>
+<p>An instance method with the same signature overrides (a covariant return is allowed; access may widen but not narrow; <code>@Override</code> makes the compiler check).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[7]</a> Static methods hide.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[7]</a> My demos: <code>describe(Shape)</code> was chosen for a <code>Shape</code>-typed variable holding a <code>Circle</code> (overload, compile time), while <code>a.sound()</code> ran <code>Dog</code>'s version (override); a static call and a field were chosen by the static type.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[4]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What is a covariant return type? (An override may return a subtype of the overridden method's return type.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[7]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0007-overriding-and-hiding.html">Overriding and hiding</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Abstract class or interface?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> interface for a capability that unrelated classes can offer; abstract class to share code and state among closely related classes.</p>
+<p>Per the tutorial: abstract classes may have non-static, non-final fields and non-public methods and support single inheritance; interface fields are constants and methods are public, with multiple implementation possible. Choose an abstract class to share code among closely related classes, an interface when unrelated classes will implement it.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[6]</a> Since JDK 8 interfaces also carry default methods (conflict rules in the Java 8 lesson).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Can an interface have state? (Only constants; use an abstract class or composition for instance state.)</div>
+<p class="see">Learn it: <a href="lessons/0009-abstract-classes-vs-interfaces.html">Abstract vs interface</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Why prefer composition over inheritance? Show a concrete failure of inheritance.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> inheritance couples a subclass to its parent's implementation; composition reuses behavior through a collaborator and stays flexible.</p>
+<p>Composition "gives the design higher flexibility" and avoids tight coupling and the diamond problem; the cost is forwarding boilerplate.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[8]</a> Failure: my <code>CountingSet extends HashSet</code> counted 6 for 3 <code>addAll</code> elements because <code>addAll</code> calls <code>add</code> internally; the composed version counted 3.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When is inheritance still right? (A real is-a relationship with a base class designed for extension.)</div>
+<p class="see">Learn it: <a href="lessons/0011-composition-over-inheritance.html">Composition over inheritance</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>What is the order of initialization for a subclass instance?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> class initialization (static blocks: parent then child) once; then per object: parent field initializers and instance blocks, parent constructor, child field initializers and instance blocks, child constructor.</p>
+<p>Static blocks run once in source order; instance initializer blocks are copied into every constructor.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[9]</a> My run printed 1 Parent static, 2 Child static, 3 Parent field init, 4 Parent instance block, 5 Parent constructor, 6 Child field init, 7 Child instance block, 8 Child constructor. Trap: an overridable method called from a parent constructor sees the child's fields uninitialized.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why is calling an overridable method in a constructor dangerous? (Child state does not exist yet.)</div>
+<p class="see">Learn it: <a href="lessons/0005-initialization-order.html">Initialization order</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>What is the difference between a static nested class and an inner class?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> an inner class is tied to an outer instance and can read its private members; a static nested class is not.</p>
+<p><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[10]</a> Reasons to nest: logical grouping, encapsulation, readability. Local and anonymous classes capture effectively-final locals. Prefer lambdas for one-method interfaces.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Memory leak risk with inner classes? (An inner instance holds a reference to its outer instance.)</div>
+<p class="see">Learn it: <a href="lessons/0012-nested-classes.html">Nested classes</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>How do you make a class immutable? Is <code>final</code> enough?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> no; final class, final fields, no mutators, and defensive copies of mutable components.</p>
+<p>My <code>MutableTeam</code> had a <code>final</code> list field but still changed when the caller mutated the list; <code>ImmutableTeam</code> used <code>List.copyOf</code> and an unmodifiable view. Records are shallowly immutable, so they need the same copying.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why is String immutable? (Sharing safely; see the Java strings lesson.)</div>
+<p class="see">Learn it: <a href="lessons/0014-immutability.html">Immutability</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Explain SOLID.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> five principles from Robert C. Martin's 2000 paper (acronym by Michael Feathers).</p>
+<ul><li><strong>SRP:</strong> "There should never be more than one reason for a class to change."</li><li><strong>OCP:</strong> "open for extension, but closed for modification."</li><li><strong>LSP:</strong> subtypes must be substitutable for their base types.</li><li><strong>ISP:</strong> "Clients should not depend upon interface methods they do not use."</li><li><strong>DIP:</strong> "depend upon abstractions, not concretes."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[11]</a></li></ul>
+<p>Each has a runnable example in the OOP ladder (invoice split, discount interface, Square/Rectangle, fat interface, notifier injection).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Which is hardest to apply and why? (Discuss LSP: it is about behavior, not just signatures.)</div>
+<p class="see">Learn it: <a href="lessons/0017-single-responsibility-principle.html">SOLID lessons</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Give an example that violates the Liskov Substitution Principle and fix it.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Square extends Rectangle with setters that change both sides.</p>
+<p>LSP: objects of a type may be replaced by objects of a subtype "without altering any of the desirable properties of that program"; preconditions cannot be strengthened, postconditions and invariants cannot be weakened, and the history constraint applies.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[12]</a> My run: code that sets width 5 and height 4 expected area 20; <code>Rectangle</code> gave 20, <code>Square</code> gave 16. Fix: separate immutable types under a common <code>Shape</code> interface.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Another smell? (An override that throws UnsupportedOperationException for an inherited method.)</div>
+<p class="see">Learn it: <a href="lessons/0019-liskov-substitution-principle.html">Liskov</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>What is dependency inversion versus dependency injection versus IoC?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> DIP is the principle (depend on abstractions), DI is a technique (pass dependencies in), IoC is the general idea that a container or caller controls creation.</p>
+<p><a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[11]</a> My <code>AlertService</code> depended on a <code>Notifier</code> interface and got concrete senders (or a lambda test double) from <code>main</code>. Spring automates it: the IoC container instantiates, assembles and injects beans.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How does DI help testing? (Substitute a fake, as the coupling demo did.)</div>
+<p class="see">Learn it: <a href="lessons/0021-dependency-inversion-principle.html">DIP</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Coupling and cohesion: what do you aim for, and what is the Law of Demeter?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> low coupling, high cohesion; talk only to your immediate friends.</p>
+<p>"Low coupling is often thought to be a sign of a well-structured computer system ... combined with high cohesion, supports ... readability and maintainability."<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[13]</a> The Law of Demeter: "each unit should only talk to its friends; don't talk to strangers", so avoid <code>a.getB().getC().act()</code>; prefer <code>a.act()</code>.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[14]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Are fluent APIs a violation? (Not in spirit when each call returns the same builder/stream; it is a guideline.)</div>
+<p class="see">Learn it: <a href="lessons/0016-law-of-demeter.html">Law of Demeter</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>What is a God object and how do you refactor it?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a class that knows or does too much; split by reason to change and inject collaborators.</p>
+<p>A god object "references a large number of distinct types, has too many unrelated or uncategorized methods"; it violates SRP and everything becomes coupled to it.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[15]</a> Steps: list responsibilities, extract classes named for what they do, inject them, keep a thin coordinator (see <code>GodObjectDemo</code>).</p>
+<div class="follow"><strong>Likely follow-up:</strong> Can a facade become one? (Yes; see Facade and Mediator cons.)</div>
+<p class="see">Learn it: <a href="lessons/0022-god-objects-and-refactoring.html">God objects</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>When would you use an enum instead of constants or a class hierarchy?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> for a fixed set of instances; give them fields and even per-constant behavior.</p>
+<p>Enums are type-safe sets of predefined constants that can have fields, methods and private constructors, and implicitly extend <code>java.lang.Enum</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[16]</a> My <code>Op</code> enum gave each constant its own <code>apply</code> body. Use sealed types instead when variants carry different data.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Can an enum implement an interface? (Yes; enums can implement interfaces since they cannot extend a class.)</div>
+<p class="see">Learn it: <a href="lessons/0013-enums-as-classes.html">Enums</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Object-Oriented Programming (Java) questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">Java Tutorials: What Is an Object?</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">Java Tutorials: Access Control</a> · [3] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">Java Tutorials: What Is Inheritance?</a> · [4] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">Java Tutorials: Polymorphism</a> · [5] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">Java Tutorials: What Is an Interface?</a> · [6] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">Java Tutorials: Abstract Methods and Classes</a> · [7] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">Java Tutorials: Overriding and Hiding</a> · [8] <a href="https://en.wikipedia.org/wiki/Composition_over_inheritance">Wikipedia: Composition over inheritance</a> · [9] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">Java Tutorials: Initializing Fields</a> · [10] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">Java Tutorials: Nested Classes</a> · [11] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · [12] <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Wikipedia: Liskov substitution principle</a> · [13] <a href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">Wikipedia: Coupling</a> · [14] <a href="https://en.wikipedia.org/wiki/Law_of_Demeter">Wikipedia: Law of Demeter</a> · [15] <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a> · [16] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">Java Tutorials: Enum Types</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 5: Requests, limits and the JVM</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Requests, limits and the JVM</h1>
+<p class="meta">Kubernetes · Lesson 0005 · step 9 of 15 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> set requests and limits for a JVM container so it schedules correctly, is not OOM-killed, and is not surprised by CPU throttling.</div>
+
+<h2>Requests versus limits</h2>
+<p><strong>Requests</strong> are what a container is guaranteed, and "the scheduler uses requests to decide which node can accommodate a Pod." <strong>Limits</strong> are the maximum it may use, enforced by the kubelet.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a> CPU is measured in cores or millicores (<code>500m</code> = 0.5 CPU); memory in bytes (<code>256Mi</code>).<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+<h2>What happens on breach</h2>
+<ul>
+<li><strong>CPU over limit:</strong> throttled by the kernel.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></li>
+<li><strong>Memory over limit:</strong> the container can be OOM-killed; enforcement is reactive, when the kernel detects memory pressure.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></li>
+</ul>
+<p>If you set a limit but no request, Kubernetes uses the limit as the request.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+<h2>Applying it to Java</h2>
+<pre><code>env:
+- name: JAVA_TOOL_OPTIONS
+  value: "-XX:MaxRAMPercentage=70"
+resources:
+  requests: { memory: "512Mi", cpu: "250m" }
+  limits:   { memory: "512Mi", cpu: "1" }</code></pre>
+<p>The JVM on Linux detects container limits by default, and <code>MaxRAMPercentage</code> sizes the heap as a percentage of that memory.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a> Setting it to 70 leaves room for non-heap memory. (The <a href="../../docker/lessons/0005-memory-cpu-limits-and-the-jvm.html">Docker lesson</a> measured this with <code>docker run --memory</code>; the same JVM detection applies here because the container runtime enforces the limit.) Choosing 70 is a starting point to measure, not a rule. A full sketch is in <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a>.</p>
+<h2>Verified: an OOM kill</h2>
+<pre><code>kubectl apply -f examples/memory-hog.yaml     # limit 20Mi, container runs: tail /dev/zero
+NAME         READY   STATUS      RESTARTS   AGE
+memory-hog   0/1     OOMKilled   0          12s
+reason=OOMKilled exit=137</code></pre>
+<p>Exit code 137 is 128 + 9 (SIGKILL). See <a href="../examples/memory-hog.yaml"><code>memory-hog.yaml</code></a>.</p>
+<div class="aside">Senior question: "Should memory request equal memory limit?" Equal values make the memory footprint predictable and avoid the node over-committing memory the Pod might need; the docs explain that requests drive scheduling and limits drive enforcement.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a> State the trade-off, not a slogan.</div>
+<p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does the scheduler use to place a Pod?</p>
+  <button data-correct>Requests</button>
+  <button>Pod name</button>
+  <button>Image size</button>
+  <button>Limits</button>
+  <p class="explain">The scheduler uses requests to decide which node can accommodate a Pod.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A container passes its CPU limit. Result?</p>
+  <button>A node restart</button>
+  <button>An OOM kill</button>
+  <button data-correct>CPU throttling</button>
+  <button>A Pod deletion</button>
+  <p class="explain">CPU limits are enforced by throttling.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. A container passes its memory limit. Result?</p>
+  <button data-correct>Possible OOM kill</button>
+  <button>A scheduler retry</button>
+  <button>A CPU boost</button>
+  <button>Automatic throttle</button>
+  <p class="explain">Memory limits are enforced with OOM kills.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why MaxRAMPercentage below 100?</p>
+  <button data-correct>Non-heap memory needs room</button>
+  <button>G1 requires it</button>
+  <button>It speeds up GC</button>
+  <button>Kubernetes rejects 100</button>
+  <p class="explain">The JVM uses memory beyond the heap, and heap plus that must fit under the limit.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-size-a-java-pod.md">Exercise 0005: size a Java Pod</a></p>
+<p>Runnable example: <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes Docs: Resource management for Pods and containers</a>. Read requests and limits, and how they are enforced.</p>
+<p><a href="0011-jobs-and-cronjobs.html">← Jobs and CronJobs</a> &nbsp;|&nbsp; <a href="0006-probes.html">Liveness, readiness and startup probes →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes Docs: Resource management for Pods and containers</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-claim
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: writer
+spec:
+  restartPolicy: Never
+  containers:
+  - name: w
+    image: busybox:1.36
+    command: ["sh", "-c", "echo persisted-$(date +%s) >> /data/log.txt; cat /data/log.txt"]
+    volumeMounts:
+    - { name: d, mountPath: /data }
+  volumes:
+  - name: d
+    persistentVolumeClaim:
+      claimName: data-claim

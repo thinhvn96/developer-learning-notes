@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka Interview Q&amp;A</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka: interview questions and answers</h1>
+<p class="meta"><a href="../index.html">Home</a> · Kafka · 11 questions · <a href="index.html">Kafka ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p>Kafka questions for Senior backend interviews. Commands and outputs mentioned come from a throwaway single-node <code>apache/kafka</code> container; production topics should use replication factor 3.</p>
+<p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
+<details class="qa">
+<summary><span class="n">1.</span>What is Kafka, and how is it different from a traditional message queue?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a distributed event-streaming platform that stores events durably in an append-only log per partition; consumption does not delete events.</p>
+<p>Kafka publishes and subscribes to event streams, stores them durably and processes them as they occur or retrospectively. "Events are not deleted after consumption"; retention is configured per topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> Because a consumer's position is just an offset it can rewind and reprocess data.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> A classic queue removes a message once acknowledged.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When would a queue be better? (Task distribution with per-message routing, retry and dead-lettering; see the RabbitMQ comparison lesson.)</div>
+<p class="see">Learn it: <a href="lessons/0001-events-topics-partitions.html">Events, topics and partitions</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>How does Kafka guarantee ordering?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> per partition only; events with the same key go to the same partition.</p>
+<p>A topic is spread over partitions on different brokers. Events with the same key are written to the same partition, and consumers of a partition read them in the order written.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> There is no global order across partitions. To keep per-entity order, key by entity id. In my run all three <code>u1</code> events went to one partition.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What happens to per-key ordering if you add partitions later? (Prepare an answer from the docs beyond this course's excerpts; say you would check the docs.)</div>
+<p class="see">Learn it: <a href="lessons/0001-events-topics-partitions.html">Events, topics and partitions</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Explain consumer groups, partition assignment and rebalancing.</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> within a group each partition goes to exactly one consumer; membership changes trigger rebalances.</p>
+<p>"Each partition is assigned to exactly one consumer in the group"; group membership is dynamic and partitions rebalance when consumers join or leave.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a> So consumers beyond the partition count sit idle (a consequence of that rule). Failure detection: with <code>session.timeout.ms</code>, no heartbeat means the broker removes the client and rebalances; <code>max.poll.interval.ms</code> bounds the gap between <code>poll()</code> calls.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[4]</a> A <code>KafkaConsumer</code> instance is not thread-safe.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Consumer lag keeps growing. What do you check? (Processing time versus poll interval, partition count versus consumers, <code>kafka-consumer-groups.sh --describe</code>.)</div>
+<p class="see">Learn it: <a href="lessons/0003-consumers-groups-and-offsets.html">Consumer groups</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>At-most-once, at-least-once, exactly-once: how do you get each?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the order of processing and committing the offset decides between at-most and at-least once; exactly-once needs idempotence or transactions.</p>
+<p>If the consumer saves its position and then processes, a crash loses messages (at-most-once). Process first, then save the position: at-least-once, with possible redelivery.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> <code>commitSync()</code> after the work gives at-least-once.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a> Since 0.11.0.0 the idempotent producer prevents duplicates from resends, and transactions write atomically to multiple partitions.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> External side effects (email, other databases) still need idempotent handling.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you make a database write idempotent? (Unique event id as a key; upsert; check processed-events table in the same transaction.)</div>
+<p class="see">Learn it: <a href="lessons/0004-delivery-semantics.html">Delivery semantics</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>What does acks=all do, and how do you avoid data loss?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> <code>acks=all</code> waits for the full set of in-sync replicas; combine with replication and <code>min.insync.replicas</code>.</p>
+<p><code>acks=0</code>: no wait. <code>acks=1</code>: leader writes locally and responds. <code>acks=all</code>: waits for all in-sync replicas and the record is not lost "as long as at least one in-sync replica remains alive".<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a> Only committed messages (received by all in-sync replicas) are given to consumers; <code>min.insync.replicas</code> ensures the write is acknowledged by at least that many in-sync replicas.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Replication factor 3 is a common production setting.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> A durable producer: <code>acks=all</code>, idempotence (default true in 4.3 docs), sensible <code>delivery.timeout.ms</code>.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What is unclean leader election? (Letting an out-of-sync replica lead favors availability over consistency and can lose data.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0005-replication-isr-and-durability.html">Replication and durability</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>What is the ISR?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> the set of replicas that are in sync with the leader.</p>
+<p>Each partition has a leader that receives writes; followers replicate by pulling. The leader keeps the set of in-sync replicas (ISR). A message is committed when all in-sync replicas have it, and only committed messages reach consumers.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What if a follower falls behind? (It leaves the ISR; what determines that is in the design docs beyond the excerpts used.)</div>
+<p class="see">Learn it: <a href="lessons/0005-replication-isr-and-durability.html">Replication and durability</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>What does the idempotent producer guarantee? Transactions?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> no duplicates from producer retries; atomic multi-partition writes.</p>
+<p>The idempotent option "guarantees that resending will not result in duplicate entries"; it is on by default in the 4.3 config docs. Transactions let a producer write to multiple partitions atomically: all or none.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a><a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a> They do not extend exactly-once to systems outside Kafka.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How does this interact with consumers? (Consumers must be idempotent or read transactionally; the details are in the design docs' delivery-semantics section.)</div>
+<p class="see">Learn it: <a href="lessons/0006-idempotence-and-transactions.html">Idempotence and transactions</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Producer tuning: what do linger.ms and batch.size do?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> they trade a little latency for larger batches and better throughput.</p>
+<p>The producer batches records for the same partition into fewer requests up to <code>batch.size</code> (default 16384 bytes); <code>linger.ms</code> (default 5 ms in these docs) adds a small delay so more records join a batch.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a> Measure end-to-end latency and throughput; I have not benchmarked this.</p>
+<div class="follow"><strong>Likely follow-up:</strong> What bounds how long a record can be delayed? (<code>delivery.timeout.ms</code>, default 120000.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a>)</div>
+<p class="see">Learn it: <a href="lessons/0002-producers-keys-and-acks.html">Producers and acks</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>How long does Kafka keep data, and what is log compaction?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> by default 7 days (<code>cleanup.policy=delete</code>, <code>retention.ms=604800000</code>); compaction keeps at least the latest value per key.</p>
+<p><a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[6]</a> Deletion works per segment file. Compaction: "always retain at least the last known value for each message key"; offsets stay stable; a null value is a tombstone that deletes the key and is itself cleaned after <code>delete.retention.ms</code> (24 h default).<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> My run (with aggressive demo settings): keys u1 and u2 with several updates compacted to the latest values, and a tombstone removed u2.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Compacted topic for an audit trail? (No: it forgets history; use delete retention.)</div>
+<p class="see">Learn it: <a href="lessons/0008-log-compaction.html">Log compaction</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>What is Kafka Streams, and how do streams differ from tables?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a client library for stream processing; a KStream is an unbounded record stream, a KTable is a table snapshot; stateful work uses state stores with exactly-once processing available.</p>
+<p><a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[7]</a> My WordCount run produced <code>kafka 1</code> then <code>kafka 2</code>: the changelog of a KTable of counts.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How does it scale? (Run more instances of the application; tasks are distributed among them; details are in the docs beyond the excerpts.)</div>
+<p class="see">Learn it: <a href="lessons/0009-kafka-streams-basics.html">Kafka Streams</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>What is Kafka Connect?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> a framework to stream data between Kafka and other systems using source and sink connectors, tasks and converters, managed by a REST API.</p>
+<p><a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[8]</a> Distributed mode gives fault tolerance and scaling; standalone does not. My run moved lines from a file into a topic and out to another file with the bundled FileStream connectors.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How would you stream PostgreSQL changes to Elasticsearch? (Source connector, topic, sink connector; design exercise.)</div>
+<p class="see">Learn it: <a href="lessons/0010-kafka-connect.html">Kafka Connect</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Kafka questions one at a time and push back on my answers".</p>
+  <p>Sources: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka: Introduction</a> · [2] <a href="https://kafka.apache.org/43/design/design/">Kafka: Design</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [4] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka: Consumer configs</a> · [5] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka: Producer configs</a> · [6] <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka: Topic configs</a> · [7] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams: core concepts</a> · [8] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect: user guide</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

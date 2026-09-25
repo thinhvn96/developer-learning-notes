@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 12: Nested, inner, local and anonymous classes</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Nested, inner, local and anonymous classes</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0012 · step 12 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose between static nested, inner, local and anonymous classes and state what each can access.</div>
+
+<h2>Two categories</h2>
+<p><strong>Inner classes</strong> (non-static) are tied to an instance of the enclosing class and "have access to other members of the enclosing class, even if they are declared private". <strong>Static nested classes</strong> have no access to the enclosing instance's members and behave like top-level classes nested for packaging convenience.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[1]</a></p>
+<p>Reasons to nest: logical grouping of classes used in one place, increased encapsulation ("by hiding class B within class A, A's members can be declared private and B can access them"), and more readable code near where it is used.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[1]</a></p>
+<pre><code>java oop/examples/NestedClasses.java
+inner sees outer&#x27;s private field      : 7
+static nested sees only static members : 99
+local class: 15, anonymous comparator sorted: [a, bb, ccc]</code></pre>
+<p>Local and anonymous classes may capture local variables that are final or effectively final (same rule as lambdas: <a href="../../java/lessons/0008-lambdas-and-functional-interfaces.html">lesson</a>). Prefer a lambda over an anonymous class for one-method interfaces; the Builder pattern uses a static nested class (<a href="../../design-patterns/lessons/0006-builder.html">lesson</a>). Source: <a href="../examples/NestedClasses.java"><code>NestedClasses.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Inner classes can access outer's private members?</p>
+  <button>Only static ones</button>
+  <button data-correct>Yes</button>
+  <button>No</button>
+  <button>Only in tests</button>
+  <p class="explain">Inner classes can, even if private.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Static nested class needs an outer instance?</p>
+  <button data-correct>No</button>
+  <button>Yes</button>
+  <button>Only in main</button>
+  <button>Always</button>
+  <p class="explain">It behaves like a top-level class nested for packaging.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. A reason to nest a class?</p>
+  <button>It is abstract</button>
+  <button data-correct>It is used in one place</button>
+  <button>It needs threads</button>
+  <button>It must be public</button>
+  <p class="explain">Logical grouping of classes used only in one place.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Captured locals must be...?</p>
+  <button data-correct>Effectively final</button>
+  <button>Volatile</button>
+  <button>Public</button>
+  <button>Static</button>
+  <p class="explain">The demo captured an effectively final int.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-refactor-nested.md">Exercise 12: refactor nested classes</a></p>
+<p>Runnable example: <a href="../examples/NestedClasses.java"><code>NestedClasses.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">Java Tutorials: Nested Classes</a>. Read 'Why Use Nested Classes?'.</p>
+<p><a href="0011-composition-over-inheritance.html">← Composition over inheritance</a> &nbsp;|&nbsp; <a href="0013-enums-as-classes.html">Enums as classes →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">Java Tutorials: Nested Classes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

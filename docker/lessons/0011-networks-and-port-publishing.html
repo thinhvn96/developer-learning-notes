@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 11: Networks, DNS by name and port publishing</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Networks, DNS by name and port publishing</h1>
+<p class="meta">Docker · Lesson 0011 · step 8 of 12 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why containers on a user-defined bridge reach each other by name but not on the default bridge, and what <code>-p</code> actually publishes.</div>
+
+<h2>Drivers</h2>
+<p>Built-in Linux drivers: <code>bridge</code> (default), <code>host</code> (removes isolation), <code>none</code> (complete isolation), <code>overlay</code> (multiple daemons), plus <code>ipvlan</code> and <code>macvlan</code>.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a></p>
+<h2>Default vs user-defined bridge</h2>
+<ul><li>User-defined bridges provide automatic DNS resolution between containers by name or alias; containers on the default bridge can only use IP addresses (or the legacy <code>--link</code>).<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></li>
+<li>User-defined bridges give better isolation: only containers attached to that network can talk to each other.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></li></ul>
+<pre><code>cd docker/examples &amp;&amp; ./04-networks.sh
+default bridge       : ping: bad address 'b-...'
+user-defined bridge  : PING d-... (172.18.0.3): 64 bytes ... time=0.056 ms
+c (user) -&gt; b (default) by name: ping: bad address</code></pre>
+<h2>Publishing ports</h2>
+<p>Without <code>-p</code>, ports "are not accessible from outside the host or, with the default configuration, from containers in other networks". Publishing forwards traffic between host ports and container ports.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a><a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a> Containers on the same user-defined bridge expose all ports to each other without publishing.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a> This is why Compose services reach the database as <code>db:5432</code>. Source: <a href="../examples/04-networks.sh"><code>04-networks.sh</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Reach another container by name on the default bridge?</p>
+  <button>Only with EXPOSE</button>
+  <button>Always possible</button>
+  <button data-correct>Not possible</button>
+  <button>Only with -p</button>
+  <p class="explain">Default-bridge containers cannot refer to each other by name.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which network type gives automatic DNS?</p>
+  <button>None driver</button>
+  <button data-correct>User-defined bridge</button>
+  <button>Host driver</button>
+  <button>Default bridge</button>
+  <p class="explain">User-defined bridges provide automatic DNS resolution.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does -p do?</p>
+  <button>Pauses the container</button>
+  <button>Pulls the image</button>
+  <button data-correct>Publishes a port to the host</button>
+  <button>Prunes networks</button>
+  <p class="explain">It forwards traffic between host ports and container ports.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Driver that removes network isolation?</p>
+  <button>overlay</button>
+  <button>bridge</button>
+  <button>none</button>
+  <button data-correct>host</button>
+  <p class="explain">host removes isolation between container and host.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-three-container-network.md">Exercise 0011: a three-container network</a></p>
+<p>Runnable example: <a href="../examples/04-networks.sh"><code>04-networks.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/engine/network/">Docker networking overview</a>. Then the bridge driver page.</p>
+<p><a href="0010-volumes-and-bind-mounts.html">← Volumes and bind mounts</a> &nbsp;|&nbsp; <a href="0004-compose-app-and-database.html">Compose: an app and a database →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/engine/network/">Docker networking overview</a> · [2] <a href="https://docs.docker.com/engine/network/drivers/bridge/">Bridge network driver</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 15: JDK 21: pattern matching for switch and record patterns</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 21: pattern matching for switch and record patterns</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0015 · step 24 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a JDK 21 <code>switch</code> that destructures records, uses <code>when</code> guards and <code>case null</code>, and needs no <code>default</code> on a sealed type.</div>
+
+<h2>Pattern matching for switch (final in JDK 21)</h2>
+<ul>
+<li><strong>Type patterns in case labels</strong> test the selector against several patterns with an action for each.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
+<li><strong>Guards:</strong> <code>case String s when s.equalsIgnoreCase("YES") -&gt; ...</code> refines a pattern with <code>when</code>.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
+<li><strong>Null:</strong> "If the selector expression evaluates to null then any null case label is said to match." Without <code>case null</code> the switch still throws <code>NullPointerException</code>, as before.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
+<li><strong>Exhaustive:</strong> pattern switches must cover all cases; for sealed types the compiler checks coverage from the permitted subtypes, sometimes removing the need for <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
+<li><strong>Dominance:</strong> a label may not be dominated by an earlier one, so put more specific patterns first (like ordering <code>catch</code> clauses).<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
+</ul>
+<h2>Record patterns (final in JDK 21)</h2>
+<p>They "deconstruct record values", and can nest: <code>Rectangle(ColoredPoint(Point(var x, var y), var c), var lr)</code>.<a class="cite" href="https://openjdk.org/jeps/440">[2]</a></p>
+<pre><code>static String describe(Shape s) {
+    return switch (s) {
+        case Circle(Point(var x, var y), var r) when r &gt; 100 -&gt; "huge circle at " + x + "," + y;
+        case Circle(Point(var x, var y), var r)              -&gt; "circle r=" + r;
+        case Rect(Point(var x1, var y1), Point(var x2, var y2)) -&gt; "rect " + (x2 - x1) + "x" + (y2 - y1);
+    };
+}</code></pre>
+<pre><code>java java/examples/jdk21/Jdk21Features.java
+circle r=5.0 at 1,2
+huge circle at 0,0
+rect width 4 height 3
+null handled inside the switch | blank string | string x | int 7</code></pre>
+<p>Source: <a href="../examples/jdk21/Jdk21Features.java"><code>Jdk21Features.java</code></a>. Compiling it with <code>--release 17</code> fails with "patterns in switch statements are not supported in -source 17", which is a handy interview fact: this is a 21 feature.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Selector is null and there is no <code>case null</code>. Result?</p>
+  <button>Silent no-op</button>
+  <button data-correct>NullPointerException</button>
+  <button>Default branch runs</button>
+  <button>Compile error</button>
+  <p class="explain">Without a null case the switch throws NPE as before.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does a <code>when</code> clause add?</p>
+  <button>A default branch</button>
+  <button>A yield statement</button>
+  <button>A loop over cases</button>
+  <button data-correct>A guard on a pattern</button>
+  <p class="explain">Guards refine a pattern case label.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Sealed selector, all subtypes covered. Default needed?</p>
+  <button>Yes, always</button>
+  <button>Only for records</button>
+  <button>Only with null</button>
+  <button data-correct>No, not needed</button>
+  <p class="explain">The compiler checks coverage for sealed types, sometimes removing default.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which patterns can be nested?</p>
+  <button>Only literals</button>
+  <button>Only enums</button>
+  <button data-correct>Record patterns</button>
+  <button>Only strings</button>
+  <p class="explain">Record patterns and type patterns can be nested.<a class="cite" href="https://openjdk.org/jeps/440">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0015-expression-evaluator.md">Exercise 0015: an expression evaluator</a></p>
+<p>Runnable example: <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a>. Then JEP 440.</p>
+<p><a href="0027-helpful-nullpointerexceptions.html">← Helpful NullPointerExceptions (JDK 14+, in 17 and 21)</a> &nbsp;|&nbsp; <a href="0016-sequenced-collections.html">JDK 21: sequenced collections →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a> · [2] <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

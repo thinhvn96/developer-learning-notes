@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes Ladder</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kubernetes: simple to advanced</h1>
+<p class="meta"><a href="../index.html">Home</a> · Stack index · <a href="interview.html">Interview Q&amp;A</a> · <a href="../reference/roadmap.html">Roadmap</a> · <span data-progress-for="kubernetes" data-total="15">15 lessons</span></p>
+<p>Pods to StatefulSets: Services, config, probes, rollouts, storage, autoscaling. 15 lessons in reading order, tick them off as you go (saved in this browser only). Folders: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<p>All manifests in <code>examples/</code> were applied to a throwaway kind cluster (Kubernetes v1.37.0) while writing; outputs shown in lessons come from those runs.</p><h2>Foundation</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0001-cluster-components"><a href="lessons/0001-cluster-components.html">Cluster components: who does what</a></li>
+<li data-id="0002-pods"><a href="lessons/0002-pods.html">Pods: the smallest deployable unit</a></li>
+<li data-id="0008-namespaces"><a href="lessons/0008-namespaces.html">Namespaces: isolating groups of resources</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0003-deployments-and-labels"><a href="lessons/0003-deployments-and-labels.html">Deployments, ReplicaSets and labels</a></li>
+<li data-id="0004-services"><a href="lessons/0004-services.html">Services: a stable address for changing Pods</a></li>
+<li data-id="0009-configmaps"><a href="lessons/0009-configmaps.html">ConfigMaps: configuration outside the image</a></li>
+<li data-id="0010-secrets"><a href="lessons/0010-secrets.html">Secrets: what they protect and what they do not</a></li>
+<li data-id="0011-jobs-and-cronjobs"><a href="lessons/0011-jobs-and-cronjobs.html">Jobs and CronJobs</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0005-requests-limits-and-the-jvm"><a href="lessons/0005-requests-limits-and-the-jvm.html">Requests, limits and the JVM</a></li>
+<li data-id="0006-probes"><a href="lessons/0006-probes.html">Liveness, readiness and startup probes</a></li>
+<li data-id="0007-rolling-updates-and-rollbacks"><a href="lessons/0007-rolling-updates-and-rollbacks.html">Rolling updates and rollbacks</a></li>
+<li data-id="0012-persistent-volumes-and-claims"><a href="lessons/0012-persistent-volumes-and-claims.html">PersistentVolumes, claims and StorageClasses</a></li>
+<li data-id="0013-statefulsets"><a href="lessons/0013-statefulsets.html">StatefulSets: stable identity and storage</a></li>
+<li data-id="0014-ingress"><a href="lessons/0014-ingress.html">Ingress: HTTP routing into the cluster</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0015-horizontal-pod-autoscaler"><a href="lessons/0015-horizontal-pod-autoscaler.html">Horizontal Pod Autoscaler</a></li>
+</ol>
+<h2>Planned</h2>
+<ul>
+<li>RBAC and service accounts <span class="meta">(planned)</span></li>
+<li>NetworkPolicy <span class="meta">(planned)</span></li>
+<li>DaemonSets <span class="meta">(planned)</span></li>
+<li>Helm and Kustomize <span class="meta">(planned)</span></li>
+</ul>
+<footer><p><strong>Ask your teacher</strong> to add, reorder or skip lessons, or to run a mock interview from the <a href="interview.html">Q&amp;A page</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

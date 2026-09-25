@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 2: Pods: the smallest deployable unit</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pods: the smallest deployable unit</h1>
+<p class="meta">Kubernetes · Lesson 0002 · step 2 of 15 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what a Pod is, why Pods are disposable, and why you rarely create them directly.</div>
+
+<h2>Definition</h2>
+<p>"Pods are the smallest deployable units of computing that you can create and manage in Kubernetes." A Pod "is a group of one or more containers, with shared storage and network resources, and a specification for how to run the containers. A Pod's contents are always co-located and co-scheduled, and run in a shared context."<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a> Most Pods hold a single container; multi-container Pods are for tightly coupled helpers.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+<h2>Disposable</h2>
+<p>Pods are "relatively ephemeral, disposable entities". A Pod stays on its node until it finishes, is deleted, is evicted for lack of resources, or its node fails.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a> Nothing restarts a lost bare Pod on another node.</p>
+<h2>So use a workload resource</h2>
+<p>"You rarely create Pods directly." Use a Deployment (replicated apps), a Job (batch), or a StatefulSet (stateful apps).<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a> Here is the docs' example, saved as <a href="../examples/pod.yaml"><code>pod.yaml</code></a>:</p>
+<pre><code>apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    ports:
+    - containerPort: 80</code></pre>
+<p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Smallest deployable unit in Kubernetes?</p>
+  <button data-correct>A Pod</button>
+  <button>A node</button>
+  <button>A Service</button>
+  <button>A container</button>
+  <p class="explain">Pods are the smallest deployable units.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Containers in one Pod share what?</p>
+  <button data-correct>Storage and network</button>
+  <button>Only the image</button>
+  <button>One node pool</button>
+  <button>One JVM heap</button>
+  <p class="explain">A Pod has shared storage and network resources.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why not create bare Pods for production?</p>
+  <button>They cost more</button>
+  <button data-correct>Nothing replaces them</button>
+  <button>Pods cannot run Java</button>
+  <button>YAML forbids it</button>
+  <p class="explain">Pods are disposable; use a Deployment, Job or StatefulSet instead.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Most common Pod layout?</p>
+  <button>One per node</button>
+  <button>No containers</button>
+  <button data-correct>One container</button>
+  <button>Ten containers</button>
+  <p class="explain">Single-container Pods are the most common pattern.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-pod-lifecycle.md">Exercise 0002: Pod lifecycle</a></p>
+<p>Runnable example: <a href="../examples/pod.yaml"><code>pod.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Kubernetes Docs: Pods</a>. Read 'What is a Pod?' and 'Pod lifecycle'.</p>
+<p><a href="0001-cluster-components.html">← Cluster components: who does what</a> &nbsp;|&nbsp; <a href="0008-namespaces.html">Namespaces: isolating groups of resources →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Kubernetes Docs: Pods</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

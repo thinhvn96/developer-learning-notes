@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 5: Memory and CPU limits, and what the JVM sees</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Memory and CPU limits, and what the JVM sees</h1>
+<p class="meta">Docker · Lesson 0005 · step 10 of 12 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Docker ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict the JVM heap and CPU count inside a memory- and CPU-limited container, and explain what kills the container when it goes over.</div>
+
+<h2>Docker's limits</h2>
+<p><code>--memory</code> (<code>-m</code>) is "the maximum amount of memory the container can use." When a container exceeds the limit on Linux, the kernel's out-of-memory handling "starts killing processes to free up memory". <code>--cpus</code> sets how much of the host CPU a container may use, for example <code>--cpus="1.5"</code> on a two-CPU host is at most one and a half CPUs.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[1]</a></p>
+<h2>What the JVM sees</h2>
+<p>On Linux the JVM has container detection on by default ("automatic container detection support"), so it reads the container's memory and CPU limits; <code>-Xlog:os+container=trace</code> shows what it found.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a> <code>-XX:MaxRAMPercentage</code> defaults to 25 percent of the maximum memory; for small heaps (about 125 MB) <code>-XX:MinRAMPercentage</code> defaults to 50 percent.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a></p>
+<h2>Measured with the example image</h2>
+<pre><code>docker run --rm hello-multi
+  processors: 12   max heap: 3920 MB      # no limits: 1/4 of host RAM
+
+docker run --rm --memory=256m --cpus=1 hello-multi
+  processors: 1    max heap: 121 MB       # heap about half of 256 MB
+
+docker run --rm --memory=256m \
+  -e JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75 hello-multi
+  max heap: 185 MB</code></pre>
+<p>The 121 MB result is consistent with the documented 50 percent default for small heaps; that link is my reading of the reference, so confirm it in the exercise by changing the limit.</p>
+<div class="aside">Senior point: heap is not the only memory the JVM uses (metaspace, thread stacks, direct buffers, code cache), so setting the heap to 100 percent of the limit invites the OOM killer. Choose a percentage below 100 and measure. The Kubernetes lesson on <a href="../../kubernetes/lessons/0005-requests-limits-and-the-jvm.html">requests and limits</a> builds on this.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Container exceeds <code>--memory</code>. What acts?</p>
+  <button>The image registry</button>
+  <button>The Java compiler</button>
+  <button data-correct>Kernel OOM handling</button>
+  <button>The Compose file</button>
+  <p class="explain">The kernel out-of-memory manager starts killing processes.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. With no limits, default max heap is about...?</p>
+  <button>Exactly 512 MB</button>
+  <button>All of RAM</button>
+  <button>One tenth of RAM</button>
+  <button data-correct>A quarter of RAM</button>
+  <p class="explain">The max heap defaults to 25 percent (MaxRAMPercentage), 3920 MB of about 15.7 GB in the run above.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does the JVM read to size itself in a container?</p>
+  <button>Only host totals</button>
+  <button data-correct>Container limits</button>
+  <button>Image size</button>
+  <button>Dockerfile labels</button>
+  <p class="explain">Container support is on by default on Linux.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Why not set MaxRAMPercentage to 100?</p>
+  <button>GC stops working</button>
+  <button>Threads disappear</button>
+  <button>Docker rejects it</button>
+  <button data-correct>Non-heap memory needs room</button>
+  <p class="explain">The JVM also uses non-heap memory; heap plus that must fit within the limit (senior-level reasoning; measure it).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-heap-under-limits.md">Exercise 0005: heap under limits</a></p>
+<p>Runnable example: <a href="../examples/hello-java/src/Hello.java"><code>hello-java/src/Hello.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.docker.com/engine/containers/resource_constraints/">Docker Docs: Resource constraints</a>. Then the -XX:MaxRAMPercentage entry in the java command reference.</p>
+<p><a href="0004-compose-app-and-database.html">← Compose: an app and a database</a> &nbsp;|&nbsp; <a href="0012-restart-policies.html">Restart policies →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.docker.com/engine/containers/resource_constraints/">Docker Docs: Resource constraints</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

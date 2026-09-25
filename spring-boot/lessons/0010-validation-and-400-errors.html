@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 10: Bean Validation and 400 responses</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bean Validation and 400 responses</h1>
+<p class="meta">Spring Boot · Lesson 0010 · step 8 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> validate a request body with Bean Validation and know which status the client receives.</div>
+
+<h2>Constraints on the model</h2>
+<p>Bean Validation lets you declare constraints on the model and enforce them at runtime: <code>@NotNull</code>, <code>@Size(max = 64)</code>, <code>@Min(0)</code> and so on.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+<pre><code>public record PersonRequest(@NotBlank String name, @Min(0) int age) { }
+
+@PostMapping
+@ResponseStatus(HttpStatus.CREATED)
+public PersonRequest add(@Valid @RequestBody PersonRequest person) { return person; }</code></pre>
+<h2>What the client sees</h2>
+<p>In Spring MVC, "validation failures are reported as <code>MethodArgumentNotValidException</code>", which typically results in an HTTP <strong>400 Bad Request</strong>. Method-level validation uses <code>@Validated</code> on the class.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+<pre><code>RESULT POST valid body -&gt; 201 Created
+RESULT POST invalid body (blank name, age -1) -&gt; 400 Bad Request</code></pre>
+<p>Code: <a href="../examples/demo-app/src/main/java/com/example/demo/web/PersonRequest.java"><code>PersonRequest.java</code></a>, <a href="../examples/demo-app/src/main/java/com/example/demo/web/PersonController.java"><code>PersonController.java</code></a>, <a href="../examples/demo-app/src/test/java/com/example/demo/PersonControllerTest.java"><code>PersonControllerTest.java</code></a>. The body of the 400 response and custom error formats are beyond the pages read; the linked MVC error-response docs cover them.</p>
+<div class="aside">Validate at the boundary (controller) and also in the database with constraints: <a href="../../postgresql/lessons/0001-tables-and-constraints.html">the database is the last line of defense</a>.</div><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Annotation to trigger validation of a body?</p>
+  <button>@Scope</button>
+  <button>@Lazy</button>
+  <button>@Profile</button>
+  <button data-correct>@Valid</button>
+  <p class="explain">@Valid on the parameter enables validation.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Exception on failure in Spring MVC?</p>
+  <button>IOException</button>
+  <button>ClassCastException</button>
+  <button>SQLException</button>
+  <button data-correct>MethodArgumentNotValidException</button>
+  <p class="explain">Validation failures are reported as MethodArgumentNotValidException.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Typical status for invalid input?</p>
+  <button>200</button>
+  <button>500</button>
+  <button data-correct>400</button>
+  <button>204</button>
+  <p class="explain">It typically results in HTTP 400 (the test returned 400).<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which constraint forbids null?</p>
+  <button>@Min</button>
+  <button>@Past</button>
+  <button data-correct>@NotNull</button>
+  <button>@Size</button>
+  <p class="explain">@NotNull is a built-in constraint annotation.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-validate-an-order.md">Exercise 0010: validate an order</a></p>
+<p>Runnable example: <a href="../examples/demo-app/src/main/java/com/example/demo/web/PersonController.java"><code>demo-app/src/main/java/com/example/demo/web/PersonController.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">Spring Framework Reference: Bean Validation</a>. Overview and Spring MVC integration.</p>
+<p><a href="0004-rest-controllers.html">← REST controllers and request mapping</a> &nbsp;|&nbsp; <a href="0005-transactional-proxies-and-rollback.html">@Transactional: proxies and rollback rules →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">Spring Framework Reference: Bean Validation</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

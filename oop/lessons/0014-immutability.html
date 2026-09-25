@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 14: Immutability and defensive copies</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Immutability and defensive copies</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0014 · step 14 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> turn a mutable class into an immutable one and explain defensive copying.</div>
+
+<h2>Why immutability</h2>
+<p>An immutable object cannot change after construction, so it can be shared freely (including between threads) and used as a map key without surprises: the same reasoning as <code>String</code>'s constant values (<a href="../../java/lessons/0018-strings-immutability-and-stringbuilder.html">strings lesson</a>).</p>
+<h2>The leak, and the fix</h2>
+<pre><code>java oop/examples/ImmutabilityDemo.java
+MutableTeam after outside change   : [ann, intruder]
+ImmutableTeam after outside change : [ann]
+cannot modify the exposed list
+Point[x=1, y=2] equals another Point(1,2): true, moved copy: Point[x=9, y=2]</code></pre>
+<p><code>MutableTeam</code> has a <code>final</code> field but keeps the caller's list, so an outside change leaks in: <code>final</code> makes the <em>reference</em> constant, not the object. <code>ImmutableTeam</code> is a <code>final</code> class with a <code>final</code> field and a defensive copy (<code>List.copyOf</code>), and exposes an unmodifiable list. A <code>record</code> gives an immutable data carrier in one line: "shallowly immutable", so the same copy step is needed for collection components.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[2]</a> Checklist (standard practice, demonstrated above): final class, final fields, no setters, defensive copies in and out. Source: <a href="../examples/ImmutabilityDemo.java"><code>ImmutabilityDemo.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Does a final field make the object immutable?</p>
+  <button>Only for lists</button>
+  <button>Only for ints</button>
+  <button>Yes, fully</button>
+  <button data-correct>No, only the reference</button>
+  <p class="explain">MutableTeam had a final list reference yet changed.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A defensive copy protects against...?</p>
+  <button>Slow code</button>
+  <button>Null values</button>
+  <button>Overflow</button>
+  <button data-correct>Outside mutation</button>
+  <p class="explain">The copy meant the outside change did not leak in.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Records are...?</p>
+  <button>Mutable</button>
+  <button data-correct>Shallowly immutable</button>
+  <button>Deeply immutable</button>
+  <button>Abstract</button>
+  <p class="explain">Records are shallowly immutable carriers.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Exposing an internal list safely?</p>
+  <button>Return the field</button>
+  <button>Make it static</button>
+  <button>Make it public</button>
+  <button data-correct>Unmodifiable or copy</button>
+  <p class="explain">The demo returned an unmodifiable list and rejected add.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0014-immutable-money.md">Exercise 14: immutable money</a></p>
+<p>Runnable example: <a href="../examples/ImmutabilityDemo.java"><code>ImmutabilityDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a>. Class description.</p>
+<p><a href="0013-enums-as-classes.html">← Enums as classes</a> &nbsp;|&nbsp; <a href="0015-coupling-and-cohesion.html">Coupling and cohesion →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">Java Tutorials: Enum/class members (fields)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

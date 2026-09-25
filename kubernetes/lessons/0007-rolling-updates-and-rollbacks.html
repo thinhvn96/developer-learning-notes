@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 7: Rolling updates and rollbacks</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Rolling updates and rollbacks</h1>
+<p class="meta">Kubernetes · Lesson 0007 · step 11 of 15 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kubernetes ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> describe how a rolling update works, what the default surge and unavailability are, and how to roll back.</div>
+
+<h2>Rolling update</h2>
+<p>A Deployment updates Pods gradually: it scales up a new ReplicaSet while scaling down the old one. The default strategy uses <code>maxUnavailable: 25%</code> and <code>maxSurge: 25%</code>.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a> <code>maxSurge</code> caps how many extra Pods may exist above the desired count during the update; <code>maxUnavailable</code> caps how many may be unavailable.</p>
+<pre><code>strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 25%
+    maxSurge: 25%</code></pre>
+<h2>Rollback</h2>
+<pre><code>kubectl rollout undo deployment/nginx-deployment</code></pre>
+<p>rolls back to the previous revision.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+<h2>How probes make updates safe</h2>
+<p>During a rolling update, traffic should reach a new Pod only when it is ready. That is the job of the readiness probe from the <a href="0006-probes.html">previous lesson</a>.</p>
+<h2>Verified: a bad release</h2>
+<pre><code>kubectl set image deployment/nginx-deployment nginx=nginx:does-not-exist
+kubectl rollout status ... --timeout=25s   -&gt; error: timed out waiting for the condition
+nginx-deployment-54fd...-4l88k  1/1 Running           # 3 old Pods kept
+nginx-deployment-54fd...-hrldm  1/1 Running
+nginx-deployment-54fd...-kqvcf  1/1 Running
+nginx-deployment-5fb7...-q7v2l  0/1 ImagePullBackOff  # 1 new Pod, stuck
+kubectl get endpoints nginx-service        -&gt; the 3 old Pod addresses only
+kubectl rollout undo deployment/nginx-deployment   -&gt; rolled back; stuck Pod terminates</code></pre>
+<p>The rollout stalled instead of taking the service down: with 3 replicas Kubernetes created just one extra Pod and kept all three old ones serving, and the Service endpoints never changed.</p>
+<div class="aside">Interview angle: "Zero-downtime deploy of a Java service?" Rolling update, readiness probe, a startup probe for slow boots, graceful shutdown on <code>SIGTERM</code> (see the Docker lesson on <a href="../../docker/lessons/0006-pinning-nonroot-and-signals.html">exec-form CMD</a>), and a rollback plan.</div>
+<p class="aside">Verified: I applied the manifests in <code>examples/</code> to a throwaway <a href="https://kind.sigs.k8s.io/">kind</a> cluster (Kubernetes v1.37.0, kubectl v1.37.1) and quote outputs from that run. The kind setup itself is not covered by the pages I read; follow the project's own docs.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default rolling update numbers?</p>
+  <button>1 and 1</button>
+  <button>50% and 0</button>
+  <button data-correct>25% and 25%</button>
+  <button>100% and 0</button>
+  <p class="explain">Default maxUnavailable and maxSurge are both 25 percent.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Command to revert a bad release?</p>
+  <button>kubectl delete node</button>
+  <button data-correct>kubectl rollout undo</button>
+  <button>kubectl scale zero</button>
+  <button>kubectl drain pod</button>
+  <p class="explain">kubectl rollout undo deployment/name rolls back.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What does maxSurge control?</p>
+  <button>Pod CPU limit</button>
+  <button>Node count</button>
+  <button data-correct>Extra Pods allowed</button>
+  <button>Image pull rate</button>
+  <p class="explain">It caps how many Pods may exist above the desired count during an update (see the Deployment docs).</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which probe gates traffic to new Pods?</p>
+  <button>Liveness probe</button>
+  <button>No probe needed</button>
+  <button>Startup probe only</button>
+  <button data-correct>Readiness probe</button>
+  <p class="explain">Readiness decides whether a Pod receives Service traffic (probes lesson).</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-ship-and-roll-back.md">Exercise 0007: ship and roll back</a></p>
+<p>Runnable example: <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a>. 'Updating a Deployment', 'Rolling Back a Deployment'.</p>
+<p><a href="0006-probes.html">← Liveness, readiness and startup probes</a> &nbsp;|&nbsp; <a href="0012-persistent-volumes-and-claims.html">PersistentVolumes, claims and StorageClasses →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

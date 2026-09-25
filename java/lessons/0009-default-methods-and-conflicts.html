@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 9: JDK 8: default methods and conflict resolution</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 8: default methods and conflict resolution</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0009 · step 8 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why default methods exist and predict which method runs when a class inherits conflicting defaults.</div>
+
+<h2>Why they exist (JDK 8)</h2>
+<p>If a library adds a method to an interface, every implementer breaks. Default methods "enable you to add new functionality to the interfaces of your libraries and ensure binary compatibility with code written for older versions of those interfaces."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a> You declare one with the <code>default</code> keyword and a body.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
+<h2>Who wins</h2>
+<ul>
+<li><strong>Class wins:</strong> a concrete method in a class (or superclass) overrides any interface default.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></li>
+<li><strong>More specific interface wins:</strong> extending an interface with a default, you may inherit it, redeclare it (making it abstract again), or redefine it.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></li>
+<li><strong>Two unrelated defaults, same signature:</strong> the compiler forces the class to override and choose, using <code>Walker.super.move()</code> syntax (shown in the example; the tutorial page describes the general resolution rules).</li>
+</ul>
+<pre><code>java java/examples/jdk8/DefaultMethods.java
+walk and swim      # Duck resolved the conflict explicitly
+base               # Robot: class method beat the interface default</code></pre>
+<p>Source: <a href="../examples/jdk8/DefaultMethods.java"><code>DefaultMethods.java</code></a>.</p>
+<div class="aside">Interview angle: "Default methods vs abstract classes?" An interface can be implemented by many unrelated classes and still has no instance state; an abstract class can hold fields but a class can extend only one. Default methods exist mainly for interface evolution, as the tutorial's motivation shows.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Main motivation for default methods?</p>
+  <button>Speed up dispatch</button>
+  <button>Replace abstract classes</button>
+  <button data-correct>Evolve interfaces safely</button>
+  <button>Add instance fields</button>
+  <p class="explain">They let libraries add interface methods without breaking older implementers.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Class and interface both supply the method. Which runs?</p>
+  <button>The interface default</button>
+  <button>A random choice</button>
+  <button data-correct>The class method</button>
+  <button>Compile error always</button>
+  <p class="explain">Class wins over an interface default.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Two interfaces give the same default. What must you do?</p>
+  <button>Make both abstract</button>
+  <button>Add final modifiers</button>
+  <button data-correct>Override in the class</button>
+  <button>Nothing at all</button>
+  <p class="explain">The class must override and pick, for example with Walker.super.move().</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Extending interface redeclares a default without body. Effect?</p>
+  <button>It becomes static</button>
+  <button data-correct>It becomes abstract</button>
+  <button>It stays default</button>
+  <button>It becomes private</button>
+  <p class="explain">Redeclaring the default method makes it abstract.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0009-diamond-of-defaults.md">Exercise 0009: the diamond of defaults</a></p>
+<p>Runnable example: <a href="../examples/jdk8/DefaultMethods.java"><code>jdk8/DefaultMethods.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a>. Read 'Extending Interfaces That Contain Default Methods'.</p>
+<p><a href="0008-lambdas-and-functional-interfaces.html">← JDK 8: lambdas, method references and functional interfaces</a> &nbsp;|&nbsp; <a href="0004-streams-and-optional.html">Streams and Optional without the traps →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

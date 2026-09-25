@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 7: Message TTL: per-queue and per-message expiry</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Message TTL: per-queue and per-message expiry</h1>
+<p class="meta">RabbitMQ · Lesson 0007 · step 5 of 9 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> expire messages by queue TTL or per-message TTL, and know where expired messages go and the head-of-queue caveat.</div>
+
+<h2>Two ways</h2>
+<ul><li><strong>Per-queue message TTL</strong>: the <code>x-message-ttl</code> queue argument (or a policy), applied to every message in the queue.</li>
+<li><strong>Per-message TTL</strong>: the <code>expiration</code> property set when publishing. If both exist, "the lower value between the two will be chosen".<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></li></ul>
+<h2>What happens to expired messages</h2>
+<p>Quorum queues dead-letter expired messages when they reach the head of the queue; classic queues do so at the head or when notified of a policy change. Expiry is one of the four dead-letter reasons, so a DLX can capture them.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a><a class="cite" href="https://www.rabbitmq.com/docs/dlx">[2]</a></p>
+<p><strong>Caveat (classic queues, per-message TTL):</strong> "expired messages can queue up behind non-expired ones until the latter are consumed or expired", so their resources are not freed; the docs suggest queue TTL if you need immediate cleanup.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+<pre><code>cd rabbitmq/examples &amp;&amp; ./02-ttl-and-streams.sh
+per-queue TTL 2000 ms + DLX:  right after publish q.ttl=2 q.expired=0 ; after 4 s q.ttl=0 q.expired=2
+per-message expiration=1000:  queue depth after 3 s = 1   (the message without TTL is still there)</code></pre>
+<p>Source: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a>. TTL + DLX is the basis for delayed-retry queues (exercise in the <a href="0005-dead-letter-exchanges.html">DLX lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Queue TTL argument name?</p>
+  <button>x-retention</button>
+  <button>x-max-age</button>
+  <button data-correct>x-message-ttl</button>
+  <button>x-expires-at</button>
+  <p class="explain">Per-queue message TTL uses x-message-ttl.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Both TTLs set. Which applies?</p>
+  <button>The higher value</button>
+  <button>The queue value</button>
+  <button data-correct>The lower value</button>
+  <button>The message value</button>
+  <p class="explain">The lower of the two is chosen.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Expired messages can go to...?</p>
+  <button data-correct>A dead letter exchange</button>
+  <button>The publisher</button>
+  <button>A stream</button>
+  <button>The default exchange</button>
+  <p class="explain">Expiry is a dead-letter reason.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Classic queue per-message TTL caveat?</p>
+  <button data-correct>Expired messages wait at the head</button>
+  <button>Queues are deleted</button>
+  <button>Messages are duplicated</button>
+  <button>TTL is ignored</button>
+  <p class="explain">Expired messages can sit behind non-expired ones until they reach the head.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0007-delay-queue.md">Exercise 0007: a delay queue</a></p>
+<p>Runnable example: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/ttl">RabbitMQ: Time-To-Live and Expiration</a>. Read both message and queue TTL sections.</p>
+<p><a href="0004-publisher-confirms-and-durability.html">← Publisher confirms and durability</a> &nbsp;|&nbsp; <a href="0005-dead-letter-exchanges.html">Dead letter exchanges →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/ttl">RabbitMQ: Time-To-Live and Expiration</a> · [2] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

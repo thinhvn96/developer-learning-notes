@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 5: Dead letter exchanges</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Dead letter exchanges</h1>
+<p class="meta">RabbitMQ · Lesson 0005 · step 6 of 9 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> name the four reasons a message is dead-lettered and configure a DLX, preferring policies over queue arguments.</div>
+
+<h2>What a DLX is</h2>
+<p>Messages from a queue can be "dead-lettered", "republished to an exchange" when certain events occur. A dead letter exchange is an ordinary exchange of any type.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+<h2>Four reasons</h2>
+<ol>
+<li>Rejected without requeue: <code>basic.reject</code> or <code>basic.nack</code> with <code>requeue=false</code> (or the AMQP 1.0 <code>rejected</code> outcome).</li>
+<li>The message expires due to per-message TTL.</li>
+<li>The message is dropped because its queue exceeded a length limit.</li>
+<li>The message is returned more times to a quorum queue than its delivery limit.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></li>
+</ol>
+<h2>Configure</h2>
+<p>Via a <strong>policy</strong> (<code>dead-letter-exchange</code>, optional <code>dead-letter-routing-key</code>) or via queue arguments (<code>x-dead-letter-exchange</code>). The docs prefer policies: they can be changed without redeploying applications, while hardcoded arguments require deleting and redeclaring the queue.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+<pre><code>=== 3. dead-lettering: reject without requeue
+q.main depth: 0   q.dead depth: 1</code></pre>
+<p>In <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a> a rejected <code>poison</code> message left <code>q.main</code> and arrived in <code>q.dead</code> via <code>ex.dlx</code>. (The example uses the queue argument for brevity; in production prefer the policy.)</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which is a reason for dead-lettering?</p>
+  <button>Consumer connects</button>
+  <button>Queue is declared</button>
+  <button data-correct>Reject with requeue false</button>
+  <button>Exchange is bound</button>
+  <p class="explain">basic.reject or basic.nack with requeue=false dead-letters a message.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A DLX is which kind of exchange?</p>
+  <button>Only topic</button>
+  <button data-correct>Any normal exchange</button>
+  <button>A special type only</button>
+  <button>Only fanout</button>
+  <p class="explain">Dead letter exchanges are normal exchanges and can be any type.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Preferred way to configure a DLX?</p>
+  <button data-correct>A policy</button>
+  <button>Manual republish</button>
+  <button>Queue arguments</button>
+  <button>A cron job</button>
+  <p class="explain">Policies can be updated without redeploying applications.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message TTL expires. What can happen?</p>
+  <button>It is acked</button>
+  <button>It is encrypted</button>
+  <button>It is duplicated</button>
+  <button data-correct>It is dead-lettered</button>
+  <p class="explain">Per-message TTL expiry is one of the dead-letter reasons.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0005-retry-queue-with-ttl.md">Exercise 0005: a retry queue with TTL</a></p>
+<p>Runnable example: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a>. Read 'Dead Lettering' and the policy configuration section.</p>
+<p><a href="0007-message-ttl.html">← Message TTL: per-queue and per-message expiry</a> &nbsp;|&nbsp; <a href="0006-quorum-queues-and-poison-messages.html">Quorum queues and poison messages →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

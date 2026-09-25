@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 12: Decorator</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Decorator</h1>
+<p class="meta">Design Patterns · Lesson 0012 · step 12 of 30 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> add behavior by wrapping an object in another object with the same interface, and recognize JDK decorators.</div>
+
+<h2>Intent</h2>
+<p>Decorator is "a structural design pattern that lets you attach new behaviors to objects by placing these objects inside special wrapper objects that contain the behaviors." Use it to assign extra behaviors at runtime without breaking existing code, and when extension by inheritance is awkward or impossible (final classes).<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+<h2>Example</h2><pre><code>java design-patterns/examples/DecoratorDemo.java
+espresso + sugar + milk = 4
+espresso + sugar + sugar = 3
+BufferedReader: line1 | line2
+unmodifiable view reads through: [a, b]
+writes rejected by the wrapper</code></pre><p>Each decorator implements <code>Coffee</code> and holds a <code>Coffee</code>, adding to description and cost; stacks can repeat. JDK decorators: <code>BufferedReader</code> wraps any reader ("reads text from a character-input stream, buffering characters"),<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/BufferedReader.html">[2]</a> and <code>Collections.unmodifiableList</code> returns a wrapper whose reads "read through" to the backing list while modifications throw <code>UnsupportedOperationException</code><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Collections.html">[3]</a> (a wrapper/view: I classify it as a decorator-style wrapper). Source: <a href="../examples/DecoratorDemo.java"><code>DecoratorDemo.java</code></a>.</p>
+<h2>Pros and cons</h2>
+<div class="cols"><p><strong>Pros</strong></p><ul><li>Extend behavior without new subclasses</li><li>Add or remove responsibilities at runtime</li><li>Combine behaviors by stacking wrappers</li><li>Small, focused classes</li></ul>
+<p><strong>Cons</strong></p><ul><li>Hard to remove a specific wrapper from the stack</li><li>Behavior can depend on stacking order</li><li>Configuration code can get messy</li></ul></div>
+<p>(From the pattern's page.)<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a> Adapter changes the interface, Decorator keeps or extends it, Proxy keeps it identical; Strategy changes an object's 'guts', Decorator its 'skin'.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A decorator implements...?</p>
+  <button>A different interface</button>
+  <button>No interface</button>
+  <button>Only Runnable</button>
+  <button data-correct>The same interface as the wrapped object</button>
+  <p class="explain">It wraps an object while keeping the interface.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Decorator vs Strategy?</p>
+  <button>Neither</button>
+  <button>Same</button>
+  <button>Decorator changes guts</button>
+  <button data-correct>Decorator changes skin</button>
+  <p class="explain">Strategy changes the guts; Decorator changes the skin.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. JDK decorator?</p>
+  <button data-correct>BufferedReader</button>
+  <button>Thread</button>
+  <button>Integer</button>
+  <button>Object</button>
+  <p class="explain">BufferedReader wraps another reader.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/BufferedReader.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Downside?</p>
+  <button>Static only</button>
+  <button>Needs threads</button>
+  <button>No polymorphism</button>
+  <button data-correct>Stack order matters</button>
+  <p class="explain">Behavior may depend on wrapper order.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-logging-decorator.md">Exercise 12: a logging decorator</a></p>
+<p>Runnable example: <a href="../examples/DecoratorDemo.java"><code>DecoratorDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/decorator">Decorator (Refactoring.Guru)</a>. Read Intent, Applicability, Pros and cons.</p>
+<p><a href="0011-composite.html">← Composite</a> &nbsp;|&nbsp; <a href="0013-facade.html">Facade →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/decorator">Decorator (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/BufferedReader.html">BufferedReader Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Collections.html">Collections Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 3: Auto-configuration and how to see it</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Auto-configuration and how to see it</h1>
+<p class="meta">Spring Boot · Lesson 0003 · step 4 of 13 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Spring Boot ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what Spring Boot auto-configuration does, how to override it, and how to ask Boot why it configured something.</div>
+
+<h2>What it does</h2>
+<p>"Spring Boot auto-configuration attempts to automatically configure your Spring application based on the jar dependencies that you have added." For example, with HSQLDB on the classpath and no database connection beans of your own, Boot configures an in-memory database.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a> You opt in with <code>@EnableAutoConfiguration</code> or <code>@SpringBootApplication</code>, added once, on your primary configuration class.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+<h2>Non-invasive</h2>
+<p>"Auto-configuration is non-invasive. At any point, you can start to define your own configuration to replace specific parts of the auto-configuration." Define your own <code>DataSource</code> bean and the embedded database backs away.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+<h2>See it, exclude it</h2>
+<ul>
+<li>Start with <code>--debug</code> to log a conditions report showing what was applied and why.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></li>
+<li>Exclude a class: <code>@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })</code>, or set <code>spring.autoconfigure.exclude</code>.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></li>
+</ul>
+<div class="aside">Interview line: "Boot's magic is conditional beans driven by the classpath and existing beans. When behavior surprises me I read the <code>--debug</code> conditions report."</div><p class="aside">Verified: the project in <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, generated with Spring Initializr) was built and its tests run in a Maven container; lines marked RESULT come from those tests. Run them yourself: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (or use the <code>maven:3-eclipse-temurin-21</code> image).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What drives auto-configuration decisions?</p>
+  <button>Docker image tags</button>
+  <button data-correct>Jars on the classpath</button>
+  <button>Git branch names</button>
+  <button>The OS user name</button>
+  <p class="explain">It configures the app based on the jar dependencies you added.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. You define your own DataSource bean. Result?</p>
+  <button>Both get created</button>
+  <button data-correct>Default backs away</button>
+  <button>The JVM restarts</button>
+  <button>Startup fails always</button>
+  <p class="explain">Auto-configuration is non-invasive and backs away from parts you define.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. How do you see what was applied and why?</p>
+  <button>Run kubectl logs</button>
+  <button>Enable the debugger</button>
+  <button>Delete the classpath</button>
+  <button data-correct>Start with --debug</button>
+  <p class="explain">--debug logs a conditions report.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. How do you turn one auto-configuration off?</p>
+  <button>Rename the package</button>
+  <button>Change the port</button>
+  <button>Remove main()</button>
+  <button data-correct>Use exclude on the annotation</button>
+  <p class="explain">Use the exclude attribute of @SpringBootApplication or the property.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-read-the-conditions-report.md">Exercise 0003: read the conditions report</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot Reference: Auto-configuration</a>. Short page; then 'Creating Your Own Auto-configuration' for depth.</p>
+<p><a href="0007-bean-scopes.html">← Bean scopes: singleton vs prototype</a> &nbsp;|&nbsp; <a href="0008-externalized-configuration-and-profiles.html">Externalized configuration, precedence and profiles →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot Reference: Auto-configuration</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

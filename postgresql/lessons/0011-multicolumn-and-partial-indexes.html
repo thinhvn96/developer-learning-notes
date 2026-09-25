@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 11: Multicolumn and partial indexes</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Multicolumn and partial indexes</h1>
+<p class="meta">PostgreSQL · Lesson 0011 · step 9 of 13 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> order columns in a multicolumn index, and use a partial index to keep an index small.</div>
+
+<h2>Multicolumn B-tree</h2>
+<p>Most efficient with constraints on the <em>leading</em> columns: "equality constraints on leading columns, plus any inequality constraints on the first column that does not have an equality constraint, will always be used to limit the portion of the index that is scanned." For an index on <code>(a, b, c)</code>: <code>WHERE a = 5 AND b &gt;= 42 AND c &lt; 77</code> is ideal.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a> Recent versions can also apply a skip-scan optimization when leading columns have few distinct values.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a> Warning: use them sparingly; more than three columns is rarely helpful unless usage is extremely stylized.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a></p>
+<h2>Partial indexes</h2>
+<p>A partial index covers a subset of rows chosen by a predicate. Its main benefit is to "avoid indexing common values": smaller index, faster updates because not every write touches it.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-partial.html">[2]</a></p>
+<pre><code>./run.sh 10-index-types.sql
+CREATE INDEX t_ab   ON t (a, b);                 -- 1352 kB
+CREATE INDEX t_rare ON t (c) WHERE status='rare';-- 64 kB
+EXPLAIN ... WHERE a = 5 AND b = 505      -&gt; Bitmap Index Scan on t_ab
+EXPLAIN ... WHERE b = 505                -&gt; Bitmap Index Scan on t_ab   (a has 100 distinct values)
+EXPLAIN ... WHERE status='rare' AND c=300 -&gt; Index Scan using t_rare</code></pre>
+<p>The second plan used the index although <code>a</code> is not constrained: consistent with the skip-scan note, since <code>a</code> has only 100 distinct values in this data. Do not rely on that for columns with many distinct values. Source: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Index on (a, b, c). Most useful constraint?</p>
+  <button>Only on c</button>
+  <button data-correct>Equality on a</button>
+  <button>No constraint</button>
+  <button>Only on b</button>
+  <p class="explain">Constraints on leading columns limit the scanned portion of the index.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Main benefit of a partial index?</p>
+  <button>Replace primary keys</button>
+  <button data-correct>Avoid indexing common values</button>
+  <button>Store more columns</button>
+  <button>Speed up sorts only</button>
+  <p class="explain">It avoids indexing common values, shrinking the index.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-partial.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Guidance on many-column indexes?</p>
+  <button>Ten columns is ideal</button>
+  <button>Never use them</button>
+  <button>Always add more</button>
+  <button data-correct>Use sparingly</button>
+  <p class="explain">Indexes with more than three columns are unlikely to help unless usage is extremely stylized.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. In the run, the partial index was how big?</p>
+  <button>1352 kB</button>
+  <button data-correct>64 kB</button>
+  <button>1 GB</button>
+  <button>64 MB</button>
+  <p class="explain">64 kB versus 1352 kB for the multicolumn index.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-design-two-indexes.md">Exercise 0011: design two indexes</a></p>
+<p>Runnable example: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">PostgreSQL Docs: Multicolumn Indexes</a>. Then Partial Indexes.</p>
+<p><a href="0010-index-types.html">← Index types: B-tree, hash, GIN, BRIN</a> &nbsp;|&nbsp; <a href="0005-reading-explain.html">Reading EXPLAIN and EXPLAIN ANALYZE →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">PostgreSQL Docs: Multicolumn Indexes</a> · [2] <a href="https://www.postgresql.org/docs/current/indexes-partial.html">PostgreSQL Docs: Partial Indexes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

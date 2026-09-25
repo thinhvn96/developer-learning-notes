@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 11: Aggregations: buckets and metrics</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Aggregations: buckets and metrics</h1>
+<p class="meta">ELK Stack · Lesson 0011 · step 9 of 14 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> write a terms aggregation with a nested metric, and say why aggregating on a text field fails.</div>
+
+<h2>Three families</h2>
+<p>"An aggregation summarizes your data as metrics, statistics, or other analytics." <strong>Metric</strong> aggregations calculate values such as sum or average; <strong>bucket</strong> aggregations group documents into buckets by field values or ranges; <strong>pipeline</strong> aggregations take input from other aggregations.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+<pre><code>{ "aggs": { "by_service": { "terms": { "field": "service.keyword" },
+    "aggs": { "avg_ms": { "avg": { "field": "ms" } }, "max_ms": { "max": { "field": "ms" } } } } } }
+orders   docs=2 avg_ms=75.0  max_ms=120.0
+payments docs=2 avg_ms=472.5 max_ms=900.0</code></pre>
+<h2>Text versus keyword again</h2>
+<p>Terms on the analyzed field <code>service</code> was refused: "Fielddata is disabled on [service]. Text fields are not optimised for operations that require per-document field data..." (from my run). With dynamic mapping the index had a <code>service.keyword</code> sub-field, which I aggregated on (observed in the run; explicit mappings avoid the guesswork). This connects to the text analysis in <a href="0009-text-analysis.html">the previous lesson</a> and to <code>keyword</code> fields in <a href="0005-query-dsl-term-match-bool.html">lesson 5</a> (the term-query page says exact values belong in keyword fields).<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[2]</a> Script: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a>. SQL analogue: <a href="../../postgresql/lessons/0007-aggregates-group-by-having.html"><code>GROUP BY</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which aggregation groups documents into buckets?</p>
+  <button>Scripted</button>
+  <button data-correct>Bucket</button>
+  <button>Pipeline</button>
+  <button>Metric</button>
+  <p class="explain">Bucket aggregations group documents by values or ranges.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which computes an average?</p>
+  <button data-correct>Metric</button>
+  <button>Term query</button>
+  <button>Bucket</button>
+  <button>Pipeline only</button>
+  <p class="explain">Metric aggregations compute sums and averages.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Terms aggregation on a text field...?</p>
+  <button data-correct>Is refused by default</button>
+  <button>Needs no mapping</button>
+  <button>Is faster</button>
+  <button>Works best</button>
+  <p class="explain">The run returned: Fielddata is disabled on text fields.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Pipeline aggregations take input from...?</p>
+  <button>Raw documents only</button>
+  <button>Kibana</button>
+  <button>Logstash</button>
+  <button data-correct>Other aggregations</button>
+  <p class="explain">They consume other aggregations' results.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-latency-report.md">Exercise 0011: a latency report</a></p>
+<p>Runnable example: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">Elasticsearch: Aggregations</a>. Overview of metric, bucket, pipeline.</p>
+<p><a href="0010-bulk-api.html">← The bulk API and per-item errors</a> &nbsp;|&nbsp; <a href="0006-logstash-grok-and-persistent-queues.html">Logstash: pipelines, grok and persistent queues →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">Elasticsearch: Aggregations</a> · [2] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">Elasticsearch: Term query</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

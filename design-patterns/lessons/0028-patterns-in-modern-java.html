@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 28: Patterns in modern Java: lambdas, records, sealed types</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Patterns in modern Java: lambdas, records, sealed types</h1>
+<p class="meta">Design Patterns · Lesson 0028 · step 28 of 30 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Design Patterns ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain which classic patterns shrink or vanish with lambdas, records, enums and sealed types.</div>
+
+<p>The first criticism of patterns is that some compensate for language limits.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a> Modern Java removes much ceremony.</p>
+<table><tr><th>Pattern</th><th>Classic</th><th>Modern Java</th></tr>
+<tr><td>Strategy</td><td>interface + N classes</td><td>a lambda or method reference for a one-method interface (the Strategy page itself notes functional languages may make the pattern unnecessary)<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></td></tr>
+<tr><td>Command</td><td>class per command</td><td><code>Runnable</code>/lambdas (still use classes when you need <code>undo</code>)</td></tr>
+<tr><td>Template Method</td><td>abstract class</td><td>pass functions for the varying steps (my suggestion)</td></tr>
+<tr><td>Visitor</td><td>accept/visit double dispatch</td><td>sealed interface + record patterns + <code>switch</code>: exhaustive checking by the compiler<a class="cite" href="https://openjdk.org/jeps/441">[2]</a><a class="cite" href="https://openjdk.org/jeps/409">[3]</a></td></tr>
+<tr><td>Singleton</td><td>private constructor + static</td><td>single-element enum, or a container-managed bean</td></tr>
+<tr><td>Builder</td><td>fluent builder</td><td>records with compact constructors for small data; builders remain for many optional parameters</td></tr>
+<tr><td>State</td><td>state classes</td><td>enum with behavior, or sealed types + switch</td></tr></table>
+<p>Verified examples in this course: lambda strategies (<a href="../examples/StrategyDemo.java"><code>StrategyDemo.java</code></a>), the sealed/pattern-switch visitor (<a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a>), enum singleton and strategy-per-constant (<a href="../examples/SingletonDemo.java"><code>SingletonDemo.java</code></a>, <a href="../../oop/examples/EnumsAsClasses.java"><code>EnumsAsClasses.java</code></a>). JEP 441 says pattern switches must be exhaustive and, over a sealed hierarchy, coverage is checked by the compiler, sometimes removing the need for <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/441">[2]</a></p>
+<div class="aside">Interview line: "Patterns are vocabulary. In Java 21 I often reach for a lambda instead of a Strategy class, or a sealed interface with a switch instead of a Visitor, but I still name the pattern so the team understands the design."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. A Strategy with one method can be...?</p>
+  <button data-correct>A lambda</button>
+  <button>An enum only</button>
+  <button>A thread</button>
+  <button>A static class</button>
+  <p class="explain">A functional interface accepts a lambda.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Modern Visitor replacement?</p>
+  <button>Threads</button>
+  <button>Serialization</button>
+  <button data-correct>Sealed types and switch</button>
+  <button>Reflection</button>
+  <p class="explain">Exhaustive pattern matching over a sealed hierarchy.<a class="cite" href="https://openjdk.org/jeps/441">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Compiler checks what for sealed switches?</p>
+  <button>Threads</button>
+  <button>Speed</button>
+  <button>Naming</button>
+  <button data-correct>Exhaustiveness</button>
+  <p class="explain">Sealed coverage is checked from the permitted subtypes.<a class="cite" href="https://openjdk.org/jeps/441">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Do patterns disappear entirely?</p>
+  <button>Only creational</button>
+  <button data-correct>No, the vocabulary stays</button>
+  <button>Yes</button>
+  <button>Only in Java 8</button>
+  <p class="explain">They shrink but remain a shared vocabulary.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0028-modernize-three-patterns.md">Exercise 28: modernize three patterns</a></p>
+<p>Runnable example: <a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a>. Cons section on functional languages.</p>
+<p><a href="0027-patterns-in-the-jdk.html">← Patterns you already use in the JDK</a> &nbsp;|&nbsp; <a href="0029-patterns-in-spring.html">Patterns in Spring →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a> · [2] <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a> · [3] <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

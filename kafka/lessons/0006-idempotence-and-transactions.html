@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 6: Idempotent producers and transactions</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Idempotent producers and transactions</h1>
+<p class="meta">Kafka · Lesson 0006 · step 8 of 10 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain what the idempotent producer and transactions guarantee, and what they do not.</div>
+
+<h2>Idempotent producer</h2>
+<p>Since 0.11.0.0 the producer supports an idempotent option "which guarantees that resending will not result in duplicate entries."<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> In the 4.3 configuration docs <code>enable.idempotence</code> is on by default, ensuring "exactly one copy of each message is written in the stream."<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a> It removes duplicates caused by the producer's own retries.</p>
+<h2>Transactions</h2>
+<p>Producers can "send messages atomically to multiple topic partitions using transactions, so that either all messages are successfully written or none of them are."<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+<h2>What this buys and what it does not</h2>
+<ul>
+<li>Producer retries no longer duplicate records in the log (idempotence).</li>
+<li>A consume-transform-produce step can write its outputs atomically (transactions).</li>
+<li>It does <strong>not</strong> make your side effects exactly-once: an email sent or a row written in another database is outside Kafka's guarantee. Keep consumers idempotent (see the <a href="0004-delivery-semantics.html">delivery semantics lesson</a>).</li>
+</ul>
+<div class="aside">The design page's full description of exactly-once (and of consumers reading only committed transactional data) goes beyond the excerpts used here. Ask your teacher to walk through it, or read the "Message Delivery Semantics" section of the Design chapter yourself.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does the idempotent producer prevent?</p>
+  <button>Slow networks</button>
+  <button data-correct>Duplicates from resends</button>
+  <button>Broker failures</button>
+  <button>Consumer lag</button>
+  <p class="explain">Resending will not result in duplicate entries.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Transactions let a producer write to many partitions...?</p>
+  <button>Without acks</button>
+  <button data-correct>Atomically</button>
+  <button>Only sequentially</button>
+  <button>Only to one</button>
+  <p class="explain">Either all messages are written or none.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Is enable.idempotence on by default in 4.3 docs?</p>
+  <button>Only in tests</button>
+  <button>Only with acks 1</button>
+  <button data-correct>Yes, true</button>
+  <button>No, false</button>
+  <p class="explain">The docs list the default as true.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Does Kafka make an email side effect exactly-once?</p>
+  <button data-correct>No, it does not</button>
+  <button>Only with acks all</button>
+  <button>Yes, always</button>
+  <button>Only with retries</button>
+  <p class="explain">Guarantees cover writes into Kafka; external side effects still need idempotent handling.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0006-design-an-idempotent-consumer.md">Exercise 0006: design an idempotent consumer</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design, Message Delivery Semantics</a>. Continue after the 'at least once' paragraphs.</p>
+<p><a href="0005-replication-isr-and-durability.html">← Replication, ISR and durability</a> &nbsp;|&nbsp; <a href="0009-kafka-streams-basics.html">Kafka Streams: streams, tables and state →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: idempotence and transactions</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 3: Consumer acknowledgements, prefetch and redelivery</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Consumer acknowledgements, prefetch and redelivery</h1>
+<p class="meta">RabbitMQ · Lesson 0003 · step 3 of 9 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain manual acknowledgements, what happens when a consumer dies, why redelivery forces idempotent consumers, and how prefetch limits in-flight messages.</div>
+
+<h2>Acknowledgements</h2>
+<p>Deliveries are identified by delivery tags. A consumer answers with <code>basic.ack</code> (positive), <code>basic.nack</code> (negative, a RabbitMQ extension) or <code>basic.reject</code> (negative, more limited than nack). With <code>multiple=true</code>, RabbitMQ acknowledges all outstanding tags up to and including the given one.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+<p>If a consumer disconnects without acking, "any delivery (message) that was not acked is automatically requeued", with the <code>redeliver</code> flag set, so consumers "be implemented with idempotence in mind."<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a> The AMQP overview says the same: the broker redelivers to another consumer.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></p>
+<h2>Automatic ack is a trap</h2>
+<p>Automatic acknowledgement "should be considered unsafe and not suitable for all workloads", and consumers can be overwhelmed by deliveries and build a backlog in memory.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a> Use manual acks.</p>
+<h2>Prefetch</h2>
+<p>Channel prefetch limits unacknowledged messages in flight; 0 means no limit, and "values in the 100 through 300 range usually offer optimal throughput."<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a> Lower prefetch gives fairer distribution among slow workers; higher improves throughput.</p>
+<h2>Watch it</h2>
+<pre><code>get with ack_requeue_true (like a consumer that died before acking):
+  redelivered=false payload=job-1
+get again:
+  redelivered=true payload=job-1</code></pre>
+<p>From <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a>: the second delivery carries <code>redelivered=true</code>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Consumer dies with unacked messages. Result?</p>
+  <button>Deleted permanently</button>
+  <button>Moved to fanout</button>
+  <button data-correct>Automatically requeued</button>
+  <button>Held for the consumer</button>
+  <p class="explain">Un-acked deliveries are automatically requeued.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Why is auto-ack considered unsafe?</p>
+  <button>It forces fanout</button>
+  <button data-correct>Messages can be lost</button>
+  <button>It slows publishers</button>
+  <button>It disables queues</button>
+  <p class="explain">The docs call automatic acknowledgement unsafe for many workloads and warn about backlog buildup.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Prefetch of 0 means what?</p>
+  <button data-correct>No limit</button>
+  <button>No messages</button>
+  <button>Manual only</button>
+  <button>One message</button>
+  <p class="explain">A value of 0 means no limit on unacknowledged messages.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. A redelivered message requires the consumer to be...?</p>
+  <button>Transactional</button>
+  <button data-correct>Idempotent</button>
+  <button>Single threaded</button>
+  <button>Stateless only</button>
+  <p class="explain">Consumers must be implemented with idempotence in mind.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0003-tune-prefetch.md">Exercise 0003: tune prefetch</a></p>
+<p>Runnable example: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a>. Read 'Consumer Acknowledgements' and 'Consumer Prefetch'.</p>
+<p><a href="0002-exchange-types.html">← Direct, fanout and topic exchanges</a> &nbsp;|&nbsp; <a href="0004-publisher-confirms-and-durability.html">Publisher confirms and durability →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a> · [2] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

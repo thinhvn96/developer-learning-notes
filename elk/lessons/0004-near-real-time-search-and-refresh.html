@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 4: Near real-time search and refresh</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Near real-time search and refresh</h1>
+<p class="meta">ELK Stack · Lesson 0004 · step 6 of 14 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">ELK Stack ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain why a just-indexed document may not be searchable yet, what a refresh does, and its default schedule.</div>
+
+<h2>Near real-time</h2>
+<p>"A refresh makes all operations performed on an index since the last refresh available for search." It is lightweight: new segments are written to the filesystem cache and opened for search without a full commit to disk.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a> "Document changes are not visible to search immediately", hence <em>near</em> real-time.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+<p>By default "Elasticsearch periodically refreshes indices every second, but only on indices that have received one search request or more in the last 30 seconds."<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+<h2>See it</h2>
+<pre><code>hits before refresh: 0
+hits after  refresh: 2</code></pre>
+<p>The script indexes two documents, counts (0), calls <code>_refresh</code>, counts again (2). The first count is 0 because the idle index had not been refreshed yet, in line with the rule above; timing can vary, so if you see 2, the periodic refresh simply ran first.</p>
+<div class="aside">Interview angle: "My test indexes a document then searches and finds nothing." Answer: call refresh in tests (or wait), and do not call refresh per document in production because refreshes cost throughput; tune <code>refresh_interval</code> for bulk loads.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What makes new documents searchable?</p>
+  <button>A replica move</button>
+  <button>A mapping change</button>
+  <button>A restart</button>
+  <button data-correct>A refresh</button>
+  <p class="explain">A refresh makes operations since the last refresh available for search.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default refresh cadence for active indices?</p>
+  <button data-correct>Every second</button>
+  <button>Every hour</button>
+  <button>Never</button>
+  <button>Every write</button>
+  <p class="explain">Indices are refreshed every second if searched in the last 30 seconds.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Why 'near' real-time?</p>
+  <button>Replicas lag hours</button>
+  <button>Search is slow</button>
+  <button data-correct>Changes are not instantly visible</button>
+  <button>Writes take a day</button>
+  <p class="explain">Document changes become visible within the refresh timeframe, not immediately.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What does a refresh write?</p>
+  <button>A full disk commit</button>
+  <button>A new shard</button>
+  <button>A new mapping</button>
+  <button data-correct>New segments in cache</button>
+  <p class="explain">It writes segments to the filesystem cache without a full commit.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0004-bulk-load-tuning.md">Exercise 0004: bulk load tuning</a></p>
+<p>Runnable example: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">Elasticsearch Docs: Near real-time search</a>. Short page.</p>
+<p><a href="0003-shards-and-replicas.html">← Shards and replicas</a> &nbsp;|&nbsp; <a href="0005-query-dsl-term-match-bool.html">Query DSL: term, match and bool →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">Elasticsearch Docs: Near real-time search</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

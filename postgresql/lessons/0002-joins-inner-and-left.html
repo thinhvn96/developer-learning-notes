@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 2: Inner and left joins, and the WHERE trap</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Inner and left joins, and the WHERE trap</h1>
+<p class="meta">PostgreSQL · Lesson 0002 · step 3 of 13 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">PostgreSQL ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> predict the row count of an inner and a left join, and spot the WHERE clause that silently turns a left join into an inner join.</div>
+
+<h2>Inner vs left outer</h2>
+<p>An inner join keeps only rows that match on both sides. A left outer join is named so because "the table mentioned on the left of the join operator will have each of its rows in the output at least once"; for a left row with no match, "empty (null) values are substituted for the right-table columns."<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 02-joins.sql
+-- inner join: 2 rows (Hayward dropped)
+-- left outer join: 3 rows (Hayward with NULL name, location)</code></pre>
+<h2>The trap</h2>
+<p>Add <code>WHERE cities.location IS NOT NULL</code> to the left join and Hayward disappears again: the NULL that the outer join produced fails the filter. The run shows 2 rows. (This follows from the NULL-substitution rule above; the third query in the example demonstrates it.) To filter the right table without losing left rows, put the condition in the <code>ON</code> clause instead.</p>
+<p class="aside">Interview angle: "Why does my LEFT JOIN return fewer rows than the left table?" Answer: a WHERE predicate on the right table's columns.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Inner join, left row has no match. Output?</p>
+  <button>The row is duplicated</button>
+  <button data-correct>The row is dropped</button>
+  <button>An error is raised</button>
+  <button>The row appears with NULLs</button>
+  <p class="explain">Only rows matching both sides appear in an inner join.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Left outer join, left row has no match. Output?</p>
+  <button data-correct>Right columns are NULL</button>
+  <button>Left columns are NULL</button>
+  <button>An error is raised</button>
+  <button>The row is dropped</button>
+  <p class="explain">Empty (null) values fill the right-table columns.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where should a right-table filter go to keep left rows?</p>
+  <button>In WHERE after join</button>
+  <button>In ORDER BY</button>
+  <button>In GROUP BY</button>
+  <button data-correct>In the ON clause</button>
+  <p class="explain">A WHERE filter on right columns removes the NULL-extended rows; ON filters before null-extension.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which side of a left join keeps every row?</p>
+  <button>Both tables</button>
+  <button>Neither table</button>
+  <button>The right table</button>
+  <button data-correct>The left table</button>
+  <p class="explain">The left table's rows each appear at least once.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-three-way-join.md">Exercise 0002: a three-way join</a></p>
+<p>Runnable example: <a href="../examples/02-joins.sql"><code>02-joins.sql</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-join.html">PostgreSQL Tutorial: Joins Between Tables</a>. Section 2.6.</p>
+<p><a href="0007-aggregates-group-by-having.html">← Aggregates, GROUP BY and HAVING</a> &nbsp;|&nbsp; <a href="0008-transactions-commit-rollback-savepoints.html">Transactions: COMMIT, ROLLBACK and savepoints →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.postgresql.org/docs/current/tutorial-join.html">PostgreSQL Tutorial: Joins Between Tables</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

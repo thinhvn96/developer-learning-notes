@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 13: Enums as classes</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Enums as classes</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0013 · step 13 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> use an enum with fields, constructors and constant-specific methods as a type-safe set of instances.</div>
+
+<h2>What an enum is</h2>
+<p>"An enum type is a special data type that enables for a variable to be a set of predefined constants." Enums can have fields, methods and constructors (which must be package-private or private) and give compile-time type safety. "All enums implicitly extend <code>java.lang.Enum</code>", so an enum cannot extend anything else.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a> Use them "any time you need to represent a fixed set of constants".<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+<pre><code>java oop/examples/EnumsAsClasses.java
+MERCURY  gravity 3.70
+EARTH    gravity 9.80
+ADD 6,7 -&gt; 13
+MUL 6,7 -&gt; 42
+valueOf(&quot;EARTH&quot;) == Planet.EARTH : true
+EnumMap: {ADD=2}
+no such constant: No enum constant EnumsAsClasses.Planet.PLUTO</code></pre>
+<p><code>Planet</code> carries data; <code>Op</code> gives each constant its own behavior (a tiny <a href="../../design-patterns/lessons/0023-strategy.html">strategy</a> per constant); <code>EnumMap</code> is an efficient map keyed by enum. Compare with sealed hierarchies when each variant needs different <em>data</em> (<a href="../../java/lessons/0014-sealed-classes.html">JDK 17 lesson</a>). Source: <a href="../examples/EnumsAsClasses.java"><code>EnumsAsClasses.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. An enum is a fixed set of...?</p>
+  <button>Packages</button>
+  <button>Interfaces</button>
+  <button data-correct>Instances</button>
+  <button>Threads</button>
+  <p class="explain">A set of predefined constants (instances).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Enum constructors may be...?</p>
+  <button>Absent only</button>
+  <button data-correct>Private or package-private</button>
+  <button>Protected only</button>
+  <button>Public</button>
+  <p class="explain">Constructors must be package-private or private.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Can an enum extend another class?</p>
+  <button>Only abstract</button>
+  <button>Only final</button>
+  <button>Yes</button>
+  <button data-correct>No</button>
+  <p class="explain">It implicitly extends java.lang.Enum.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Constant-specific method bodies give...?</p>
+  <button>Inheritance</button>
+  <button>Faster startup</button>
+  <button data-correct>Per-constant behavior</button>
+  <button>Mutability</button>
+  <p class="explain">Op.ADD and Op.MUL each implemented apply differently.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-state-machine-enum.md">Exercise 13: a state-machine enum</a></p>
+<p>Runnable example: <a href="../examples/EnumsAsClasses.java"><code>EnumsAsClasses.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">Java Tutorials: Enum Types</a>. Basic and Planet examples.</p>
+<p><a href="0012-nested-classes.html">← Nested, inner, local and anonymous classes</a> &nbsp;|&nbsp; <a href="0014-immutability.html">Immutability and defensive copies →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">Java Tutorials: Enum Types</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

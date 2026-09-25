@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 10: Sharding, shard keys and consistent hashing</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Sharding, shard keys and consistent hashing</h1>
+<p class="meta">System Design · Lesson 0010 · step 11 of 11 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">System Design ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain shard keys and the three main strategies, and show why hash-mod-N is painful when you add a shard.</div>
+
+<h2>Idea</h2>
+<p>"Divide a data store into a set of horizontal partitions or shards": each shard has the same schema and its own subset of the data. The <strong>shard key</strong> is the most critical decision; changing it typically means migrating all data. A good key is immutable, has high cardinality, spreads data and load evenly and matches the dominant queries; avoid monotonically increasing values and low-cardinality attributes.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+<h2>Strategies</h2>
+<ul><li><strong>Lookup (directory):</strong> a map from key to shard; flexible, extra lookup cost.</li>
+<li><strong>Range:</strong> good for range queries; hotspots and hard rebalancing.</li>
+<li><strong>Hash:</strong> even distribution; with plain <code>hash(key) mod N</code>, "adding or removing a shard reassigns most keys"; consistent hashing moves only a small fraction.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></li>
+<li><strong>Geographic:</strong> for residency and latency; risk of imbalance.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></li></ul>
+<pre><code>java system-design/examples/ShardingDemo.java     # 100,000 keys, 4 -&gt; 5 shards
+hash(key) mod N            : 80.1% of keys move
+consistent hashing (ring)  : 18.2% of keys move (ideal 20%)</code></pre>
+<p>Source: <a href="../examples/ShardingDemo.java"><code>ShardingDemo.java</code></a>. Costs the docs list: cross-shard queries and transactions, operational burden (monitoring, backups, schema changes). Consider read replicas, caching, or table partitioning before sharding.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a> Related: Kafka partitions are sharding by key (<a href="../../kafka/lessons/0001-events-topics-partitions.html">lesson</a>) and Elasticsearch shards (<a href="../../elk/lessons/0003-shards-and-replicas.html">lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Most critical sharding decision?</p>
+  <button>The logo</button>
+  <button data-correct>The shard key</button>
+  <button>The port</button>
+  <button>The driver</button>
+  <p class="explain">The shard key is the most critical design decision.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. hash mod N when adding a shard?</p>
+  <button data-correct>Most keys move</button>
+  <button>No keys move</button>
+  <button>Only one moves</button>
+  <button>Half stay</button>
+  <p class="explain">Adding or removing a shard reassigns most keys (80.1% in the demo).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Consistent hashing moves about...?</p>
+  <button>Nothing</button>
+  <button>Everything</button>
+  <button>Exactly half</button>
+  <button data-correct>A small fraction</button>
+  <p class="explain">Only a small fraction of keys move (18.2% in the demo).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Good shard key trait?</p>
+  <button data-correct>High cardinality</button>
+  <button>Frequently changing</button>
+  <button>Auto-increment</button>
+  <button>Boolean</button>
+  <p class="explain">Effective keys are immutable with high cardinality.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-choose-a-shard-key.md">Exercise 0010: choose a shard key</a></p>
+<p>Runnable example: <a href="../examples/ShardingDemo.java"><code>ShardingDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">Azure: Sharding pattern</a>. Solution, shard key selection, strategies.</p>
+<p><a href="0011-transactional-outbox.html">← The transactional outbox</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">Azure: Sharding pattern</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

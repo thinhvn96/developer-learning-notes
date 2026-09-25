@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 2: Direct, fanout and topic exchanges</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Direct, fanout and topic exchanges</h1>
+<p class="meta">RabbitMQ · Lesson 0002 · step 2 of 9 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">RabbitMQ ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> choose direct, fanout or topic for a routing requirement and predict which queues receive a message.</div>
+
+<h2>Four exchange types, three you will use</h2>
+<table>
+<tr><th>Type</th><th>Routing<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></th></tr>
+<tr><td>Direct</td><td>exact routing-key match; unicast</td></tr>
+<tr><td>Fanout</td><td>copies to <em>all</em> bound queues, ignoring the routing key</td></tr>
+<tr><td>Topic</td><td>routing-key <em>pattern</em> match for selective distribution</td></tr>
+<tr><td>Headers</td><td>routes on message header values, not the routing key</td></tr>
+</table>
+<h2>What the example did</h2>
+<ul>
+<li><code>ex.direct</code> bound <code>q.errors</code> with key <code>error</code>. Publishing <code>error</code> reached it; <code>info</code> reached nothing.</li>
+<li><code>ex.fanout</code> bound <code>q.all</code> and <code>q.eu</code>. One publish put a copy in each.</li>
+<li><code>ex.topic</code> bound <code>q.eu</code> with pattern <code>orders.eu.*</code>. <code>orders.eu.created</code> matched; <code>orders.us.created</code> did not.</li>
+</ul>
+<pre><code>queue q.errors depth: 1
+queue q.all depth: 1
+queue q.eu depth: 2       # one from the fanout, one from the topic exchange</code></pre>
+<p>The <code>orders.eu.*</code> pattern uses the topic wildcard <code>*</code> as in the AMQP tutorial (the fetched excerpt describes topic exchanges as pattern matching; the wildcard behavior here was confirmed by the run above).</p>
+<div class="aside">Interview angle: "Fanout versus topic?" Fanout is broadcast; topic is selective subscription by pattern. Use direct when you know the exact key, for example one queue per severity.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which exchange ignores the routing key?</p>
+  <button>Default</button>
+  <button data-correct>Fanout</button>
+  <button>Topic</button>
+  <button>Direct</button>
+  <p class="explain">Fanout broadcasts copies to all bound queues and ignores the routing key.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which exchange matches routing-key patterns?</p>
+  <button>Direct</button>
+  <button>Fanout</button>
+  <button>Headers</button>
+  <button data-correct>Topic</button>
+  <p class="explain">Topic exchanges match routing patterns.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which routes on header values?</p>
+  <button>Direct</button>
+  <button>Default</button>
+  <button>Fanout</button>
+  <button data-correct>Headers</button>
+  <p class="explain">The headers exchange uses message header values.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Bound with key error, publish key info to direct. Result?</p>
+  <button>Queue receives it</button>
+  <button>Broker error</button>
+  <button>Copied to all</button>
+  <button data-correct>Unrouted, dropped</button>
+  <p class="explain">Direct requires an exact match; the example returned routed:false.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0002-design-the-topology.md">Exercise 0002: design the topology</a></p>
+<p>Runnable example: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a>. The 'Exchanges and Exchange Types' section.</p>
+<p><a href="0001-amqp-model-exchanges-queues-bindings.html">← The AMQP model: exchanges, queues and bindings</a> &nbsp;|&nbsp; <a href="0003-acks-prefetch-redelivery.html">Consumer acknowledgements, prefetch and redelivery →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

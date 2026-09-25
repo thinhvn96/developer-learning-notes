@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 20: SOLID 4: Interface Segregation Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 4: Interface Segregation Principle</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0020 · step 20 of 22 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> split a fat interface into role interfaces so no class implements methods it cannot support.</div>
+
+<h2>The principle</h2>
+<p>"Clients should not depend upon interface methods they do not use."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+<pre><code>java oop/examples/IspDemo.java
+fat interface: Robot forced to implement eat() -&gt; robots do not eat
+robot works
+human eats
+human works</code></pre>
+<p><code>FatWorker</code> forces <code>FatRobot</code> to implement <code>eat()</code>, and it can only throw <code>UnsupportedOperationException</code> (also an LSP smell). Splitting into <code>Workable</code> and <code>Feedable</code> lets each class implement just its roles and each client depend on only what it calls. Source: <a href="../examples/IspDemo.java"><code>IspDemo.java</code></a>.</p>
+<p>Java has both faces: <code>Comparator</code> is a tiny single-purpose interface (<a href="../../design-patterns/lessons/0023-strategy.html">Strategy</a>), and the <code>java.util.function</code> package is a catalog of role interfaces (<a href="../../java/lessons/0008-lambdas-and-functional-interfaces.html">lambdas lesson</a>).</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. ISP says clients should not depend on...?</p>
+  <button>Classes</button>
+  <button>Interfaces</button>
+  <button data-correct>Methods they do not use</button>
+  <button>Packages</button>
+  <p class="explain">Clients should not depend upon interface methods they do not use.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. A symptom of a fat interface?</p>
+  <button>Many small interfaces</button>
+  <button>Lambdas</button>
+  <button data-correct>Implementations throwing UnsupportedOperation</button>
+  <button>Records</button>
+  <p class="explain">FatRobot threw for eat().</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. The fix?</p>
+  <button>Merge classes</button>
+  <button>Add more methods</button>
+  <button>Make them static</button>
+  <button data-correct>Split into role interfaces</button>
+  <p class="explain">Workable and Feedable.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which class implements both roles in the demo?</p>
+  <button>Robot</button>
+  <button data-correct>Human</button>
+  <button>None</button>
+  <button>FatRobot</button>
+  <p class="explain">Human implements Workable and Feedable.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0020-split-an-interface.md">Exercise 20: split an interface</a></p>
+<p>Runnable example: <a href="../examples/IspDemo.java"><code>IspDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. The SOLID overview page.</p>
+<p><a href="0019-liskov-substitution-principle.html">← SOLID 3: Liskov Substitution Principle</a> &nbsp;|&nbsp; <a href="0021-dependency-inversion-principle.html">SOLID 5: Dependency Inversion Principle →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

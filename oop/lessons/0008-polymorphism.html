@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 8: Polymorphism and virtual method invocation</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Polymorphism and virtual method invocation</h1>
+<p class="meta">OOP (Object-Oriented Programming) · Lesson 0008 · step 8 of 22 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">OOP (Object-Oriented Programming) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> explain virtual method invocation and distinguish runtime dispatch (overriding) from compile-time selection (overloading).</div>
+
+<h2>Definition</h2>
+<p>"Subclasses of a class can define their own unique behaviors and yet share some of the same functionality of the parent class." The key mechanism: "The Java virtual machine (JVM) calls the appropriate method for the object that is referred to in each variable. It does not call the method that is defined by the variable's type. This behavior is referred to as <em>virtual method invocation</em>."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[1]</a></p>
+<pre><code>java oop/examples/PolymorphismDemo.java
+Circle  area=3.14
+Square  area=4.00
+Circle  area=0.79
+total=7.93
+overload chosen for a Shape-typed variable holding a Circle: describe(Shape)</code></pre>
+<p>One loop over <code>List&lt;Shape&gt;</code> produced three different behaviors. The last line is the trap: <em>overloads</em> (<code>describe(Shape)</code> vs <code>describe(Circle)</code>) are chosen at compile time from the variable's declared type, so a <code>Shape</code>-typed variable holding a <code>Circle</code> selected <code>describe(Shape)</code>. Overriding is dynamic; overloading is static. Source: <a href="../examples/PolymorphismDemo.java"><code>PolymorphismDemo.java</code></a>.</p>
+<p>Why this matters: this is what lets callers depend on an interface and stay open to new types: the basis of most <a href="../../design-patterns/index.html">design patterns</a> and of the <a href="0018-open-closed-principle.html">Open/Closed Principle</a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which method runs for an overridden call?</p>
+  <button>Always the parent's</button>
+  <button data-correct>The object's runtime class</button>
+  <button>The first one found</button>
+  <button>The variable's declared type</button>
+  <p class="explain">The JVM calls the method of the object referred to.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Overload resolution happens...?</p>
+  <button>Never</button>
+  <button data-correct>At compile time</button>
+  <button>At runtime</button>
+  <button>At class loading</button>
+  <p class="explain">The demo picked describe(Shape) from the declared type.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Virtual method invocation is...?</p>
+  <button>A keyword</button>
+  <button>A JIT flag</button>
+  <button data-correct>Runtime dispatch on the object</button>
+  <button>A design pattern</button>
+  <p class="explain">It is the runtime selection of the overridden method.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What does polymorphism enable?</p>
+  <button>Faster loops</button>
+  <button>Static typing removal</button>
+  <button>Private access</button>
+  <button data-correct>One loop, many behaviors</button>
+  <p class="explain">The demo's single loop printed three different areas.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0008-shapes-and-overloads.md">Exercise 8: shapes and overloads</a></p>
+<p>Runnable example: <a href="../examples/PolymorphismDemo.java"><code>PolymorphismDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">Java Tutorials: Polymorphism</a>. Short page.</p>
+<p><a href="0007-overriding-and-hiding.html">← Overriding versus hiding</a> &nbsp;|&nbsp; <a href="0009-abstract-classes-vs-interfaces.html">Abstract classes versus interfaces →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">Java Tutorials: Polymorphism</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

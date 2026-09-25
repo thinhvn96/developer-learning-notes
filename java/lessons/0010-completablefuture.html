@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 10: JDK 8: CompletableFuture and async pipelines</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>JDK 8: CompletableFuture and async pipelines</h1>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0010 · step 12 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+
+<div class="win"><b>Today's win:</b> chain async steps with CompletableFuture, recover from failure, and say which thread pool runs them by default and how join and get report errors differently.</div>
+
+<h2>What it is (JDK 8)</h2>
+<p>A <code>CompletableFuture</code> is a <code>Future</code> "that may be explicitly completed" and can act as a <code>CompletionStage</code>, supporting dependent functions and actions triggered on completion.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a> If several threads try to <code>complete</code>, <code>completeExceptionally</code> or <code>cancel</code> it, only one succeeds.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
+<h2>Which threads run it</h2>
+<p>"All async methods without an explicit Executor argument ... are performed using the <code>ForkJoinPool.commonPool()</code>."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a> Interview consequence: blocking work in the common pool starves other tasks; pass your own <code>Executor</code> for blocking calls (or, on JDK 21, consider virtual threads, see <a href="0006-virtual-threads.html">lesson 6</a>).</p>
+<h2>Errors</h2>
+<ul>
+<li><code>exceptionally(fn)</code> recovers from an exception; <code>handle(fn)</code> sees both result and exception.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></li>
+<li><code>join()</code> throws the unchecked <code>CompletionException</code>; <code>get()</code> throws the checked <code>ExecutionException</code>; both carry the original cause.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></li>
+<li>Cancellation is exceptional completion: <code>cancel()</code> acts like <code>completeExceptionally(new CancellationException())</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></li>
+</ul>
+<pre><code>java java/examples/jdk8/CompletableFutureDemo.java
+HELLO
+recovered: -1
+join() throws CompletionException, cause: java.lang.IllegalStateException: boom
+get()  throws ExecutionException,  cause: java.lang.IllegalStateException: boom</code></pre>
+<p>Source: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>CompletableFutureDemo.java</code></a>.</p>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default executor for async methods?</p>
+  <button>A virtual thread pool</button>
+  <button data-correct>ForkJoinPool common pool</button>
+  <button>The caller's thread</button>
+  <button>A new thread each</button>
+  <p class="explain">Async methods without an executor use ForkJoinPool.commonPool().<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which method throws the unchecked CompletionException?</p>
+  <button>cancel</button>
+  <button>get</button>
+  <button>complete</button>
+  <button data-correct>join</button>
+  <p class="explain">join() throws CompletionException; get() throws ExecutionException.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which method recovers from an exception?</p>
+  <button>thenApply</button>
+  <button data-correct>exceptionally</button>
+  <button>allOf</button>
+  <button>supplyAsync</button>
+  <p class="explain">exceptionally(Function) allows recovery from exceptions.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Two threads call complete on one future. Outcome?</p>
+  <button>Last write wins</button>
+  <button data-correct>Only one succeeds</button>
+  <button>Exception is thrown</button>
+  <button>Both values stored</button>
+  <p class="explain">Only one of the competing completions succeeds.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0010-parallel-calls.md">Exercise 0010: parallel calls with a timeout</a></p>
+<p>Runnable example: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>jdk8/CompletableFutureDemo.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a>. The class description only.</p>
+<p><a href="0011-java-time.html">← JDK 8: java.time, the date and time API</a> &nbsp;|&nbsp; <a href="0005-visibility-and-happens-before.html">Visibility and happens-before →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>
