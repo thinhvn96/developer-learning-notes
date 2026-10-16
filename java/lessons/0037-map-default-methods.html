@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 37: Map power methods: merge, compute and their traps</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Map power methods: merge, compute and their traps</h1>
+<p class="subtitle">Replace "get, check for null, put" with one call, and learn the three ways it can surprise you.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0037 · step 19 of 46 · Advanced · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0037-map-default-methods.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Counting words, grouping orders by customer, building a cache: half of all map code is "if the key is missing, create something; otherwise update it". Java 8 added methods that do this in one call. Reviewers and interviewers expect you to use them, and to know where they bite: null results, eager arguments and recursion.</div>
+
+<div class="win"><b>Today's win:</b> replace get-check-put code with <code>merge</code>, <code>computeIfAbsent</code> and friends, and avoid their three null and recursion traps.</div>
+
+<dl class="words">
+  <dt>default method</dt><dd>A method with a body inside an interface. Java 8 used them to add new methods to <code>Map</code> without breaking every class that implements it.</dd>
+  <dt>lambda</dt><dd>A small unnamed function you pass as a value, like <code>k -&gt; new ArrayList&lt;&gt;()</code>. Lesson 0008 covers them.</dd>
+  <dt>method reference</dt><dd>A short way to write a lambda that calls one existing method: <code>Integer::sum</code> means <code>(a, b) -&gt; Integer.sum(a, b)</code>.</dd>
+  <dt>mapping function</dt><dd>The function you give to <code>computeIfAbsent</code>: it receives the key and returns the new value.</dd>
+  <dt>remapping function</dt><dd>The function you give to <code>merge</code> or <code>compute</code>: it receives the old value and returns the new one.</dd>
+  <dt>multimap</dt><dd>A map where one key holds many values, usually <code>Map&lt;K, List&lt;V&gt;&gt;</code>.</dd>
+  <dt>eager / lazy</dt><dd>Eager: computed right away, even if not needed. Lazy: computed only when it is actually needed.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Write, in your head or on paper, the classic JDK 7 code that counts how many times each word appears in a list, using <code>get</code> and <code>put</code>. Count the lines. Section 1 does it in one.</p>
+
+<h2>1. The JDK 8 Map toolbox</h2>
+<p>Think of a hotel reception desk. The old way: "Do we have a room for Mr. An? No? Then create one. Now give me that room. Now put the bag in it." Three trips to the desk. The new way: "Put this bag in Mr. An's room, and create the room if it doesn't exist." One trip.</p>
+<p>All these methods are "Since 1.8", so they are available on 8, 17 and 21.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></p>
+<table>
+<tr><th>Instead of</th><th>Write</th></tr>
+<tr><td><code>Integer c = m.get(w); m.put(w, c == null ? 1 : c + 1);</code></td><td><code>m.merge(w, 1, Integer::sum)</code></td></tr>
+<tr><td><code>if (!m.containsKey(k)) m.put(k, new ArrayList&lt;&gt;()); m.get(k).add(v);</code></td><td><code>m.computeIfAbsent(k, x -&gt; new ArrayList&lt;&gt;()).add(v)</code></td></tr>
+<tr><td><code>m.containsKey(k) ? m.get(k) : d</code></td><td><code>m.getOrDefault(k, d)</code></td></tr>
+<tr><td>loop + <code>put</code> to transform values</td><td><code>m.replaceAll((k, v) -&gt; ...)</code></td></tr>
+</table>
+<p>The multimap line is straight from the Javadoc: <code>map.computeIfAbsent(key, k -&gt; new HashSet&lt;V&gt;()).add(v);</code><a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> It works because <code>computeIfAbsent</code> <strong>returns</strong> the value: the existing list, or the new one it just stored.</p>
+
+<h3>Trace: counting words with merge</h3>
+<p><code>merge(key, value, function)</code> reads like this: "If the specified key is not already associated with a value or is associated with null, associates it with the given non-null value."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Otherwise it calls your function with the old value and the new one.</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="merge(key, 1, Integer::sum): if the key is absent or null, store 1. Otherwise call sum(old, 1) and store the result; if the result is null, remove the key.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="90" width="170" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="105" y="112" text-anchor="middle">merge(w, 1,</text>
+    <text x="105" y="130" text-anchor="middle">Integer::sum)</text>
+    <rect x="240" y="90" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="315" y="112" text-anchor="middle">old value for w</text>
+    <text x="315" y="130" text-anchor="middle">is null/absent?</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M190 115h44M228 110l6 5-6 5"/>
+      <path d="M390 105L450 50M440 52l10-2-3 10"/>
+      <path d="M390 125L450 180M447 170l3 10-10-2"/>
+    </g>
+    <text x="405" y="70" font-size="11">yes</text>
+    <text x="405" y="170" font-size="11">no</text>
+    <rect x="455" y="20" width="205" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="557" y="42" text-anchor="middle" fill="var(--accent)">store 1</text>
+    <text x="557" y="60" text-anchor="middle" font-size="11">function not called</text>
+    <rect x="455" y="155" width="205" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="557" y="176" text-anchor="middle">store sum(old, 1)</text>
+    <text x="557" y="194" text-anchor="middle" font-size="11">if result is null:</text>
+    <text x="557" y="209" text-anchor="middle" font-size="11" fill="var(--accent)">remove the key</text>
+  </g>
+</svg>
+<figcaption>One call covers "first time" and "next times". Returning <code>null</code> from the function deletes the entry.</figcaption>
+</figure>
+
+<pre><code>for (String w : List.of("kafka", "java", "kafka", "sql", "java", "kafka"))
+    counts.merge(w, 1, Integer::sum);
+<span class="c">Step 1  "kafka": absent → store 1</span>
+<span class="c">Step 2  "java":  absent → store 1</span>
+<span class="c">Step 3  "kafka": old 1 → sum(1, 1) → store 2</span>
+<span class="c">...     "sql" → 1, "java" → 2, "kafka" → 3</span></code></pre>
+<pre><code>$ java java/examples/collections/MapPowerMethods.java
+merge count         : {java=2, kafka=3, sql=1}
+computeIfAbsent list: {j=[java, java], k=[kafka, kafka, kafka], s=[sql]}
+getOrDefault        : 0
+objects built (putIfAbsent + computeIfAbsent on existing key): 1
+null result removes : {}
+getOrDefault on null value: null
+recursive computeIfAbsent: ConcurrentModificationException
+groupingBy+counting : {java=2, kafka=3, sql=1}</code></pre>
+<p>The last line shows the stream alternative from <a href="0004-streams-and-optional.html">lesson 0004</a>: <code>Collectors.groupingBy(w -&gt; w, TreeMap::new, Collectors.counting())</code> gives the same counts. Use <code>merge</code> when you update a map that already exists; use <code>groupingBy</code> when you build a new map from a stream.</p>
+
+<h2>2. Concurrency: where these methods matter most</h2>
+<p>On a plain <code>HashMap</code> these methods are just shorter code. The Javadoc is explicit: "The default implementation makes no guarantees about synchronization or atomicity properties of this method. Any implementation providing atomicity guarantees must override this method and document its concurrency properties."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></p>
+<p><code>ConcurrentHashMap</code> does override them and makes them atomic, which is why they matter even more there (<a href="0025-concurrenthashmap.html">lesson 0025</a>). With two threads, <code>get</code> then <code>put</code> can lose an update: both read 2, both write 3. <code>merge</code> on a ConcurrentHashMap does the read and the write as one step.</p>
+
+<h2>3. The traps</h2>
+<pre><code>objects built (putIfAbsent + computeIfAbsent on existing key): 1
+null result removes : {}
+getOrDefault on null value: null
+recursive computeIfAbsent: ConcurrentModificationException</code></pre>
+
+<h3>Trap 1: putIfAbsent is eager</h3>
+<p>Java evaluates method arguments <em>before</em> the call. So <code>m.putIfAbsent("x", new ArrayList&lt;&gt;())</code> builds a new list even when <code>"x"</code> already exists, and throws it away. <code>computeIfAbsent</code> takes a <em>function</em>, and only calls it when the key is missing.</p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Key x already exists. putIfAbsent: the argument new ArrayList is built first, then thrown away. computeIfAbsent: the map sees x exists and never calls the function.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="13">key "x" already exists</text>
+    <text x="20" y="62">putIfAbsent("x", new ArrayList&lt;&gt;())</text>
+    <rect x="20" y="76" width="200" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="98" text-anchor="middle" fill="var(--accent)">1. build ArrayList</text>
+    <g fill="none" stroke="currentColor"><path d="M220 93h40M254 88l6 5-6 5"/><path d="M460 93h40M494 88l6 5-6 5"/></g>
+    <rect x="260" y="76" width="200" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="360" y="98" text-anchor="middle">2. "x" exists</text>
+    <rect x="500" y="76" width="160" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="580" y="98" text-anchor="middle">3. list wasted</text>
+    <text x="20" y="146">computeIfAbsent("x", k -&gt; new ArrayList&lt;&gt;())</text>
+    <rect x="20" y="160" width="200" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="182" text-anchor="middle">1. "x" exists</text>
+    <g fill="none" stroke="currentColor"><path d="M220 177h40M254 172l6 5-6 5"/></g>
+    <rect x="260" y="160" width="400" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="460" y="182" text-anchor="middle">2. return existing list; function never runs</text>
+  </g>
+</svg>
+<figcaption>Eager versus lazy. In the example, the counter shows exactly 1 object built: the one wasted by <code>putIfAbsent</code>.</figcaption>
+</figure>
+<p>For a cheap value like <code>0</code> this does not matter. For a database call or a big object, it does.</p>
+
+<h3>Trap 2: null means "no mapping"</h3>
+<p>If the mapping function returns null "no mapping is recorded"; if a remapping function returns null "the mapping is removed".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> In the example, <code>computeIfAbsent("pear", k -&gt; null)</code> adds nothing, and decreasing apple's stock to 0 with <code>v - 1 == 0 ? null : v - 1</code> removes apple: the map prints <code>{}</code>. That is handy on purpose, and a surprise by accident.</p>
+<p>And <code>getOrDefault</code> returns "the value to which the specified key is mapped, or defaultValue if this map contains no mapping for the key".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> A key mapped to <code>null</code> <em>has</em> a mapping, so you get the stored <code>null</code>, not your default. The run printed <code>getOrDefault on null value: null</code>.</p>
+
+<h3>Trap 3: do not modify the map inside the function</h3>
+<p>"The mapping function should not modify this map during computation."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> HashMap "will, on a best-effort basis, throw a ConcurrentModificationException" when it detects this.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> The classic victim is memoized recursion:</p>
+<pre><code>static int fib(int n, Map&lt;Integer, Integer&gt; memo) {
+    if (n &lt; 2) return n;
+    return memo.computeIfAbsent(n, k -&gt; fib(k - 1, memo) + fib(k - 2, memo));
+}
+<span class="c">Step 1  computeIfAbsent(30) starts; HashMap is in the middle of an insert</span>
+<span class="c">Step 2  the function calls fib(29) → computeIfAbsent(29) → puts into the same map</span>
+<span class="c">Step 3  back in step 1, HashMap sees the map changed under it → </span><span class="hl">ConcurrentModificationException</span></code></pre>
+<p><strong>The fix:</strong> use a plain <code>get</code> and <code>put</code> there: compute the value first, then store it.</p>
+<pre><code>Integer cached = memo.get(n);
+if (cached != null) return cached;
+int value = fib(n - 1, memo) + fib(n - 2, memo);
+memo.put(n, value);
+return value;</code></pre>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Which call counts words in a <code>Map&lt;String, Integer&gt;</code> in one line?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>merge(w, 1, Integer::sum)</code></button>
+    <button class="opt"><code>putIfAbsent(w, 1)</code></button>
+    <button class="opt"><code>compute(w, null)</code></button>
+    <button class="opt"><code>put(w, get(w) + 1)</code></button>
+  </div>
+  <div class="why">merge stores 1 the first time and combines old + 1 after that. <code>put(w, get(w) + 1)</code> throws NullPointerException the first time.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The function passed to <code>computeIfAbsent</code> returns <code>null</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>No mapping is recorded</button>
+    <button class="opt">The null value is stored</button>
+    <button class="opt">It throws NullPointerException</button>
+    <button class="opt">The key is stored with no value</button>
+  </div>
+  <div class="why">If the mapping function returns null, no mapping is recorded, and computeIfAbsent returns null.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The key <code>"x"</code> already exists. Which call still builds its argument object?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>putIfAbsent("x", new ArrayList&lt;&gt;())</code></button>
+    <button class="opt"><code>computeIfAbsent("x", k -&gt; new ArrayList&lt;&gt;())</code></button>
+    <button class="opt"><code>computeIfPresent("x", (k, v) -&gt; v)</code></button>
+    <button class="opt"><code>getOrDefault("x", List.of())</code></button>
+  </div>
+  <div class="why">putIfAbsent takes a value, and Java evaluates arguments before the call. computeIfAbsent takes a function and only runs it when needed. (<code>List.of()</code> is built too, but it is a shared empty list, not a new object you asked for.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The map holds <code>"k" → null</code>. What does <code>getOrDefault("k", "default")</code> return?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>null</code></button>
+    <button class="opt"><code>"default"</code></button>
+    <button class="opt">It throws NPE</button>
+    <button class="opt"><code>"k"</code></button>
+  </div>
+  <div class="why">The key has a mapping (to null), so the default is not used. The example printed <code>null</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A memoized <code>fib</code> calls itself inside <code>computeIfAbsent</code> on a <code>HashMap</code>. What is the bug?</p>
+  <div class="options">
+    <button class="opt" data-correct>The function changes the map, so HashMap may throw CME</button>
+    <button class="opt">computeIfAbsent caches nothing because fib returns int</button>
+    <button class="opt">The recursion is too deep and always overflows the stack</button>
+    <button class="opt">There is no bug; this is the recommended memo pattern</button>
+  </div>
+  <div class="why">The mapping function should not modify the map. HashMap detects it on a best-effort basis and throws ConcurrentModificationException.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">On a plain <code>HashMap</code>, is <code>merge</code> atomic when two threads call it?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, the default makes no atomicity guarantees</button>
+    <button class="opt">Yes, every Map method from Java 8 is atomic</button>
+    <button class="opt">Yes, but only when the remapping function is pure</button>
+    <button class="opt">No, merge always throws when called from threads</button>
+  </div>
+  <div class="why">Only implementations that override and document it, like ConcurrentHashMap, give atomicity. A plain HashMap is not thread-safe at all.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer shows you <code>get</code>-check-<code>put</code> code and asks: <strong>"How would you write this in modern Java, and what should you be careful about?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Java 8 added default methods to Map: <code>merge</code>, <code>compute*</code>, <code>getOrDefault</code>, <code>replaceAll</code>.</label></li>
+      <li><label><input type="checkbox"> Counting: <code>merge(k, 1, Integer::sum)</code>; multimap: <code>computeIfAbsent(k, x -&gt; new ArrayList&lt;&gt;()).add(v)</code>.</label></li>
+      <li><label><input type="checkbox"> putIfAbsent is eager; computeIfAbsent is lazy.</label></li>
+      <li><label><input type="checkbox"> A function returning null means "no mapping" or "remove".</label></li>
+      <li><label><input type="checkbox"> getOrDefault returns a stored null, not the default.</label></li>
+      <li><label><input type="checkbox"> Never modify the map inside the function (recursive memo → CME).</label></li>
+      <li><label><input type="checkbox"> Atomic only on ConcurrentHashMap, not on HashMap.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Since Java 8, Map has default methods for exactly this. For counting I write merge with the key, 1 and Integer::sum, which stores 1 the first time and adds after that. For a multimap I write computeIfAbsent with a function that creates the list, and call add on the result. There are a few traps. putIfAbsent takes a value, so the value is built even if the key exists, while computeIfAbsent only calls the function when needed. If my function returns null, nothing is stored, or with merge and compute the entry is removed. getOrDefault returns a stored null instead of my default. And the function must not modify the same map, so a recursive memoized fib inside computeIfAbsent can throw ConcurrentModificationException on a HashMap. Finally, these methods are only atomic on ConcurrentHashMap, not on a plain HashMap."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0037-refactor-to-map-methods.md">Exercise 0037: refactor to Map methods</a>. Rewrite each snippet, then say which trap could hit it.</p>
+<p>Runnable example: <a href="../examples/collections/MapPowerMethods.java"><code>MapPowerMethods.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may now ask about cost: <em>"Your map holds ten million Integer counts. How much memory is that? Why did <code>==</code> on two Integers suddenly return false?"</em> <a href="0038-capacity-boxing-and-memory.html">Lesson 0038</a> covers capacity, boxing and memory.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc (JDK 21)</a>. Read the method details for computeIfAbsent, compute and merge.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When should I use compute instead of merge?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0036-enummap-identity-and-weak-maps.html">← EnumMap, EnumSet, IdentityHashMap and WeakHashMap</a> &nbsp;|&nbsp; <a href="0038-capacity-boxing-and-memory.html">Capacity, boxing and the memory cost of collections →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

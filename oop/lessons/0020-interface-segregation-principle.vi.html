@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 20: SOLID 4: Interface Segregation Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 4: Interface Segregation Principle</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0020 · bước 20/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0020-interface-segregation-principle.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tách một interface "béo" thành các role interface (interface theo vai trò) để không class nào phải implement những method mà nó không hỗ trợ được.</div>
+
+<h2>Nguyên lý</h2>
+<p>"Client không nên phụ thuộc vào những method của interface mà nó không dùng."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+<pre><code>java oop/examples/IspDemo.java
+fat interface: Robot forced to implement eat() -&gt; robots do not eat
+robot works
+human eats
+human works</code></pre>
+<p><code>FatWorker</code> ép <code>FatRobot</code> phải implement <code>eat()</code>, và nó chỉ còn cách ném <code>UnsupportedOperationException</code> (cũng là một dấu hiệu vi phạm LSP). Tách thành <code>Workable</code> và <code>Feedable</code> giúp mỗi class chỉ implement đúng những vai trò của nó, và mỗi client chỉ phụ thuộc vào những gì nó thực sự gọi. Mã nguồn: <a href="../examples/IspDemo.java"><code>IspDemo.java</code></a>.</p>
+<p>Java có cả hai bộ mặt: <code>Comparator</code> là một interface nhỏ xíu chỉ phục vụ một mục đích (<a href="../../design-patterns/lessons/0023-strategy.vi.html">Strategy</a>), và package <code>java.util.function</code> là cả một danh mục các role interface (<a href="../../java/lessons/0008-lambdas-and-functional-interfaces.vi.html">bài về lambda</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. ISP nói client không nên phụ thuộc vào...?</p>
+  <button>Class</button>
+  <button>Interface</button>
+  <button data-correct>Method mà nó không dùng</button>
+  <button>Package</button>
+  <p class="explain">Client không nên phụ thuộc vào những method của interface mà nó không dùng.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một triệu chứng của interface béo?</p>
+  <button>Nhiều interface nhỏ</button>
+  <button>Lambda</button>
+  <button data-correct>Implementation ném UnsupportedOperation</button>
+  <button>Record</button>
+  <p class="explain">FatRobot ném exception cho eat().</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cách sửa?</p>
+  <button>Gộp các class lại</button>
+  <button>Thêm nhiều method hơn</button>
+  <button>Cho chúng là static</button>
+  <button data-correct>Tách thành role interface</button>
+  <p class="explain">Workable và Feedable.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Trong demo, class nào implement cả hai vai trò?</p>
+  <button>Robot</button>
+  <button data-correct>Human</button>
+  <button>Không class nào</button>
+  <button>FatRobot</button>
+  <p class="explain">Human implement cả Workable và Feedable.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0020-split-an-interface.vi.md">Bài tập 20: tách một interface</a></p>
+<p>Ví dụ chạy được: <a href="../examples/IspDemo.java"><code>IspDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. Trang tổng quan về SOLID.</p>
+<p><a href="0019-liskov-substitution-principle.vi.html">← SOLID 3: Liskov Substitution Principle</a> &nbsp;|&nbsp; <a href="0021-dependency-inversion-principle.vi.html">SOLID 5: Dependency Inversion Principle →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

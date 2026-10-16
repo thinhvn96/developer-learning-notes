@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 9: Adapter</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Adapter</h1>
+<p class="meta">Design Patterns · Bài 0009 · bước 9/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-adapter.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> bọc một class không tương thích để nó khớp với interface mà client mong đợi, và nhận ra <code>Arrays.asList</code> chính là một adapter.</div>
+
+<h2>Mục đích</h2>
+<p>Adapter là "một structural design pattern cho phép các object có interface không tương thích làm việc được với nhau." Hãy dùng nó khi bạn muốn dùng một class có sẵn nhưng interface của nó không khớp với code của bạn, hoặc khi muốn tái sử dụng nhiều subclass vốn thiếu một chức năng chung.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/AdapterDemo.java
+legacy printed 5 bytes: hello
+array=[x, y, c] view=[x, y, c]
+fixed-size: add() unsupported</code></pre><p><code>LegacyAdapter</code> implement <code>Printer</code> mà client mong đợi và dịch lời gọi sang method với tham số khác của class legacy. Trong JDK, <code>Arrays.asList</code> "đóng vai trò cầu nối giữa API dựa trên mảng và API dựa trên collection": một list kích thước cố định được mảng đứng sau, ghi xuyên qua theo cả hai chiều (như ở trên); gọi add sẽ ném <code>UnsupportedOperationException</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[2]</a> Mã nguồn: <a href="../examples/AdapterDemo.java"><code>AdapterDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Tách việc chuyển đổi interface hoặc dữ liệu khỏi business logic</li><li>Có thể thêm adapter mới mà không làm hỏng code phía client</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Thêm interface và class; đôi khi sửa thẳng class service lại đơn giản hơn</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a> Adapter dùng để chắp vá cho class có sẵn (còn Bridge được thiết kế từ đầu); Decorator giữ nguyên hoặc mở rộng interface trong khi Adapter thay đổi nó; Proxy giữ interface y hệt; Facade định nghĩa một interface mới cho cả một subsystem, còn Adapter thường chỉ bọc một object.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mục đích của Adapter?</p>
+  <button>Giấu việc tạo object</button>
+  <button>Thêm trách nhiệm</button>
+  <button>Sao chép object</button>
+  <button data-correct>Ghép các interface không tương thích</button>
+  <p class="explain">Các object có interface không tương thích làm việc được với nhau.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Arrays.asList là...?</p>
+  <button>Một deep copy</button>
+  <button>Một bản sao immutable</button>
+  <button>Một list tự giãn được</button>
+  <button data-correct>Một view ghi xuyên xuống mảng</button>
+  <p class="explain">Thay đổi đi xuyên xuống mảng (thấy rõ trong lần chạy).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Adapter so với Facade?</p>
+  <button>Facade bọc một object</button>
+  <button>Là một thứ</button>
+  <button>Không cái nào bọc gì</button>
+  <button data-correct>Adapter bọc một object</button>
+  <p class="explain">Adapter thường bọc một object; Facade bọc cả một subsystem.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một cái giá của Adapter?</p>
+  <button>Mất kế thừa</button>
+  <button>Trạng thái static</button>
+  <button data-correct>Thêm class</button>
+  <button>JIT chậm hơn</button>
+  <p class="explain">Độ phức tạp tổng thể tăng lên.<a class="cite" href="https://refactoring.guru/design-patterns/adapter">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-adapt-a-payment-sdk.vi.md">Bài tập 9: adapt một payment SDK</a></p>
+<p>Ví dụ chạy được: <a href="../examples/AdapterDemo.java"><code>AdapterDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/adapter">Adapter (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0008-singleton.vi.html">← Singleton</a> &nbsp;|&nbsp; <a href="0010-bridge.vi.html">Bridge →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/adapter">Adapter (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

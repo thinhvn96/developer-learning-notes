@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn OOP (Java)</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Lập trình hướng đối tượng (Java): câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · OOP · 14 câu hỏi · <a href="index.vi.html">Lộ trình OOP</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi OOP cho vòng phỏng vấn Java cấp Senior, từ các trụ cột cơ bản đến SOLID, câu nào cũng có ví dụ chạy được trong lộ trình OOP.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Bốn trụ cột của OOP là gì và Java hỗ trợ từng trụ cột như thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> encapsulation, inheritance (kế thừa), polymorphism, abstraction (trừu tượng hoá).</p>
+<p><strong>Encapsulation:</strong> "che giấu state bên trong và bắt buộc mọi tương tác phải đi qua các method của object".<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a> Java hỗ trợ bằng: field private, các access level.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[2]</a> <strong>Inheritance:</strong> một superclass trực tiếp với <code>extends</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[3]</a> <strong>Polymorphism:</strong> JVM gọi method của object được trỏ tới, chứ không phải của kiểu biến (virtual method invocation).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[4]</a> <strong>Abstraction:</strong> interface như những hợp đồng được kiểm soát lúc build, và abstract class.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[5]</a><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[6]</a> (Cách gọi "bốn trụ cột" là cách nói quen thuộc trong phỏng vấn; các trang tutorial định nghĩa từng ý riêng lẻ.)</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Trụ cột nào hay bị lạm dụng? (Inheritance; nên ưu tiên composition.)</div>
+<p class="see">Học bài: <a href="lessons/0001-objects-state-and-behavior.vi.html">Object và encapsulation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Encapsulation khác abstraction thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> encapsulation bảo vệ state bằng cách giấu nó sau các method; abstraction giấu sự phức tạp sau một hợp đồng đơn giản hơn.</p>
+<p>Encapsulation xoay quanh việc che giấu dữ liệu và giữ invariant: <code>BankAccount</code> của tôi để <code>balance</code> là private nên quy tắc "không bao giờ âm" được kiểm soát ở đúng hai method.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a> Abstraction là thứ mà interface hay abstract class mang lại: phía gọi phụ thuộc vào hợp đồng, không phụ thuộc vào cách hiện thực.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[5]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cho một ví dụ mà encapsulation bị phá vỡ nhưng abstraction vẫn ổn. (Một getter trả về list nội bộ có thể sửa được.)</div>
+<p class="see">Học bài: <a href="lessons/0003-access-levels.vi.html">Access level</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Giải thích override so với overload, và hiding.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> override là dispatch lúc runtime theo class của object; overload là chọn lúc compile theo kiểu tham số được khai báo; static method và field thì hide, chúng không override.</p>
+<p>Một instance method có cùng signature sẽ override (cho phép covariant return; mức truy cập có thể rộng hơn nhưng không được hẹp hơn; <code>@Override</code> bắt compiler kiểm tra).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[7]</a> Static method thì hide.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[7]</a> Trong demo của tôi: <code>describe(Shape)</code> được chọn cho một biến kiểu <code>Shape</code> đang giữ một <code>Circle</code> (overload, lúc compile), trong khi <code>a.sound()</code> chạy phiên bản của <code>Dog</code> (override); lời gọi static và field thì được chọn theo kiểu tĩnh.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[4]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Covariant return type là gì? (Method override có thể trả về một subtype của kiểu trả về của method bị override.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[7]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0007-overriding-and-hiding.vi.html">Override và hiding</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Abstract class hay interface?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> interface cho một năng lực mà các class không liên quan đều có thể cung cấp; abstract class để chia sẻ code và state giữa các class có quan hệ gần gũi.</p>
+<p>Theo tutorial: abstract class có thể có field non-static, non-final và method không public, và chỉ hỗ trợ đơn kế thừa; field của interface là hằng số, method là public, và một class có thể implement nhiều interface. Chọn abstract class để chia sẻ code giữa các class có quan hệ gần gũi, chọn interface khi các class không liên quan sẽ implement nó.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[6]</a> Từ JDK 8, interface còn có default method (quy tắc xử lý xung đột nằm trong bài Java 8).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Interface có state được không? (Chỉ có hằng số; muốn có instance state thì dùng abstract class hoặc composition.)</div>
+<p class="see">Học bài: <a href="lessons/0009-abstract-classes-vs-interfaces.vi.html">Abstract class và interface</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Vì sao nên ưu tiên composition hơn kế thừa? Hãy chỉ ra một lỗi cụ thể do kế thừa gây ra.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> kế thừa gắn chặt subclass với cách hiện thực của class cha; composition tái sử dụng behavior thông qua một object cộng tác và vẫn giữ được sự linh hoạt.</p>
+<p>Composition "mang lại cho thiết kế sự linh hoạt cao hơn" và tránh được coupling chặt cũng như diamond problem; cái giá phải trả là boilerplate để chuyển tiếp lời gọi.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[8]</a> Ví dụ lỗi: <code>CountingSet extends HashSet</code> của tôi đếm ra 6 cho 3 phần tử thêm qua <code>addAll</code>, vì bên trong <code>addAll</code> gọi <code>add</code>; phiên bản dùng composition đếm đúng 3.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào kế thừa vẫn là lựa chọn đúng? (Khi có quan hệ is-a thực sự với một base class được thiết kế để cho kế thừa.)</div>
+<p class="see">Học bài: <a href="lessons/0011-composition-over-inheritance.vi.html">Ưu tiên composition hơn kế thừa</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Thứ tự khởi tạo của một instance subclass là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> khởi tạo class (static block: cha rồi tới con) một lần; sau đó với mỗi object: field initializer và instance block của cha, constructor của cha, field initializer và instance block của con, constructor của con.</p>
+<p>Static block chạy một lần theo thứ tự trong mã nguồn; instance initializer block được chép vào mọi constructor.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[9]</a> Lần chạy của tôi in ra 1 Parent static, 2 Child static, 3 Parent field init, 4 Parent instance block, 5 Parent constructor, 6 Child field init, 7 Child instance block, 8 Child constructor. Bẫy: một method có thể override được gọi từ constructor của class cha sẽ thấy các field của class con chưa được khởi tạo.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao gọi method có thể override trong constructor lại nguy hiểm? (Vì state của class con lúc đó chưa tồn tại.)</div>
+<p class="see">Học bài: <a href="lessons/0005-initialization-order.vi.html">Thứ tự khởi tạo</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Static nested class khác inner class ở điểm nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> inner class gắn với một instance của class bao ngoài và đọc được member private của nó; static nested class thì không.</p>
+<p><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">[10]</a> Lý do để lồng class: gom nhóm logic, đóng gói, dễ đọc. Local class và anonymous class capture các biến cục bộ effectively final. Với interface chỉ có một method thì ưu tiên lambda.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Rủi ro memory leak với inner class? (Một instance inner giữ reference tới instance bao ngoài của nó.)</div>
+<p class="see">Học bài: <a href="lessons/0012-nested-classes.vi.html">Nested class</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Làm sao để một class trở thành immutable? Chỉ <code>final</code> có đủ không?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> không đủ; cần class final, field final, không có method thay đổi state, và defensive copy cho các thành phần mutable.</p>
+<p><code>MutableTeam</code> của tôi có field list là <code>final</code> nhưng vẫn bị thay đổi khi phía gọi sửa list đó; <code>ImmutableTeam</code> dùng <code>List.copyOf</code> và một view không sửa được. Record chỉ immutable ở mức nông, nên cũng cần sao chép y như vậy.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao String là immutable? (Để chia sẻ an toàn; xem bài về string trong Java.)</div>
+<p class="see">Học bài: <a href="lessons/0014-immutability.vi.html">Immutability</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Giải thích SOLID.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> năm nguyên lý từ bài viết năm 2000 của Robert C. Martin (từ viết tắt do Michael Feathers đặt).</p>
+<ul><li><strong>SRP:</strong> "Không bao giờ nên có quá một lý do để một class phải thay đổi."</li><li><strong>OCP:</strong> "mở để mở rộng, nhưng đóng để sửa đổi."</li><li><strong>LSP:</strong> subtype phải thay thế được cho base type của nó.</li><li><strong>ISP:</strong> "Client không nên phụ thuộc vào những method của interface mà nó không dùng."</li><li><strong>DIP:</strong> "phụ thuộc vào abstraction, không phụ thuộc vào thứ cụ thể."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[11]</a></li></ul>
+<p>Mỗi nguyên lý đều có ví dụ chạy được trong lộ trình OOP (tách class hoá đơn, interface giảm giá, Square/Rectangle, interface béo, inject notifier).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Nguyên lý nào khó áp dụng nhất và vì sao? (Nói về LSP: nó liên quan tới behavior, không chỉ là signature.)</div>
+<p class="see">Học bài: <a href="lessons/0017-single-responsibility-principle.vi.html">Các bài SOLID</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Cho một ví dụ vi phạm Liskov Substitution Principle và sửa nó.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Square extends Rectangle với các setter thay đổi cả hai cạnh.</p>
+<p>LSP: object của một kiểu có thể được thay bằng object của subtype "mà không làm thay đổi bất kỳ tính chất mong muốn nào của chương trình đó"; không được siết chặt precondition, không được nới lỏng postcondition và invariant, và phải tuân theo history constraint.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[12]</a> Lần chạy của tôi: code đặt chiều rộng 5 và chiều cao 4 mong đợi diện tích 20; <code>Rectangle</code> cho 20, <code>Square</code> cho 16. Cách sửa: tách thành các kiểu immutable riêng biệt dưới một interface <code>Shape</code> chung.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Một dấu hiệu khác? (Một bản override ném UnsupportedOperationException cho method được kế thừa.)</div>
+<p class="see">Học bài: <a href="lessons/0019-liskov-substitution-principle.vi.html">Liskov</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Dependency inversion, dependency injection và IoC khác nhau thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> DIP là nguyên lý (phụ thuộc vào abstraction), DI là kỹ thuật (truyền dependency từ ngoài vào), IoC là ý tưởng chung rằng container hoặc phía gọi kiểm soát việc tạo object.</p>
+<p><a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[11]</a> <code>AlertService</code> của tôi phụ thuộc vào interface <code>Notifier</code> và nhận các sender cụ thể (hoặc một test double bằng lambda) từ <code>main</code>. Spring tự động hoá việc này: IoC container khởi tạo, lắp ráp và inject các bean.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> DI giúp gì cho việc test? (Thay vào một bản fake, như demo coupling đã làm.)</div>
+<p class="see">Học bài: <a href="lessons/0021-dependency-inversion-principle.vi.html">DIP</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Coupling và cohesion: bạn nhắm tới điều gì, và Law of Demeter là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> coupling thấp, cohesion cao; chỉ nói chuyện với những người bạn trực tiếp.</p>
+<p>"Coupling thấp thường được xem là dấu hiệu của một hệ thống có cấu trúc tốt ... khi đi kèm với cohesion cao, nó hỗ trợ ... việc dễ đọc và dễ bảo trì."<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[13]</a> Law of Demeter: "mỗi đơn vị chỉ nên nói chuyện với bạn bè của nó; đừng nói chuyện với người lạ", nên tránh <code>a.getB().getC().act()</code>; hãy dùng <code>a.act()</code>.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[14]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Fluent API có vi phạm không? (Về tinh thần thì không, khi mỗi lời gọi trả về cùng một builder/stream; đây chỉ là một hướng dẫn.)</div>
+<p class="see">Học bài: <a href="lessons/0016-law-of-demeter.vi.html">Law of Demeter</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>God object là gì và bạn refactor nó như thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một class biết quá nhiều hoặc làm quá nhiều; tách theo lý do thay đổi và inject các object cộng tác.</p>
+<p>God object "tham chiếu tới rất nhiều kiểu khác nhau, có quá nhiều method không liên quan hoặc không được phân loại"; nó vi phạm SRP và mọi thứ đều bị gắn chặt vào nó.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[15]</a> Các bước: liệt kê các trách nhiệm, tách thành các class được đặt tên theo việc chúng làm, inject chúng vào, giữ lại một class điều phối mỏng (xem <code>GodObjectDemo</code>).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Facade có thể trở thành god object không? (Có; xem phần nhược điểm của Facade và Mediator.)</div>
+<p class="see">Học bài: <a href="lessons/0022-god-objects-and-refactoring.vi.html">God object</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Khi nào bạn dùng enum thay vì hằng số hay một cây class kế thừa?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> khi có một tập instance cố định; cho chúng field và thậm chí behavior riêng cho từng hằng.</p>
+<p>Enum là tập hằng số định sẵn an toàn về kiểu, có thể có field, method và constructor private, và ngầm extend <code>java.lang.Enum</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[16]</a> Enum <code>Op</code> của tôi cho mỗi hằng một thân <code>apply</code> riêng. Khi các biến thể mang dữ liệu khác nhau thì dùng sealed type.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Enum có implement interface được không? (Được; enum có thể implement interface vì nó không thể extend class.)</div>
+<p class="see">Học bài: <a href="lessons/0013-enums-as-classes.vi.html">Enum</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi tôi lần lượt từng câu Lập trình hướng đối tượng (Java) này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">Java Tutorials: What Is an Object?</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">Java Tutorials: Access Control</a> · [3] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">Java Tutorials: What Is Inheritance?</a> · [4] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">Java Tutorials: Polymorphism</a> · [5] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">Java Tutorials: What Is an Interface?</a> · [6] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">Java Tutorials: Abstract Methods and Classes</a> · [7] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">Java Tutorials: Overriding and Hiding</a> · [8] <a href="https://en.wikipedia.org/wiki/Composition_over_inheritance">Wikipedia: Composition over inheritance</a> · [9] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">Java Tutorials: Initializing Fields</a> · [10] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/nested.html">Java Tutorials: Nested Classes</a> · [11] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · [12] <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Wikipedia: Liskov substitution principle</a> · [13] <a href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">Wikipedia: Coupling</a> · [14] <a href="https://en.wikipedia.org/wiki/Law_of_Demeter">Wikipedia: Law of Demeter</a> · [15] <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a> · [16] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">Java Tutorials: Enum Types</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

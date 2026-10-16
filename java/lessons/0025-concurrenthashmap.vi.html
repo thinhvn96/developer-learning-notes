@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 25: ConcurrentHashMap: cập nhật nguyên tử và weak consistency</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Dùng chung một map giữa các thread: ConcurrentHashMap</h1>
+<p class="subtitle">Một map thread-safe không làm code của bạn thread-safe. Các method nguyên tử của nó mới làm được.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0025 · bước 32/46 · Advanced · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0025-concurrenthashmap.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Cache, kho session, bộ đếm theo user, theo endpoint, theo mã lỗi: service giữ map dùng chung ở khắp nơi. Interviewer hỏi <em>"HashMap khác ConcurrentHashMap thế nào?"</em> rồi tới câu hỏi thật sự: <em>"Dùng ConcurrentHashMap rồi thì có còn mất update được không?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng đúng các method nguyên tử của <code>ConcurrentHashMap</code> và giải thích quy tắc về null cùng iterator weakly consistent của nó.</div>
+
+<dl class="words">
+  <dt>thread-safe</dt><dd>Một class là thread-safe nếu nhiều thread có thể gọi method của nó cùng lúc mà nó vẫn hoạt động đúng.</dd>
+  <dt>check-then-act</dt><dd>Code nhìn một giá trị trước ("key đã có chưa?") rồi hành động dựa trên điều vừa thấy ("chưa thì put"). Thread khác có thể đổi mọi thứ ở giữa.</dd>
+  <dt>method nguyên tử</dt><dd>Method làm trọn việc của nó trong một bước mà thread khác không thể cắt ngang giữa chừng.</dd>
+  <dt>iterator</dt><dd>Object mà vòng lặp <code>for (x : map.keySet())</code> dùng ngầm để duyệt từng entry một.</dd>
+  <dt>fail-fast</dt><dd>Iterator ném <code>ConcurrentModificationException</code> ngay khi phát hiện map bị đổi trong lúc nó đang duyệt.</dd>
+  <dt>weakly consistent</dt><dd>Iterator không bao giờ ném lỗi vì thay đổi đồng thời; nó có thể thấy hoặc không thấy những thay đổi xảy ra sau khi nó bắt đầu.</dd>
+  <dt><code>LongAdder</code></dt><dd>Một bộ đếm thread-safe làm cho trường hợp rất nhiều thread cùng cộng (từ <a href="0024-atomics-and-locks.vi.html">bài 0024</a>).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Hai thread chạy <code>map.put(word, map.get(word) + 1)</code> trên một <code>ConcurrentHashMap</code>. Có thể mất một lần đếm không?"</em> Chọn có hoặc không và nêu lý do. Mục 3 có câu trả lời.</p>
+
+<h2>1. Vì sao HashMap thường là không đủ</h2>
+<p>Hãy hình dung một cuốn sổ duy nhất trong văn phòng, nơi ai cũng ghi đơn hàng vào. Nếu hai người cùng viết lên một trang cùng lúc, trang đó sẽ rối tung. <code>HashMap</code> thường chính là cuốn sổ đó. Javadoc của nó nói: "Lưu ý rằng cài đặt này không được synchronized. Nếu nhiều thread truy cập một hash map đồng thời, và ít nhất một thread thay đổi cấu trúc map, thì nó phải được synchronized từ bên ngoài."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<p><code>ConcurrentHashMap</code> (hay gọi tắt "CHM") là cuốn sổ được thiết kế cho đám đông. Nhiều người có thể đọc và ghi các trang khác nhau cùng lúc, an toàn.</p>
+
+<h2>2. ConcurrentHashMap hứa những gì</h2>
+<ul>
+  <li><strong>Đọc không lock.</strong> "Các thao tác truy xuất (gồm <code>get</code>) nhìn chung không bị chặn", và "các thao tác truy xuất <em>không</em> dùng lock". Một lần đọc thấy "kết quả của các thao tác cập nhật <em>đã hoàn tất</em> gần nhất tính tới lúc nó bắt đầu"; các thao tác cập nhật có mức độ đồng thời kỳ vọng cao.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></li>
+  <li><strong>Không có lock cho cả bảng.</strong> "<em>Không</em> có hỗ trợ nào để lock toàn bộ bảng theo cách ngăn mọi truy cập".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></li>
+  <li><strong>Visibility đi kèm miễn phí.</strong> Các hành động trong một thread trước khi đặt object vào concurrent collection happen-before các hành động sau khi thread khác đọc hoặc xóa nó (cạnh từ <a href="0005-visibility-and-happens-before.vi.html">bài 0005</a>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent: memory consistency</a></li>
+</ul>
+<p>Vậy từng lời gọi <em>riêng lẻ</em> đều an toàn. Cái bẫy nằm ở việc ghép các lời gọi lại.</p>
+
+<h2>3. Map thread-safe, code vẫn race</h2>
+<p>Đây là bộ đếm ở phần "Trước khi bắt đầu":</p>
+<pre><code>Integer old = map.get("hits");              <span class="c">// step 1: read</span>
+map.put("hits", old == null ? 1 : old + 1); <span class="c">// step 2: write</span></code></pre>
+<p>Mỗi lời gọi đều thread-safe, nhưng <em>ở giữa</em> chúng, thread khác có thể làm đúng điều tương tự. Đây là lost update y như <code>count++</code> trong bài 0024, chỉ ở mức cao hơn. Pattern này gọi là <span class="term">check-then-act</span>, và nó vẫn race kể cả trên concurrent map.</p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Bên trái: với get rồi put, thread A và B cùng đọc 5 và cùng put 6, nên hits kết thúc ở 6 và mất một lần đếm. Bên phải: với merge, A đổi 5 thành 6 trong một bước, rồi B đổi 6 thành 7.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="175" y="26" text-anchor="middle" font-size="13">get, rồi put</text>
+    <text x="505" y="26" text-anchor="middle" font-size="13">merge (một bước nguyên tử)</text>
+    <path d="M340 14v240" fill="none" stroke="currentColor" opacity=".3"/>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="44" width="290" height="30" rx="4"/>
+      <rect x="30" y="82" width="290" height="30" rx="4"/>
+      <rect x="30" y="120" width="290" height="30" rx="4"/>
+      <rect x="360" y="44" width="290" height="50" rx="4"/>
+      <rect x="360" y="110" width="290" height="50" rx="4"/>
+      <path d="M505 94v10M500 98l5 6 5-6"/>
+    </g>
+    <rect x="30" y="158" width="290" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="45" y="64">A: get("hits")     → 5</text>
+    <text x="45" y="102">B: get("hits")     → 5</text>
+    <text x="45" y="140">A: put("hits", 6)</text>
+    <text x="45" y="178" fill="var(--accent)">B: put("hits", 6)  ghi đè</text>
+    <text x="175" y="222" text-anchor="middle" fill="var(--accent)">hits = 6: mất một lần đếm</text>
+    <text x="375" y="66">A: merge("hits", 1, sum)</text>
+    <text x="375" y="84" font-size="11" opacity=".75">   đọc 5, ghi 6, không hở</text>
+    <text x="375" y="132">B: merge("hits", 1, sum)</text>
+    <text x="375" y="150" font-size="11" opacity=".75">   đọc 6, ghi 7, không hở</text>
+    <rect x="410" y="200" width="190" height="34" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="505" y="222" text-anchor="middle" fill="var(--accent)">hits = 7</text>
+    <path d="M505 160v34M500 188l5 6 5-6" fill="none" stroke="currentColor"/>
+  </g>
+</svg>
+<figcaption>Bên trái: hai lời gọi an toàn với một khoảng hở ở giữa. Bên phải: một lời gọi làm cả đọc lẫn ghi, nên update của thread kia không thể rơi vào khoảng hở nào.</figcaption>
+</figure>
+
+<h3>Cách sửa: các method gộp nguyên tử</h3>
+<p>CHM cho bạn các method làm đọc và ghi trong một bước: <code>putIfAbsent</code>, <code>computeIfAbsent</code>, <code>computeIfPresent</code>, <code>compute</code>, <code>merge</code>. Với <code>merge</code> và <code>computeIfAbsent</code>, Javadoc nói: "Toàn bộ lời gọi method được thực hiện một cách nguyên tử."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></p>
+<pre><code>map.merge("hits", 1, Integer::sum);</code></pre>
+<p>Đọc nó là: "nếu <code>hits</code> chưa có giá trị thì put 1; nếu có rồi thì thay giá trị cũ bằng <code>old + 1</code>". Lần theo hai thread:</p>
+<pre><code><span class="c">Bước 1  A gọi merge: chưa có hits → put 1          (một bước)</span>
+<span class="c">Bước 2  B gọi merge: hits = 1 → sum(1, 1) = 2      (một bước)</span>
+<span class="c">Bước 3  Nếu B tới đúng lúc A đang ở trong merge với cùng key,</span>
+<span class="c">        B có thể chờ một chút. Nó không bao giờ thấy update làm dở.</span></code></pre>
+<pre><code>$ java java/examples/ChmDemo.java
+merge() total   : <span class="hl">400000 (expected 400000)</span>
+null key        : NullPointerException
+modified while iterating: no exception, size=9
+HashMap          : ConcurrentModificationException</code></pre>
+<p>Dòng đầu: bốn thread, mỗi thread gọi <code>merge("hits", 1, Integer::sum)</code> 100.000 lần, và không mất lần đếm nào.</p>
+<h3>Idiom bộ đếm scale tốt</h3>
+<p>Với frequency map có rất nhiều thread, idiom chính Javadoc đưa ra là:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></p>
+<pre><code>ConcurrentHashMap&lt;String, LongAdder&gt; freqs = new ConcurrentHashMap&lt;&gt;();
+freqs.computeIfAbsent(key, k -&gt; new LongAdder()).increment();</code></pre>
+<p><code>computeIfAbsent</code> tạo bộ đếm đúng một lần, một cách nguyên tử; sau đó <code>increment()</code> trên <code>LongAdder</code> tự nó đã thread-safe.</p>
+<h3>Quy tắc cho hàm bạn truyền vào</h3>
+<p>Trong lúc hàm chạy, "một số thao tác cập nhật của thread khác trên map này có thể bị chặn", "nên phép tính phải ngắn và đơn giản". Hàm mapping "không được sửa map này trong lúc tính", và hàm của <code>merge</code> "không được cố cập nhật bất kỳ mapping nào khác của Map này".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a> Vậy nên: không gọi database, không gọi HTTP, không <code>map.put</code> bên trong <code>computeIfAbsent</code>.</p>
+<p class="muted">JDK 8 vs 17 vs 21: <code>merge</code>, <code>compute*</code> và các default method kiểu <code>putIfAbsent</code> trên <code>Map</code> có từ JDK 8 (<code>Since: 1.8</code>)<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a>, nên code trong bài chạy như nhau trên 8, 17 và 21.</p>
+
+<h2>4. Không cho phép null</h2>
+<p>"Giống <code>Hashtable</code> nhưng khác <code>HashMap</code>, class này <em>không</em> cho phép dùng <code>null</code> làm key hay value."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a> Bạn đã thấy trong output: <code>counts.put(null, 1)</code> ném <code>NullPointerException</code>.</p>
+<p>Một cách thực tế để nhớ vì sao điều này có ích: nếu không thể có null, thì <code>get(key)</code> trả về <code>null</code> chỉ có thể nghĩa là "key không tồn tại". Với <code>HashMap</code> bạn phải hỏi thêm "hay value là null?", và giữa hai câu hỏi đó thread khác có thể đổi map.</p>
+
+<h2>5. Duyệt map trong khi người khác đang ghi</h2>
+<p>Iterator của <code>HashMap</code> là <span class="term">fail-fast</span>: nếu map bị đổi cấu trúc sau khi iterator được tạo (trừ khi đổi qua chính iterator), nó ném <code>ConcurrentModificationException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Iterator của CHM là <span class="term">weakly consistent</span>: chúng trả về các phần tử "phản ánh trạng thái của hash table tại một thời điểm nào đó, lúc hoặc sau khi iterator được tạo", và "Chúng <em>không</em> ném <code>ConcurrentModificationException</code>. Tuy nhiên, iterator được thiết kế để chỉ một thread dùng tại một thời điểm."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></p>
+<p>Demo thêm key trong lúc duyệt một map 3 key. CHM kết thúc với 9 entry và không có exception (vài key mới được duyệt tới và lại thêm key nữa; lần chạy khác hoặc JDK khác con số có thể khác). Phiên bản <code>HashMap</code> thì ném lỗi.</p>
+<h3>Bẫy: size() là ảnh chụp, không phải sự thật</h3>
+<p>Kết quả của "<code>size</code>, <code>isEmpty</code> và <code>containsValue</code> thường chỉ hữu ích khi map không bị cập nhật đồng thời"; nếu không, chúng ổn "cho mục đích giám sát hoặc ước lượng, nhưng không dùng để điều khiển chương trình".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a> Vậy <code>if (map.size() &lt; 100) map.put(...)</code> lại là một race check-then-act nữa.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Chuyện gì xảy ra với <code>concurrentHashMap.put(null, 1)</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó ném ra NullPointerException</button>
+    <button class="opt">Nó lưu một entry với key null</button>
+    <button class="opt">Nó âm thầm bỏ qua key null đó</button>
+    <button class="opt">Chỉ chạy được trên JDK 8, không phải 21</button>
+  </div>
+  <div class="why">Khác <code>HashMap</code>, CHM không cho phép key hay value <code>null</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn thêm key vào một CHM trong khi vòng for-each đang duyệt các key của nó. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không exception; key mới có thể hiện hoặc không</button>
+    <button class="opt">Ném ConcurrentModificationException ngay</button>
+    <button class="opt">Vòng lặp chặn lại đến khi bên ghi xong</button>
+    <button class="opt">Vòng lặp thấy bản sao đóng băng của map cũ</button>
+  </div>
+  <div class="why">Iterator của CHM là weakly consistent: không bao giờ ném CME và phản ánh map tại một thời điểm lúc hoặc sau khi được tạo.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Hai thread đếm từ trong một CHM. Dòng nào an toàn?</p>
+  <div class="options">
+    <button class="opt" data-correct>map.merge(w, 1, Integer::sum)</button>
+    <button class="opt">map.put(w, map.get(w) + 1)</button>
+    <button class="opt">if (!map.containsKey(w)) map.put(w, 1)</button>
+    <button class="opt">map.put(w, map.size() + 1)</button>
+  </div>
+  <div class="why"><code>merge</code> chạy nguyên tử. Các dòng còn lại là check-then-act: hai lời gọi an toàn với một khoảng hở nơi thread khác có thể ghi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Quy tắc cho hàm bạn truyền vào <code>computeIfAbsent</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ngắn, đơn giản, và không bao giờ sửa map</button>
+    <button class="opt">Phải trả về null khi key đã tồn tại rồi</button>
+    <button class="opt">Nên tự lock cả map trước khi bắt đầu</button>
+    <button class="opt">Được phép gọi computeIfAbsent đệ quy</button>
+  </div>
+  <div class="why">Các thao tác cập nhật khác có thể bị chặn khi nó chạy, và hàm không được sửa map trong lúc tính.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Code chạy <code>if (map.size() &lt; 100) map.put(k, v)</code> từ nhiều thread. Bug là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>size() chỉ là ước lượng; check và put bị race</button>
+    <button class="opt">size() ném lỗi khi thread khác đang ghi vào</button>
+    <button class="opt">put() thất bại khi kích thước gần tới 100</button>
+    <button class="opt">Không có bug, CHM làm cặp lệnh này nguyên tử</button>
+  </div>
+  <div class="why"><code>size()</code> khi có cập nhật đồng thời chỉ dùng để giám sát, không dùng để điều khiển, và khoảng hở giữa check và put cho phép map vượt quá 100.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Câu nào về thao tác đọc trong CHM là đúng?</p>
+  <div class="options">
+    <button class="opt" data-correct>get() không lock; nó thấy các update đã xong</button>
+    <button class="opt">get() lock cả bảng trong lúc nó đang đọc</button>
+    <button class="opt">get() có thể thấy một update mới làm dở</button>
+    <button class="opt">get() chỉ an toàn sau khi gọi lockAll()</button>
+  </div>
+  <div class="why">Thao tác truy xuất không dùng lock và phản ánh các update đã hoàn tất gần nhất. Hoàn toàn không có lock cho cả bảng.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"HashMap và ConcurrentHashMap khác nhau thế nào, và dùng ConcurrentHashMap rồi có còn mất update được không?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> HashMap không được synchronized; thay đổi đồng thời cần lock từ bên ngoài.</label></li>
+      <li><label><input type="checkbox"> CHM: mỗi lời gọi đều thread-safe, đọc không lock, không có lock cả bảng.</label></li>
+      <li><label><input type="checkbox"> Có, vẫn mất update được với check-then-act (get rồi put).</label></li>
+      <li><label><input type="checkbox"> Dùng các method nguyên tử: merge, compute, computeIfAbsent, putIfAbsent.</label></li>
+      <li><label><input type="checkbox"> Hàm truyền vào phải ngắn và không được sửa map.</label></li>
+      <li><label><input type="checkbox"> Không có key/value null; iterator weakly consistent (không CME); size() chỉ là ước lượng khi đang có update.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"HashMap không được synchronized, nên nếu nhiều thread cùng sửa thì em phải lock từ bên ngoài, và iterator của nó là fail-fast. ConcurrentHashMap được làm cho concurrency: từng lời gọi đều thread-safe, get không lock, và không có lock cho cả bảng. Nhưng đúng là vẫn có thể mất update nếu em làm check-then-act, kiểu get rồi put: hai thread đọc cùng một giá trị và lần put sau đè lần put trước. Nên em dùng các method nguyên tử: merge cho bộ đếm, computeIfAbsent để tạo value đúng một lần, ví dụ với LongAdder cho bộ đếm nóng. Hàm em truyền vào phải ngắn và không được đụng tới map. Thêm hai khác biệt nữa: ConcurrentHashMap không cho key hay value null, và iterator của nó weakly consistent, nên không bao giờ ném ConcurrentModificationException. Còn size chỉ là ước lượng khi các thread khác đang ghi."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0025-word-count-concurrently.vi.md">Bài tập 0025: đếm từ đồng thời</a>. Hãy gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Tiếp theo interviewer hỏi ai chạy tất cả các thread này: <em>"Bạn submit task vào thread pool. Khi nào nó tạo thread, khi nào xếp hàng, khi nào từ chối?"</em> <a href="0023-thread-pools-executors.vi.html">Bài 0023</a> lần theo một <code>ThreadPoolExecutor</code> từng task một. Về các cấu trúc concurrent khác (queue, list copy-on-write), xem <a href="0039-concurrent-collections.vi.html">bài 0039</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">Javadoc của ConcurrentHashMap</a>, phần mô tả class (màn hình đầu tiên là đủ).</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao computeIfAbsent lại chặn các thread khác?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0024-atomics-and-locks.vi.html">← Vì sao count++ làm mất update, và cách sửa</a> &nbsp;|&nbsp; <a href="0023-thread-pools-executors.vi.html">Thread pool quyết định thế nào: chạy, xếp hàng hay từ chối →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">Javadoc của ConcurrentHashMap</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">Javadoc của HashMap</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Javadoc của Map</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 21: Observer</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Observer</h1>
+<p class="meta">Design Patterns · Bài 0021 · bước 21/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0021-observer.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> cài đặt publish/subscribe, biết vì sao <code>java.util.Observable</code> bị deprecate, và dùng được <code>Flow</code> API của JDK.</div>
+
+<h2>Mục đích</h2>
+<p>Observer là "một behavioral design pattern cho phép bạn định nghĩa một cơ chế đăng ký (subscription) để thông báo cho nhiều object về bất kỳ sự kiện nào xảy ra với object mà chúng đang quan sát." Hãy dùng nó khi thay đổi ở một object có thể kéo theo thay đổi ở các object khác mà tập hợp của chúng không biết trước hoặc thay đổi động, cho các hook trong GUI, và cho việc quan sát tạm thời.<a class="cite" href="https://refactoring.guru/design-patterns/observer">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/ObserverDemo.java
+A sees 10
+B sees 10
+A sees 11
+--- Flow API (Publisher/Subscriber with back-pressure)
+Flow got 1
+Flow got 2
+Flow got 3</code></pre><p>Một danh sách subscriber, subscribe/unsubscribe lúc runtime. Cặp <code>Observable</code>/<code>Observer</code> nguyên thủy của JDK đã bị deprecate: theo tài liệu, "mô hình sự kiện ... khá hạn chế, thứ tự thông báo mà <code>Observable</code> gửi đi không được đặc tả, và thay đổi trạng thái không tương ứng một-một với các thông báo", với <code>java.beans</code>, <code>java.util.concurrent</code> và <code>Flow</code> API là các lựa chọn thay thế.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[2]</a> <code>Flow</code> định nghĩa rằng "Publisher tạo ra các item được tiêu thụ bởi một hoặc nhiều Subscriber, mỗi Subscriber được quản lý bởi một Subscription", và kiểm soát luồng thông qua <code>request(n)</code> "để tránh các vấn đề quản lý tài nguyên trong hệ thống kiểu push".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[3]</a> Mã nguồn: <a href="../examples/ObserverDemo.java"><code>ObserverDemo.java</code></a>. Các hệ thống messaging chính là Observer ở quy mô kiến trúc (<a href="../../kafka/index.vi.html">Kafka</a>, <a href="../../rabbitmq/index.vi.html">RabbitMQ</a>).</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Open/Closed: thêm subscriber mà không sửa publisher</li><li>Thiết lập quan hệ giữa các object lúc runtime</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Subscriber được thông báo theo thứ tự ngẫu nhiên</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/observer">[1]</a> Chain of Responsibility, Command, Mediator và Observer nối bên gửi với bên nhận theo những cách khác nhau; Mediator có thể được xây bằng Observer.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Observer định nghĩa...?</p>
+  <button>Một cơ chế sao chép</button>
+  <button data-correct>Một cơ chế đăng ký</button>
+  <button>Một phép sort</button>
+  <button>Một cache</button>
+  <p class="explain">Thông báo cho nhiều object về các sự kiện.<a class="cite" href="https://refactoring.guru/design-patterns/observer">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao Observable bị deprecate?</p>
+  <button>Quá lớn</button>
+  <button data-correct>Mô hình sự kiện hạn chế, thứ tự không đặc tả</button>
+  <button>Quá nhanh</button>
+  <button>Bị gỡ khỏi JVM</button>
+  <p class="explain">Javadoc nêu mô hình sự kiện hạn chế và thứ tự thông báo không được đặc tả.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Lựa chọn thay thế hiện đại trong JDK?</p>
+  <button>Hashtable</button>
+  <button>Stack</button>
+  <button data-correct>Flow API</button>
+  <button>Vector</button>
+  <p class="explain">Flow API được đề xuất cho kiểu lập trình reactive-streams.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Method back-pressure của Flow?</p>
+  <button>Subscriber.kill</button>
+  <button data-correct>Subscription.request</button>
+  <button>Publisher.stop</button>
+  <button>Processor.reset</button>
+  <p class="explain">Kiểm soát luồng dựa vào request(long).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0021-event-bus.vi.md">Bài tập 21: một event bus</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ObserverDemo.java"><code>ObserverDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/observer">Observer (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0020-memento.vi.html">← Memento</a> &nbsp;|&nbsp; <a href="0022-state.vi.html">State →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/observer">Observer (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">Observable Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">Flow Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 33: Set, thứ tự và LRU cache</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Collection nào nhớ thứ tự, và một LRU cache trong mười dòng</h1>
+<p class="subtitle"><code>HashSet</code> thực chất là một <code>HashMap</code>, và <code>LinkedHashMap</code> có thể trở thành một cache.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0033 · bước 14/46 · Core · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0033-hashset-linkedhashmap-and-lru.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> "Sao set của mình in ra theo thứ tự lạ thế?" là một bất ngờ hay gặp, còn <em>"Hãy implement một LRU cache"</em> là bài interview kinh điển. Java cho bạn cái cache gần như miễn phí, nếu bạn biết một cờ trong constructor và một method cần override.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích HashSet được xây thế nào, chọn giữa HashSet, LinkedHashSet và TreeSet theo nhu cầu thứ tự, và viết một LRU cache trong mười dòng.</div>
+
+<dl class="words">
+  <dt>Set</dt><dd>Một collection không có phần tử trùng. Thêm thứ đã có sẵn thì không có gì xảy ra.</dd>
+  <dt>thứ tự duyệt</dt><dd>Thứ tự mà vòng lặp (hoặc <code>println</code>) đi qua các phần tử.</dd>
+  <dt>danh sách liên kết đôi</dt><dd>Một chuỗi mà mỗi phần tử trỏ tới phần tử trước và phần tử sau nó, nên tháo một phần tử ra rất nhanh (doubly linked list).</dd>
+  <dt>cache</dt><dd>Một kho nhỏ, nhanh, chứa các kết quả gần đây để khỏi tính lại hay lấy lại. Nó có giới hạn kích thước.</dd>
+  <dt>LRU</dt><dd>"Least recently used" (ít được dùng gần đây nhất): khi cache đầy, bỏ đi phần tử lâu nhất không ai đụng tới.</dd>
+  <dt>eviction</dt><dd>Loại một phần tử khỏi cache để lấy chỗ cho phần tử mới.</dd>
+  <dt>extends, override</dt><dd><code>class A extends B</code> làm A thành class con của B; khi đó A có thể override (thay thế) một số method của B.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Dự đoán: một cache chứa tối đa 3 phần tử. Bạn <code>put</code> a, b, c, rồi <code>get(a)</code>, rồi <code>put(d)</code>. Key nào bị loại ra? Nói thành lời kèm lý do. Phần 3 sẽ lần theo từng bước.</p>
+
+<h2>1. HashSet là HashMap đội lốt</h2>
+<p>Hãy tưởng tượng danh sách khách được lưu trong hệ thống thẻ phòng của khách sạn: mỗi tên khách là một key thẻ, và "value" trên mọi thẻ là cùng một miếng dán trắng. Bạn chỉ quan tâm tên đó có trong hệ thống hay không. Đó chính là <code>HashSet</code>.</p>
+<p>Theo tài liệu, "class này implement interface Set, dựa trên một bảng băm (thực chất là một instance HashMap)."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashSet.html">HashSet javadoc</a> Mỗi phần tử là một key có value là một object giả dùng chung. Trong mã nguồn OpenJDK, nó đúng nghĩa đen là:<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashSet.java">HashSet.java</a></p>
+<pre><code>static final Object PRESENT = new Object();
+
+public boolean add(E e) {
+    return map.put(e, PRESENT)==null;   <span class="c">// true if the key was new</span>
+}</code></pre>
+<p>Vì vậy mọi thứ trong <a href="0030-hashmap-internals.vi.html">bài bên trong HashMap</a> đều áp dụng: add/contains thời gian hằng số "với giả định hàm hash phân tán các phần tử đều", cho phép một null, và "không đảm bảo gì về thứ tự duyệt ... đặc biệt, không đảm bảo thứ tự giữ nguyên theo thời gian".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashSet.html">HashSet javadoc</a> Thứ tự bạn thấy chỉ là thứ tự bucket ở bài 0030, và một lần resize có thể làm nó thay đổi.</p>
+
+<h2>2. Các biến thể Linked giữ thứ tự thêm vào</h2>
+<p>Giờ hãy hình dung cùng khách sạn đó, cộng thêm một cuốn sổ khách bằng giấy ở quầy lễ tân: mỗi khách mới ký ở dòng cuối. Hệ thống thẻ vẫn tìm khách nhanh; cuốn sổ nhớ ai đến trước.</p>
+<p><code>LinkedHashMap</code> thêm một danh sách liên kết đôi xuyên qua các entry. Theo tài liệu, thứ tự của nó "thường là thứ tự các key được thêm vào"; put lại một key đã có thì không làm nó di chuyển.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> Trong mã nguồn, mỗi entry có thêm hai field <code>before</code> và <code>after</code>, và map giữ <code>head</code> (cũ nhất) và <code>tail</code> (mới nhất).<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/LinkedHashMap.java">LinkedHashMap.java</a> <code>LinkedHashSet</code> là cùng ý tưởng cho set.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Một LinkedHashMap: các entry c, a, b nằm ở các bucket khác nhau của bảng băm, và một chuỗi riêng nối chúng theo thứ tự thêm vào: head c, rồi a, rồi b ở tail.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11" opacity=".75">bảng băm (tìm key nhanh)</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="20" y="34" width="80" height="40"/><rect x="100" y="34" width="80" height="40"/><rect x="180" y="34" width="80" height="40"/><rect x="260" y="34" width="80" height="40"/>
+      <rect x="340" y="34" width="80" height="40"/><rect x="420" y="34" width="80" height="40"/><rect x="500" y="34" width="80" height="40"/><rect x="580" y="34" width="80" height="40"/>
+    </g>
+    <g font-size="10" opacity=".6"><text x="24" y="46">0</text><text x="104" y="46">1</text><text x="184" y="46">2</text><text x="264" y="46">3</text><text x="344" y="46">4</text><text x="424" y="46">5</text><text x="504" y="46">6</text><text x="584" y="46">7</text></g>
+    <text x="140" y="64" text-anchor="middle">a=10</text>
+    <text x="380" y="64" text-anchor="middle">c=3</text>
+    <text x="620" y="64" text-anchor="middle">b=2</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="3 3" opacity=".5">
+      <path d="M140 74L340 150M380 74L130 150M620 74L550 150"/>
+    </g>
+    <text x="20" y="104" font-size="11" fill="var(--accent)">linked list</text>
+    <rect x="60" y="150" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="270" y="150" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="480" y="150" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="130" y="177" text-anchor="middle">c=3</text>
+    <text x="340" y="177" text-anchor="middle">a=10</text>
+    <text x="550" y="177" text-anchor="middle">b=2</text>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M200 165h64M258 160l6 5-6 5M270 180h-64M212 175l-6 5 6 5"/>
+      <path d="M410 165h64M468 160l6 5-6 5M480 180h-64M422 175l-6 5 6 5"/>
+    </g>
+    <text x="235" y="158" text-anchor="middle" font-size="10">after</text>
+    <text x="235" y="198" text-anchor="middle" font-size="10">before</text>
+    <text x="130" y="216" text-anchor="middle" font-size="11" fill="var(--accent)">head (cũ nhất)</text>
+    <text x="550" y="216" text-anchor="middle" font-size="11" fill="var(--accent)">tail (mới nhất)</text>
+    <text x="340" y="240" text-anchor="middle" font-size="11" opacity=".8">put c, a, b, rồi put lại a=10: a giữ nguyên vị trí</text>
+  </g>
+</svg>
+<figcaption>Cùng các entry, hai cấu trúc: bucket cho tra cứu nhanh, chuỗi before/after cho thứ tự ổn định. Khi duyệt, map đi theo chuỗi, không theo bucket.</figcaption>
+</figure>
+
+<pre><code>$ java java/examples/collections/LruCache.java
+insertion order (re-put 'a' keeps its place): {c=3, a=10, b=2}
+HashSet: [java, kafka, redis, docker, sql]   LinkedHashSet: [kafka, java, docker, sql, redis]</code></pre>
+<p>Cả hai set đều nhận <code>kafka, java, docker, sql, redis</code> theo đúng thứ tự đó. <code>HashSet</code> in theo thứ tự bucket; <code>LinkedHashSet</code> in theo thứ tự bạn đã thêm vào.</p>
+<p>Thêm một điểm cộng: chi phí duyệt tỉ lệ với size, trong khi duyệt một HashMap thường thì tỉ lệ với capacity.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a></p>
+
+<h3>Chọn set nào?</h3>
+<table>
+<tr><th>Bạn cần</th><th>Chọn</th><th>Thứ tự khi lặp</th></tr>
+<tr><td>Chỉ cần "có hay không?", nhanh nhất</td><td><code>HashSet</code></td><td>không hứa gì, có thể thay đổi</td></tr>
+<tr><td>Thứ tự bạn đã thêm vào</td><td><code>LinkedHashSet</code></td><td>thứ tự thêm vào</td></tr>
+<tr><td>Thứ tự sắp xếp, truy vấn khoảng</td><td><code>TreeSet</code></td><td>sắp theo compare (<a href="0031-comparable-comparator-and-ordering.vi.html">bài 0031</a>)</td></tr>
+</table>
+
+<h2>3. Access order và LRU cache</h2>
+<p>Đổi quy tắc của cuốn sổ khách: mỗi lần một khách <em>dùng</em> quầy bar, họ gạch dòng cũ của mình và ký lại ở cuối sổ. Giờ dòng đầu tiên luôn là vị khách im lặng lâu nhất. Khi khách sạn đầy, đó là người bạn mời ra. Đó là một LRU cache.</p>
+<p>Một constructor đặc biệt <code>LinkedHashMap(initialCapacity, loadFactor, accessOrder)</code> sắp các entry từ ít được truy cập gần đây nhất đến gần đây nhất: theo tài liệu, "loại map này rất phù hợp để xây LRU cache."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> <code>get</code>, <code>put</code>, <code>getOrDefault</code>, các method <code>compute*</code> và <code>merge</code> đều tính là truy cập.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> Sau đó override <code>removeEldestEntry</code>, method này "được put và putAll gọi sau khi thêm một entry mới".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a></p>
+<pre><code>class LruCache&lt;K, V&gt; extends LinkedHashMap&lt;K, V&gt; {
+    private final int capacity;
+    LruCache(int capacity) {
+        super(16, 0.75f, <span class="hl">true</span>);       <span class="c">// accessOrder = true</span>
+        this.capacity = capacity;
+    }
+    @Override
+    protected boolean removeEldestEntry(Map.Entry&lt;K, V&gt; eldest) {
+        return size() &gt; capacity;      <span class="c">// true = drop the eldest</span>
+    }
+}</code></pre>
+<p>Từng dòng: <code>extends LinkedHashMap</code> tái sử dụng toàn bộ map. <code>super(16, 0.75f, true)</code> gọi constructor của class cha với access order được bật. <code>removeEldestEntry</code> được hỏi sau mỗi lần thêm; trả về <code>true</code> sẽ xóa đầu chuỗi, tức entry ít được dùng gần đây nhất.</p>
+
+<h3>Lần theo với capacity 3</h3>
+<pre><code><span class="c">                          chain: eldest → newest</span>
+<span class="c">Step 1  put a, b, c       [a, b, c]           size 3, nothing to evict</span>
+<span class="c">Step 2  get(a)            [b, c, a]           a moves to the end</span>
+<span class="c">Step 3  put d             [b, c, a, d]        size 4 &gt; 3 → evict b</span>
+<span class="c">                          [c, a, d]</span>
+<span class="c">Step 4  put e             [c, a, d, e]        size 4 &gt; 3 → evict c</span>
+<span class="c">                          [a, d, e]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="LRU cache kích thước 3. Sau get a, chuỗi là b, c, a. put d nối d vào cuối và loại b ở đầu. put e nối e và loại c.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="22" font-size="11" opacity=".75">cũ nhất (head) → mới nhất (tail)</text>
+    <text x="20" y="62" font-size="12">sau get(a)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="200" y="40" width="70" height="36" rx="4"/><rect x="290" y="40" width="70" height="36" rx="4"/>
+    </g>
+    <rect x="380" y="40" width="70" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="235" y="63" text-anchor="middle">b</text><text x="325" y="63" text-anchor="middle">c</text><text x="415" y="63" text-anchor="middle" fill="var(--accent)">a</text>
+    <text x="470" y="63" font-size="11" fill="var(--accent)">← a dời xuống cuối</text>
+
+    <text x="20" y="122" font-size="12">put(d)</text>
+    <rect x="200" y="100" width="70" height="36" rx="4" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <g fill="none" stroke="currentColor">
+      <rect x="290" y="100" width="70" height="36" rx="4"/><rect x="380" y="100" width="70" height="36" rx="4"/><rect x="470" y="100" width="70" height="36" rx="4"/>
+    </g>
+    <text x="235" y="123" text-anchor="middle" fill="var(--accent)" text-decoration="line-through">b</text>
+    <text x="325" y="123" text-anchor="middle">c</text><text x="415" y="123" text-anchor="middle">a</text><text x="505" y="123" text-anchor="middle">d</text>
+    <text x="560" y="123" font-size="11" fill="var(--accent)">loại b</text>
+
+    <text x="20" y="182" font-size="12">put(e)</text>
+    <rect x="290" y="160" width="70" height="36" rx="4" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <g fill="none" stroke="currentColor">
+      <rect x="380" y="160" width="70" height="36" rx="4"/><rect x="470" y="160" width="70" height="36" rx="4"/><rect x="560" y="160" width="70" height="36" rx="4"/>
+    </g>
+    <text x="325" y="183" text-anchor="middle" fill="var(--accent)" text-decoration="line-through">c</text>
+    <text x="415" y="183" text-anchor="middle">a</text><text x="505" y="183" text-anchor="middle">d</text><text x="595" y="183" text-anchor="middle">e</text>
+    <text x="340" y="220" text-anchor="middle" font-size="11" opacity=".8">removeEldestEntry: size() &gt; 3 → xóa đầu chuỗi</text>
+  </g>
+</svg>
+<figcaption>Mỗi lần truy cập dời entry xuống cuối. Mỗi lần thêm vượt giới hạn thì xóa đầu chuỗi. Đầu chuỗi luôn là key ít được dùng gần đây nhất.</figcaption>
+</figure>
+
+<p>Lần chạy thật cũng cho kết quả y vậy:</p>
+<pre><code>LRU after get(a), put(d): [c, a, d]     <span class="c">// b was least recently used</span>
+LRU after put(e):         [a, d, e]</code></pre>
+
+<h3>Hai lưu ý ở mức senior</h3>
+<ul>
+  <li><strong>Thread.</strong> Ở chế độ access order, theo tài liệu, "chỉ riêng việc truy vấn map bằng get đã là một structural modification", nên kể cả đọc cũng cần lock khi nhiều thread dùng chung; hãy bọc bằng <code>Collections.synchronizedMap</code> hoặc dùng một thư viện cache (Caffeine) trên production.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> Điều này cũng có nghĩa một lệnh <code>get</code> trong vòng lặp qua chính map đó là structural change (bài 0029).</li>
+  <li><strong>JDK 21.</strong> <code>LinkedHashMap</code> là một <code>SequencedMap</code>, nên còn có <code>putFirst</code>/<code>putLast</code> và <code>reversed()</code> (<a href="0016-sequenced-collections.vi.html">bài 0016</a>). Trên JDK 8 và 17 thì không có.</li>
+</ul>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Bên trong một <code>HashSet</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một HashMap có mọi value là một object giả</button>
+    <button class="opt">Một mảng đã sắp xếp, tìm bằng tìm kiếm nhị phân</button>
+    <button class="opt">Một linked list được duyệt từ phần tử đầu tiên</button>
+    <button class="opt">Một TreeMap giữ các phần tử luôn được sắp xếp</button>
+  </div>
+  <div class="why">HashSet "dựa trên một bảng băm (thực chất là một instance HashMap)". Mỗi phần tử là một key; value là object <code>PRESENT</code> dùng chung.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn thêm năm từ vào một <code>HashSet</code> rồi in ra. Câu nào đúng?</p>
+  <div class="options">
+    <button class="opt" data-correct>Thứ tự không được hứa và có thể đổi về sau</button>
+    <button class="opt">Các từ luôn in theo thứ tự bạn đã thêm vào</button>
+    <button class="opt">Các từ luôn in theo thứ tự bảng chữ cái</button>
+    <button class="opt">Các từ luôn in theo thứ tự ngược lúc thêm</button>
+  </div>
+  <div class="why">HashSet "không đảm bảo gì về thứ tự duyệt", kể cả việc nó giữ nguyên. Dùng <code>LinkedHashSet</code> nếu cần thứ tự thêm vào.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong một <code>LinkedHashMap</code> bình thường (insertion order), bạn <code>put("a", 10)</code> khi <code>a</code> đã có. Giờ <code>a</code> nằm ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ở vị trí cũ, với value mới</button>
+    <button class="opt">Ở cuối, vì nó vừa được thêm lại</button>
+    <button class="opt">Ở đầu, vì được dùng gần đây nhất</button>
+    <button class="opt">Hai lần: một với 1, một với 10</button>
+  </div>
+  <div class="why">Thứ tự thêm vào "không bị ảnh hưởng nếu một key được thêm lại". Lần chạy in ra <code>{c=3, a=10, b=2}</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Tham số constructor nào biến <code>LinkedHashMap</code> thành access order?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>accessOrder = true</code></button>
+    <button class="opt"><code>loadFactor = 1.0f</code></button>
+    <button class="opt"><code>initialCapacity = 0</code></button>
+    <button class="opt"><code>ordered = false</code></button>
+  </div>
+  <div class="why">Constructor ba tham số <code>LinkedHashMap(int, float, boolean accessOrder)</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một LRU cache kích thước 3 nhận <code>put a, b, c</code>, rồi <code>get(a)</code>, rồi <code>put(d)</code>. Key nào bị loại?</p>
+  <div class="options">
+    <button class="opt" data-correct>b</button>
+    <button class="opt">a</button>
+    <button class="opt">c</button>
+    <button class="opt">d</button>
+  </div>
+  <div class="why"><code>get(a)</code> dời <code>a</code> xuống cuối, nên chuỗi là <code>[b, c, a]</code>. <code>b</code> ở đầu: ít được dùng gần đây nhất.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Khi nào <code>LinkedHashMap</code> gọi <code>removeEldestEntry</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Sau khi put hoặc putAll thêm một entry mới</button>
+    <button class="opt">Trước mỗi lần get, để dọn chỗ từ trước</button>
+    <button class="opt">Chỉ khi bảng resize lên gấp đôi kích thước</button>
+    <button class="opt">Mỗi giây một lần, từ một thread chạy nền</button>
+  </div>
+  <div class="why">Nó "được put và putAll gọi sau khi thêm một entry mới". Trả về <code>true</code> thì entry cũ nhất bị xóa.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Hai thread dùng chung <code>LruCache</code> access-order của bạn nhưng chỉ gọi <code>get</code>. Vì sao vẫn không an toàn?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mỗi get dời một entry, nên nó là thao tác ghi</button>
+    <button class="opt">get ném exception khi hai thread cùng gọi nó</button>
+    <button class="opt">get xóa sạch cache khi bị gọi hai lần liền</button>
+    <button class="opt">Nó an toàn, vì get không bao giờ sửa map</button>
+  </div>
+  <div class="why">Ở chế độ access order, "chỉ riêng việc truy vấn map bằng get đã là một structural modification". Hãy dùng lock hoặc một thư viện cache như Caffeine.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Bạn sẽ implement một LRU cache trong Java thế nào?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Extend <code>LinkedHashMap</code>: một bảng băm cộng một danh sách liên kết đôi.</label></li>
+      <li><label><input type="checkbox"> Dùng constructor với <code>accessOrder = true</code>, để <code>get</code>/<code>put</code> dời entry xuống cuối.</label></li>
+      <li><label><input type="checkbox"> Override <code>removeEldestEntry</code> trả về <code>size() &gt; capacity</code>.</label></li>
+      <li><label><input type="checkbox"> Nó được gọi sau khi <code>put</code> thêm entry; đầu chuỗi là entry ít được dùng gần đây nhất.</label></li>
+      <li><label><input type="checkbox"> <code>get</code>/<code>put</code> vẫn O(1) trung bình (tra hash + nối lại liên kết).</label></li>
+      <li><label><input type="checkbox"> Không thread safe: kể cả <code>get</code> cũng là structural change; cần lock hoặc dùng Caffeine.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Trong Java em sẽ extend <code>LinkedHashMap</code>. Nó là một HashMap cộng thêm danh sách liên kết đôi xuyên qua các entry. Bình thường danh sách giữ thứ tự thêm vào, nhưng nếu gọi constructor với <code>accessOrder</code> là true thì mỗi lần <code>get</code> hay <code>put</code> sẽ dời entry đó xuống cuối, nên đầu danh sách luôn là entry ít được dùng gần đây nhất. Sau đó em override <code>removeEldestEntry</code> trả về <code>size() &gt; capacity</code>; map gọi nó sau mỗi lần thêm và xóa đầu danh sách khi em trả về true. Tra cứu vẫn O(1) trung bình. Điểm cần lưu ý là concurrency: ở access order, kể cả <code>get</code> cũng sửa danh sách, nên nếu nhiều thread dùng chung thì em cần lock, còn trên production em sẽ dùng thư viện như Caffeine. Nếu họ muốn viết từ đầu thì cũng cùng ý tưởng: một HashMap từ key tới node, cộng danh sách liên kết đôi do mình tự viết."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0033-build-an-lru.vi.md">Bài tập 0033: viết một LRU cache</a>. Dự đoán từng lần eviction trên giấy trước, rồi chạy cache của bạn.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/LruCache.java"><code>LruCache.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể ép thêm: <em>"Giờ hãy implement mà không dùng LinkedHashMap"</em> (một HashMap cộng danh sách liên kết đôi tự viết, như trong câu trả lời mẫu), hoặc <em>"Nếu tôi cần key gần nhất chứ không phải key chính xác thì sao?"</em> Đó là <code>TreeMap</code> và <code>NavigableMap</code>: <a href="0034-treemap-and-navigable-maps.vi.html">bài 0034</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap Javadoc (JDK 21)</a>. Đọc phần mô tả class, kể cả access order, rồi đến removeEldestEntry.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Mình viết LRU cache với linked list tự làm thế nào?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0032-unmodifiable-vs-immutable.vi.html">← List không ai sửa được (thật không?)</a> &nbsp;|&nbsp; <a href="0042-review-collections-core.vi.html">Ôn tập 3: HashMap bên trong, thứ tự và tính bất biến →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashSet.html">HashSet Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashSet.java">Mã nguồn OpenJDK 21: HashSet.java</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/LinkedHashMap.java">Mã nguồn OpenJDK 21: LinkedHashMap.java</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

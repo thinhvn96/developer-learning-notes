@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 4: Index: được gì và mất gì</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Index: được gì và mất gì</h1>
+<p class="meta">PostgreSQL · Bài 0004 · bước 7/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-indexes-what-they-buy.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vì sao index giúp tra cứu nhanh, nó tốn gì khi ghi, và chứng minh bằng plan trước/sau.</div>
+
+<h2>Vì sao index có ích</h2>
+<p>Không có index, "hệ thống sẽ phải quét toàn bộ table, từng dòng một". Có index trên cột được tìm kiếm, "có thể nó chỉ cần đi xuống vài tầng của một cây tìm kiếm."<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+<h2>Cái giá phải trả</h2>
+<p>"Sau khi tạo index, hệ thống phải giữ nó đồng bộ với table. Điều này làm tăng chi phí cho các thao tác thay đổi dữ liệu." Vì vậy "những index hiếm khi hoặc không bao giờ được query dùng tới thì nên xóa đi."<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+<h2>Trước và sau (200.000 dòng)</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 04-index-explain.sql
+Seq Scan on test1  (cost=0.00..3582.00 rows=1 ...) (actual time=3.107..5.069 ...)
+   Rows Removed by Filter: 199999
+   Execution Time: 5.078 ms
+CREATE INDEX test1_id_index ON test1 (id);
+Index Scan using test1_id_index on test1 (cost=0.42..8.44 rows=1 ...)
+   Index Cond: (id = 123456)
+   Execution Time: 0.028 ms</code></pre>
+<p>Thời gian là của một lần chạy trên máy này; điều quan trọng là hình dạng của plan (quét toàn bộ, đọc từng dòng so với vài bước nhảy trên cây). Muốn tìm hiểu sâu hơn về composite index, sắp xếp và join, cuốn sách web miễn phí <a href="https://use-the-index-luke.com/">Use The Index, Luke</a><a class="cite" href="https://use-the-index-luke.com/">[2]</a> có đề cập PostgreSQL cùng nhiều database khác.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Query trên cột lọc không có index thì sao?</p>
+  <button data-correct>Quét toàn bộ table</button>
+  <button>Tự tạo một index</button>
+  <button>Đi theo cây tìm kiếm</button>
+  <button>Báo lỗi và dừng</button>
+  <p class="explain">Không có index, hệ thống quét table từng dòng một.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Thêm một index thì tốn gì?</p>
+  <button>Đọc luôn chậm hơn</button>
+  <button>Tốn ít đĩa hơn</button>
+  <button data-correct>Chi phí khi ghi</button>
+  <button>Mất các constraint</button>
+  <p class="explain">Index phải được giữ đồng bộ với table, làm tăng chi phí khi thay đổi dữ liệu.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Nên làm gì với một index không được dùng?</p>
+  <button>Nhân bản nó</button>
+  <button>Đổi thành unique</button>
+  <button data-correct>Xóa nó đi</button>
+  <button>Rebuild hằng ngày</button>
+  <p class="explain">Index hiếm khi hoặc không bao giờ được dùng thì nên xóa.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Sau <code>CREATE INDEX</code>, plan hiện gì?</p>
+  <button>Một node Seq Scan</button>
+  <button data-correct>Một node Index Scan</button>
+  <button>Chỉ một node Sort</button>
+  <button>Một node Hash Join</button>
+  <p class="explain">Trong lần chạy ví dụ, phép tra cứu đã dùng test1_id_index.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-index-a-join-column.vi.md">Bài tập 0004: đánh index cho cột join</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-index-explain.sql"><code>04-index-explain.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://use-the-index-luke.com/">Use The Index, Luke (Markus Winand)</a>. Bắt đầu với chương 'Anatomy of an Index'.</p>
+<p><a href="0009-ctes-with-and-recursive.vi.html">← CTE: WITH và WITH RECURSIVE</a> &nbsp;|&nbsp; <a href="0010-index-types.vi.html">Các loại index: B-tree, hash, GIN, BRIN →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/indexes-intro.html">PostgreSQL Docs: Indexes, introduction</a> · [2] <a href="https://use-the-index-luke.com/">Use The Index, Luke</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

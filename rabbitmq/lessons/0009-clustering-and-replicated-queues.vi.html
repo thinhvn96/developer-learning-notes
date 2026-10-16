@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 9: Clustering: node, số lẻ và replicated queue</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Clustering: node, số lẻ và replicated queue</h1>
+<p class="meta">RabbitMQ · Bài 0009 · bước 9/9 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-clustering-and-replicated-queues.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được cluster chia sẻ những gì, vì sao mặc định nội dung queue không được replicate, vì sao số node lẻ lại quan trọng, và chứng minh một quorum queue vẫn sống khi mất node đang giữ leader.</div>
+
+<h2>Cluster là gì</h2>
+<p>Theo tài liệu, cluster là "một nhóm logic gồm một hoặc nhiều node (ba, năm, bảy hoặc nhiều hơn), cùng chia sẻ user, virtual host, queue, stream, exchange, binding, runtime parameter và các state phân tán khác." Mọi state đều được replicate giữa các node, "ngoại lệ là message queue, mặc định chỉ nằm trên một node, dù vẫn nhìn thấy và truy cập được từ mọi node."<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a> Muốn replicate nội dung queue thì dùng một kiểu queue có replication như quorum queue.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+<h2>Số lẻ</h2>
+<p>"Rất nên dùng số node lẻ cho cluster", còn cluster hai node thì "rất không nên" vì sau khi mất kết nối các node không thể xác định được đâu là phần đa số. Quorum queue cần sự đồng thuận giữa các member.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a> Quorum queue được xây dựng trên Raft và là lựa chọn mặc định cho queue có replication, tính sẵn sàng cao.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[2]</a></p>
+<h2>Thử với một cluster thật</h2>
+<pre><code>cd rabbitmq/examples &amp;&amp; ./03-cluster-quorum.sh     # 3 containers: rmq1, rmq2, rmq3
+Running Nodes: rabbit@rmq1 rabbit@rmq2 rabbit@rmq3
+q.classic  classic  leader rmq1  members [rmq1]                    messages 3
+q.quorum   quorum   leader rmq1  members [rmq1, rmq2, rmq3]        messages 3
+docker stop rmq1                     # the node hosting both queues' leaders
+asked via rmq2:  q.classic  rabbit_classic_queue  (no message count: unavailable)
+                 q.quorum   quorum  3               (still available, 3 messages)</code></pre>
+<p>Classic queue nằm trên một node và trở nên không dùng được khi node đó dừng; quorum queue vẫn giữ đủ 3 message trên các member còn sống. Mã nguồn: <a href="../examples/03-cluster-quorum.sh"><code>03-cluster-quorum.sh</code></a>. Network partition và cách xử lý split-brain nằm ngoài các trang tài liệu đã đọc; clustering guide có trình bày về chúng. Thứ tương đương bên Kafka là replication với ISR: <a href="../../kafka/lessons/0005-replication-isr-and-durability.vi.html">bài replication</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mặc định một classic queue nằm ở đâu?</p>
+  <button>Trong etcd</button>
+  <button>Trên mọi node</button>
+  <button>Ở phía client</button>
+  <button data-correct>Trên một node</button>
+  <p class="explain">Mặc định message queue chỉ nằm trên một node.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Số node được khuyến nghị?</p>
+  <button>Số chẵn</button>
+  <button>Đúng hai</button>
+  <button data-correct>Số lẻ</button>
+  <button>Bao nhiêu cũng được</button>
+  <p class="explain">Rất nên dùng số node lẻ.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao tránh cluster hai node?</p>
+  <button>Quá chậm</button>
+  <button>Port không hỗ trợ</button>
+  <button>Quá tốn kém</button>
+  <button data-correct>Không thể có đa số</button>
+  <p class="explain">Hai node không thể xác định được phần đa số sau khi mất kết nối.<a class="cite" href="https://www.rabbitmq.com/docs/clustering">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Điều gì giữ queue sống trong lần chạy của mình?</p>
+  <button>Message TTL</button>
+  <button>Heap lớn hơn</button>
+  <button data-correct>Quorum replication</button>
+  <button>Publisher confirm</button>
+  <p class="explain">Quorum queue có replica trên cả ba node.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-lose-two-nodes.vi.md">Bài tập 0009: mất hai node</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-cluster-quorum.sh"><code>03-cluster-quorum.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/clustering">RabbitMQ: Clustering Guide</a>. Phần tổng quan, số lượng node và đồng thuận.</p>
+<p><a href="0008-streams.vi.html">← Stream: một append-only log ngay trong RabbitMQ</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/clustering">RabbitMQ: Clustering Guide</a> · [2] <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum Queues</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

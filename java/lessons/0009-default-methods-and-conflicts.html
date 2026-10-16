@@ -3,77 +3,244 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 9: JDK 8: default methods and conflict resolution</title>
+<title>Java 9: Default methods and conflicts</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 8: default methods and conflict resolution</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0009 · step 8 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Default methods: adding to an interface without breaking anyone</h1>
+<p class="subtitle">Why JDK 8 let interfaces carry code, and which method runs when two of them disagree.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0009 · step 24 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0009-default-methods-and-conflicts.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> explain why default methods exist and predict which method runs when a class inherits conflicting defaults.</div>
+<div class="mission"><strong>Why this lesson?</strong> You call default methods every day (<code>list.forEach</code>, <code>map.getOrDefault</code>, <code>predicate.and</code>). Interviewers like to ask <em>"Why do default methods exist?"</em> and then show a class that implements two interfaces with the same default: <em>"Which one runs?"</em></div>
 
-<h2>Why they exist (JDK 8)</h2>
-<p>If a library adds a method to an interface, every implementer breaks. Default methods "enable you to add new functionality to the interfaces of your libraries and ensure binary compatibility with code written for older versions of those interfaces."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a> You declare one with the <code>default</code> keyword and a body.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
-<h2>Who wins</h2>
+<div class="win"><b>Today's win:</b> explain why default methods exist in one sentence, and predict which <code>move()</code> runs in three situations: class vs interface, two interfaces, and an interface that extends another.</div>
+
+<dl class="words">
+  <dt>implement</dt><dd>A class <em>implements</em> an interface when it promises to provide its methods: <code>class Duck implements Walker</code>.</dd>
+  <dt>extend</dt><dd>A class <em>extends</em> one parent class and inherits its code. An interface can extend other interfaces.</dd>
+  <dt>default method</dt><dd>A method inside an interface that already has a body, marked with the word <code>default</code>.</dd>
+  <dt>static method</dt><dd>A method that belongs to the type itself, not to an object. You call it as <code>Type.method()</code>.</dd>
+  <dt>signature</dt><dd>A method's name plus its parameter types, e.g. <code>move()</code>. Two methods with the same signature compete.</dd>
+  <dt>abstract class</dt><dd>A class that cannot be created directly; it may hold fields and unfinished methods for its subclasses.</dd>
+  <dt>binary compatibility</dt><dd>Old compiled code keeps working with a newer version of a library, without being recompiled.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"A class extends <code>Base</code>, which has <code>move()</code>, and implements <code>Walker</code>, which has a default <code>move()</code>. Which one runs?"</em> Make a guess. You will check it with real output in section 3.</p>
+
+<h2>1. The problem: one new rule breaks every member</h2>
+<p>Imagine a sports club with a rulebook that every member must follow. The club adds a new rule: "every member must also write a monthly report". Overnight, every member who has never written a report is breaking the rules. Unless the club adds: "if you don't write your own, we use this standard template". Now nobody breaks.</p>
+<p>An interface is that rulebook. Before JDK 8, adding a method to an interface broke <strong>every</strong> class that implemented it: each one suddenly missed a method. That is why JDK 8 needed default methods to add <code>forEach</code> and <code>stream</code> to collections. The tutorial says they "enable you to add new functionality to the interfaces of your libraries and ensure binary compatibility with code written for older versions of those interfaces."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a></p>
+<pre><code>interface Walker {
+  String name();                                  <span class="c">// abstract: each class must write it</span>
+  <span class="hl">default</span> String move() { return "walk"; }       <span class="c">// new rule WITH a standard body</span>
+}
+
+class Cat implements Walker {
+  public String name() { return "cat"; }         <span class="c">// no move() here, still compiles</span>
+}
+new Cat().move();                                 <span class="hl">// "walk"</span></code></pre>
+<p>You declare one with the <code>default</code> keyword and a body.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a> The language spec says the body "provides a default implementation for any class that implements the interface without overriding the method".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4</a></p>
+
+<h3>Static methods in interfaces</h3>
+<p>JDK 8 also allowed <code>static</code> methods in interfaces, so helper methods can live in the interface "rather than in a separate class".<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a> You call them on the interface name, for example <code>Comparator.naturalOrder()</code>. All interface methods are implicitly <code>public</code>, unless declared <code>private</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4</a></p>
+
+<h2>2. Rule one: the class wins</h2>
+<p>Think of a family recipe. Your parent (the superclass) gave you a recipe for soup, and a cookbook you bought (the interface) also has a soup recipe. At home, you follow the family recipe. Java does the same: a real method in a class, or in a superclass, always beats an interface default.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a></p>
+<p>The language spec puts it formally: a class does not inherit a default method if a concrete method it inherits from its superclass has the same signature.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.8">JLS 8.4.8</a></p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Robot extends Base and implements Walker. Base.move returns base and wins over the default Walker.move that returns walk.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="50" y="30" width="230" height="64" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="165" y="54" text-anchor="middle" fill="var(--accent)">class Base</text>
+    <text x="165" y="78" text-anchor="middle" fill="var(--accent)">move() → "base"</text>
+    <rect x="400" y="30" width="230" height="64" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="515" y="54" text-anchor="middle">interface Walker</text>
+    <text x="515" y="78" text-anchor="middle" opacity=".75">default move() → "walk"</text>
+    <rect x="225" y="160" width="230" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="190" text-anchor="middle">class Robot</text>
+    <g fill="none"><path d="M165 94L300 158" stroke="var(--accent)" stroke-width="2"/><path d="M515 94L380 158" stroke="currentColor" stroke-dasharray="5 3"/></g>
+    <text x="180" y="135" text-anchor="middle" font-size="11" fill="var(--accent)">extends: wins</text>
+    <text x="452" y="135" font-size="11" opacity=".75">implements: ignored</text>
+    <text x="340" y="236" text-anchor="middle" fill="var(--accent)">new Robot().move()  →  "base"</text>
+  </g>
+</svg>
+<figcaption>Class wins. The method from the superclass hides the interface default, so <code>Robot</code> never even inherits <code>Walker.move()</code>.</figcaption>
+</figure>
+
+<h2>3. Rule two: two interfaces, same default → you must choose</h2>
+<p>Now the class has no superclass method, but two interfaces both bring a default <code>move()</code>. Java refuses to guess. The spec: "It is a compile-time error if a class C inherits a default method whose signature is override-equivalent with another method inherited by C" (with a rare exception for an abstract superclass method).<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.8.4">JLS 8.4.8.4</a> "Override-equivalent" here simply means "same signature".</p>
+<p>To fix it, you override the method in the class. Inside, you can call a specific interface's version with the syntax <code>InterfaceName.super.method()</code>.</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Duck implements Walker and Swimmer, both with default move. Duck must override move and can call Walker.super.move and Swimmer.super.move.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="50" y="24" width="230" height="64" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="165" y="48" text-anchor="middle">interface Walker</text>
+    <text x="165" y="72" text-anchor="middle" opacity=".75">default move() → "walk"</text>
+    <rect x="400" y="24" width="230" height="64" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="515" y="48" text-anchor="middle">interface Swimmer</text>
+    <text x="515" y="72" text-anchor="middle" opacity=".75">default move() → "swim"</text>
+    <g fill="none" stroke="currentColor"><path d="M165 88L250 150"/><path d="M515 88L430 150"/></g>
+    <text x="340" y="118" text-anchor="middle" font-size="11">same signature: conflict!</text>
+    <rect x="70" y="152" width="540" height="70" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="176" text-anchor="middle" fill="var(--accent)">class Duck implements Walker, Swimmer</text>
+    <text x="340" y="204" text-anchor="middle" font-size="11">move() { Walker.super.move() + " and " + Swimmer.super.move() }</text>
+    <text x="340" y="248" text-anchor="middle" font-size="11" opacity=".8">without this override: compile error · with it: "walk and swim"</text>
+  </g>
+</svg>
+<figcaption>The diamond of defaults. The compiler forces <code>Duck</code> to override <code>move()</code>; <code>X.super.move()</code> picks one parent's version.</figcaption>
+</figure>
+
+<h3>Trace the example step by step</h3>
+<pre><code>new Duck().move();
+<span class="c">Step 1  Duck has its own move()            → run it</span>
+<span class="c">Step 2  Walker.super.move()                → "walk"</span>
+<span class="c">Step 3  Swimmer.super.move()               → "swim"</span>
+<span class="c">Step 4  "walk" + " and " + "swim"          → "walk and swim"</span>
+
+new Robot().move();
+<span class="c">Step 1  Robot has no move() of its own</span>
+<span class="c">Step 2  superclass Base has move()         → class wins</span>
+<span class="c">Step 3  Walker's default is never used     → "base"</span></code></pre>
+<pre><code>$ java java/examples/jdk8/DefaultMethods.java
+walk and swim
+base</code></pre>
+<p>The first line is <code>Duck</code> resolving the conflict explicitly; the second is <code>Robot</code>, where the class method beat the interface default.</p>
+
+<h2>4. Rule three: when an interface extends another</h2>
+<p>An interface can extend an interface that has a default. The tutorial lists three choices:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a></p>
+<ol class="steps">
+  <li><strong>Don't mention it.</strong> The new interface simply inherits the default.</li>
+  <li><strong>Redeclare it without a body.</strong> This makes it <code>abstract</code> again, so every implementing class must write it.</li>
+  <li><strong>Redefine it with a new body.</strong> This overrides the default; the more specific interface wins.</li>
+</ol>
+<pre><code>interface FastWalker extends Walker {
+  default String move() { return "run"; }   <span class="c">// choice 3: redefine</span>
+}
+class Dog implements Walker, FastWalker {}
+new Dog().move();                            <span class="hl">// "run": FastWalker is more specific</span></code></pre>
+<p class="muted">No conflict here: <code>FastWalker</code> already overrides <code>Walker.move()</code>, so only one candidate is left.</p>
+
+<h3>Common mistakes</h3>
 <ul>
-<li><strong>Class wins:</strong> a concrete method in a class (or superclass) overrides any interface default.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></li>
-<li><strong>More specific interface wins:</strong> extending an interface with a default, you may inherit it, redeclare it (making it abstract again), or redefine it.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></li>
-<li><strong>Two unrelated defaults, same signature:</strong> the compiler forces the class to override and choose, using <code>Walker.super.move()</code> syntax (shown in the example; the tutorial page describes the general resolution rules).</li>
+  <li><strong>Forgetting the override in the diamond.</strong> The code does not compile. Fix: override and choose with <code>X.super.method()</code>.</li>
+  <li><strong>Trying to give <code>equals</code>, <code>hashCode</code> or <code>toString</code> a default.</strong> "It is a compile-time error if a default method is override-equivalent with a non-private method of the class <code>Object</code>", because every class already inherits one from <code>Object</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4.1.2">JLS 9.4.1.2</a></li>
+  <li><strong>Using an interface as a place to keep state.</strong> Interfaces have no instance fields, so a default method can only call other methods.</li>
 </ul>
-<pre><code>java java/examples/jdk8/DefaultMethods.java
-walk and swim      # Duck resolved the conflict explicitly
-base               # Robot: class method beat the interface default</code></pre>
-<p>Source: <a href="../examples/jdk8/DefaultMethods.java"><code>DefaultMethods.java</code></a>.</p>
+
 <div class="aside">Interview angle: "Default methods vs abstract classes?" An interface can be implemented by many unrelated classes and still has no instance state; an abstract class can hold fields but a class can extend only one. Default methods exist mainly for interface evolution, as the tutorial's motivation shows.</div>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Main motivation for default methods?</p>
-  <button>Speed up dispatch</button>
-  <button>Replace abstract classes</button>
-  <button data-correct>Evolve interfaces safely</button>
-  <button>Add instance fields</button>
-  <p class="explain">They let libraries add interface methods without breaking older implementers.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Class and interface both supply the method. Which runs?</p>
-  <button>The interface default</button>
-  <button>A random choice</button>
-  <button data-correct>The class method</button>
-  <button>Compile error always</button>
-  <p class="explain">Class wins over an interface default.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Two interfaces give the same default. What must you do?</p>
-  <button>Make both abstract</button>
-  <button>Add final modifiers</button>
-  <button data-correct>Override in the class</button>
-  <button>Nothing at all</button>
-  <p class="explain">The class must override and pick, for example with Walker.super.move().</p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Extending interface redeclares a default without body. Effect?</p>
-  <button>It becomes static</button>
-  <button data-correct>It becomes abstract</button>
-  <button>It stays default</button>
-  <button>It becomes private</button>
-  <p class="explain">Redeclaring the default method makes it abstract.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[1]</a></p>
-</div>
+<h3>JDK 8 vs 17 vs 21</h3>
+<p>Default and static interface methods arrived in JDK 8. In the JDK 21 language spec an interface method may also be <code>private</code> (and <code>private static</code>), which lets several defaults share a helper; this is not available in JDK 8.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4</a> The "who wins" rules are the same on 8, 17 and 21.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">What was the main reason for adding default methods in JDK 8?</p>
+  <div class="options">
+    <button class="opt" data-correct>To add methods to existing interfaces without breaking old implementers</button>
+    <button class="opt">To make interface method calls faster than calls on abstract classes</button>
+    <button class="opt">To let interfaces hold instance fields, just like abstract classes do</button>
+    <button class="opt">To replace abstract classes completely in all new Java library code</button>
+  </div>
+  <div class="why">Default methods let libraries evolve interfaces (like adding <code>forEach</code> to collections) and keep binary compatibility with old code.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Robot extends Base implements Walker</code>. Both <code>Base</code> and <code>Walker</code> have <code>move()</code>; Walker's is a default. What does <code>new Robot().move()</code> run?</p>
+  <div class="options">
+    <button class="opt" data-correct>Base.move(), because the class wins</button>
+    <button class="opt">Walker.move(), because it is newer</button>
+    <button class="opt">Nothing: this is a compile error</button>
+    <button class="opt">Whichever was declared first in code</button>
+  </div>
+  <div class="why">A concrete method from the class or its superclass always beats an interface default. The real output is <code>base</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>class Duck implements Walker, Swimmer {}</code>, and both interfaces have a default <code>move()</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compile error until Duck overrides move()</button>
+    <button class="opt">Walker wins because it is listed first</button>
+    <button class="opt">Swimmer wins because it is listed last</button>
+    <button class="opt">It runs both and joins the two results</button>
+  </div>
+  <div class="why">Two inherited defaults with the same signature are a compile-time error. Duck must override and choose, e.g. with <code>Walker.super.move()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Inside <code>Duck</code>, how do you call Walker's version of <code>move()</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Walker.super.move()</button>
+    <button class="opt">super.Walker.move()</button>
+    <button class="opt">Walker.move(this)</button>
+    <button class="opt">((Walker) this).move()</button>
+  </div>
+  <div class="why">The syntax is <code>InterfaceName.super.method()</code>. Casting <code>this</code> would still call Duck's own override.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">An interface extends <code>Walker</code> and redeclares <code>String move();</code> with no body. What is <code>move()</code> now?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is abstract again</button>
+    <button class="opt">It is still a default</button>
+    <button class="opt">It becomes a static one</button>
+    <button class="opt">It becomes a private one</button>
+  </div>
+  <div class="why">Redeclaring the default method makes it abstract, so every class that implements the new interface must write it.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is wrong with <code>interface Named { default String toString() { return "x"; } }</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>It does not compile: defaults can't override Object's methods</button>
+    <button class="opt">Nothing: every Named object will now print "x" when printed</button>
+    <button class="opt">It compiles, but it only works for classes with no superclass</button>
+    <button class="opt">It must be declared static, because toString has no state</button>
+  </div>
+  <div class="why">A default method that is override-equivalent with a non-private <code>Object</code> method is a compile-time error. Every class already inherits <code>toString</code> from <code>Object</code>, and the class would win anyway.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Why do default methods exist, and what happens when two interfaces define the same one?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A default method is an interface method with a body, added in JDK 8.</label></li>
+      <li><label><input type="checkbox"> Reason: to evolve interfaces (e.g. <code>Collection.stream</code>, <code>forEach</code>) without breaking existing implementers.</label></li>
+      <li><label><input type="checkbox"> Rule 1: a method in the class or a superclass wins over any interface default.</label></li>
+      <li><label><input type="checkbox"> Rule 2: a more specific interface (one that overrides the default) wins.</label></li>
+      <li><label><input type="checkbox"> Rule 3: two unrelated defaults with the same signature are a compile error; override and pick with <code>X.super.m()</code>.</label></li>
+      <li><label><input type="checkbox"> Versus abstract classes: interfaces have no instance state, but a class can implement many of them.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Default methods came in JDK 8 so that library authors could add methods to existing interfaces without breaking every class that implements them. That's how <code>Collection</code> got <code>stream()</code> and <code>Iterable</code> got <code>forEach</code>. When there's a conflict, three rules apply. First, the class wins: if my class or its superclass has the method, the interface default is ignored. Second, the more specific interface wins, so if one interface extends another and overrides the default, that one is used. Third, if two unrelated interfaces give me the same default, the code doesn't compile until I override it; inside I can call <code>Walker.super.move()</code> to reuse one of them. Compared to an abstract class: an interface has no instance fields, but a class can implement many interfaces and extend only one class."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0009-diamond-of-defaults.md">Exercise 0009: the diamond of defaults</a></p>
+<p><a href="../exercises/0009-diamond-of-defaults.md">Exercise 0009: the diamond of defaults</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/jdk8/DefaultMethods.java"><code>jdk8/DefaultMethods.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a>. Read 'Extending Interfaces That Contain Default Methods'.</p>
-<p><a href="0008-lambdas-and-functional-interfaces.html">← JDK 8: lambdas, method references and functional interfaces</a> &nbsp;|&nbsp; <a href="0004-streams-and-optional.html">Streams and Optional without the traps →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Name some default methods you use every day"</em>. Good answers: <code>Map.getOrDefault</code> and <code>Map.merge</code> (see <a href="0037-map-default-methods.html">lesson 0037</a>), and <code>Collection.stream()</code>, which is where <a href="0004-streams-and-optional.html">lesson 0004 on streams</a> starts.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a>. Read "Extending Interfaces That Contain Default Methods".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When should I use an abstract class instead?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0008-lambdas-and-functional-interfaces.html">← Lambdas: passing a piece of code as a value</a> &nbsp;|&nbsp; <a href="0004-streams-and-optional.html">Streams and Optional without the traps →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Oracle Java Tutorials and the Java Language Specification (Java SE 21), October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.8">JLS 8.4.8 Inheritance, Overriding, and Hiding</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4 Interface Method Declarations</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 22: God object và refactor hướng tới SOLID</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>God object và refactor hướng tới SOLID</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0022 · bước 22/22 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0022-god-objects-and-refactoring.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nhận ra một God object và tách nó thành các object cộng tác có cohesion cao.</div>
+
+<h2>Anti-pattern</h2>
+<p>God object là "một object tham chiếu tới rất nhiều kiểu khác nhau, có quá nhiều method không liên quan hoặc không được phân loại, hoặc cả hai." Nó vi phạm Single Responsibility Principle, "bị gắn chặt với (bị tham chiếu bởi) quá nhiều phần code khác" đến mức một thay đổi sẽ kéo theo hàng loạt thay đổi dây chuyền, và khiến cả chương trình phụ thuộc vào một điểm nghẽn duy nhất.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[1]</a> Anti-pattern là "bất kỳ giải pháp phổ biến nhưng phản tác dụng nào cho một lớp vấn đề"; God object là một trong những ví dụ kinh điển.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+<h2>Tách nhỏ</h2>
+<pre><code>java oop/examples/GodObjectDemo.java
+[god] INSERT order for ann
+  [god] email ann: total 54
+god processed 54
+  [mailer] ann: total 54
+processor processed 54</code></pre>
+<p><code>OrderManager</code> validate, tính giá, lưu dữ liệu và gửi email trong cùng một method. <code>OrderProcessor</code> điều phối hai object cộng tác chuyên biệt (<code>Pricing</code>, <code>Mailer</code>) được nhận qua constructor, và cho ra cùng một kết quả. Các bước: (1) liệt kê các lý do thay đổi, (2) tách mỗi lý do thành một class có tên nói rõ nó làm gì, (3) inject chúng vào, (4) giữ cho class điều phối thật mỏng. Mã nguồn: <a href="../examples/GodObjectDemo.java"><code>GodObjectDemo.java</code></a>. Refactoring.Guru cũng cảnh báo rằng Facade và Mediator có thể dần biến thành god object; xem <a href="../../design-patterns/lessons/0003-criticism-and-anti-patterns.vi.html">bài về những lời phê bình pattern</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. God object là...?</p>
+  <button>Một singleton</button>
+  <button data-correct>Quá nhiều trách nhiệm không liên quan</button>
+  <button>Một record</button>
+  <button>Một interface</button>
+  <p class="explain">Nó tham chiếu tới nhiều kiểu hoặc có quá nhiều method không liên quan.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Nó vi phạm nguyên lý nào?</p>
+  <button>Chỉ Liskov</button>
+  <button>Chỉ Open/Closed</button>
+  <button>Không gì cả</button>
+  <button data-correct>Single Responsibility</button>
+  <p class="explain">Nó dồn chức năng vào một chỗ thay vì chia ra.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bước refactor đầu tiên?</p>
+  <button>Xoá test</button>
+  <button>Thêm getter</button>
+  <button data-correct>Liệt kê lý do thay đổi</button>
+  <button>Cho nó là static</button>
+  <p class="explain">Xác định các trách nhiệm riêng biệt trước tiên.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Anti-pattern là...?</p>
+  <button data-correct>Giải pháp phổ biến nhưng phản tác dụng</button>
+  <button>Một design pattern</button>
+  <button>Một framework</button>
+  <button>Một bug hiếm gặp</button>
+  <p class="explain">Đó là bất kỳ giải pháp phổ biến nhưng phản tác dụng nào cho một lớp vấn đề.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0022-tame-a-service.vi.md">Bài tập 22: thuần hoá một class service</a></p>
+<p>Ví dụ chạy được: <a href="../examples/GodObjectDemo.java"><code>GodObjectDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a>. Trang ngắn.</p>
+<p><a href="0021-dependency-inversion-principle.vi.html">← SOLID 5: Dependency Inversion Principle</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a> · [2] <a href="https://en.wikipedia.org/wiki/Anti-pattern">Wikipedia: Anti-pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

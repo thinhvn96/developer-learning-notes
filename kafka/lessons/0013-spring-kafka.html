@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 13: Spring Kafka: KafkaTemplate, @KafkaListener and commits</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Spring Kafka: KafkaTemplate, @KafkaListener and commits</h1>
+<p class="meta">Kafka · Lesson 0013 · step 8 of 23 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0013-spring-kafka.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> wire a Spring Boot service to Kafka with <code>KafkaTemplate</code> and <code>@KafkaListener</code>, and explain exactly when Spring commits offsets.</div>
+
+<h2>The minimal app</h2>
+<p>With Spring Boot you add <code>spring-boot-starter-kafka</code> and Boot manages a compatible version.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">[1]</a> The quick tour's consumer is this small:<a class="cite" href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">[1]</a></p>
+<pre><code>@Bean
+public NewTopic topic() {
+    return TopicBuilder.name("topic1").partitions(10).replicas(1).build();
+}
+
+@KafkaListener(id = "myId", topics = "topic1")
+public void listen(String in) {
+    System.out.println(in);
+}</code></pre>
+<p>"The <code>NewTopic</code> bean causes the topic to be created on the broker; it is not needed if the topic already exists."<a class="cite" href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">[1]</a> Producing is <code>template.send("topic1", key, value)</code> on an injected <code>KafkaTemplate</code>, which returns a future like the plain producer.</p>
+<h2>When are offsets committed?</h2>
+<p>Spring does not use Kafka's auto-commit: "the framework sets <code>enable.auto.commit</code> to <code>false</code> unless explicitly set in the configuration."<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a> The listener container commits according to its <code>AckMode</code>; "The default AckMode is BATCH".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+<table>
+<tr><th>AckMode</th><th>Commits<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></th></tr>
+<tr><td><code>RECORD</code></td><td>when the listener returns after processing each record</td></tr>
+<tr><td><code>BATCH</code> (default)</td><td>when all records returned by the <code>poll()</code> have been processed</td></tr>
+<tr><td><code>MANUAL</code></td><td>your code calls <code>Acknowledgment.acknowledge()</code>, then BATCH semantics apply</td></tr>
+<tr><td><code>MANUAL_IMMEDIATE</code></td><td>immediately when <code>acknowledge()</code> is called</td></tr>
+</table>
+<p>So the default is process-then-commit: at-least-once. A crash mid-batch redelivers the processed part of that batch, which is why your listener must be idempotent.</p>
+<h2>Concurrency</h2>
+<p><code>concurrency=3</code> creates three <code>KafkaMessageListenerContainer</code>s, each with its own consumer (a <code>KafkaConsumer</code> is not thread-safe<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a>), and Kafka splits partitions among them.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a> Concurrency above the partition count leaves consumers idle. With several topics the default <code>RangeAssignor</code> can also leave consumers idle: three topics of five partitions with <code>concurrency=15</code> gives "only five active consumers".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+<div class="aside">Interview answer: "Spring Kafka turns off auto-commit and commits per AckMode, default BATCH after the listener handles the whole poll. That's at-least-once, so the listener is idempotent. Concurrency is capped by partitions."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default AckMode of a Spring Kafka container?</p>
+  <button>TIME</button>
+  <button data-correct>BATCH</button>
+  <button>MANUAL</button>
+  <button>RECORD</button>
+  <p class="explain">The default AckMode is BATCH.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Spring Kafka sets enable.auto.commit to what?</p>
+  <button data-correct>False unless set</button>
+  <button>True for batches</button>
+  <button>True, Kafka default</button>
+  <button>It removes the key</button>
+  <p class="explain">Since 2.3 the framework sets it to false unless explicitly configured.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Six partitions, concurrency ten. Active consumers?</p>
+  <button data-correct>Six consumers</button>
+  <button>Ten consumers</button>
+  <button>Sixty consumers</button>
+  <button>One consumer</button>
+  <p class="explain">Each partition goes to one consumer in the group, so four sit idle.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Default commit order gives which guarantee?</p>
+  <button>Exactly once</button>
+  <button>At most once</button>
+  <button data-correct>At least once</button>
+  <button>No guarantee</button>
+  <p class="explain">BATCH commits after the records are processed, so a crash causes redelivery, not loss.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0013-spring-listener-review.md">Exercise 0013: review a Spring listener</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">Spring for Apache Kafka: Message Listener Containers</a>. Read 'Committing Offsets' and the concurrency section of ConcurrentMessageListenerContainer.</p>
+<p><a href="0012-partitioning-and-partition-count.html">← Partitioning: keys, the partitioner and partition count</a> &nbsp;|&nbsp; <a href="0008-log-compaction.html">Log compaction and tombstones →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">Spring for Apache Kafka: Quick Tour</a> · [2] <a href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">Spring for Apache Kafka: Message Listener Containers</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

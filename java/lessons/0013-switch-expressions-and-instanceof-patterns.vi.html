@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 13: switch expression và instanceof pattern</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>switch trả về giá trị, instanceof tự cast giúp bạn</h1>
+<p class="subtitle">Hai tính năng của JDK 14 và JDK 16 xoá sổ cả một nhóm bug do copy-paste.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0013 · bước 38/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-switch-expressions-and-instanceof-patterns.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Quên một <code>break</code> trong <code>switch</code> của JDK 8, hay cast sai sau <code>instanceof</code>, là những bug production kinh điển. Interviewer hỏi <em>"<code>switch</code> thay đổi gì sau Java 8?"</em> để xem bạn có nắm Java hiện đại không, và hai tính năng này là nền tảng cho pattern matching ở JDK 21.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết lại một câu lệnh <code>switch</code> của JDK 8 thành switch expression, và một chuỗi <code>instanceof</code>-rồi-cast thành <code>instanceof</code> pattern, rồi giải thích vì sao cả hai không thể fall through hay cast sai.</div>
+
+<dl class="words">
+  <dt>statement (câu lệnh)</dt><dd>Một dòng code <em>làm</em> một việc, như <code>x = 5;</code> hay <code>if (...) {...}</code>. Nó không trả lại giá trị.</dd>
+  <dt>expression (biểu thức)</dt><dd>Code <em>tạo ra một giá trị</em>, như <code>2 + 3</code> hay <code>name.length()</code>. Bạn có thể đặt nó bên phải dấu <code>=</code>.</dd>
+  <dt>fall-through (rơi xuyên)</dt><dd>Trong <code>switch</code> kiểu cũ, sau khi một <code>case</code> khớp, Java chạy tiếp các case bên dưới cho tới khi gặp <code>break</code>.</dd>
+  <dt>exhaustive (đầy đủ)</dt><dd>Bao hết mọi đầu vào có thể. Không đầu vào nào bị bỏ sót.</dd>
+  <dt>cast (ép kiểu)</dt><dd>Bảo Java "coi object này là kiểu X", viết là <code>(String) obj</code>. Nếu bạn sai, nó ném <code>ClassCastException</code> lúc chạy.</dd>
+  <dt>pattern variable</dt><dd>Biến mới mà <code>instanceof</code> tạo cho bạn khi phép kiểm tra thành công, như <code>s</code> trong <code>obj instanceof String s</code>.</dd>
+  <dt>scope (phạm vi)</dt><dd>Phần code mà tên biến được phép dùng.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Đọc đoạn code JDK 8 này và nói to xem nó in ra gì khi <code>day</code> bằng 1. Rồi kiểm tra ở mục 1.</p>
+<pre><code>String r;
+switch (day) {
+  case 1: r = "one";
+  case 2: r = "two"; break;
+  default: r = "?";
+}
+System.out.println(r);</code></pre>
+
+<h2>1. switch kiểu cũ là cầu trượt, không phải nút bấm</h2>
+<p>Hình dung một cầu trượt nước có nhiều cửa vào. Bạn vào ở cửa 1, nhưng không có gì giữ bạn lại: bạn trượt qua cửa 2, cửa 3, cứ thế cho tới khi đụng tường. Trong <code>switch</code> kiểu cũ, các nhãn <code>case</code> là cửa, còn <code>break</code> là bức tường. Đó là <span class="term">fall-through</span>.</p>
+<p>Vậy đoạn code trên in ra <strong>two</strong>, không phải one. Mình đã chạy trên JDK 21:</p>
+<pre><code><span class="c">Step 1  day is 1, so Java jumps to "case 1"</span>
+<span class="c">Step 2  r = "one"</span>
+<span class="c">Step 3  no break, so Java falls into "case 2": r = "two"</span>
+<span class="c">Step 4  break: leave the switch</span>
+$ java Old.java
+<span class="hl">two</span></code></pre>
+<p>JEP 361 nói thẳng: switch cũ "mặc định hỗ trợ ngữ nghĩa fall through".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> Quên một <code>break</code> là có bug âm thầm.</p>
+
+<h3>switch kiểu mới là máy bán hàng tự động</h3>
+<p>Máy bán hàng tự động thì khác: bấm B2 là nhận đúng một món. JDK 14 mang tới nhãn mũi tên, <code>case L -&gt;</code>. Với chúng, "không có fall through": chỉ code bên phải mũi tên được chạy.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> Và JEP 361 mở rộng <code>switch</code> "để nó có thể dùng như statement hoặc expression".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> Một <span class="term">expression</span> trả lại giá trị, nên bạn có thể <code>return</code> hoặc gán nó trực tiếp.</p>
+<pre><code><span class="c">// JDK 8: a statement, a variable declared outside, a break on every line</span>
+String kind;
+switch (day) {
+  case 6: case 7: kind = "weekend"; break;
+  case 1: case 2: case 3: case 4: case 5: kind = "weekday"; break;
+  default: kind = "invalid: " + day;
+}
+return kind;
+
+<span class="c">// JDK 14+: a switch expression</span>
+return switch (day) {
+    case 6, 7 -&gt; "weekend";
+    case 1, 2, 3, 4, 5 -&gt; "weekday";
+    default -&gt; { String msg = "invalid: " + day; yield msg; }
+};</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Bên trái: câu lệnh switch kiểu cũ. Vào ở case 1 thì trôi xuống case 2 cho tới break. Bên phải: switch mũi tên. Mỗi case trỏ tới đúng một kết quả, và kết quả được trả về làm giá trị.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="22" text-anchor="middle" font-size="11" opacity=".75">switch statement JDK 8</text>
+    <text x="510" y="22" text-anchor="middle" font-size="11" opacity=".75">switch expression JDK 14+</text>
+    <rect x="30" y="40" width="250" height="36" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="46" y="63">case 1: r = "one";</text>
+    <rect x="30" y="96" width="250" height="36" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="46" y="119">case 2: r = "two";</text>
+    <rect x="30" y="152" width="250" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="46" y="175">break;&#160;&#160;→ thoát</text>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5">
+      <path d="M290 58c30 0 30 56 0 56M296 109l-6 5 6 4"/>
+      <path d="M290 114c30 0 30 56 0 56M296 165l-6 5 6 4"/>
+    </g>
+    <text x="155" y="214" text-anchor="middle" font-size="11" fill="var(--accent)">day = 1 rơi xuyên: r cuối cùng là "two"</text>
+    <rect x="380" y="40" width="130" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="396" y="63">case 6, 7</text>
+    <rect x="380" y="96" width="130" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="396" y="119">case 1..5</text>
+    <rect x="380" y="152" width="130" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="396" y="175">default</text>
+    <g fill="none" stroke="currentColor"><path d="M510 58h40M544 53l6 5-6 5M510 114h40M544 109l6 5-6 5M510 170h40M544 165l6 5-6 5"/></g>
+    <rect x="554" y="40" width="106" height="148" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="607" y="63" text-anchor="middle">"weekend"</text>
+    <text x="607" y="119" text-anchor="middle">"weekday"</text>
+    <text x="607" y="175" text-anchor="middle">yield msg</text>
+    <text x="520" y="214" text-anchor="middle" font-size="11" fill="var(--accent)">chỉ một case chạy, giá trị của nó là kết quả</text>
+    <text x="340" y="240" text-anchor="middle" font-size="11" opacity=".8">-&gt; không bao giờ rơi xuyên; cả switch là một giá trị để return</text>
+  </g>
+</svg>
+<figcaption><code>switch</code> cũ: vào ở một case rồi trượt xuống tới <code>break</code>. <code>switch</code> mũi tên: một case, một giá trị.</figcaption>
+</figure>
+
+<h2>2. Đọc switch mới, từng dòng</h2>
+<ol class="steps">
+  <li><strong><code>case 6, 7 -&gt;</code></strong>: nhiều hằng số trong một nhãn, cách nhau bằng dấu phẩy. JEP 361 đề xuất "cho phép nhiều hằng số trong một case, cách nhau bằng dấu phẩy".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a></li>
+  <li><strong><code>-&gt; "weekend";</code></strong>: giá trị bên phải là giá trị của cả switch.</li>
+  <li><strong><code>default -&gt; { ... yield msg; }</code></strong>: khi cần nhiều dòng, dùng block <code>{ }</code> và trả giá trị bằng <code>yield</code>. JEP 361 giới thiệu "câu lệnh <code>yield</code> mới để trả ra một giá trị, giá trị này trở thành giá trị của <code>switch</code> expression bao quanh".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a></li>
+</ol>
+<p>Ví dụ thật in ra ba trường hợp:</p>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+{
+  "name": "orders",
+  "port": 8080
+}
+<span class="hl">weekend, weekday, invalid: 9</span>
+3.14 4.00 6.00</code></pre>
+<p class="muted">Mấy dòng JSON đến từ text block ở <a href="0012-var-and-text-blocks.vi.html">bài 0012</a>; dòng cuối đến từ mục 4 bên dưới.</p>
+
+<h3>Quy tắc: switch expression phải bao hết mọi giá trị</h3>
+<p>Switch expression phải trả giá trị cho mọi đầu vào có thể: nó phải <span class="term">exhaustive</span>. Với <code>int</code>, thường có nghĩa là phải có <code>default</code>.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> Bỏ <code>default</code> ở trên đi và <code>javac</code> 21 từ chối:</p>
+<pre><code>error: the switch expression does not cover all possible input values
+    return switch (day) { case 6, 7 -&gt; "weekend"; case 1, 2, 3, 4, 5 -&gt; "weekday"; };</code></pre>
+<p>Với <code>enum</code>, liệt kê hết các hằng là đủ. Không cần <code>default</code>; thay vào đó, theo JEP, "compiler tự chèn một mệnh đề <code>default</code>", nên nếu sau này có hằng mới thì sẽ bị phát hiện lúc chạy.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a></p>
+<pre><code>enum Size { S, M, L }
+<span class="c">// no default needed: all 3 constants are listed</span>
+String label = switch (size) {
+    case S -&gt; "small";
+    case M -&gt; "medium";
+    case L -&gt; "large";
+};</code></pre>
+
+<h3>Bẫy: <code>return</code> bên trong switch expression</h3>
+<p>Bên trong switch <em>expression</em>, bạn không thể dùng <code>return</code>, <code>break</code> hay <code>continue</code> để nhảy ra. Theo JEP, switch expression phải "kết thúc bình thường với một giá trị, hoặc kết thúc đột ngột bằng cách ném exception".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> <strong>Cách sửa:</strong> dùng <code>yield</code> để trả giá trị, hoặc <code>throw</code> cho trường hợp không thể xảy ra.</p>
+
+<h2>3. instanceof: kiểm tra và đặt tên trong một bước</h2>
+<p>Hình dung một bảo vệ kiểm tra thùng hàng. Ở JDK 8, bảo vệ nói "Đây có phải laptop không? Phải." Rồi người thứ hai nói "OK, giờ tôi sẽ <em>coi</em> nó là laptop." Hai bước, và người thứ hai có thể nhầm. Ở JDK 16, bảo vệ nói "Nếu đây là laptop thì gọi nó là <code>lap</code>", rồi đưa ra món hàng đã dán nhãn sẵn.</p>
+<pre><code><span class="c">// JDK 8: test, then cast by hand (type written twice)</span>
+if (obj instanceof String) {
+    String s = (String) obj;       <span class="c">// the JEP itself comments: "grr..."</span>
+    System.out.println(s.length());
+}
+
+<span class="c">// JDK 16+: pattern matching for instanceof</span>
+if (obj instanceof String s) {     <span class="c">// test + new variable s</span>
+    System.out.println(s.length());
+}</code></pre>
+<p>JEP 394 viết "mọi lập trình viên Java đều quen với thành ngữ <code>instanceof</code>-rồi-cast", và thay thế nó.<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> Cách cũ có một rủi ro ẩn: nếu bạn copy-paste block, đổi phép kiểm tra thành <code>Integer</code> nhưng quên đổi cast, code vẫn compile và ném <code>ClassCastException</code> lúc chạy. Với pattern, kiểu chỉ viết một lần, nên kiểm tra và cast không bao giờ lệch nhau.</p>
+
+<h3>Được dùng <code>s</code> ở đâu? Flow scoping</h3>
+<p><span class="term">Pattern variable</span> <code>s</code> chỉ tồn tại ở nơi compiler chắc chắn phép kiểm tra đã thành công. Theo JEP, "pattern variable chỉ nằm trong scope ở nơi compiler suy ra được rằng pattern chắc chắn đã khớp".<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> Hãy đi theo cách compiler suy luận:</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Hai ví dụ code. Ở ví dụ đầu, s dùng được ở vế phải của toán tử AND và trong nhánh true, nhưng không dùng được trong nhánh else. Ở ví dụ thứ hai, sau if not instanceof thì return, s dùng được ở phần còn lại của method.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11" opacity=".75">ví dụ A: &amp;&amp;</text>
+    <rect x="54" y="58" width="164" height="20" fill="var(--accent-soft)"/>
+    <rect x="20" y="82" width="300" height="20" fill="var(--accent-soft)"/>
+    <text x="28" y="50">if (o instanceof String s</text>
+    <text x="28" y="72">&#160;&#160;&#160;&#160;&amp;&amp; s.length() &gt; 3) {</text>
+    <text x="28" y="96">&#160;&#160;use(s);&#160;&#160;&#160;<tspan fill="var(--accent)">✓ s là String</tspan></text>
+    <text x="28" y="120">} else {</text>
+    <text x="28" y="144">&#160;&#160;use(s);&#160;&#160;&#160;<tspan opacity=".75">✗ không có s</tspan></text>
+    <text x="28" y="168">}</text>
+    <text x="370" y="24" font-size="11" opacity=".75">ví dụ B: thoát sớm</text>
+    <text x="370" y="50">if (!(o instanceof String s)) {</text>
+    <text x="386" y="72">return;&#160;&#160;&#160;<tspan opacity=".75">✗ không có s</tspan></text>
+    <text x="370" y="96">}</text>
+    <rect x="362" y="106" width="298" height="46" fill="var(--accent-soft)"/>
+    <text x="370" y="122">use(s);&#160;&#160;&#160;<tspan fill="var(--accent)">✓ s là String</tspan></text>
+    <text x="370" y="144">... phần còn lại của method</text>
+    <text x="340" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">phần tô màu = nơi compiler biết chắc đã khớp, nên có s</text>
+    <text x="340" y="228" text-anchor="middle" font-size="11" opacity=".8">B chạy được vì chỉ khi o LÀ String mới đi qua được if</text>
+  </g>
+</svg>
+<figcaption>Pattern variable sống đúng ở nơi phép kiểm tra chắc chắn đã qua. Cái này gọi là flow scoping.</figcaption>
+</figure>
+<p>Ở ví dụ A, theo JEP, <code>s</code> "nằm trong scope ở vế phải của toán tử <code>&amp;&amp;</code>, và trong nhánh true".<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> Java tính <code>&amp;&amp;</code> từ trái sang phải và dừng sớm khi vế trái sai, nên khi tới vế phải thì phép kiểm tra đã qua. Ví dụ B cũng có trong JEP: sau <code>if (!(o instanceof String s)) throw ...;</code>, <code>s</code> nằm trong scope cho phần code còn lại.<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> Mình đã chạy cả hai trên JDK 21; chúng compile và in ra đúng giá trị.</p>
+<p class="muted">Với <code>||</code> thì ngược lại: trong <code>o instanceof String s || s.isEmpty()</code>, vế phải chỉ chạy khi phép kiểm tra <em>thất bại</em>, nên ở đó không có <code>s</code> và code không compile.</p>
+
+<h2>4. Kết hợp cả hai: ví dụ hình học</h2>
+<p>Ví dụ của khoá học dùng <code>instanceof</code> pattern để tính diện tích ba loại hình. Mỗi dòng vừa kiểm tra vừa đặt tên:</p>
+<pre><code>static double area(Shape s) {
+    if (s instanceof Circle c) return Math.PI * c.r() * c.r();
+    if (s instanceof Square q) return q.side() * q.side();
+    if (s instanceof Rect r)   return r.w() * r.h();
+    throw new IllegalStateException();
+}</code></pre>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+...
+<span class="hl">3.14 4.00 6.00</span></code></pre>
+<p>Để ý dòng cuối, <code>throw new IllegalStateException()</code>. Compiler không thể biết ba hình này là tất cả, nên bạn cần một nhánh dự phòng. Ở <a href="0014-sealed-classes.vi.html">bài 0014</a> bạn sẽ đóng danh sách hình lại, và ở JDK 21 một <code>switch</code> có thể kiểm tra giúp bạn.</p>
+<p>Cả hai tính năng đều thuộc về "JDK 17" với bạn, vì 17 gồm mọi thứ đã chính thức tới 17: switch expression chính thức ở JDK 14, <code>instanceof</code> pattern ở JDK 16 sau hai lần preview ở 14 và 15.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a><a class="src" href="https://openjdk.org/jeps/394">JEP 394</a></p>
+<div class="aside">Pattern matching cho <em>switch</em> (<code>case Circle c -&gt;</code>) là tính năng của JDK 21: ví dụ JDK 21 không compile với <code>--release 17</code> (đã kiểm chứng khi viết bài này; compiler báo patterns in switch không được hỗ trợ ở -source 17). Xem <a href="0015-pattern-matching-switch-and-record-patterns.vi.html">bài 15</a>.</div>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Trong code JDK 8 <code>case 1: r = "one"; case 2: r = "two"; break;</code>, <code>r</code> bằng gì khi <code>day</code> là 1?</p>
+  <div class="options">
+    <button class="opt" data-correct>"two", vì case 1 rơi xuyên xuống</button>
+    <button class="opt">"one", vì case 1 khớp trước tiên</button>
+    <button class="opt">null, vì sau case 1 không có break</button>
+    <button class="opt">Không compile được khi thiếu break</button>
+  </div>
+  <div class="why">Không có <code>break</code>, switch cũ chạy tiếp vào case 2, ghi đè <code>r</code> thành "two".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Điều gì xảy ra sau khi một nhãn <code>case L -&gt;</code> khớp?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chỉ code bên phải mũi tên được chạy</button>
+    <button class="opt">Các case sau chạy tiếp tới khi gặp break</button>
+    <button class="opt">Nhánh default cũng chạy ở cuối cùng</button>
+    <button class="opt">Chỉ rơi xuyên với các hằng của enum</button>
+  </div>
+  <div class="why">Nhãn mũi tên không bao giờ fall through. Một case, một kết quả.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Keyword nào trả giá trị từ một block <code>{ }</code> bên trong switch expression?</p>
+  <div class="options">
+    <button class="opt" data-correct>yield</button>
+    <button class="opt">return</button>
+    <button class="opt">break</button>
+    <button class="opt">continue</button>
+  </div>
+  <div class="why"><code>yield</code> đặt giá trị cho switch expression. <code>return</code> và <code>break</code> không nhảy ra khỏi switch expression được.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một switch expression trên <code>int</code> có case 1 tới 7 nhưng không có <code>default</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lỗi compile: chưa bao hết mọi giá trị</button>
+    <button class="opt">Compile được và trả null khi là 8</button>
+    <button class="opt">Compile được và ném lỗi khi là 8</button>
+    <button class="opt">Compile được, chỉ có một warning</button>
+  </div>
+  <div class="why">Switch expression phải exhaustive. <code>int</code> có nhiều giá trị hơn 1 tới 7 rất nhiều, nên bạn cần <code>default</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Switch expression trên <code>enum Size { S, M, L }</code> liệt kê S, M và L. Có bắt buộc <code>default</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, đã bao hết các hằng</button>
+    <button class="opt">Có, switch nào cũng cần default</button>
+    <button class="opt">Có, phòng khi enum bị null</button>
+    <button class="opt">Chỉ khi có dùng block yield</button>
+  </div>
+  <div class="why">Liệt kê hết các hằng là đã exhaustive. Compiler tự chèn default riêng cho các hằng được thêm sau này.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Sau <code>if (!(o instanceof String s)) return;</code>, dòng tiếp theo có dùng được <code>s</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Được, o phải là String mới tới đây</button>
+    <button class="opt">Không, s chỉ tồn tại trong ngoặc của if</button>
+    <button class="opt">Không, phép phủ định làm mất biến</button>
+    <button class="opt">Được, nhưng phải cast sang String trước</button>
+  </div>
+  <div class="why">Flow scoping: cách duy nhất để đi qua <code>if</code> là phép kiểm tra thành công, nên compiler biết <code>s</code> là <code>String</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"<code>switch</code> và <code>instanceof</code> đã thay đổi gì từ Java 8 tới Java 17?"</strong> Bấm giờ. Trả lời to, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>switch</code> cũ rơi xuyên khi thiếu <code>break</code>, một bug âm thầm kinh điển.</label></li>
+      <li><label><input type="checkbox"> JDK 14: nhãn mũi tên <code>case X -&gt;</code> không bao giờ fall through; nhiều hằng trong một case, cách bằng dấu phẩy.</label></li>
+      <li><label><input type="checkbox"> <code>switch</code> có thể là expression trả về giá trị; <code>yield</code> trả giá trị từ block.</label></li>
+      <li><label><input type="checkbox"> Switch expression phải exhaustive: có <code>default</code>, hoặc đủ mọi hằng của enum.</label></li>
+      <li><label><input type="checkbox"> JDK 16: <code>obj instanceof String s</code> kiểm tra và cast trong một bước; không cast tay.</label></li>
+      <li><label><input type="checkbox"> Flow scoping: <code>s</code> chỉ tồn tại nơi chắc chắn đã khớp (sau <code>&amp;&amp;</code>, trong nhánh true, sau return sớm có phủ định).</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Ở Java 8, <code>switch</code> chỉ là statement, và nó fall through: quên <code>break</code> là case sau cũng chạy. Từ JDK 14 có nhãn mũi tên, <code>case 6, 7 -&gt;</code>, không bao giờ fall through, và <code>switch</code> có thể là expression, nên em viết được <code>return switch (day) {...}</code>. Case nào cần nhiều dòng thì em dùng block và <code>yield</code> giá trị. Switch expression phải exhaustive, nên compiler bắt phải có <code>default</code>, hoặc với enum thì đủ mọi hằng. Còn <code>instanceof</code>, JDK 16 thêm pattern matching: <code>if (obj instanceof String s)</code> kiểm tra và cast trong một bước, kiểu chỉ viết một lần nên kiểm tra và cast không lệch nhau được. Biến <code>s</code> dùng flow scoping: chỉ dùng được ở nơi chắc chắn đã khớp, ví dụ vế phải của <code>&amp;&amp;</code> hay sau một return sớm. Hai cái này là nền cho pattern matching trong switch ở JDK 21."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-modernize-a-visitor.vi.md">Bài tập 0013: hiện đại hoá một chuỗi cast</a>. Viết lại, rồi gửi phiên bản của bạn cho giáo viên trước khi so sánh.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer senior sẽ hỏi tiếp: <em>"Method <code>area()</code> của bạn kết thúc bằng <code>throw new IllegalStateException()</code>. Làm sao để compiler chứng minh bạn đã xử lý mọi hình?"</em> Câu trả lời cần thêm hai mảnh: record để chứa dữ liệu (<a href="0003-records-and-immutability.vi.html">bài 0003</a>) và sealed type để đóng danh sách (<a href="0014-sealed-classes.vi.html">bài 0014</a>). Sau đó <a href="0015-pattern-matching-switch-and-record-patterns.vi.html">bài 0015</a> đặt chúng vào một <code>switch</code> của JDK 21.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a>, rồi <a href="https://openjdk.org/jeps/394">JEP 394: Pattern Matching for instanceof</a>. Cả hai có phần Motivation ngắn và rõ.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao không được return trong switch expression?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ báo luôn điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0012-var-and-text-blocks.vi.html">← var và text block: gõ ít hơn, kiểu vẫn y nguyên</a> &nbsp;|&nbsp; <a href="0003-records-and-immutability.vi.html">Record: một dòng thay cho bốn mươi dòng →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với các JEP của OpenJDK và compile thử bằng JDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> · <a href="https://openjdk.org/jeps/394">JEP 394: Pattern Matching for instanceof</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 1: Pipeline ELK: thu thập, phân tích, lưu trữ, khám phá</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pipeline ELK: thu thập, phân tích, lưu trữ, khám phá</h1>
+<p class="meta">ELK Stack · Bài 0001 · bước 1/14 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-elk-overview-and-pipeline.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nêu được vai trò của từng thành phần ELK và vẽ được đường đi của một dòng log từ file tới dashboard.</div>
+
+<h2>Bốn vai trò</h2>
+<table>
+<tr><th>Thành phần</th><th>Vai trò</th></tr>
+<tr><td>Filebeat (một Beat)</td><td>đọc file log và gửi đi: "một harvester chịu trách nhiệm đọc nội dung của một file duy nhất"; một input quản lý các harvester và tìm nguồn dữ liệu<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></td></tr>
+<tr><td>Logstash</td><td>pipeline xử lý gồm ba giai đoạn: "inputs &rarr; filters &rarr; outputs"<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[2]</a></td></tr>
+<tr><td>Elasticsearch</td><td>lưu các document JSON trong index, phân tán trên các shard<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a></td></tr>
+<tr><td>Kibana</td><td>Discover là "công cụ chính để khám phá dữ liệu Elasticsearch trong Kibana"; tìm kiếm và lọc bằng KQL, Lucene hoặc ES|QL<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[4]</a></td></tr>
+</table>
+<h2>Đường đi</h2>
+<pre><code>app log file --Filebeat--&gt; Logstash (grok parse) --&gt; Elasticsearch index --&gt; Kibana Discover</code></pre>
+<p>Logstash là tuỳ chọn nếu log vốn đã có cấu trúc tốt; Beats cũng có thể gửi thẳng vào Elasticsearch. Chọn bố cục nào là một quyết định thiết kế (cần buffer không, cần parse gì), các bài sau sẽ quay lại chuyện này.</p>
+<h2>Chạy hai mảnh ở giữa</h2>
+<pre><code>cd elk/examples &amp;&amp; ./02-logstash-grok.sh      # parse a log line
+cd elk/examples &amp;&amp; ./01-elasticsearch-basics.sh   # index, search, shards</code></pre>
+<p>Cả hai đều khởi động container dùng xong bỏ (Logstash và Elasticsearch 9.0.0). Elasticsearch chạy với security bị tắt, chỉ để demo.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Thành phần nào đọc từng dòng của một file?</p>
+  <button data-correct>Một harvester</button>
+  <button>Một data view</button>
+  <button>Một shard</button>
+  <button>Một codec</button>
+  <p class="explain">Harvester đọc nội dung của một file duy nhất.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Thứ tự các giai đoạn của pipeline Logstash?</p>
+  <button data-correct>Inputs, filters, outputs</button>
+  <button>Filters, inputs, outputs</button>
+  <button>Inputs, outputs, filters</button>
+  <button>Outputs, filters, inputs</button>
+  <p class="explain">Pipeline có ba giai đoạn: inputs, filters, outputs.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Document nằm ở đâu?</p>
+  <button>Codec của Logstash</button>
+  <button data-correct>Index trong Elasticsearch</button>
+  <button>Registry của Filebeat</button>
+  <button>Dashboard của Kibana</button>
+  <p class="explain">Index là đơn vị lưu trữ cơ bản trong Elasticsearch.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Công cụ chính của Kibana để khám phá dữ liệu?</p>
+  <button>Grok</button>
+  <button>Refresh</button>
+  <button data-correct>Discover</button>
+  <button>Harvester</button>
+  <p class="explain">Discover là công cụ chính để khám phá dữ liệu Elasticsearch của bạn.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[4]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-draw-the-pipeline.vi.md">Bài tập 0001: vẽ pipeline</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-logstash-grok.sh"><code>02-logstash-grok.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash Docs: How Logstash works</a>. Sau đó đọc trang documents-and-indices của Elasticsearch.</p>
+<p> &nbsp;|&nbsp; <a href="0008-kql-and-discover.vi.html">Tìm kiếm trong Kibana: Discover và KQL →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat Docs: How Filebeat works</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash Docs: How Logstash works</a> · [3] <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch Docs: Indices, documents and mappings</a> · [4] <a href="https://www.elastic.co/docs/explore-analyze/discover">Kibana Docs: Discover</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

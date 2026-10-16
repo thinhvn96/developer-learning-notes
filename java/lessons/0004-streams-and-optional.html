@@ -3,82 +3,293 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 4: Streams and Optional without the traps</title>
+<title>Java 4: Streams and Optional</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
 <h1>Streams and Optional without the traps</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0004 · step 9 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<p class="subtitle">A stream is a conveyor belt that only starts when someone at the end pulls. Optional is a box that may be empty.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0004 · step 25 of 46 · Core · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0004-streams-and-optional.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> predict what a stream pipeline prints (or does not), and use <code>Optional</code> as intended.</div>
+<div class="mission"><strong>Why this lesson?</strong> Streams are everywhere in modern Java services: filtering orders, mapping DTOs, summing amounts. Interviewers love small "what does this print?" puzzles about streams, because the answer is often <em>nothing</em>. They also ask <em>"How should you use Optional?"</em></div>
 
-<h2>Four rules from the stream package docs</h2>
+<div class="win"><b>Today's win:</b> predict what a stream pipeline prints (or doesn't), explain why a stream can't be reused, and choose correctly between <code>orElse</code> and <code>orElseGet</code>.</div>
+
+<dl class="words">
+  <dt>stream</dt><dd>A one-time flow of elements that you process step by step. It is not a list; it stores nothing.</dd>
+  <dt>source</dt><dd>Where the elements come from: a list, an array, a file.</dd>
+  <dt>pipeline</dt><dd>The chain of steps: source, then zero or more middle steps, then one final step.</dd>
+  <dt>intermediate operation</dt><dd>A middle step like <code>filter</code> or <code>map</code>. It returns a new stream and only <em>describes</em> work.</dd>
+  <dt>terminal operation</dt><dd>The final step like <code>toList()</code>, <code>count()</code> or <code>forEach</code>. It produces a result and starts the work.</dd>
+  <dt>lazy</dt><dd>"Not done until needed." The work waits until someone asks for the result.</dd>
+  <dt>side effect</dt><dd>When a lambda changes something outside itself, like adding to a list or printing.</dd>
+  <dt>Optional</dt><dd>A small box that holds either one value or nothing. It makes "no result" visible in a method's return type.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"What does <code>List.of(1, 2, 3).stream().peek(System.out::println).map(x -&gt; x * 2);</code> print?"</em> Commit to an answer before you read on.</p>
+
+<h2>1. The picture: a conveyor belt with a start button at the end</h2>
+<p>Picture a factory belt. At the start is a box of parts (the <span class="term">source</span>). Along the belt are stations: one throws away bad parts (<code>filter</code>), one paints each part (<code>map</code>). At the very end stands a worker who packs the result (the <span class="term">terminal operation</span>).</p>
+<p>The strange part: <strong>the belt has no power switch at the start.</strong> Building the stations does nothing. The belt only moves when the worker at the end pulls the next part. No worker at the end, no movement at all.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="A stream pipeline as a conveyor belt: source List.of(1,2,3), stations peek and map, and terminal toList. The terminal operation pulls each element through the whole belt, one at a time.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <path d="M150 66C150 30 560 30 560 66" fill="none" stroke="var(--accent)"/>
+    <path d="M144 58l6 9 6-9" fill="none" stroke="var(--accent)"/>
+    <text x="355" y="26" text-anchor="middle" font-size="11" fill="var(--accent)">toList() pulls: 1 all the way, then 2, then 3</text>
+    <rect x="20" y="80" width="130" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="85" y="102" text-anchor="middle">source</text>
+    <text x="85" y="120" text-anchor="middle" font-size="11">List.of(1,2,3)</text>
+    <path d="M150 105h40M310 105h40M470 105h40" stroke="currentColor" stroke-width="3" opacity=".35"/>
+    <rect x="190" y="80" width="120" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="250" y="102" text-anchor="middle">peek(print)</text>
+    <text x="250" y="120" text-anchor="middle" font-size="11" opacity=".75">intermediate</text>
+    <rect x="350" y="80" width="120" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="410" y="102" text-anchor="middle">map(x*2)</text>
+    <text x="410" y="120" text-anchor="middle" font-size="11" opacity=".75">intermediate</text>
+    <rect x="510" y="80" width="150" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="585" y="102" text-anchor="middle" fill="var(--accent)">toList()</text>
+    <text x="585" y="120" text-anchor="middle" font-size="11" fill="var(--accent)">terminal</text>
+    <path d="M30 160h620" stroke="currentColor" opacity=".25"/>
+    <text x="250" y="188" text-anchor="middle" font-size="11">no toList(): stations are built,</text>
+    <text x="250" y="206" text-anchor="middle" font-size="11">nothing moves, nothing printed</text>
+    <text x="510" y="188" text-anchor="middle" font-size="11" fill="var(--accent)">with toList(): saw 1, saw 2, saw 3</text>
+    <text x="510" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">result [2, 4, 6]</text>
+  </g>
+</svg>
+<figcaption>Intermediate operations only build the belt. The terminal operation at the end is the start button: it pulls elements through.</figcaption>
+</figure>
+
+<p>The <code>java.util.stream</code> docs say a stream has "No storage": it "is not a data structure that stores elements; instead, it conveys elements from a source ... through a pipeline of computational operations."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></p>
+
+<h2>2. Rule one: intermediate operations are lazy</h2>
+<p>"Intermediate operations are always lazy." Traversal of the source "does not begin until the terminal operation of the pipeline is executed."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></p>
+<pre><code>List&lt;Integer&gt; data = List.of(1, 2, 3);
+
+data.stream().peek(x -&gt; System.out.println("  saw " + x)).map(x -&gt; x * 2);
+<span class="c">Step 1  stream()  → a belt starting at data</span>
+<span class="c">Step 2  peek(...) → a station is added; nothing runs</span>
+<span class="c">Step 3  map(...)  → a station is added; nothing runs</span>
+<span class="c">Step 4  the line ends. No terminal op → </span><span class="hl">nothing is printed</span>
+
+data.stream().peek(x -&gt; System.out.println("  saw " + x)).map(x -&gt; x * 2).toList();
+<span class="c">Step 1  toList() asks for an element → 1 goes through peek ("saw 1") and map (2)</span>
+<span class="c">Step 2  toList() asks again          → 2 goes through ("saw 2") → 4</span>
+<span class="c">Step 3  toList() asks again          → 3 goes through ("saw 3") → 6</span></code></pre>
+<p>Notice in Step 1 to 3 that each element travels the <strong>whole</strong> belt before the next one starts. That is why laziness pays off: for "find the first String with three consecutive vowels", the stream "need not examine all the input strings".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a> Operations like <code>findFirst</code> or <code>limit</code> are <em>short-circuiting</em>: they may stop early, even on an infinite stream.</p>
+<p class="muted"><code>peek</code> "exists mainly to support debugging", to see elements as they flow past a point.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Stream javadoc</a> Don't put business logic in it.</p>
+
+<h2>3. Rule two: a stream is used once</h2>
+<p>A belt is built for one run. "After the terminal operation is performed, the stream pipeline is considered consumed, and can no longer be used"; to traverse the same data again, you go back to the source for a new stream.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></p>
+<pre><code>Stream&lt;Integer&gt; s = data.stream();
+s.count();     <span class="c">// 3</span>
+s.count();     <span class="hl">// IllegalStateException</span></code></pre>
+<p><strong>The fix:</strong> don't store streams in fields or variables to reuse. Keep the <em>source</em> (the list) and call <code>data.stream()</code> each time, or use a <code>Supplier&lt;Stream&lt;T&gt;&gt;</code>.</p>
+
+<h2>4. Rule three: don't touch the outside world from inside</h2>
+<p>Two rules from the docs about the lambdas you pass in (the docs call them <em>behavioral parameters</em>):</p>
 <ul>
-<li><strong>Lazy.</strong> "Intermediate operations are always lazy." Traversal "does not begin until the terminal operation of the pipeline is executed."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
-<li><strong>Single use.</strong> "After the terminal operation is performed, the stream pipeline is considered consumed, and can no longer be used."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
-<li><strong>Non-interference.</strong> Behavioral parameters "should never modify the stream's data source."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
-<li><strong>Avoid side effects.</strong> "Side-effects in behavioral parameters to stream operations are, in general, discouraged." The docs show <code>forEach(results::add)</code> as the anti-pattern and <code>.toList()</code> as the fix.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></li>
+  <li><strong>Non-interference.</strong> They "should never modify the stream's data source".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a> Don't add to or remove from the list you are streaming over.</li>
+  <li><strong>Avoid side effects.</strong> "Side-effects in behavioral parameters to stream operations are, in general, discouraged." The docs show <code>forEach(results::add)</code> as the anti-pattern and a collecting terminal operation as the fix.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></li>
 </ul>
-<h2>Optional: a return type, not a field type</h2>
-<p>"<code>Optional</code> is primarily intended for use as a method return type where there is a clear need to represent 'no result,' and where using <code>null</code> is likely to cause errors."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a> And <code>orElseGet</code> takes a supplier that only runs when empty, while <code>orElse</code>'s argument is computed regardless.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a></p>
-<pre><code>java java/examples/StreamAndOptional.java
+<pre><code><span class="c">// Wrong: the lambda changes a list outside the stream</span>
+List&lt;String&gt; results = new ArrayList&lt;&gt;();
+names.stream().filter(n -&gt; n.length() &lt;= 3).forEach(results::add);
+
+<span class="c">// Right: let the stream build the result</span>
+List&lt;String&gt; results = names.stream().filter(n -&gt; n.length() &lt;= 3).<span class="hl">toList()</span>;</code></pre>
+<p>Why does it matter? The side-effect version breaks as soon as someone adds <code>.parallel()</code>: several threads then call <code>add</code> on one <code>ArrayList</code> at the same time.</p>
+<h3>JDK 8 vs 17 vs 21: <code>toList()</code></h3>
+<p><code>Stream.toList()</code> arrived in JDK 16, so it works on 17 and 21 but not on 8. "The returned List is unmodifiable"; calling <code>add</code> on it throws <code>UnsupportedOperationException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Stream javadoc</a> On JDK 8 you write <code>.collect(Collectors.toList())</code>, which gives no guarantee about mutability (see <a href="0022-collectors-groupingby-tomap.html">lesson 0022</a>).</p>
+
+<h2>5. Optional: a box that may be empty</h2>
+<p>Think of a parcel locker. When you open it, either there is a parcel inside or it is empty. You can't forget to check, because you have to open the box first. Compare with <code>null</code>: a method returns <code>null</code>, you forget to check, and you get a <code>NullPointerException</code> far away.</p>
+<p>The Javadoc is clear about its purpose: "<code>Optional</code> is primarily intended for use as a method return type where there is a clear need to represent 'no result,' and where using <code>null</code> is likely to cause errors." And: "A variable whose type is <code>Optional</code> should never itself be <code>null</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Optional javadoc</a></p>
+<pre><code>Optional&lt;User&gt; findByEmail(String email);              <span class="c">// good: return type</span>
+
+String city = findByEmail(e)
+    .map(User::city)                                   <span class="c">// empty stays empty</span>
+    .orElse("unknown");
+
+class User { Optional&lt;String&gt; nickname; }              <span class="hl">// avoid: not a field type</span></code></pre>
+
+<h3>The trap: <code>orElse</code> vs <code>orElseGet</code></h3>
+<p>Both give a fallback when the box is empty. The difference is <strong>when the fallback is computed</strong>. <code>orElse(x)</code> takes a ready value, so Java computes <code>x</code> before the call, even when the box is full. <code>orElseGet(supplier)</code> takes a recipe (a <code>Supplier</code>) and only runs it when the box is empty.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Optional javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="With orElse, expensive() runs before the call even though the Optional has a value, and its result is thrown away. With orElseGet, only the supplier is passed and it is never called.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="30">Optional.of("present").orElse(expensive())</text>
+    <rect x="20" y="44" width="200" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="66" text-anchor="middle" fill="var(--accent)">1. expensive() runs</text>
+    <text x="120" y="84" text-anchor="middle" font-size="11" fill="var(--accent)">prints, costs time</text>
+    <g fill="none" stroke="currentColor"><path d="M220 69h28M242 64l6 5-6 5"/></g>
+    <rect x="250" y="44" width="190" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="345" y="66" text-anchor="middle">2. orElse checks box</text>
+    <text x="345" y="84" text-anchor="middle" font-size="11">value is present</text>
+    <g fill="none" stroke="currentColor"><path d="M440 69h28M462 64l6 5-6 5"/></g>
+    <rect x="470" y="44" width="190" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="565" y="66" text-anchor="middle">3. "present"</text>
+    <text x="565" y="84" text-anchor="middle" font-size="11">"default" is wasted</text>
+    <text x="20" y="140">Optional.of("present").orElseGet(App::expensive)</text>
+    <rect x="20" y="154" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="176" text-anchor="middle">1. pass the recipe</text>
+    <text x="120" y="194" text-anchor="middle" font-size="11">nothing runs yet</text>
+    <g fill="none" stroke="currentColor"><path d="M220 179h28M242 174l6 5-6 5"/></g>
+    <rect x="250" y="154" width="190" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="345" y="176" text-anchor="middle">2. checks box</text>
+    <text x="345" y="194" text-anchor="middle" font-size="11">value is present</text>
+    <g fill="none" stroke="currentColor"><path d="M440 179h28M462 174l6 5-6 5"/></g>
+    <rect x="470" y="154" width="190" height="50" rx="6" fill="none" stroke="var(--accent)"/>
+    <text x="565" y="176" text-anchor="middle" fill="var(--accent)">3. "present"</text>
+    <text x="565" y="194" text-anchor="middle" font-size="11" fill="var(--accent)">supplier never called</text>
+  </g>
+</svg>
+<figcaption>Java evaluates method arguments before the call. <code>orElse</code> therefore always pays for its fallback; <code>orElseGet</code> pays only when the box is empty.</figcaption>
+</figure>
+
+<h3>Run all five rules</h3>
+<pre><code>$ java java/examples/StreamAndOptional.java
 1. Intermediate ops are lazy (no terminal op, no output):
 2. A terminal op triggers the pipeline:
-  saw 1  saw 2  saw 3
+  saw 1
+  saw 2
+  saw 3
 3. A stream is consumed once:
   IllegalStateException: stream has already been operated upon or closed
 4. orElse evaluates its argument even when a value is present:
   expensive() called
-5. orElseGet only calls the supplier when empty:</code></pre>
+5. orElseGet only calls the supplier when empty:
+  (nothing printed above)</code></pre>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Pipeline has <code>filter</code> and <code>map</code> but no terminal op. Result?</p>
-  <button>Only map executes</button>
-  <button>Everything is executed</button>
-  <button>Only filter executes</button>
-  <button data-correct>Nothing is executed</button>
-  <p class="explain">Intermediate operations are lazy; nothing runs until a terminal operation.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. You call <code>count()</code> twice on one stream. Result?</p>
-  <button>Both throw errors</button>
-  <button>Both return the count</button>
-  <button>First call throws</button>
-  <button data-correct>Second call throws</button>
-  <p class="explain">A stream is consumed by its terminal operation; reuse throws IllegalStateException.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Intended primary use of <code>Optional</code>?</p>
-  <button>A serialized DTO field</button>
-  <button>A method parameter</button>
-  <button data-correct>A method return type</button>
-  <button>An entity field type</button>
-  <p class="explain">The Javadoc: primarily a return type where 'no result' must be represented.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Default value is costly to build. Which call?</p>
-  <button data-correct>orElseGet with supplier</button>
-  <button>orElse with a null</button>
-  <button>orElse with a call</button>
-  <button>get without checking</button>
-  <p class="explain">orElseGet only invokes the supplier when the Optional is empty.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[2]</a></p>
-</div>
+<h3>Common Optional mistakes</h3>
+<ul>
+  <li><strong>Calling <code>get()</code> without checking.</strong> It throws <code>NoSuchElementException</code> when empty. The Javadoc says "The preferred alternative to this method is <code>orElseThrow()</code>", which says the same thing more honestly.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Optional javadoc</a></li>
+  <li><strong>Returning <code>null</code> from a method whose type is Optional.</strong> Return <code>Optional.empty()</code> instead; use <code>Optional.ofNullable(x)</code> to wrap a value that might be null.</li>
+  <li><strong>Using <code>orElse(callDatabase())</code>.</strong> The call runs every time. Use <code>orElseGet(() -&gt; callDatabase())</code>.</li>
+</ul>
+<p class="muted">Version notes: the no-argument <code>orElseThrow()</code> is JDK 10+, and <code>isEmpty()</code> is JDK 11+.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Optional javadoc</a> On JDK 8 use <code>get()</code> after <code>isPresent()</code>, or <code>orElseThrow(SomeException::new)</code>.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">A pipeline has <code>peek(print)</code> and <code>map</code> but no terminal operation. What is printed?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nothing at all</button>
+    <button class="opt">Every element once</button>
+    <button class="opt">Only the first element</button>
+    <button class="opt">Every element twice</button>
+  </div>
+  <div class="why">Intermediate operations are lazy. Without a terminal operation, the belt never moves, so <code>peek</code> never runs.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You call <code>s.count()</code> twice on the same stream <code>s</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>The second call throws IllegalStateException</button>
+    <button class="opt">Both calls return the same count of 3</button>
+    <button class="opt">The second call returns 0, as it is empty</button>
+    <button class="opt">The first call throws, the second returns 3</button>
+  </div>
+  <div class="why">The terminal operation consumes the stream. To traverse again, go back to the source: <code>data.stream()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In <code>data.stream().peek(print).map(x -&gt; x * 2).toList()</code> with data 1, 2, 3, in what order do things happen?</p>
+  <div class="options">
+    <button class="opt" data-correct>1 goes through peek and map, then 2, then 3</button>
+    <button class="opt">peek sees 1, 2, 3 first, then map doubles all three</button>
+    <button class="opt">map doubles all three first, then peek prints them</button>
+    <button class="opt">The order is random because streams run in parallel</button>
+  </div>
+  <div class="why">The terminal operation pulls one element at a time through the whole pipeline. That is what lets short-circuiting operations stop early.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the bug? <code>List&lt;String&gt; out = new ArrayList&lt;&gt;(); names.stream().filter(ok).forEach(out::add);</code></p>
+  <div class="options">
+    <button class="opt" data-correct>A side effect: let the stream build the list with toList()</button>
+    <button class="opt">forEach is lazy, so nothing is ever added to the out list</button>
+    <button class="opt">Method references can't be used inside forEach at all</button>
+    <button class="opt">filter must always come after forEach in a pipeline</button>
+  </div>
+  <div class="why">The docs discourage side effects in behavioral parameters and show <code>forEach(results::add)</code> as the anti-pattern. It breaks under <code>.parallel()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the intended main use of <code>Optional</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>A method return type</button>
+    <button class="opt">A field in an entity</button>
+    <button class="opt">A method parameter</button>
+    <button class="opt">A field in a DTO</button>
+  </div>
+  <div class="why">The Javadoc: "primarily intended for use as a method return type where there is a clear need to represent 'no result'".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The fallback value needs a slow database call. Which line is best?</p>
+  <div class="options">
+    <button class="opt" data-correct>opt.orElseGet(() -&gt; loadFromDb())</button>
+    <button class="opt">opt.orElse(loadFromDb())</button>
+    <button class="opt">opt.get() ?: loadFromDb()</button>
+    <button class="opt">opt.orElse(null).loadFromDb()</button>
+  </div>
+  <div class="why"><code>orElse</code>'s argument is computed even when a value is present. <code>orElseGet</code> only calls the supplier when the Optional is empty.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">On JDK 21, <code>var list = Stream.of(1, 2).toList(); list.add(3);</code> What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>UnsupportedOperationException</button>
+    <button class="opt">The list becomes [1, 2, 3]</button>
+    <button class="opt">A compile error on toList()</button>
+    <button class="opt">IllegalStateException</button>
+  </div>
+  <div class="why"><code>Stream.toList()</code> (JDK 16+) returns an unmodifiable list; any mutator throws <code>UnsupportedOperationException</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How do Java streams work, and how should you use Optional?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A pipeline is a source, zero or more intermediate operations, and one terminal operation.</label></li>
+      <li><label><input type="checkbox"> Intermediate operations are lazy; nothing runs until the terminal operation.</label></li>
+      <li><label><input type="checkbox"> Elements flow one at a time, so short-circuiting ops like <code>findFirst</code> can stop early.</label></li>
+      <li><label><input type="checkbox"> A stream can be used only once; reuse throws <code>IllegalStateException</code>.</label></li>
+      <li><label><input type="checkbox"> Lambdas should not modify the source or have side effects; collect results with <code>toList()</code> / collectors.</label></li>
+      <li><label><input type="checkbox"> Optional is mainly a return type for "no result"; never a null Optional.</label></li>
+      <li><label><input type="checkbox"> <code>orElse</code> always evaluates its argument; <code>orElseGet</code> only when empty.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A stream pipeline has a source, like a list, then intermediate operations like <code>filter</code> and <code>map</code>, and one terminal operation like <code>toList</code> or <code>count</code>. The intermediate operations are lazy: they only describe the work, and nothing runs until the terminal operation pulls elements through, one at a time. That's why <code>findFirst</code> can stop early. A stream is single-use; calling a second terminal operation throws <code>IllegalStateException</code>, so I keep the list and call <code>stream()</code> again. I avoid side effects in the lambdas, for example adding to an outside list in <code>forEach</code>, and let a collector build the result. For Optional: I use it as a return type when 'no result' is a normal case, never as a field, and never return null instead. And I use <code>orElseGet</code> when the default is expensive, because <code>orElse</code> evaluates its argument every time."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0004-fix-the-pipeline.md">Exercise 0004: fix the pipeline</a></p>
+<p><a href="../exercises/0004-fix-the-pipeline.md">Exercise 0004: fix the pipeline</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/StreamAndOptional.java"><code>StreamAndOptional.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a>. The sections 'Stream operations and pipelines', 'Non-interference' and 'Side-effects'.</p>
-<p><a href="0009-default-methods-and-conflicts.html">← JDK 8: default methods and conflict resolution</a> &nbsp;|&nbsp; <a href="0022-collectors-groupingby-tomap.html">Collectors: groupingBy, partitioningBy and toMap →</a></p>
+<h2>What's next</h2>
+<p>The terminal operation <code>collect</code> deserves its own lesson: grouping, counting and building maps. A senior interviewer will ask <em>"What happens when <code>toMap</code> sees the same key twice?"</em> That's <a href="0022-collectors-groupingby-tomap.html">lesson 0022</a>. Lambdas themselves were in <a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a>, the sections "Stream operations and pipelines", "Non-interference" and "Side-effects".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Is a parallel stream faster?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0009-default-methods-and-conflicts.html">← Default methods: adding to an interface without breaking anyone</a> &nbsp;|&nbsp; <a href="0022-collectors-groupingby-tomap.html">Collectors: sorting a stream into boxes →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">Optional Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Stream Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Optional Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

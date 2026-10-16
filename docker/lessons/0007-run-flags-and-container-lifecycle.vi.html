@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 7: docker run: các flag và vòng đời của container</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>docker run: các flag và vòng đời của container</h1>
+<p class="meta">Docker · Bài 0007 · bước 2/12 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-run-flags-and-container-lifecycle.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> start, đặt tên, publish port, stop và xóa một container, và nói được flag nào làm gì.</div>
+
+<h2>docker run</h2>
+<p><code>docker run</code> sẽ "tạo và chạy một container mới từ một image", tự pull image nếu cần.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a> Các flag bạn dùng hằng ngày:</p>
+<table><tr><th>Flag</th><th>Ý nghĩa<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></th></tr>
+<tr><td><code>-d</code></td><td>chạy như một process nền, không chiếm terminal của bạn</td></tr>
+<tr><td><code>-p host:container</code></td><td>publish một port của container ra host, ví dụ <code>-p 127.0.0.1:80:8080/tcp</code></td></tr>
+<tr><td><code>--rm</code></td><td>tự động xóa container (cùng các anonymous volume của nó) khi thoát</td></tr>
+<tr><td><code>-e VAR=value</code></td><td>đặt một biến môi trường; <code>--env-file</code> nạp từ một file</td></tr>
+<tr><td><code>--name</code></td><td>đặt tên cho container thay vì để tên ngẫu nhiên</td></tr>
+<tr><td><code>-it</code></td><td>giữ STDIN mở và cấp một pseudo-TTY cho phiên tương tác</td></tr></table>
+<h2>Vòng đời trong một lần chạy</h2>
+<pre><code>cd docker/examples &amp;&amp; ./02-run-and-lifecycle.sh
+GREETING=hello
+GET / -&gt; HTTP 200
+running:  lesson-web-... Up 1 second
+stopped:  lesson-web-... Exited (0) Less than a second ago
+after rm, containers named that: 0</code></pre>
+<p>Container đã stop vẫn còn tồn tại (cả writable layer của nó) cho tới khi bạn <code>docker rm</code>. Source: <a href="../examples/02-run-and-lifecycle.sh"><code>02-run-and-lifecycle.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Flag nào chạy container ở chế độ nền?</p>
+  <button data-correct>-d</button>
+  <button>-p</button>
+  <button>-it</button>
+  <button>-e</button>
+  <p class="explain">-d start container như một process nền.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. --rm làm gì?</p>
+  <button>Restart container</button>
+  <button>Đổi tên container</button>
+  <button>Xóa image</button>
+  <button data-correct>Xóa nó khi thoát</button>
+  <p class="explain">Nó tự động xóa container và các anonymous volume của container khi container thoát.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Flag nào publish port?</p>
+  <button data-correct>-p</button>
+  <button>--rm</button>
+  <button>--name</button>
+  <button>-e</button>
+  <p class="explain">-p publish một port của container ra host.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một container đã stop thì vẫn...?</p>
+  <button>Chạy âm thầm</button>
+  <button>Giữ một port</button>
+  <button data-correct>Tồn tại tới khi bị xóa</button>
+  <button>Tự chạy lại</button>
+  <p class="explain">Bản demo cho thấy nó vẫn được liệt kê với trạng thái Exited cho tới khi docker rm.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-run-a-container.vi.md">Bài tập 0007: chạy và quan sát</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-run-and-lifecycle.sh"><code>02-run-and-lifecycle.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/reference/cli/docker/container/run/">docker container run reference</a>. Lướt qua bảng option.</p>
+<p><a href="0001-containers-images-layers.vi.html">← Container, image và layer</a> &nbsp;|&nbsp; <a href="0008-dockerfile-instructions.vi.html">Các lệnh trong Dockerfile: ENV vs ARG, COPY vs ADD, EXPOSE →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/reference/cli/docker/container/run/">docker container run reference</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

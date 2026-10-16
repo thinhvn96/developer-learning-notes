@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 37: Các method mạnh của Map: merge, compute và cái bẫy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Các method mạnh của Map: merge, compute và cái bẫy</h1>
+<p class="subtitle">Thay "get, kiểm tra null, put" bằng một lần gọi, và học ba cách nó có thể làm bạn bất ngờ.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0037 · bước 19/46 · Advanced · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0037-map-default-methods.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Đếm từ, nhóm đơn hàng theo khách, xây cache: một nửa code dùng map là "nếu chưa có key thì tạo; có rồi thì cập nhật". Java 8 thêm các method làm việc này trong một lần gọi. Reviewer và người phỏng vấn mong bạn dùng chúng, và biết chỗ chúng cắn: kết quả null, đối số được tính sẵn, và đệ quy.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> thay code get-kiểm tra-put bằng <code>merge</code>, <code>computeIfAbsent</code> và các method họ hàng, và tránh ba cái bẫy về null và đệ quy của chúng.</div>
+
+<dl class="words">
+  <dt>default method</dt><dd>Một method có thân nằm trong interface. Java 8 dùng chúng để thêm method mới vào <code>Map</code> mà không làm hỏng mọi class đang implement nó.</dd>
+  <dt>lambda</dt><dd>Một hàm nhỏ không tên mà bạn truyền như một giá trị, như <code>k -&gt; new ArrayList&lt;&gt;()</code>. Bài 0008 nói về chúng.</dd>
+  <dt>method reference</dt><dd>Cách viết ngắn cho một lambda gọi đúng một method có sẵn: <code>Integer::sum</code> nghĩa là <code>(a, b) -&gt; Integer.sum(a, b)</code>.</dd>
+  <dt>mapping function</dt><dd>Hàm bạn đưa cho <code>computeIfAbsent</code>: nó nhận key và trả về value mới.</dd>
+  <dt>remapping function</dt><dd>Hàm bạn đưa cho <code>merge</code> hoặc <code>compute</code>: nó nhận value cũ và trả về value mới.</dd>
+  <dt>multimap</dt><dd>Một map mà một key giữ nhiều value, thường là <code>Map&lt;K, List&lt;V&gt;&gt;</code>.</dd>
+  <dt>eager / lazy</dt><dd>Eager: tính ngay, kể cả khi không cần. Lazy: chỉ tính khi thật sự cần.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Viết, trong đầu hoặc ra giấy, đoạn code kiểu JDK 7 kinh điển đếm số lần mỗi từ xuất hiện trong một list, dùng <code>get</code> và <code>put</code>. Đếm số dòng. Phần 1 làm việc đó trong một dòng.</p>
+
+<h2>1. Bộ công cụ Map của JDK 8</h2>
+<p>Hãy nghĩ tới quầy lễ tân khách sạn. Cách cũ: "Có phòng cho anh An chưa? Chưa à? Vậy tạo một phòng. Giờ đưa tôi phòng đó. Giờ để túi vào." Ba lần ra quầy. Cách mới: "Để túi này vào phòng anh An, chưa có phòng thì tạo." Một lần.</p>
+<p>Mọi method này đều "Since 1.8", nên có sẵn trên 8, 17 và 21.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></p>
+<table>
+<tr><th>Thay vì</th><th>Viết</th></tr>
+<tr><td><code>Integer c = m.get(w); m.put(w, c == null ? 1 : c + 1);</code></td><td><code>m.merge(w, 1, Integer::sum)</code></td></tr>
+<tr><td><code>if (!m.containsKey(k)) m.put(k, new ArrayList&lt;&gt;()); m.get(k).add(v);</code></td><td><code>m.computeIfAbsent(k, x -&gt; new ArrayList&lt;&gt;()).add(v)</code></td></tr>
+<tr><td><code>m.containsKey(k) ? m.get(k) : d</code></td><td><code>m.getOrDefault(k, d)</code></td></tr>
+<tr><td>vòng lặp + <code>put</code> để biến đổi value</td><td><code>m.replaceAll((k, v) -&gt; ...)</code></td></tr>
+</table>
+<p>Dòng multimap lấy thẳng từ Javadoc: <code>map.computeIfAbsent(key, k -&gt; new HashSet&lt;V&gt;()).add(v);</code><a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Nó chạy được vì <code>computeIfAbsent</code> <strong>trả về</strong> value: list đã có, hoặc list mới vừa được lưu.</p>
+
+<h3>Lần theo: đếm từ bằng merge</h3>
+<p><code>merge(key, value, function)</code> đọc như sau: "Nếu key chưa gắn với value nào hoặc đang gắn với null, gắn nó với value khác null được cho."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Ngược lại, nó gọi hàm của bạn với value cũ và value mới.</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="merge(key, 1, Integer::sum): nếu key chưa có hoặc là null, lưu 1. Ngược lại gọi sum(old, 1) và lưu kết quả; nếu kết quả là null, xóa key.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="90" width="170" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="105" y="112" text-anchor="middle">merge(w, 1,</text>
+    <text x="105" y="130" text-anchor="middle">Integer::sum)</text>
+    <rect x="240" y="90" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="315" y="112" text-anchor="middle">value cũ của w</text>
+    <text x="315" y="130" text-anchor="middle">null/chưa có?</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M190 115h44M228 110l6 5-6 5"/>
+      <path d="M390 105L450 50M440 52l10-2-3 10"/>
+      <path d="M390 125L450 180M447 170l3 10-10-2"/>
+    </g>
+    <text x="405" y="70" font-size="11">có</text>
+    <text x="405" y="170" font-size="11">không</text>
+    <rect x="455" y="20" width="205" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="557" y="42" text-anchor="middle" fill="var(--accent)">lưu 1</text>
+    <text x="557" y="60" text-anchor="middle" font-size="11">không gọi hàm</text>
+    <rect x="455" y="155" width="205" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="557" y="176" text-anchor="middle">lưu sum(old, 1)</text>
+    <text x="557" y="194" text-anchor="middle" font-size="11">nếu kết quả là null:</text>
+    <text x="557" y="209" text-anchor="middle" font-size="11" fill="var(--accent)">xóa key</text>
+  </g>
+</svg>
+<figcaption>Một lần gọi bao cả "lần đầu" lẫn "các lần sau". Hàm trả về <code>null</code> sẽ xóa entry.</figcaption>
+</figure>
+
+<pre><code>for (String w : List.of("kafka", "java", "kafka", "sql", "java", "kafka"))
+    counts.merge(w, 1, Integer::sum);
+<span class="c">Step 1  "kafka": absent → store 1</span>
+<span class="c">Step 2  "java":  absent → store 1</span>
+<span class="c">Step 3  "kafka": old 1 → sum(1, 1) → store 2</span>
+<span class="c">...     "sql" → 1, "java" → 2, "kafka" → 3</span></code></pre>
+<pre><code>$ java java/examples/collections/MapPowerMethods.java
+merge count         : {java=2, kafka=3, sql=1}
+computeIfAbsent list: {j=[java, java], k=[kafka, kafka, kafka], s=[sql]}
+getOrDefault        : 0
+objects built (putIfAbsent + computeIfAbsent on existing key): 1
+null result removes : {}
+getOrDefault on null value: null
+recursive computeIfAbsent: ConcurrentModificationException
+groupingBy+counting : {java=2, kafka=3, sql=1}</code></pre>
+<p>Dòng cuối cho thấy cách làm bằng stream từ <a href="0004-streams-and-optional.vi.html">bài 0004</a>: <code>Collectors.groupingBy(w -&gt; w, TreeMap::new, Collectors.counting())</code> cho cùng kết quả đếm. Dùng <code>merge</code> khi cập nhật một map đã có; dùng <code>groupingBy</code> khi xây map mới từ một stream.</p>
+
+<h2>2. Concurrency: nơi các method này quan trọng nhất</h2>
+<p>Trên <code>HashMap</code> thường, các method này chỉ là code ngắn hơn. Javadoc nói rõ: "Cài đặt mặc định không đảm bảo gì về synchronization hay tính nguyên tử của method này. Cài đặt nào cung cấp đảm bảo nguyên tử phải override method này và ghi rõ các thuộc tính concurrency của nó."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></p>
+<p><code>ConcurrentHashMap</code> có override chúng và làm chúng nguyên tử, vì thế chúng càng quan trọng ở đó (<a href="0025-concurrenthashmap.vi.html">bài 0025</a>). Với hai thread, <code>get</code> rồi <code>put</code> có thể mất cập nhật: cả hai đọc 2, cả hai ghi 3. <code>merge</code> trên ConcurrentHashMap làm việc đọc và ghi như một bước.</p>
+
+<h2>3. Các cái bẫy</h2>
+<pre><code>objects built (putIfAbsent + computeIfAbsent on existing key): 1
+null result removes : {}
+getOrDefault on null value: null
+recursive computeIfAbsent: ConcurrentModificationException</code></pre>
+
+<h3>Bẫy 1: putIfAbsent là eager</h3>
+<p>Java tính các đối số của method <em>trước</em> khi gọi. Nên <code>m.putIfAbsent("x", new ArrayList&lt;&gt;())</code> tạo một list mới kể cả khi <code>"x"</code> đã có, rồi vứt nó đi. <code>computeIfAbsent</code> nhận một <em>hàm</em>, và chỉ gọi khi key chưa có.</p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Key x đã có. putIfAbsent: đối số new ArrayList được tạo trước, rồi bị vứt đi. computeIfAbsent: map thấy x đã có và không bao giờ gọi hàm.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="13">key "x" đã có sẵn</text>
+    <text x="20" y="62">putIfAbsent("x", new ArrayList&lt;&gt;())</text>
+    <rect x="20" y="76" width="200" height="34" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="98" text-anchor="middle" fill="var(--accent)">1. tạo ArrayList</text>
+    <g fill="none" stroke="currentColor"><path d="M220 93h40M254 88l6 5-6 5"/><path d="M460 93h40M494 88l6 5-6 5"/></g>
+    <rect x="260" y="76" width="200" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="360" y="98" text-anchor="middle">2. "x" đã có</text>
+    <rect x="500" y="76" width="160" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="580" y="98" text-anchor="middle">3. list bị phí</text>
+    <text x="20" y="146">computeIfAbsent("x", k -&gt; new ArrayList&lt;&gt;())</text>
+    <rect x="20" y="160" width="200" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="182" text-anchor="middle">1. "x" đã có</text>
+    <g fill="none" stroke="currentColor"><path d="M220 177h40M254 172l6 5-6 5"/></g>
+    <rect x="260" y="160" width="400" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="460" y="182" text-anchor="middle">2. trả list có sẵn; hàm không bao giờ chạy</text>
+  </g>
+</svg>
+<figcaption>Eager và lazy. Trong ví dụ, bộ đếm cho thấy đúng 1 object được tạo: cái bị <code>putIfAbsent</code> làm phí.</figcaption>
+</figure>
+<p>Với value rẻ như <code>0</code> thì không sao. Với một lần gọi database hay một object lớn thì có.</p>
+
+<h3>Bẫy 2: null nghĩa là "không có mapping"</h3>
+<p>Nếu mapping function trả về null thì "không mapping nào được ghi lại"; nếu remapping function trả về null thì "mapping bị xóa".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Trong ví dụ, <code>computeIfAbsent("pear", k -&gt; null)</code> không thêm gì, và giảm tồn kho của apple về 0 bằng <code>v - 1 == 0 ? null : v - 1</code> sẽ xóa apple: map in ra <code>{}</code>. Cố ý thì tiện, vô tình thì bất ngờ.</p>
+<p>Còn <code>getOrDefault</code> trả về "value mà key được gắn tới, hoặc defaultValue nếu map không có mapping nào cho key đó".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Một key gắn với <code>null</code> <em>vẫn có</em> mapping, nên bạn nhận <code>null</code> đã lưu, không phải giá trị mặc định. Lần chạy in ra <code>getOrDefault on null value: null</code>.</p>
+
+<h3>Bẫy 3: đừng sửa map bên trong hàm</h3>
+<p>"Mapping function không nên sửa map này trong lúc tính toán."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> HashMap "sẽ, theo khả năng tốt nhất, ném ConcurrentModificationException" khi phát hiện việc này.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Nạn nhân kinh điển là đệ quy có memo:</p>
+<pre><code>static int fib(int n, Map&lt;Integer, Integer&gt; memo) {
+    if (n &lt; 2) return n;
+    return memo.computeIfAbsent(n, k -&gt; fib(k - 1, memo) + fib(k - 2, memo));
+}
+<span class="c">Step 1  computeIfAbsent(30) starts; HashMap is in the middle of an insert</span>
+<span class="c">Step 2  the function calls fib(29) → computeIfAbsent(29) → puts into the same map</span>
+<span class="c">Step 3  back in step 1, HashMap sees the map changed under it → </span><span class="hl">ConcurrentModificationException</span></code></pre>
+<p><strong>Cách sửa:</strong> dùng <code>get</code> và <code>put</code> thường ở đây: tính value trước, rồi mới lưu.</p>
+<pre><code>Integer cached = memo.get(n);
+if (cached != null) return cached;
+int value = fib(n - 1, memo) + fib(n - 2, memo);
+memo.put(n, value);
+return value;</code></pre>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Lời gọi nào đếm từ trong <code>Map&lt;String, Integer&gt;</code> trong một dòng?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>merge(w, 1, Integer::sum)</code></button>
+    <button class="opt"><code>putIfAbsent(w, 1)</code></button>
+    <button class="opt"><code>compute(w, null)</code></button>
+    <button class="opt"><code>put(w, get(w) + 1)</code></button>
+  </div>
+  <div class="why">merge lưu 1 ở lần đầu và cộng cũ + 1 ở các lần sau. <code>put(w, get(w) + 1)</code> ném NullPointerException ở lần đầu.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Hàm truyền vào <code>computeIfAbsent</code> trả về <code>null</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không mapping nào được ghi lại</button>
+    <button class="opt">Giá trị null được lưu vào map</button>
+    <button class="opt">Ném ra NullPointerException</button>
+    <button class="opt">Key được lưu mà không có value</button>
+  </div>
+  <div class="why">Nếu mapping function trả về null, không mapping nào được ghi, và computeIfAbsent trả về null.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Key <code>"x"</code> đã có. Lời gọi nào vẫn tạo object đối số?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>putIfAbsent("x", new ArrayList&lt;&gt;())</code></button>
+    <button class="opt"><code>computeIfAbsent("x", k -&gt; new ArrayList&lt;&gt;())</code></button>
+    <button class="opt"><code>computeIfPresent("x", (k, v) -&gt; v)</code></button>
+    <button class="opt"><code>getOrDefault("x", List.of())</code></button>
+  </div>
+  <div class="why">putIfAbsent nhận một value, và Java tính đối số trước khi gọi. computeIfAbsent nhận một hàm và chỉ chạy khi cần. (<code>List.of()</code> cũng được tính, nhưng nó là list rỗng dùng chung, không phải object mới bạn yêu cầu.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Map đang giữ <code>"k" → null</code>. <code>getOrDefault("k", "default")</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>null</code></button>
+    <button class="opt"><code>"default"</code></button>
+    <button class="opt">Ném NPE</button>
+    <button class="opt"><code>"k"</code></button>
+  </div>
+  <div class="why">Key có mapping (tới null), nên giá trị mặc định không được dùng. Ví dụ in ra <code>null</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một hàm <code>fib</code> có memo tự gọi chính nó bên trong <code>computeIfAbsent</code> trên <code>HashMap</code>. Bug là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Hàm sửa map, nên HashMap có thể ném CME</button>
+    <button class="opt">computeIfAbsent không cache gì vì fib trả về int</button>
+    <button class="opt">Đệ quy quá sâu và luôn làm tràn stack</button>
+    <button class="opt">Không có bug; đây là cách memo được khuyên dùng</button>
+  </div>
+  <div class="why">Mapping function không nên sửa map. HashMap phát hiện việc này theo khả năng tốt nhất và ném ConcurrentModificationException.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trên <code>HashMap</code> thường, <code>merge</code> có nguyên tử khi hai thread cùng gọi không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, mặc định không đảm bảo tính nguyên tử</button>
+    <button class="opt">Có, mọi method Map từ Java 8 đều nguyên tử</button>
+    <button class="opt">Có, nhưng chỉ khi remapping function là thuần</button>
+    <button class="opt">Không, merge luôn ném lỗi khi gọi từ thread</button>
+  </div>
+  <div class="why">Chỉ những cài đặt override và ghi rõ điều đó, như ConcurrentHashMap, mới nguyên tử. HashMap thường hoàn toàn không thread-safe.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn cho bạn xem code <code>get</code>-kiểm tra-<code>put</code> và hỏi: <strong>"Bạn sẽ viết lại bằng Java hiện đại thế nào, và cần cẩn thận điều gì?"</strong> Bấm giờ. Trả lời thành tiếng, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Java 8 thêm default method vào Map: <code>merge</code>, <code>compute*</code>, <code>getOrDefault</code>, <code>replaceAll</code>.</label></li>
+      <li><label><input type="checkbox"> Đếm: <code>merge(k, 1, Integer::sum)</code>; multimap: <code>computeIfAbsent(k, x -&gt; new ArrayList&lt;&gt;()).add(v)</code>.</label></li>
+      <li><label><input type="checkbox"> putIfAbsent là eager; computeIfAbsent là lazy.</label></li>
+      <li><label><input type="checkbox"> Hàm trả về null nghĩa là "không mapping" hoặc "xóa".</label></li>
+      <li><label><input type="checkbox"> getOrDefault trả về null đã lưu, không phải giá trị mặc định.</label></li>
+      <li><label><input type="checkbox"> Không bao giờ sửa map bên trong hàm (memo đệ quy → CME).</label></li>
+      <li><label><input type="checkbox"> Chỉ nguyên tử trên ConcurrentHashMap, không phải HashMap.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Từ Java 8, Map có default method cho đúng việc này. Để đếm em viết merge với key, 1 và Integer::sum: lần đầu nó lưu 1, các lần sau thì cộng thêm. Với multimap em viết computeIfAbsent với hàm tạo list, rồi gọi add trên kết quả. Có vài cái bẫy. putIfAbsent nhận value, nên value được tạo kể cả khi key đã có, còn computeIfAbsent chỉ gọi hàm khi cần. Nếu hàm của em trả về null thì không có gì được lưu, hoặc với merge và compute thì entry bị xóa. getOrDefault trả về null đã lưu chứ không trả giá trị mặc định. Và hàm không được sửa chính map đó, nên một hàm fib đệ quy có memo bên trong computeIfAbsent có thể ném ConcurrentModificationException trên HashMap. Cuối cùng, các method này chỉ nguyên tử trên ConcurrentHashMap, không phải trên HashMap thường."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0037-refactor-to-map-methods.vi.md">Bài tập 0037: refactor sang các method của Map</a>. Viết lại từng đoạn, rồi nói cái bẫy nào có thể dính.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/MapPowerMethods.java"><code>MapPowerMethods.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior giờ có thể hỏi về chi phí: <em>"Map của bạn giữ mười triệu bộ đếm Integer. Tốn bao nhiêu bộ nhớ? Vì sao <code>==</code> trên hai Integer đột nhiên trả về false?"</em> <a href="0038-capacity-boxing-and-memory.vi.html">Bài 0038</a> nói về capacity, boxing và bộ nhớ.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc (JDK 21)</a>. Đọc chi tiết các method computeIfAbsent, compute và merge.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào nên dùng compute thay vì merge?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0036-enummap-identity-and-weak-maps.vi.html">← EnumMap, EnumSet, IdentityHashMap và WeakHashMap</a> &nbsp;|&nbsp; <a href="0038-capacity-boxing-and-memory.vi.html">Capacity, boxing và chi phí bộ nhớ của collection →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

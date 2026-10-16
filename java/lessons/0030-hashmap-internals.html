@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 30: Inside HashMap: buckets, resize and trees</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Inside HashMap: buckets, resize and trees</h1>
+<p class="subtitle">How 98262 becomes mailbox 7, what happens at the 13th entry, and why one long bucket turns into a tree.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0030 · step 11 of 46 · Core · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0030-hashmap-internals.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> In <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a> you learned the mailbox picture. A senior interviewer goes one level deeper: <em>"Walk me through <code>put</code>. How is the bucket chosen? When does it resize? What did Java 8 change?"</em> This lesson answers each question with real numbers you can say out loud.</div>
+
+<div class="win"><b>Today's win:</b> walk an interviewer through <code>put</code> in a JDK 8+ HashMap: hash spreading, bucket index, resize by doubling, and when a bucket turns into a tree.</div>
+
+<dl class="words">
+  <dt>bit</dt><dd>One binary digit, 0 or 1. An <code>int</code> in Java has 32 of them.</dd>
+  <dt>bin</dt><dd>Another word for bucket, used in the OpenJDK source. One slot of the HashMap's array.</dd>
+  <dt>capacity</dt><dd>The number of buckets, written <code>n</code>. In a HashMap it is always a power of two: 16, 32, 64, …</dd>
+  <dt>load factor</dt><dd>How full the map may get before it grows. The default 0.75 means "grow when entries pass 75% of the buckets".</dd>
+  <dt>resize</dt><dd>Building a new array twice as big and moving every entry into it.</dd>
+  <dt>red-black tree</dt><dd>A sorted tree that keeps itself balanced, so finding one item among k takes about log k steps instead of k.</dd>
+  <dt><code>&amp;</code>, <code>^</code>, <code>&gt;&gt;&gt;</code></dt><dd>Bit operators: AND keeps a bit only where both have 1; XOR gives 1 where the bits differ; <code>&gt;&gt;&gt; 16</code> slides all bits 16 places to the right.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"A new HashMap has 16 buckets. I keep calling <code>put</code> with new keys. When does it grow, and what happens to the entries already inside?"</em> Guess a number. You will check it in section 4.</p>
+
+<h2>1. The mailbox wall, with real numbers</h2>
+<p>Lesson 0001 showed a wall of 16 mailboxes. Here are the real rules behind it. A HashMap is an array of buckets ("bins"). The default capacity is 16, and the source says it "MUST be a power of two". The default load factor is 0.75.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+<p>When the number of entries exceeds capacity × load factor (16 × 0.75 = <strong>12</strong> for the defaults), the map is "rehashed ... so that the hash table has approximately twice the number of buckets".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<p class="muted">A small detail from the OpenJDK source: <code>new HashMap&lt;&gt;()</code> does not create the array yet. The first <code>put</code> calls <code>resize()</code>, which creates the 16 buckets.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<h2>2. From hash code to mailbox number</h2>
+<p>Think of a postcode. The sorting office for a small town only reads the <strong>last digit</strong> to pick a shelf. If the town grows to 100 shelves, it reads the last <strong>two</strong> digits. HashMap does the same with bits: with 16 buckets it reads the last 4 bits of the hash; with 32 buckets, the last 5.</p>
+<p>It happens in two steps:</p>
+<ol class="steps">
+  <li><strong>Spread the hash.</strong> <code>(h = key.hashCode()) ^ (h &gt;&gt;&gt; 16)</code>: it "spreads (XORs) higher bits of hash to lower", because only the low bits pick the bucket.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> Without this, two keys that differ only in their high bits would always collide. A null key hashes to 0, which is why HashMap allows one null key.</li>
+  <li><strong>Pick the bucket.</strong> <code>index = (n - 1) &amp; hash</code>. With <code>n</code> a power of two this equals <code>hash % n</code>, but cheaper.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> <code>n - 1 = 15</code> is <code>1111</code> in binary, so <code>&amp; 15</code> keeps exactly the last 4 bits.</li>
+</ol>
+<p>Here is the key <code>"cat"</code> from lesson 0001, bit by bit:</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="cat has hash code 98262. XOR with itself shifted right by 16 changes the last bit, giving hash ending in 0111. AND with 15 keeps the last 4 bits, index 7. AND with 31 keeps the last 5 bits, index 23.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="34">"cat".hashCode()</text>
+    <text x="210" y="34">0000 0000 0000 0001 0111 1111 1101 0110</text>
+    <text x="580" y="34" opacity=".75">= 98262</text>
+    <text x="20" y="58" opacity=".75">h &gt;&gt;&gt; 16</text>
+    <text x="210" y="58" opacity=".75">0000 0000 0000 0000 0000 0000 0000 0001</text>
+    <path d="M210 68h340" stroke="currentColor" opacity=".4"/>
+    <text x="20" y="88">hash = h ^ (h&gt;&gt;&gt;16)</text>
+    <text x="210" y="88">0000 0000 0000 0001 0111 1111 110<tspan fill="var(--accent)">1 0111</tspan></text>
+
+    <rect x="14" y="108" width="652" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="20" y="130" opacity=".8">n - 1 = 15</text>
+    <text x="210" y="130" opacity=".8">0000 0000 0000 0000 0000 0000 0000 1111</text>
+    <text x="20" y="154" fill="var(--accent)">hash &amp; 15</text>
+    <text x="210" y="154">0000 0000 0000 0000 0000 0000 0000 <tspan fill="var(--accent)">0111</tspan></text>
+    <text x="580" y="154" fill="var(--accent)">= box 7</text>
+
+    <text x="20" y="194" opacity=".8">n - 1 = 31</text>
+    <text x="210" y="194" opacity=".8">0000 0000 0000 0000 0000 0000 0001 1111</text>
+    <text x="20" y="218">hash &amp; 31</text>
+    <text x="210" y="218">0000 0000 0000 0000 0000 0000 000<tspan fill="var(--accent)">1 0111</tspan></text>
+    <text x="580" y="218">= box 23</text>
+    <text x="340" y="242" text-anchor="middle" font-size="11" opacity=".75">16 buckets read 4 bits; 32 buckets read 5 bits. The 5th bit is 1, so 7 + 16 = 23.</text>
+  </g>
+</svg>
+<figcaption>The same hash gives box 7 in a 16-bucket table and box 23 in a 32-bucket table. Only the low bits are read.</figcaption>
+</figure>
+
+<p>You can check the bucket math with the runnable example. It copies HashMap's <code>spread</code> and mask:</p>
+<pre><code>$ java java/examples/collections/HashMapInternals.java
+=== bucket index = (n - 1) &amp; spread(hashCode), table size n = 16
+apple   hashCode=   93029210  index= 1
+banana  hashCode=-1396355227  index= 0
+cherry  hashCode=-1361513063  index= 1
+Aa      hashCode=       2112  index= 0
+BB      hashCode=       2112  index= 0
+('Aa' and 'BB' have the same String hashCode: a real collision)</code></pre>
+<p>Notice: <code>apple</code> and <code>cherry</code> have different hash codes but land in the same bucket 1, because their last 4 bits match. <code>Aa</code> and <code>BB</code> have the same hash code, so they always share a bucket.</p>
+
+<h2>3. put(key, value), step by step</h2>
+<pre><code>map.put("cat", 1);
+<span class="c">Step 1  spread:  hash = 98262 ^ (98262 &gt;&gt;&gt; 16)        → 98263</span>
+<span class="c">Step 2  index:   (16 - 1) &amp; 98263                     → 7</span>
+<span class="c">Step 3  walk bucket 7: for each node, same hash? then == or equals()?</span>
+<span class="c">          found    → replace the value, return the old one</span>
+<span class="c">          not found → append a new node at the end of the chain</span>
+<span class="c">Step 4  ++size &gt; threshold (12)?                      → if yes, resize()</span></code></pre>
+<p>Step 3 is what lesson 0001 drew: compare the hash first, then <code>==</code> or <code>equals</code>. Found: replace the value. Not found: append a node. In the source, <code>putVal</code> checks the size only after adding a <em>new</em> key; replacing a value never triggers a resize.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<h2>4. When the wall is full: resize to 32</h2>
+<p>The 13th new key makes <code>size</code> 13, which is more than 12. So the map builds a wall of 32 mailboxes and moves every letter. Does Java recompute every hash code? No. On resize, "the elements from each bin must either stay at same index, or move with a power of two offset".<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> No full rehash of hash codes: one extra bit decides.</p>
+<p>Back to the postcode: the office now reads one more digit. Letters whose new digit is 0 stay on their shelf; letters whose new digit is 1 move to "old shelf + 16". In the source, that test is literally <code>(e.hash &amp; oldCap) == 0</code>.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Before: 16 buckets, banana in 0, apple and cherry in 1, cat in 7. After resize to 32: banana stays in 0, cherry stays in 1, apple moves to 17, cat moves to 23, directly below their old column.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="22" font-size="11" opacity=".75">before: n = 16</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="80" y="30" width="36" height="40"/><rect x="116" y="30" width="36" height="40"/><rect x="152" y="30" width="36" height="40"/><rect x="188" y="30" width="36" height="40"/>
+      <rect x="224" y="30" width="36" height="40"/><rect x="260" y="30" width="36" height="40"/><rect x="296" y="30" width="36" height="40"/><rect x="332" y="30" width="36" height="40"/>
+      <rect x="368" y="30" width="36" height="40"/><rect x="404" y="30" width="36" height="40"/><rect x="440" y="30" width="36" height="40"/><rect x="476" y="30" width="36" height="40"/>
+      <rect x="512" y="30" width="36" height="40"/><rect x="548" y="30" width="36" height="40"/><rect x="584" y="30" width="36" height="40"/><rect x="620" y="30" width="36" height="40"/>
+    </g>
+    <g font-size="10" opacity=".6">
+      <text x="83" y="41">0</text><text x="119" y="41">1</text><text x="155" y="41">2</text><text x="191" y="41">3</text><text x="227" y="41">4</text><text x="263" y="41">5</text><text x="299" y="41">6</text><text x="335" y="41">7</text>
+      <text x="371" y="41">8</text><text x="407" y="41">9</text><text x="443" y="41">10</text><text x="479" y="41">11</text><text x="515" y="41">12</text><text x="551" y="41">13</text><text x="587" y="41">14</text><text x="623" y="41">15</text>
+    </g>
+    <text x="98" y="62" text-anchor="middle">b</text>
+    <text x="134" y="62" text-anchor="middle">a c</text>
+    <text x="350" y="62" text-anchor="middle">t</text>
+
+    <g fill="none" stroke="currentColor"><path d="M40 78v58M35 130l5 6 5-6"/></g>
+    <text x="52" y="102" font-size="11">resize(): look at one more bit, hash &amp; 16</text>
+    <text x="52" y="118" font-size="11" opacity=".75">bit 0 → stay at i</text>
+    <text x="220" y="118" font-size="11" opacity=".75">bit 1 → move to i + 16</text>
+
+    <text x="20" y="152" font-size="11" opacity=".75">0..15</text>
+    <text x="20" y="200" font-size="11" opacity=".75">16..31</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="80" y="140" width="36" height="40"/><rect x="116" y="140" width="36" height="40"/><rect x="152" y="140" width="36" height="40"/><rect x="188" y="140" width="36" height="40"/>
+      <rect x="224" y="140" width="36" height="40"/><rect x="260" y="140" width="36" height="40"/><rect x="296" y="140" width="36" height="40"/><rect x="332" y="140" width="36" height="40"/>
+      <rect x="368" y="140" width="36" height="40"/><rect x="404" y="140" width="36" height="40"/><rect x="440" y="140" width="36" height="40"/><rect x="476" y="140" width="36" height="40"/>
+      <rect x="512" y="140" width="36" height="40"/><rect x="548" y="140" width="36" height="40"/><rect x="584" y="140" width="36" height="40"/><rect x="620" y="140" width="36" height="40"/>
+      <rect x="80" y="188" width="36" height="40"/><rect x="152" y="188" width="36" height="40"/><rect x="188" y="188" width="36" height="40"/>
+      <rect x="224" y="188" width="36" height="40"/><rect x="260" y="188" width="36" height="40"/><rect x="296" y="188" width="36" height="40"/>
+      <rect x="368" y="188" width="36" height="40"/><rect x="404" y="188" width="36" height="40"/><rect x="440" y="188" width="36" height="40"/><rect x="476" y="188" width="36" height="40"/>
+      <rect x="512" y="188" width="36" height="40"/><rect x="548" y="188" width="36" height="40"/><rect x="584" y="188" width="36" height="40"/><rect x="620" y="188" width="36" height="40"/>
+    </g>
+    <rect x="116" y="188" width="36" height="40" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="332" y="188" width="36" height="40" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g font-size="10" opacity=".6">
+      <text x="83" y="151">0</text><text x="119" y="151">1</text><text x="155" y="151">2</text><text x="191" y="151">3</text><text x="227" y="151">4</text><text x="263" y="151">5</text><text x="299" y="151">6</text><text x="335" y="151">7</text>
+      <text x="371" y="151">8</text><text x="407" y="151">9</text><text x="443" y="151">10</text><text x="479" y="151">11</text><text x="515" y="151">12</text><text x="551" y="151">13</text><text x="587" y="151">14</text><text x="623" y="151">15</text>
+      <text x="83" y="199">16</text><text x="155" y="199">18</text><text x="191" y="199">19</text><text x="227" y="199">20</text><text x="263" y="199">21</text><text x="299" y="199">22</text>
+      <text x="371" y="199">24</text><text x="407" y="199">25</text><text x="443" y="199">26</text><text x="479" y="199">27</text><text x="515" y="199">28</text><text x="551" y="199">29</text><text x="587" y="199">30</text><text x="623" y="199">31</text>
+    </g>
+    <text x="119" y="199" font-size="10" fill="var(--accent)">17</text>
+    <text x="335" y="199" font-size="10" fill="var(--accent)">23</text>
+    <text x="98" y="172" text-anchor="middle">b</text>
+    <text x="134" y="172" text-anchor="middle">c</text>
+    <text x="134" y="220" text-anchor="middle" fill="var(--accent)">a</text>
+    <text x="350" y="220" text-anchor="middle" fill="var(--accent)">t</text>
+    <text x="340" y="250" text-anchor="middle" font-size="11" opacity=".8">a = apple, b = banana, c = cherry, t = cat. Each entry stays in its column.</text>
+  </g>
+</svg>
+<figcaption>After the resize, every entry is either in the same box or exactly 16 boxes further (drawn directly below). No entry jumps anywhere else.</figcaption>
+</figure>
+
+<p>The example prints the same thing:</p>
+<pre><code>=== after resize to n = 32 an entry stays at i or moves to i + 16
+apple   n=16 -&gt;  1   n=32 -&gt; 17
+banana  n=16 -&gt;  0   n=32 -&gt;  0
+cherry  n=16 -&gt;  1   n=32 -&gt;  1</code></pre>
+<p>So the answer to the pre-test: a default map resizes when the 13th key goes in (16 → 32), and again after the 24th (32 × 0.75 = 24, so at the 25th key, 32 → 64). Each entry stays at <code>i</code> or moves to <code>i + old n</code>.</p>
+
+<h2>5. When one mailbox overflows: tree bins (JDK 8+)</h2>
+<p>Imagine a prank: someone writes the same postcode on thousands of letters. They all go to one mailbox, and finding yours means reading them one by one. A long bucket makes lookups degrade toward linear.</p>
+<p>Since JDK 8 a bin is converted to a red-black tree of <code>TreeNode</code>s when it reaches <code>TREEIFY_THRESHOLD = 8</code> nodes (the source: bins are converted "when adding an element to a bin with at least this many nodes"), but only if the table has at least <code>MIN_TREEIFY_CAPACITY = 64</code> buckets; otherwise it resizes instead. A tree bin turns back into a list when a resize splits it down to <code>UNTREEIFY_THRESHOLD = 6</code> nodes or fewer.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> These numbers are OpenJDK implementation details, not Javadoc promises.</p>
+<p>This gives "worst-case O(log n)" per bucket. With random hash codes, bins follow a Poisson distribution with a mean of about 0.5, so trees are rare in healthy maps.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<h3>How does a tree sort keys that all have the same hash?</h3>
+<p>The tree orders keys by hash and, "when keys are <code>Comparable</code>", by comparison to "help break ties".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> If the keys are not <code>Comparable</code>, the tree cannot tell them apart and often has to search both sides. The example puts 20,000 keys that all return <code>hashCode() == 42</code>, then looks each one up:</p>
+<pre><code>=== 20000 keys that ALL share hashCode 42, then 20000 lookups
+not Comparable :  3529 ms
+Comparable     :    88 ms</code></pre>
+<p class="muted">Timings vary by machine and run (an earlier run measured 3658 ms vs 69 ms). The gap of about 40× is what matters.</p>
+
+<h3>The trap: a bad hashCode</h3>
+<p>A bad <code>hashCode</code> is "a sure way to slow down performance of any hash table".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Implementing <code>Comparable</code> limits the damage; a good hash avoids it. <strong>The fix:</strong> build <code>hashCode()</code> from all the fields used in <code>equals()</code>, with <code>Objects.hash(...)</code> or a record.</p>
+
+<h2>6. Sizing the map up front</h2>
+<p>If you know the size, create the map big enough: "If the initial capacity is greater than the maximum number of entries divided by the load factor, no rehash operations will ever occur."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<pre><code><span class="c">// expect 1,000 entries, never resize</span>
+<span class="c">// JDK 19+, so JDK 21:</span>
+Map&lt;String, Order&gt; a = HashMap.newHashMap(1000);
+<span class="c">// JDK 8 / 17:</span>
+Map&lt;String, Order&gt; b = new HashMap&lt;&gt;((int) (1000 / 0.75f) + 1);
+<span class="c">// trap: 1024 buckets × 0.75 = 768, still resizes</span>
+Map&lt;String, Order&gt; c = new HashMap&lt;&gt;(1000);   <span class="hl">// wrong</span></code></pre>
+<p><code>HashMap.newHashMap(numMappings)</code> (JDK 19+) does the division for you.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> The third line is a common mistake: the number you pass is a <em>capacity</em>, not an entry count. The source rounds it up to a power of two (<code>tableSizeFor</code>), so 1000 becomes 1024 buckets and the map resizes after 768 entries.</p>
+<p>Do not oversize either: iteration costs capacity plus size.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> A map with a million empty buckets is slow to loop over.</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<ul>
+  <li><strong>JDK 8:</strong> tree bins and the current <code>hash()</code> spreading arrived. Everything in this lesson applies.</li>
+  <li><strong>JDK 17:</strong> same internals.</li>
+  <li><strong>JDK 21:</strong> same internals, plus <code>HashMap.newHashMap(n)</code> (added in 19).</li>
+</ul>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">How does a HashMap with capacity <code>n</code> compute the bucket index?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>(n - 1) &amp; hash</code></button>
+    <button class="opt"><code>hash &gt;&gt;&gt; n</code></button>
+    <button class="opt"><code>n % hashCode</code></button>
+    <button class="opt"><code>hash / n</code></button>
+  </div>
+  <div class="why"><code>putVal</code> uses <code>tab[(n - 1) &amp; hash]</code>. Because <code>n</code> is a power of two, this keeps the low bits, like <code>hash % n</code> but cheaper.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does HashMap XOR the hash code with <code>h &gt;&gt;&gt; 16</code> first?</p>
+  <div class="options">
+    <button class="opt" data-correct>Only low bits pick the bucket, so high bits are mixed in</button>
+    <button class="opt">It makes every key's hash code unique inside the map</button>
+    <button class="opt">It turns a negative hash code into a positive index</button>
+    <button class="opt">It encrypts the key so other threads cannot read it</button>
+  </div>
+  <div class="why">The mask reads only the last few bits. Spreading lets the high bits influence the bucket, so keys that differ only in high bits do not all collide.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A <code>new HashMap&lt;&gt;()</code> receives new keys one by one. Which <code>put</code> triggers the first resize?</p>
+  <div class="options">
+    <button class="opt" data-correct>The 13th, because 16 × 0.75 = 12</button>
+    <button class="opt">The 17th, when all 16 buckets are used</button>
+    <button class="opt">The 9th, when one bucket has 8 nodes</button>
+    <button class="opt">The 16th, when the array is completely full</button>
+  </div>
+  <div class="why">The threshold is capacity × load factor = 12. After the 13th new key, <code>++size &gt; threshold</code> is true, so the table doubles to 32.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">During a resize from 16 to 32, where does an entry at index <code>i</code> go?</p>
+  <div class="options">
+    <button class="opt" data-correct>It stays at i or moves to i + 16</button>
+    <button class="opt">It always moves to index i × 2</button>
+    <button class="opt">It goes to a new random index</button>
+    <button class="opt">It always goes back to index 0</button>
+  </div>
+  <div class="why">The new mask reads one more bit. If that bit is 0 the entry stays; if it is 1 it moves by the old capacity. <code>"cat"</code>: 7 → 23.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">When does a bin become a red-black tree in OpenJDK?</p>
+  <div class="options">
+    <button class="opt" data-correct>At 8 nodes, if the table has at least 64 buckets</button>
+    <button class="opt">At the very first collision in that bucket</button>
+    <button class="opt">At 4 nodes, whatever the size of the table</button>
+    <button class="opt">On every resize, for every bucket in the table</button>
+  </div>
+  <div class="why"><code>TREEIFY_THRESHOLD</code> is 8 and <code>MIN_TREEIFY_CAPACITY</code> is 64. Below 64 buckets the map resizes instead.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">20,000 keys all return <code>hashCode() == 42</code>. What makes lookups much faster?</p>
+  <div class="options">
+    <button class="opt" data-correct>Making the key class implement Comparable</button>
+    <button class="opt">Calling map.clear() before each lookup</button>
+    <button class="opt">Using a bigger load factor such as 2.0</button>
+    <button class="opt">Making the key class override toString()</button>
+  </div>
+  <div class="why">The tree uses <code>compareTo</code> to break ties between equal hashes: 3529 ms dropped to 88 ms in our run. A good <code>hashCode</code> avoids the problem entirely.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You expect 1,000 entries and write <code>new HashMap&lt;&gt;(1000)</code>. What is the bug?</p>
+  <div class="options">
+    <button class="opt" data-correct>It becomes 1024 buckets and still resizes after 768</button>
+    <button class="opt">It throws, because 1000 is not a power of two</button>
+    <button class="opt">It ignores the number and starts with 16 buckets</button>
+    <button class="opt">There is no bug: it never resizes for 1,000 keys</button>
+  </div>
+  <div class="why">The argument is a capacity, rounded up to a power of two. 1024 × 0.75 = 768. Use <code>HashMap.newHashMap(1000)</code> on JDK 19+.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What happens when I call <code>map.put(k, v)</code> on a HashMap?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> It spreads the hash code: <code>h ^ (h &gt;&gt;&gt; 16)</code>, so high bits matter too.</label></li>
+      <li><label><input type="checkbox"> Index = <code>(n - 1) &amp; hash</code>; <code>n</code> is a power of two (16 by default).</label></li>
+      <li><label><input type="checkbox"> It walks the bucket: hash, then <code>equals</code>; replace the value or append a node.</label></li>
+      <li><label><input type="checkbox"> When size passes capacity × 0.75 (12 by default), the table doubles.</label></li>
+      <li><label><input type="checkbox"> On resize each entry stays at <code>i</code> or moves to <code>i + old n</code>.</label></li>
+      <li><label><input type="checkbox"> Since JDK 8, a bin with 8+ nodes becomes a red-black tree if the table has 64+ buckets.</label></li>
+      <li><label><input type="checkbox"> Presize with <code>HashMap.newHashMap(n)</code> on JDK 19+.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"First Java calls <code>hashCode()</code> on the key and spreads it by XORing the high 16 bits into the low ones, because only the low bits pick the bucket. The index is <code>(n - 1) &amp; hash</code>, and that works because the table size is always a power of two, 16 by default. Then it walks that bucket: compare hashes, then <code>equals</code>. If the key exists, it replaces the value; otherwise it appends a node. After adding a new key, if the size passes capacity times the load factor, 12 for a default map, the table doubles. Each entry then either stays at the same index or moves by the old capacity, so there's no real rehashing. Since Java 8, if one bucket reaches 8 nodes and the table has at least 64 buckets, that bucket becomes a red-black tree, so the worst case is O(log n) instead of O(n). If I know the size up front, I use <code>HashMap.newHashMap</code> to avoid resizes."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0030-trace-a-put.md">Exercise 0030: trace a put</a>. Compute the indexes by hand first, then run the program to check.</p>
+<p>Runnable example: <a href="../examples/collections/HashMapInternals.java"><code>HashMapInternals.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may now ask: <em>"Is HashMap thread safe? What can go wrong if two threads <code>put</code> at the same time?"</em> (no; see <a href="0039-concurrent-collections.html">lesson 0039</a>), or <em>"How does a TreeMap decide that two keys are the same?"</em> That is <a href="0031-comparable-comparator-and-ordering.html">lesson 0031</a>, next.</p>
+<p><strong>Read more:</strong> <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">OpenJDK 21 source: HashMap.java</a>. Read the 'Implementation notes' comment at the top of the class, then <code>putVal</code> and <code>resize</code>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Can you show the XOR step with a different key?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0041-review-collections-basics.html">← Review 2: collection basics and HashMap</a> &nbsp;|&nbsp; <a href="0031-comparable-comparator-and-ordering.html">How Java puts things in order →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation and the OpenJDK 21 source, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">OpenJDK 21 source: HashMap.java</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

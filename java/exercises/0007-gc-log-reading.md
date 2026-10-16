@@ -1,5 +1,7 @@
 # Exercise 0007: two collectors, one program
 
+[Tiếng Việt](0007-gc-log-reading.vi.md)
+
 Companion to [lesson 7](../lessons/0007-heap-and-garbage-collection.html).
 
 1. Run `java -Xmx64m -Xlog:gc java/examples/GcDemo.java` and note the collector name and one pause line.

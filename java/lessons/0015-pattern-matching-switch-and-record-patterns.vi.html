@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 15: switch "mở hộp" object như thế nào (JDK 21)</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>switch "mở hộp" object như thế nào (JDK 21)</h1>
+<p class="subtitle">Pattern matching cho <code>switch</code> và record pattern: kiểm tra kiểu, lấy các field ra, và để compiler kiểm tra giúp bạn không sót trường hợp nào.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0015 · bước 42/46 · Advanced · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0015-pattern-matching-switch-and-record-patterns.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Code thực tế hay nhận vào "một trong vài loại": một payment là thẻ hoặc chuyển khoản, một event là created, paid hoặc cancelled. Trước JDK 21, bạn xử lý bằng chuỗi <code>if / else if / instanceof</code> dài. Người phỏng vấn hay hỏi <em>"JDK 21 thêm gì vào switch, và vì sao nó quan trọng khi đi cùng sealed type và record?"</em> Bài này trả lời câu đó.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết một <code>switch</code> JDK 21 có destructure record, dùng guard <code>when</code> và <code>case null</code>, và không cần <code>default</code> khi switch trên một kiểu sealed.</div>
+
+<dl class="words">
+  <dt>selector</dt><dd>Giá trị bạn đặt trong ngoặc của <code>switch (...)</code>. Java so sánh nó với từng <code>case</code>.</dd>
+  <dt>pattern</dt><dd>Một "phép thử hình dạng" nhỏ trong <code>case</code>, ví dụ <code>String s</code>. Nếu giá trị có hình dạng đó, phép thử thành công và Java gán giá trị vào biến.</dd>
+  <dt>type pattern</dt><dd>Pattern kiểm tra kiểu: <code>case Integer i</code> nghĩa là "nếu nó là Integer thì gọi nó là <code>i</code>".</dd>
+  <dt>record pattern</dt><dd>Pattern kiểm tra một kiểu record và lấy các field ra cùng lúc: <code>case Point(int x, int y)</code>.</dd>
+  <dt>guard</dt><dd>Điều kiện thêm sau <code>when</code>. Case chỉ khớp khi pattern khớp <em>và</em> điều kiện đúng.</dd>
+  <dt>exhaustive</dt><dd>"Vét cạn": bao phủ mọi giá trị có thể. Compiler từ chối một switch dùng pattern nếu có giá trị nào đó không khớp case nào.</dd>
+  <dt>sealed type</dt><dd>Class hoặc interface liệt kê đủ mọi subtype được phép bằng <code>permits</code> (bài 0014), nên compiler biết danh sách đầy đủ.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói thành tiếng: <em>"Mình có một <code>Object</code>. Nó có thể là <code>Integer</code>, <code>String</code> hoặc <code>null</code>. Trong Java 8, làm sao in ra một thông báo khác nhau cho mỗi loại?"</em> Đừng tra cứu gì cả. Cuối bài bạn sẽ so sánh với cách của JDK 21.</p>
+
+<h2>1. Cách cũ: một chuỗi câu hỏi</h2>
+<p>Hãy hình dung một nhân viên bưu điện phân loại bưu kiện. Với mỗi bưu kiện, cô ấy hỏi: "Có phải thư không? Không. Hộp nhỏ? Không. Hộp lớn? Đúng, để vào đây." Mỗi câu hỏi viết riêng lẻ, và nếu cô ấy quên một loại bưu kiện thì chẳng ai nhắc.</p>
+<p>Đó chính là code Java kiểu cũ. JEP 441 minh hoạ nó với comment "Prior to Java 21":<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<pre><code>static String formatter(Object obj) {
+    String formatted = "unknown";
+    if (obj instanceof Integer i) {
+        formatted = String.format("int %d", i);
+    } else if (obj instanceof Long l) {
+        formatted = String.format("long %d", l);
+    } else if (obj instanceof String s) {
+        formatted = String.format("String %s", s);
+    }
+    return formatted;
+}</code></pre>
+<p>Đoạn này đã dùng <code>instanceof</code> pattern của JDK 16 trong <a href="0013-switch-expressions-and-instanceof-patterns.vi.html">bài 0013</a>. Ở JDK 8 nó còn dài hơn: <code>if (obj instanceof Integer) { Integer i = (Integer) obj; ... }</code>, mỗi nhánh một lần kiểm tra rồi một lần cast.</p>
+<p>Ba vấn đề: code lặp lại, thứ tự các <code>if</code> dễ sai, và compiler không thể báo cho bạn biết là bạn quên một loại.</p>
+
+<h2>2. Cách mới: pattern ngay trong <code>case</code></h2>
+<p>JDK 21 cho phép đặt <strong>type pattern trong case label</strong>, nên selector được kiểm tra với nhiều pattern, mỗi pattern có một hành động riêng.<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> Phương thức trên trở thành:</p>
+<pre><code>static String formatter(Object obj) {
+    return switch (obj) {
+        case Integer i -&gt; String.format("int %d", i);
+        case Long l    -&gt; String.format("long %d", l);
+        case String s  -&gt; String.format("String %s", s);
+        default        -&gt; "unknown";   <span class="c">// needed: Object has endless subtypes</span>
+    };
+}</code></pre>
+<p>Đọc <code>case Integer i -&gt;</code> là: "nếu <code>obj</code> là <code>Integer</code> thì gọi nó là <code>i</code> và chạy code bên phải." Mũi tên <code>-&gt;</code> nghĩa là không fall-through, giống hệt switch expression ở bài 0013.</p>
+<p>Java chọn case như thế nào? Theo JEP, "case label đầu tiên trong switch block áp dụng được cho giá trị sẽ được chọn".<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> Cùng trace <code>formatter(42L)</code>:</p>
+<pre><code>formatter(42L);
+<span class="c">Step 1  Is 42L an Integer?  no  → try the next case</span>
+<span class="c">Step 2  Is 42L a Long?      yes → bind l = 42L</span>
+<span class="c">Step 3  Run the right side  → String.format("long %d", 42L)</span>
+<span class="hl">        returns "long 42"</span></code></pre>
+
+<h2>3. Guard với <code>when</code>, và vì sao thứ tự quan trọng</h2>
+<p>Đôi khi biết kiểu thôi là chưa đủ. Bạn muốn "một String, <em>nhưng chỉ khi nó rỗng</em>". Hãy thêm <span class="term">guard</span> bằng <code>when</code>: nó thu hẹp một pattern.<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<pre><code>static String nullSafe(Object o) {
+    return switch (o) {
+        case null -&gt; "null handled inside the switch";
+        case String str when str.isBlank() -&gt; "blank string";
+        case String str -&gt; "string " + str;
+        case Integer i  -&gt; "int " + i;
+        default         -&gt; "other";
+    };
+}</code></pre>
+<p>Thứ tự quan trọng, giống các khối <code>catch</code>. Một case không được bị một case trước nó <span class="term">dominate</span> (lấn át): theo JEP, "sẽ là lỗi compile nếu một <code>case</code> label trong switch block bị bất kỳ <code>case</code> label nào đứng trước lấn át".<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> Vậy hãy đặt pattern cụ thể hơn lên trước.</p>
+<h3>Bẫy: case tổng quát đứng trước</h3>
+<p><code>String</code> cũng là một <code>CharSequence</code>. Nếu case <code>CharSequence</code> đứng trước thì case <code>String</code> không bao giờ được chạm tới. Mình đã compile đoạn này trên JDK 21:</p>
+<pre><code>return switch (o) {
+    case CharSequence cs -&gt; "cs";
+    case String s        -&gt; "s";      <span class="c">// can never be reached</span>
+    default              -&gt; "o";
+};
+
+$ javac Dom.java
+<span class="hl">error: this case label is dominated by a preceding case label</span></code></pre>
+<p><strong>Cách sửa:</strong> đổi chỗ. Cụ thể (<code>String</code>, hoặc case có guard) đứng trước, tổng quát (<code>CharSequence</code>, <code>default</code>) đứng sau.</p>
+
+<h2>4. Còn <code>null</code> thì sao?</h2>
+<p>Ở mọi phiên bản Java trước 21, <code>switch (null)</code> ném <code>NullPointerException</code>. JDK 21 thêm <code>case null</code>: "Nếu biểu thức selector có giá trị null thì bất kỳ case null nào cũng được coi là khớp."<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<p>Nhưng nếu bạn không viết nó thì hành vi cũ vẫn giữ nguyên: "Nếu switch block không có label như vậy thì <code>switch</code> ném <code>NullPointerException</code>, như trước đây."<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> <code>default</code> <strong>không</strong> bắt <code>null</code>. Muốn cả hai, bạn có thể viết chung <code>case null, default -&gt; ...</code>; JEP cho phép "<code>null</code> case label đi kèm một <code>default</code> tuỳ chọn".<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<pre><code>switch (o) { case String s -&gt; ...; default -&gt; ...; }
+<span class="c">// o == null → NullPointerException</span>
+
+switch (o) { case null -&gt; ...; case String s -&gt; ...; default -&gt; ...; }
+<span class="hl">// o == null → the null case runs</span></code></pre>
+
+<h2>5. Record pattern: mở hộp ngay trong <code>case</code></h2>
+<p>Hãy nghĩ tới một bưu kiện có dán danh sách hàng bên ngoài: "gồm: một điểm, một bán kính". <span class="term">Record pattern</span> đọc danh sách đó và đưa bạn từng món theo tên. Record pattern dùng để "phân rã (deconstruct) giá trị record".<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a></p>
+<p>Cách cũ và cách mới, cả hai đều lấy từ JEP 440:<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a></p>
+<pre><code>record Point(int x, int y) {}
+
+<span class="c">// As of Java 16: test the type, then call the accessors yourself</span>
+if (obj instanceof Point p) {
+    int x = p.x();
+    int y = p.y();
+    System.out.println(x + y);
+}
+
+<span class="c">// As of Java 21: the pattern declares x and y for you</span>
+if (obj instanceof Point(int x, int y)) {
+    System.out.println(x + y);
+}</code></pre>
+<p>Pattern có thể <strong>lồng nhau</strong>: record trong record, mở ra trong một dòng, ví dụ <code>Rectangle(ColoredPoint(Point(var x, var y), var c), var lr)</code>.<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a> Bạn có thể viết <code>var</code> thay cho kiểu của component: "Record pattern có thể dùng <code>var</code> để khớp với một record component mà không cần ghi kiểu của component đó."<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a></p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Một object Circle chứa center là Point với x 0, y 0 và bán kính 500. Pattern case Circle(Point(var x, var y), var r) gọi các accessor và gán vào ba biến x, y và r.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="160" y="24" text-anchor="middle" font-size="11" opacity=".75">object (một record)</text>
+    <rect x="30" y="36" width="260" height="160" rx="6" fill="none" stroke="currentColor"/>
+    <text x="44" y="58">Circle</text>
+    <rect x="50" y="72" width="220" height="74" rx="4" fill="none" stroke="currentColor" opacity=".8"/>
+    <text x="62" y="92" font-size="11" opacity=".75">center: Point</text>
+    <text x="80" y="114">x = 0</text>
+    <text x="80" y="134">y = 0</text>
+    <text x="62" y="178">r = 500.0</text>
+    <text x="510" y="24" text-anchor="middle" font-size="11" fill="var(--accent)">case Circle(Point(var x, var y), var r)</text>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="450" y="96" width="130" height="28" rx="4"/>
+      <rect x="450" y="132" width="130" height="28" rx="4"/>
+      <rect x="450" y="168" width="130" height="28" rx="4"/>
+    </g>
+    <g fill="var(--accent)" text-anchor="middle">
+      <text x="515" y="115">int x = 0</text>
+      <text x="515" y="151">int y = 0</text>
+      <text x="515" y="187">double r = 500.0</text>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <path d="M130 110h314M438 105l6 5-6 5"/>
+      <path d="M130 130L444 146M437 140l7 6-9 3"/>
+      <path d="M150 174L444 182M436 176l8 6-8 5"/>
+    </g>
+    <g font-size="11" opacity=".75" text-anchor="middle">
+      <text x="360" y="102">center().x()</text>
+      <text x="360" y="133">center().y()</text>
+      <text x="360" y="173">r()</text>
+    </g>
+    <text x="340" y="228" text-anchor="middle" font-size="11" opacity=".8">pattern kiểm tra kiểu, rồi đọc từng component bằng accessor của nó</text>
+  </g>
+</svg>
+<figcaption>Một record pattern lồng nhau mở <code>Circle</code> và <code>Point</code> bên trong nó chỉ trong một bước.</figcaption>
+</figure>
+
+<p>Một chi tiết: "Giá trị <code>null</code> không khớp với bất kỳ record pattern nào."<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a> Vì vậy <code>case Circle(var c, var r)</code> không bao giờ chạy với <code>null</code>; bạn cần <code>case null</code> cho trường hợp đó.</p>
+
+<h2>6. Sealed type: không cần <code>default</code>, và compiler kiểm tra giúp bạn</h2>
+<p>Quay lại bưu điện. Nếu bưu điện tuyên bố "chúng tôi chỉ nhận ba cỡ bưu kiện, hết", thì một nhân viên có ba ngăn đã bao phủ mọi thứ. <span class="term">Sealed type</span> (bài 0014) chính là lời hứa đó trong Java.</p>
+<p>Switch dùng pattern phải <span class="term">exhaustive</span>. Với kiểu sealed, "việc kiểm tra độ bao phủ kiểu có thể tính đến mệnh đề <code>permits</code> của sealed class", và "kết quả là không cần <code>default</code> label".<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> Đây là ví dụ đầy đủ của khoá học:</p>
+<pre><code>sealed interface Shape permits Circle, Rect {}
+record Point(int x, int y) {}
+record Circle(Point center, double r) implements Shape {}
+record Rect(Point topLeft, Point bottomRight) implements Shape {}
+
+static String describe(Shape s) {
+    return switch (s) {   <span class="c">// no default: Circle and Rect are the only Shapes</span>
+        case Circle(Point(var x, var y), var r) when r &gt; 100
+            -&gt; "huge circle at " + x + "," + y;
+        case Circle(Point(var x, var y), var r)
+            -&gt; "circle r=" + r + " at " + x + "," + y;
+        case Rect(Point(var x1, var y1), Point(var x2, var y2))
+            -&gt; "rect width " + (x2 - x1) + " height " + (y2 - y1);
+    };
+}</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="describe(new Circle(new Point(1,2), 5)) thử các case từ trên xuống. Case đầu khớp kiểu nhưng guard r lớn hơn 100 là sai. Case thứ hai khớp và trả về. Case Rect không bao giờ được thử.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="16" width="300" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="170" y="38" text-anchor="middle">Circle(Point(1,2), 5.0)</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M40 50v168M35 212l5 6 5-6"/>
+    </g>
+    <text x="52" y="236" font-size="11" opacity=".75">thử từ trên xuống</text>
+    <rect x="70" y="66" width="290" height="40" rx="4" fill="none" stroke="currentColor" opacity=".8"/>
+    <text x="82" y="84" font-size="11">case Circle(...) when r &gt; 100</text>
+    <text x="82" y="99" font-size="11" opacity=".7">kiểu: đúng · guard: 5 &gt; 100? sai</text>
+    <rect x="70" y="118" width="290" height="40" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="82" y="136" font-size="11" fill="var(--accent)">case Circle(...)</text>
+    <text x="82" y="151" font-size="11" fill="var(--accent)">kiểu: đúng · x=1, y=2, r=5.0</text>
+    <rect x="70" y="170" width="290" height="40" rx="4" fill="none" stroke="currentColor" opacity=".45"/>
+    <text x="82" y="194" font-size="11" opacity=".55">case Rect(...)</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M360 86h40" opacity=".8"/>
+      <path d="M360 138h40M394 133l6 5-6 5" stroke="var(--accent)"/>
+      <path d="M360 190h40" opacity=".45"/>
+    </g>
+    <text x="410" y="90" font-size="11" opacity=".8">không → case tiếp theo</text>
+    <text x="410" y="132" font-size="11" fill="var(--accent)">khớp → trả về</text>
+    <text x="410" y="148" font-size="11" fill="var(--accent)">"circle r=5.0 at 1,2"</text>
+    <text x="410" y="194" font-size="11" opacity=".55">không bao giờ được thử</text>
+  </g>
+</svg>
+<figcaption>Case đầu tiên khớp (cả kiểu lẫn guard) sẽ thắng; các case còn lại bị bỏ qua.</figcaption>
+</figure>
+
+<p>Chạy trên JDK 21:</p>
+<pre><code>$ java java/examples/jdk21/Jdk21Features.java
+circle r=5.0 at 1,2
+huge circle at 0,0
+rect width 4 height 3
+null handled inside the switch | blank string | string x | int 7
+a c [c, b, a]
+one=1 two=2 {two=2, one=1}</code></pre>
+<p class="muted">Bốn dòng đầu thuộc bài này. Hai dòng cuối là sequenced collection, bài tiếp theo.</p>
+
+<h3>Vì sao "không có default" là một tính năng, không phải lười</h3>
+<p>Giả sử ai đó thêm <code>record Triangle(...) implements Shape</code> vào danh sách <code>permits</code>. Mọi switch trên <code>Shape</code> không có <code>default</code> giờ sẽ không compile được, nên compiler chỉ cho bạn mọi chỗ cần cập nhật. Mình đã xoá case <code>Rect</code> để xem thông báo:</p>
+<pre><code>$ javac Miss.java
+<span class="hl">error: the switch expression does not cover all possible input values</span></code></pre>
+<p>Nếu bạn viết <code>default</code>, <code>Triangle</code> mới sẽ lặng lẽ rơi vào <code>default</code> và bạn mất lời cảnh báo đó. Còn nếu một class file thay đổi sau khi compile, "trong trường hợp này compiler sẽ chèn một mệnh đề <code>default</code> tổng hợp (synthetic) để ném exception", nên chương trình hỏng một cách rõ ràng thay vì im lặng không làm gì.<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+
+<h3>JDK 17 và 21</h3>
+<p>JDK 17 có sealed class, record, switch expression và <code>instanceof</code> pattern, nhưng <strong>không</strong> có pattern trong <code>switch</code> và không có record pattern. Mình đã compile ví dụ với <code>--release 17</code>:</p>
+<pre><code>$ javac --release 17 java/examples/jdk21/Jdk21Features.java
+<span class="hl">error: patterns in switch statements are not supported in -source 17</span></code></pre>
+<p>Đây là một ý hữu ích khi phỏng vấn: đây là tính năng của 21 (chính thức trong JDK 21 qua JEP 441 và JEP 440). JDK 8 thì không có gì cả: bạn viết <code>instanceof</code> rồi cast, hoặc dùng Visitor pattern.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Selector là <code>null</code>, switch có <code>default</code> nhưng không có <code>case null</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó ném ra NullPointerException</button>
+    <button class="opt">Nhánh default chạy như bình thường</button>
+    <button class="opt">Không nhánh nào chạy, trả về null</button>
+    <button class="opt">Code thậm chí không compile được</button>
+  </div>
+  <div class="why">Không có <code>case null</code> thì switch "ném NullPointerException, như trước đây". <code>default</code> không bắt null.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Mệnh đề <code>when</code> thêm gì vào một <code>case</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một điều kiện thêm: guard cho pattern</button>
+    <button class="opt">Một nhánh default cho các kiểu còn thiếu</button>
+    <button class="opt">Một cách để fall-through sang case sau</button>
+    <button class="opt">Một vòng lặp thử case đó nhiều lần</button>
+  </div>
+  <div class="why">Guard thu hẹp pattern: case chỉ khớp khi pattern khớp và điều kiện <code>when</code> đúng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Lỗi ở đâu? <code>case CharSequence cs -&gt; ...; case String s -&gt; ...;</code></p>
+  <div class="options">
+    <button class="opt" data-correct>Case String bị lấn át; đó là lỗi compile</button>
+    <button class="opt">Không lỗi; Java tự chọn case cụ thể nhất</button>
+    <button class="opt">Compile được, nhưng String sẽ ném lỗi lúc chạy</button>
+    <button class="opt">Không được viết case String trong switch nào</button>
+  </div>
+  <div class="why">Java chọn case đầu tiên áp dụng được, nên case String không bao giờ chạy. Compiler báo "this case label is dominated by a preceding case label". Cụ thể đứng trước.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Selector là một sealed interface và mọi subtype được phép đều có case. Có cần <code>default</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không; compiler biết đủ danh sách từ permits</button>
+    <button class="opt">Có; mọi switch trên object đều cần default</button>
+    <button class="opt">Chỉ khi các subtype là record, không phải class</button>
+    <button class="opt">Chỉ khi trong switch cũng có một case null</button>
+  </div>
+  <div class="why">Việc kiểm tra độ bao phủ dùng mệnh đề <code>permits</code>, nên "không cần default label". Bỏ default còn giúp compiler cảnh báo khi có subtype mới.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Với <code>record Point(int x, int y)</code>, khi khớp thì <code>obj instanceof Point(int x, int y)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Khai báo x và y, lấy giá trị từ accessor của record</button>
+    <button class="opt">Tạo một Point mới với các giá trị x và y</button>
+    <button class="opt">So sánh obj với điểm tại x và y bằng equals</button>
+    <button class="opt">Cast obj sang Point nhưng không đọc field nào</button>
+  </div>
+  <div class="why">Record pattern phân rã record: nó kiểm tra kiểu và gán từng component vào một biến mới.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Code có <code>case Circle(Point(var x, var y), var r)</code> được compile bằng <code>javac --release 17</code>. Kết quả?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lỗi compile: pattern trong switch cần JDK 21</button>
+    <button class="opt">Compile được, vì JDK 17 đã có record</button>
+    <button class="opt">Compile được, chỉ có cảnh báo về var</button>
+    <button class="opt">Compile được, nhưng ném MatchException khi chạy</button>
+  </div>
+  <div class="why">Pattern matching cho switch và record pattern chính thức ở JDK 21. javac báo "patterns in switch statements are not supported in -source 17".</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"JDK 21 thêm gì vào switch, và nó hoạt động thế nào với sealed type và record?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>case</code> label có thể chứa type pattern (<code>case String s</code>), thay cho chuỗi <code>if / instanceof</code>.</label></li>
+      <li><label><input type="checkbox"> Case khớp đầu tiên sẽ thắng; case bị lấn át là lỗi compile, nên case cụ thể đứng trước.</label></li>
+      <li><label><input type="checkbox"> <code>when</code> thêm điều kiện guard cho pattern.</label></li>
+      <li><label><input type="checkbox"> <code>case null</code> xử lý null; không có nó thì switch vẫn ném NPE (default không bắt null).</label></li>
+      <li><label><input type="checkbox"> Record pattern lấy các component của record ra, và có thể lồng nhau (<code>Circle(Point(var x, var y), var r)</code>).</label></li>
+      <li><label><input type="checkbox"> Switch dùng pattern phải exhaustive; với sealed type không cần default, và subtype mới làm hỏng compile đúng chỗ cần xử lý.</label></li>
+      <li><label><input type="checkbox"> Chính thức trong JDK 21 (JEP 441, JEP 440); JDK 17 từ chối.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Từ JDK 21, switch có thể match theo kiểu chứ không chỉ theo hằng số. Em viết <code>case Circle c</code>, hoặc record pattern như <code>case Circle(Point(var x, var y), var r)</code>, vừa check kiểu vừa lấy field ra trong một bước. Các case được thử từ trên xuống và case khớp đầu tiên thắng, nên em để case cụ thể lên trước; compiler sẽ báo lỗi nếu một case bị case trước nó dominate. Em có thể thêm guard bằng <code>when</code>, và có thể viết <code>case null</code>; nếu không có thì switch vẫn ném NullPointerException. Điểm mạnh nhất là khi dùng với sealed type: switch phải exhaustive, mà compiler biết hết các subtype được permit nên em không cần default. Sau này ai thêm subtype mới thì mọi switch chưa xử lý nó sẽ không compile được, đúng cái em muốn. Sealed interface cộng record cộng pattern switch cho Java kiểu algebraic data type thực sự, và nó chính thức ở 21, không có trên 17."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0015-expression-evaluator.vi.md">Bài tập 0015: bộ tính biểu thức</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi: <em>"Bạn còn dùng Visitor pattern không? Khi thêm subtype thì các switch cũ ra sao? Sao không đặt một method trên mỗi class?"</em> Một câu trả lời tốt: method trên mỗi class là tốt nhất khi hành vi thuộc về chính kiểu đó; pattern switch tốt nhất khi thao tác nằm ngoài các kiểu (format, tính giá, serialize), và sealed giúp nó an toàn. Ôn lại sealed type ở <a href="0014-sealed-classes.vi.html">bài 0014</a> và record ở <a href="0003-records-and-immutability.vi.html">bài 0003</a>, rồi tiếp tục với <a href="0016-sequenced-collections.vi.html">sequenced collection</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a>, sau đó <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a>. Cả hai đều mở đầu bằng các ví dụ trước và sau rất rõ ràng.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Dominated chính xác là gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0027-helpful-nullpointerexceptions.vi.html">← Phần nào bị null? Helpful NullPointerException</a> &nbsp;|&nbsp; <a href="0016-sequenced-collections.vi.html">Đầu, cuối và đảo ngược: sequenced collection (JDK 21) →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với JEP 441, JEP 440 và các lần chạy ví dụ trên JDK 21.0.12, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a> · <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

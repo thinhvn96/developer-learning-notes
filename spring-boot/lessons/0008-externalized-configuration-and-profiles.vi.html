@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 8: Externalized configuration, thứ tự ưu tiên và profile</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Externalized configuration, thứ tự ưu tiên và profile</h1>
+<p class="meta">Spring Boot · Bài 0008 · bước 5/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-externalized-configuration-and-profiles.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> đoán đúng giá trị nào thắng khi cùng một property được đặt trong file, trong file của profile, và trong một nguồn có độ ưu tiên cao hơn.</div>
+
+<h2>Thứ tự ưu tiên (cái sau ghi đè cái trước)</h2>
+<ol><li>default properties</li><li><code>@PropertySource</code></li><li>các file config data (<code>application.properties</code>/<code>.yaml</code>)</li><li>giá trị random</li><li>biến môi trường của OS</li><li>Java system properties</li><li>JNDI, servlet init params</li><li><code>SPRING_APPLICATION_JSON</code></li><li><strong>tham số dòng lệnh</strong> (cao nhất)<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li></ol>
+<p>Đó là lý do cùng một JAR chạy được ở mọi môi trường: file chứa giá trị mặc định, còn ConfigMap/env var của Kubernetes hoặc tham số dòng lệnh sẽ ghi đè chúng (<a href="../../kubernetes/lessons/0009-configmaps.vi.html">bài về ConfigMap</a>).</p>
+<h2>Profile</h2>
+<p>Profile "tách riêng các phần cấu hình của ứng dụng và chỉ cho chúng có hiệu lực ở một số môi trường nhất định". Đánh dấu bean bằng <code>@Profile("production")</code>; kích hoạt bằng <code>spring.profiles.active=dev</code> (qua property hoặc dòng lệnh). Khi không có profile nào được kích hoạt, profile <code>default</code> sẽ được bật.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[2]</a> Một file profile như <code>application-dev.properties</code> sẽ thêm hoặc ghi đè giá trị khi profile đó active (quy ước đặt tên này được dùng trong demo project và đã chạy đúng).</p>
+<pre><code>RESULT default profile: name=demo-app greeting=hello bean=default-profile bean
+RESULT dev profile:     name=demo-app greeting=hello from the dev profile bean=dev-profile bean
+RESULT dev profile + test property: greeting=from a higher-precedence source</code></pre>
+<p>Code: <a href="../examples/demo-app/src/test/java/com/example/demo/ConfigAndProfileTest.java"><code>ConfigAndProfileTest.java</code></a>, <a href="../examples/demo-app/src/main/resources/application-dev.properties"><code>application-dev.properties</code></a>, <a href="../examples/demo-app/src/main/java/com/example/demo/config/GreetingConfig.java"><code>GreetingConfig.java</code></a>. Trường hợp cuối đặt property ngay trong annotation của test (một nguồn có độ ưu tiên cao hơn file profile) và nó thắng.</p><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Nguồn có độ ưu tiên cao nhất?</p>
+  <button>Default properties</button>
+  <button>@PropertySource</button>
+  <button data-correct>Tham số dòng lệnh</button>
+  <button>application.properties</button>
+  <p class="explain">Tham số dòng lệnh ghi đè mọi thứ đứng trước nó trong danh sách.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Env var so với application.properties. Cái nào thắng?</p>
+  <button>Không cái nào</button>
+  <button data-correct>Biến môi trường</button>
+  <button>File</button>
+  <button>Ngẫu nhiên</button>
+  <p class="explain">Biến môi trường của OS đứng sau trong thứ tự.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Property dùng để kích hoạt profile?</p>
+  <button>spring.profile.name</button>
+  <button data-correct>spring.profiles.active</button>
+  <button>spring.env.use</button>
+  <button>app.profile</button>
+  <p class="explain">spring.profiles.active kích hoạt các profile.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Không có profile nào active. Profile nào được bật?</p>
+  <button>none</button>
+  <button data-correct>default</button>
+  <button>production</button>
+  <button>dev</button>
+  <p class="explain">Một profile tên là default sẽ được bật.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-override-in-docker.vi.md">Bài tập 0008: ghi đè cấu hình trong Docker</a></p>
+<p>Ví dụ chạy được: <a href="../examples/demo-app/src/test/java/com/example/demo/ConfigAndProfileTest.java"><code>demo-app/src/test/java/com/example/demo/ConfigAndProfileTest.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration</a>. Danh sách thứ tự các property source.</p>
+<p><a href="0003-auto-configuration.vi.html">← Auto-configuration và cách nhìn thấy nó</a> &nbsp;|&nbsp; <a href="0009-configuration-properties-binding.vi.html">@ConfigurationProperties: cấu hình type-safe →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration</a> · [2] <a href="https://docs.spring.io/spring-boot/reference/features/profiles.html">Spring Boot: Profiles</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

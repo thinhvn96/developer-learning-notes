@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn RabbitMQ</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>RabbitMQ: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · RabbitMQ · 10 câu hỏi · <a href="index.vi.html">Lộ trình RabbitMQ</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi RabbitMQ cho vòng phỏng vấn backend Senior, từ mô hình AMQP tới độ tin cậy. Các output được trích là từ script ví dụ chạy trên một container <code>rabbitmq:4-management</code> dùng xong bỏ.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn làm căn cứ cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Giải thích mô hình của RabbitMQ (AMQP 0-9-1).</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> publisher gửi tới exchange; exchange route bản sao tới các queue qua binding; consumer đọc từ queue.</p>
+<p>"Message được publish tới các exchange ... Sau đó exchange phân phối bản sao của message tới các queue dựa trên các quy tắc gọi là binding." Consumer nhận message từ queue bằng cách subscribe (push) hoặc polling (không được khuyến khích). Default exchange là một direct exchange không tên, tự bind mỗi queue mới với routing key là tên queue.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Message không route được thì sao? (API trong ví dụ của mình trả về <code>routed:false</code>; publisher nên phát hiện được trường hợp này. Xem phần publisher confirm và cách xử lý trong tài liệu.)</div>
+<p class="see">Học bài: <a href="lessons/0001-amqp-model-exchanges-queues-bindings.vi.html">Mô hình AMQP</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Exchange direct, fanout, topic và headers khác nhau thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> khớp key chính xác, broadcast, khớp pattern, khớp giá trị header.</p>
+<p>Direct route theo routing key khớp chính xác (unicast); fanout sao chép tới mọi queue đã bind và bỏ qua key; topic khớp routing key theo pattern; headers route theo giá trị header.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> Trong lần chạy của mình: binding direct <code>error</code> chỉ nhận <code>error</code>; fanout sao chép vào cả hai queue; pattern topic <code>orders.eu.*</code> nhận <code>orders.eu.created</code> nhưng không nhận <code>orders.us.created</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Thiết kế routing cho audit + các queue theo khu vực. (Fanout cho audit, topic cho khu vực.)</div>
+<p class="see">Học bài: <a href="lessons/0002-exchange-types.vi.html">Các kiểu exchange</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Acknowledgement hoạt động thế nào? Nếu consumer crash thì sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> consumer ack sau khi xử lý xong; các delivery chưa ack sẽ được requeue nếu consumer ngắt kết nối.</p>
+<p><code>basic.ack</code>, <code>basic.nack</code>, <code>basic.reject</code> định danh delivery bằng tag; <code>multiple=true</code> ack toàn bộ các tag còn treo cho tới tag đó. "Mọi delivery chưa được ack sẽ tự động được requeue", được gắn cờ <code>redelivered</code>, nên consumer "cần được viết với tư duy idempotent". Automatic ack "nên được xem là không an toàn".<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[2]</a> Lần chạy của mình: lần get đầu tiên <code>redelivered=false</code>, sau khi requeue thì <code>redelivered=true</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Prefetch là gì và bạn chọn giá trị bao nhiêu? (Giới hạn số message chưa ack; 0 là không giới hạn; tài liệu gợi ý 100 đến 300 để tối ưu throughput, thấp hơn nếu cần chia việc công bằng.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[2]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0003-acks-prefetch-redelivery.vi.html">Ack và prefetch</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Làm sao đảm bảo message không bị mất?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> queue durable + message persistent + publisher confirm + manual ack ở consumer (+ replicated queue).</p>
+<p>"Cả queue lẫn message đều phải được đánh dấu durable" để không mất dữ liệu khi restart.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> Publisher confirm khiến broker xác nhận đã nhận một cách bất đồng bộ bằng <code>basic.ack</code> (hoặc <code>basic.nack</code> nếu nó không thể nhận trách nhiệm).<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[2]</a> Phía consumer thì dùng manual ack. Để chống sự cố node, dùng replicated queue: quorum queue, dựa trên Raft, là lựa chọn mặc định được khuyến nghị cho replicated queue.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[3]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Còn message publish tới chỗ không có binding nào thì sao? (Không route được; phát hiện bằng cơ chế return hoặc xử lý confirm.)</div>
+<p class="see">Học bài: <a href="lessons/0004-publisher-confirms-and-durability.vi.html">Publisher confirm</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Dead letter exchange là gì và khi nào message bị dead-letter?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> là exchange nhận những message mà queue đã "bỏ cuộc": bị reject với requeue=false, hết TTL, queue vượt giới hạn độ dài, hoặc vượt delivery limit của quorum queue.</p>
+<p>Cấu hình bằng policy (<code>dead-letter-exchange</code>, routing key là tuỳ chọn) hoặc queue argument (<code>x-dead-letter-exchange</code>); policy được ưu tiên vì có thể đổi mà không cần deploy lại ứng dụng.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[4]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm retry có độ trễ thế nào? (Một retry queue có TTL, dead-letter quay về exchange chính; nhớ chặn vòng lặp vô hạn.)</div>
+<p class="see">Học bài: <a href="lessons/0005-dead-letter-exchanges.vi.html">Dead letter exchange</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Quorum queue khác classic queue thế nào? Bạn xử lý poison message ra sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> quorum queue có replication (Raft) và là lựa chọn mặc định cho HA; với poison message thì dùng delivery limit và DLX.</p>
+<p>"Quorum queue nên được xem là lựa chọn mặc định khi cần một queue có replication và tính sẵn sàng cao"; classic mirroring đã bị loại bỏ trong RabbitMQ 4.0. Quorum queue theo dõi số lần giao lại trong <code>x-delivery-count</code> và áp dụng delivery limit mặc định là 20; vượt quá thì message bị bỏ, hoặc bị dead-letter nếu có cấu hình DLX. Dead lettering at-least-once giữ lại message đã dead-letter cho tới khi chúng được ack.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[3]</a><a class="cite" href="https://www.rabbitmq.com/docs/dlx">[4]</a> Consumer vẫn phải idempotent.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào quorum queue không phù hợp? (Queue tạm thời và một số use case transient, theo tài liệu.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[3]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0006-quorum-queues-and-poison-messages.vi.html">Quorum queue</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>RabbitMQ so với Kafka?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một queue chứa các đầu việc so với một log bền vững chứa các event.</p>
+<p>Xem bài so sánh bên system design: RabbitMQ có exchange, ack và DLX; Kafka giữ lại event sau khi đã consume và cho phép consumer tua lại offset. Hãy chọn theo ngữ nghĩa bạn cần và chứng minh bằng benchmark.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Dùng cả hai được không? (Được; thường gặp khi bạn vừa cần routing/task vừa cần một event log.)</div>
+<p class="see">Học bài: <a href="../system-design/lessons/0003-queue-versus-log.vi.html">Queue và log</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Message TTL hoạt động thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>x-message-ttl</code> theo queue hoặc <code>expiration</code> theo từng message; giá trị nhỏ hơn thắng; message hết hạn có thể bị dead-letter.</p>
+<p><a class="cite" href="https://www.rabbitmq.com/docs/ttl">[5]</a> Lưu ý với classic queue dùng per-message TTL: message hết hạn nằm sau các message còn hạn chỉ bị bỏ khi chúng tới đầu queue. Lần chạy của mình: một queue có TTL 2000 ms kèm DLX đã chuyển cả hai message sang dead-letter queue trong vòng 4 giây.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm retry có độ trễ? (Một queue có TTL, dead-letter quay về exchange chính.)</div>
+<p class="see">Học bài: <a href="lessons/0007-message-ttl.vi.html">Message TTL</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>RabbitMQ stream là gì và khác queue ở đâu?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một append-only log có replication, đọc không phá huỷ và replay được từ một offset.</p>
+<p><a class="cite" href="https://www.rabbitmq.com/docs/streams">[6]</a> Phù hợp cho fan-out lớn, replay, throughput cao và backlog lớn; consumer chọn <code>x-stream-offset</code> (first, last, offset, timestamp). Trong lần chạy của mình, <code>basic.get</code> bị từ chối với stream queue.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Stream hay Kafka topic? (Hai thứ chồng lấn nhau; hãy so sánh mức độ phù hợp về vận hành và hệ sinh thái.)</div>
+<p class="see">Học bài: <a href="lessons/0008-streams.vi.html">Stream</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Clustering trong RabbitMQ hoạt động thế nào, và vì sao nên dùng số node lẻ?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các node chia sẻ definition; classic queue chỉ nằm trên một node trừ khi bạn dùng kiểu queue có replication; số node lẻ giúp luôn có phần đa số để đồng thuận.</p>
+<p><a class="cite" href="https://www.rabbitmq.com/docs/clustering">[7]</a> Trong lần chạy ba node của mình, dừng node đang chứa cả hai queue khiến classic queue không dùng được, trong khi quorum queue vẫn giữ đủ 3 message.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao tránh cluster hai node? (Không có phần đa số sau khi bị partition.)</div>
+<p class="see">Học bài: <a href="lessons/0009-clustering-and-replicated-queues.vi.html">Clustering</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi mình lần lượt từng câu RabbitMQ này và phản biện lại câu trả lời của mình".</p>
+  <p>Nguồn: [1] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP model</a> · [2] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Acks and confirms</a> · [3] <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum queues</a> · [4] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead letter exchanges</a> · [5] <a href="https://www.rabbitmq.com/docs/ttl">RabbitMQ: TTL</a> · [6] <a href="https://www.rabbitmq.com/docs/streams">RabbitMQ: Streams</a> · [7] <a href="https://www.rabbitmq.com/docs/clustering">RabbitMQ: Clustering</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

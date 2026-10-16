@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn Java (JDK 8, 17, 21)</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Java (JDK 8, 17, 21): câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Java · 37 câu hỏi · <a href="index.vi.html">Lộ trình Java</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Những câu hỏi bạn nên trả lời được thành tiếng trong một buổi interview Java cấp Senior. Mỗi câu trả lời bắt đầu bằng bản ngắn, rồi tới phần chi tiết, kèm trích dẫn tới đặc tả hoặc tài liệu chính thức. Những gì vượt ra ngoài các nguồn tôi đã đọc đều được ghi chú trong phần câu hỏi nối tiếp.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link dạng chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Giải thích contract equals/hashCode. Chuyện gì hỏng nếu bạn chỉ override equals?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các object bằng nhau phải có hash code bằng nhau; chiều ngược lại thì không bắt buộc. Chỉ override <code>equals</code> sẽ làm các collection dựa trên hash âm thầm mất entry.</p>
+<p>Javadoc của <code>Object</code> nói rằng nếu hai object bằng nhau theo <code>equals</code>, gọi <code>hashCode</code> trên từng object phải cho cùng một số nguyên, còn các object không bằng nhau thì <em>không bắt buộc</em> phải có hash code khác nhau (khác nhau chỉ giúp hiệu năng tốt hơn). <code>equals</code> cũng phải có tính phản xạ, đối xứng, bắc cầu, nhất quán, và trả về false khi so với null.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">[1]</a></p>
+<p><code>HashMap</code> dùng hash code để chọn bucket rồi dùng <code>equals</code> bên trong bucket đó. Nếu hai key bằng nhau lại có hash khác nhau, lần tra cứu thứ hai đi vào sai bucket và <code>equals</code> không bao giờ được chạy, nên <code>get</code> trả về <code>null</code>. Code vẫn biên dịch và chạy, chính điều đó làm nó nguy hiểm. Tôi đã minh họa trong <code>LostKey.java</code>: key sai in ra <code>null</code>, key đúng in ra <code>value</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao key mutable nguy hiểm ngay cả khi hashCode viết đúng? (Nếu các field dùng trong hashCode thay đổi sau khi đưa vào map, entry sẽ nằm ở sai bucket. Javadoc của Map cảnh báo phải hết sức cẩn thận với key mutable.)</div>
+<p class="see">Học bài: <a href="lessons/0001-hashmap-equals-hashcode.vi.html">HashMap, equals và hashCode</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>HashMap hoạt động thế nào, và bạn nói gì về thread safety?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một mảng bucket được định vị bằng hash; capacity mặc định 16 và load factor 0.75; nó tăng gấp đôi khi số entry vượt load factor nhân capacity; nó không thread-safe.</p>
+<p>Theo Javadoc: load factor mặc định là 0.75 và capacity ban đầu mặc định là 16. Khi số entry vượt quá load factor nhân capacity, bảng được rehash sang khoảng gấp đôi số bucket. Nó cho phép một key null và các value null, không đảm bảo thứ tự, và "không được synchronized": thay đổi cấu trúc đồng thời cần synchronization từ bên ngoài. Iterator là fail-fast và ném <code>ConcurrentModificationException</code> khi có thay đổi cấu trúc ngoài iterator. Khi key là <code>Comparable</code>, class có thể dùng thứ tự so sánh để giúp phân xử khi bị trùng hash.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a></p>
+<p>Với nhu cầu đồng thời, tôi sẽ nêu <code>ConcurrentHashMap</code> và giải thích trade-off thay vì bọc HashMap bằng <code>Collections.synchronizedMap</code> (bài atomic/concurrent collection trong khóa học này vẫn đang dự kiến; nếu bạn chưa học thì hãy nói thật).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Thứ tự duyệt thay đổi thế nào khi map resize? (Không có đảm bảo: tài liệu nói thứ tự có thể không giữ nguyên theo thời gian.)</div>
+<p class="see">Học bài: <a href="lessons/0001-hashmap-equals-hashcode.vi.html">HashMap, equals và hashCode</a> · <a href="lessons/0030-hashmap-internals.vi.html">Bên trong HashMap</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>ArrayList, LinkedList hay ArrayDeque: bạn chọn cái nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> mặc định dùng <code>ArrayList</code>; dùng <code>ArrayDeque</code> cho stack và queue; <code>LinkedList</code> cần một lý do cụ thể.</p>
+<p><code>ArrayList</code>: <code>size</code>, <code>isEmpty</code>, <code>get</code>, <code>set</code> và iterator chạy trong thời gian hằng số, <code>add</code> là hằng số khấu hao, phần còn lại tuyến tính, và hằng số của nó thấp so với <code>LinkedList</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[3]</a> Các thao tác theo chỉ số của <code>LinkedList</code> duyệt từ đầu gần hơn, nên <code>get(i)</code> là đi bộ từng bước.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">[4]</a> <code>ArrayDeque</code> "nhiều khả năng nhanh hơn <code>Stack</code> khi dùng làm stack, và nhanh hơn <code>LinkedList</code> khi dùng làm queue"; không cho phép null.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[5]</a> Không class nào trong số này được synchronized.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Xóa phần tử trong lúc duyệt ArrayList? (Dùng removeIf hoặc remove của iterator; for-each kèm list.remove sẽ ném ConcurrentModificationException, như ListPitfalls.java cho thấy.)</div>
+<p class="see">Học bài: <a href="lessons/0002-choosing-a-list.vi.html">Chọn list</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Java 8 đã thêm gì làm thay đổi cách bạn viết code?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> lambda và method reference, default method, stream, <code>Optional</code>, <code>java.time</code>, và <code>CompletableFuture</code>.</p>
+<ul>
+<li><strong>Lambda:</strong> coi chức năng như đối số của method; dùng với functional interface (một abstract method), có sẵn các interface chuẩn trong <code>java.util.function</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[6]</a></li>
+<li><strong>Default method:</strong> thêm method vào interface mà không làm hỏng các class cài đặt sẵn có.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[7]</a></li>
+<li><strong>Stream:</strong> pipeline lazy có terminal operation; dùng một lần.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[8]</a></li>
+<li><strong>Optional:</strong> kiểu trả về cho "không có kết quả".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[9]</a></li>
+<li><strong>java.time:</strong> <code>LocalDate</code>, <code>Instant</code>, <code>Duration</code>, <code>ZonedDateTime</code> và các class liên quan.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[10]</a></li>
+<li><strong>CompletableFuture:</strong> các phép tính async có thể kết hợp với nhau.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[11]</a></li>
+</ul>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Chọn một cái và đi sâu. (Chuẩn bị sẵn câu trả lời 60 giây cho từng cái; các câu hỏi nối tiếp nằm ở những câu bên dưới.)</div>
+<p class="see">Học bài: <a href="index.vi.html">Lộ trình Java</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Quy tắc cho biến local được lambda capture là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> chúng phải là final hoặc effectively final.</p>
+<p>"Một lambda expression chỉ có thể truy cập biến local và tham số của khối bao quanh nếu chúng là final hoặc effectively final." Effectively final nghĩa là không bao giờ bị gán lại sau khi khởi tạo; gán lại bên trong lambda hay sau đó đều là lỗi biên dịch. Lambda có phạm vi từ vựng: không tạo thêm tầng scope mới và không kế thừa tên từ supertype.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[6]</a> Lý do là lambda có thể chạy sau đó hoặc trên thread khác, và biến local được capture là bản sao, nên cho phép sửa đổi sẽ dẫn tới ngữ nghĩa khó hiểu và dễ race (lập luận này là suy luận phổ biến, không phải trích từ tutorial).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vậy đếm trong forEach thế nào? (Dùng phép reduce, một AtomicInteger, hoặc cấu trúc lại code; đừng sửa biến local bên ngoài.)</div>
+<p class="see">Học bài: <a href="lessons/0008-lambdas-and-functional-interfaces.vi.html">Lambda</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Stream có những cái bẫy nào? Và orElse khác orElseGet của Optional thế nào?</summary>
+<div class="ans">
+<p><strong>Stream:</strong> intermediate operation là lazy và không có gì chạy cho tới khi có terminal operation; stream đã tiêu thụ không dùng lại được (nó ném <code>IllegalStateException</code>); behavioral parameter không nên sửa nguồn dữ liệu và nên tránh side effect, tài liệu đưa ra <code>toList()</code> thay cho <code>forEach(results::add)</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">[8]</a></p>
+<p><strong>Optional:</strong> "chủ yếu được thiết kế để dùng làm kiểu trả về của method"; một biến kiểu <code>Optional</code> không bao giờ được là null. <code>orElse(x)</code> tính <code>x</code> ngay cả khi đã có giá trị; <code>orElseGet(supplier)</code> chỉ gọi supplier khi rỗng, nên hãy dùng nó khi giá trị mặc định tốn kém.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">[9]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Optional có nên làm field hay tham số không? (Mục đích theo Javadoc là kiểu trả về.)</div>
+<p class="see">Học bài: <a href="lessons/0004-streams-and-optional.vi.html">Stream và Optional</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Hai interface cung cấp cùng một default method. Chuyện gì xảy ra?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> class phải override method đó và tự chọn, nếu không sẽ không biên dịch được.</p>
+<p>Quy tắc: method cụ thể của class thắng default của interface; interface cụ thể hơn có thể kế thừa, khai báo lại (thành abstract) hoặc định nghĩa lại default.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">[7]</a> Với hai default không liên quan có cùng signature, compiler từ chối class đó ("types W and S are incompatible" trong lần thử của tôi) cho tới khi bạn override và chọn bằng <code>Walker.super.move()</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Default method khác abstract class thế nào? (Interface không có state của instance và một class có thể implement nhiều interface; default method tồn tại để interface tiến hóa được.)</div>
+<p class="see">Học bài: <a href="lessons/0009-default-methods-and-conflicts.vi.html">Default method</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>CompletableFuture: thread nào chạy nó, và lỗi lộ ra như thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các method async không có executor dùng <code>ForkJoinPool.commonPool()</code>; <code>join()</code> ném <code>CompletionException</code>, <code>get()</code> ném <code>ExecutionException</code>.</p>
+<p>Theo Javadoc: <code>CompletableFuture</code> có thể được hoàn tất tường minh và hỗ trợ các action phụ thuộc; method async không có <code>Executor</code> tường minh dùng common pool; <code>exceptionally</code> phục hồi, <code>handle</code> thấy cả kết quả lẫn exception; cancel là một dạng hoàn tất bằng exception; trong các lời gọi <code>complete</code>/<code>cancel</code> tranh nhau thì chỉ một cái thắng.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[11]</a> Hệ quả thực tế: đừng chạy I/O blocking trong common pool; hãy truyền executor riêng (hoặc, trên JDK 21, dùng virtual thread).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> So sánh CompletableFuture với virtual thread. (Virtual thread cho phép bạn viết code blocking đơn giản cho từng task; CompletableFuture kết hợp các stage async.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[12]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0010-completablefuture.vi.html">CompletableFuture</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Bạn dùng kiểu java.time nào cho ngày sinh, cuộc họp, timestamp và khoảng thời gian đã trôi qua?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>LocalDate</code>, <code>ZonedDateTime</code>, <code>Instant</code>, <code>Duration</code>.</p>
+<p>Theo tutorial: thời gian theo cách con người hiểu dùng các class Local, thời gian của máy dùng <code>Instant</code> (độ phân giải nano giây tính từ epoch), nhu cầu cần biết múi giờ dùng <code>ZonedDateTime</code> hoặc <code>OffsetDateTime</code>; <code>Duration</code> đo bằng giây và nano giây, còn <code>Period</code> đo bằng năm, tháng và ngày.<a class="cite" href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">[10]</a> Lưu trữ và trao đổi bằng <code>Instant</code>, chỉ chuyển sang múi giờ khi hiển thị.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Sao không dùng java.util.Date? (Nằm ngoài phạm vi nguồn của khóa học này; hãy mô tả các vấn đề thiết kế bạn biết và kiểm tra Javadoc trước khi đi interview.)</div>
+<p class="see">Học bài: <a href="lessons/0011-java-time.vi.html">java.time</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Những tính năng ngôn ngữ nào xuất hiện giữa Java 8 và 17?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>var</code> (10), switch expression (14), text block (15), pattern matching cho <code>instanceof</code> (16), record (16), sealed class (17).</p>
+<ul>
+<li><code>var</code>: suy luận kiểu cho biến local có khởi tạo; không dùng cho field, tham số hay kiểu trả về.<a class="cite" href="https://openjdk.org/jeps/286">[13]</a></li>
+<li>Switch expression: nhãn mũi tên, không fall-through, <code>yield</code>, phải vét cạn.<a class="cite" href="https://openjdk.org/jeps/361">[14]</a></li>
+<li>Text block: literal nhiều dòng mở bằng <code>"""</code>, phần thụt lề bị cắt bỏ.<a class="cite" href="https://openjdk.org/jeps/378">[15]</a></li>
+<li><code>instanceof</code> pattern: <code>if (o instanceof String s)</code> với biến bind theo flow scoping.<a class="cite" href="https://openjdk.org/jeps/394">[16]</a></li>
+<li>Record: vật chứa trong suốt, bất biến nông, tự sinh <code>equals</code>, <code>hashCode</code>, <code>toString</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[17]</a></li>
+<li>Sealed class: <code>permits</code>; subclass là <code>final</code>, <code>sealed</code> hoặc <code>non-sealed</code>.<a class="cite" href="https://openjdk.org/jeps/409">[18]</a></li>
+</ul>
+<p>Java 17 là bản LTS (8, 11, 17, 21 và 25 đều là LTS).<a class="cite" href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">[19]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Trong codebase thật, bạn sẽ dùng cái nào trước, và vì sao? (Record cho DTO, kèm defensive copy cho collection.)</div>
+<p class="see">Học bài: <a href="index.vi.html">Lộ trình Java</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Record có bất biến không? Nó sinh ra những gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> chỉ bất biến nông.</p>
+<p>"Một record class là một vật chứa trong suốt, bất biến nông, cho một tập giá trị cố định." Nó có canonical constructor, một field private final và một accessor public cho mỗi component; <code>equals</code>, <code>hashCode</code> và <code>toString</code> được suy ra từ tất cả component.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[17]</a> Một record chứa <code>ArrayList</code> chỉ bất biến đúng bằng mức của list đó; hãy dùng compact constructor với <code>List.copyOf</code>. Đã minh họa trong <code>RecordDemo.java</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Record có extend được class khác không? (Record không thể extend class khác; hãy kiểm tra Java Language Specification trước khi khẳng định các chi tiết vượt ra ngoài những gì Javadoc nói.)</div>
+<p class="see">Học bài: <a href="lessons/0003-records-and-immutability.vi.html">Record</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Vì sao cần sealed class? Nó liên quan gì tới switch?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> để mô hình hóa một tập subtype đóng, nhờ đó compiler kiểm tra được switch có vét cạn hay không.</p>
+<p>Mục tiêu của JEP 409: cho tác giả kiểm soát code nào được implement một kiểu, rõ ràng và mang tính khai báo hơn access modifier, và hỗ trợ phân tích pattern vét cạn. Mỗi subclass được phép phải là đúng một trong <code>final</code>, <code>sealed</code>, <code>non-sealed</code>.<a class="cite" href="https://openjdk.org/jeps/409">[18]</a> Trên JDK 21, một pattern <code>switch</code> trên kiểu sealed phải vét cạn, và độ bao phủ được kiểm tra dựa trên các subtype được phép, đôi khi nhờ vậy không cần <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/441">[20]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Sealed khác enum thế nào? (Enum: tập đóng các instance của một kiểu. Sealed: tập đóng các kiểu có dữ liệu khác nhau.)</div>
+<p class="see">Học bài: <a href="lessons/0014-sealed-classes.vi.html">Sealed class</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Từ Java 17 lên 21 có gì thay đổi mà bạn thực sự dùng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> pattern matching cho <code>switch</code>, record pattern, sequenced collection, virtual thread, generational ZGC.</p>
+<ul>
+<li>Pattern <code>switch</code> (chính thức ở 21): type pattern, guard <code>when</code>, <code>case null</code>, kiểm tra vét cạn cho kiểu sealed, kiểm tra dominance.<a class="cite" href="https://openjdk.org/jeps/441">[20]</a></li>
+<li>Record pattern: phân rã record, lồng nhau được.<a class="cite" href="https://openjdk.org/jeps/440">[21]</a></li>
+<li>Sequenced collection: <code>SequencedCollection</code>, <code>SequencedSet</code>, <code>SequencedMap</code> với <code>getFirst</code>, <code>getLast</code>, <code>reversed</code> và nhiều hơn nữa.<a class="cite" href="https://openjdk.org/jeps/431">[22]</a></li>
+<li>Virtual thread: cho khả năng mở rộng (throughput), không phải tốc độ.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[12]</a></li>
+<li>Generational ZGC: <code>-XX:+UseZGC -XX:+ZGenerational</code>, mục tiêu pause dưới một mili giây.<a class="cite" href="https://openjdk.org/jeps/439">[23]</a></li>
+</ul>
+<p>Tôi đã kiểm chứng một ví dụ pattern switch biên dịch được với <code>--release 21</code> và lỗi với <code>--release 17</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cho xem một pattern switch trên một hệ phân cấp sealed. (Xem Jdk21Features.java.)</div>
+<p class="see">Học bài: <a href="lessons/0015-pattern-matching-switch-and-record-patterns.vi.html">Pattern matching cho switch</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Virtual thread là gì, và quy tắc khi dùng chúng là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các <code>Thread</code> nhẹ không gắn với một OS thread; chúng cho khả năng mở rộng, không phải tốc độ; đừng pool chúng.</p>
+<p>Virtual thread chạy trên một OS thread nhưng bị tạm dừng khi gặp I/O blocking để OS thread phục vụ các thread khác. "Virtual thread không phải là thread nhanh hơn ... Chúng tồn tại để mang lại khả năng mở rộng (throughput cao hơn), không phải tốc độ (latency thấp hơn)." Mỗi task một thread qua <code>Executors.newVirtualThreadPerTaskExecutor()</code>, không bao giờ pool chúng, và giới hạn mức đồng thời bằng <code>Semaphore</code>. Chúng có thể bị pin vào carrier (ví dụ khi gọi native), làm giảm khả năng mở rộng nhưng không ảnh hưởng tính đúng đắn.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[12]</a> Demo của tôi chạy 10.000 lần sleep một giây trong khoảng một giây.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào virtual thread không giúp gì? (Việc nặng CPU: chúng không chạy code nhanh hơn.)</div>
+<p class="see">Học bài: <a href="lessons/0006-virtual-threads.vi.html">Virtual thread</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>Giải thích Java Memory Model: happens-before là gì, và volatile cho bạn điều gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> happens-before là đảm bảo về thứ tự giúp các lần ghi của một thread hiển thị với thread khác; volatile cho visibility và thứ tự đối với biến đó, chứ không làm các thao tác gộp thành nguyên tử.</p>
+<p>JLS 17: hai truy cập xung đột không được sắp thứ tự bởi happens-before là một <em>data race</em>. Các cạnh gồm: unlock monitor trước mọi lần lock sau đó trên monitor ấy; ghi volatile trước mọi lần đọc field đó về sau; <code>Thread.start()</code> trước các hành động của thread được khởi động; các hành động của một thread trước khi thread khác return từ <code>join()</code> trên nó. Nếu chương trình được synchronized đúng, mọi lần thực thi trông như nhất quán tuần tự. Lần ghi <code>long</code> và <code>double</code> không volatile có thể bị tách thành hai lần ghi 32-bit.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[24]</a> Package concurrent bổ sung các cạnh cho concurrent collection, việc submit vào <code>Executor</code>, <code>Future.get()</code>, lock và latch.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/package-summary.html">[25]</a> <code>volatile</code> không làm <code>count++</code> thành nguyên tử (việc đó cần atomic hoặc lock).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao một vòng lặp trên flag không volatile có thể treo? (Không có cạnh happens-before thì lần ghi không được đảm bảo sẽ hiển thị.)</div>
+<p class="see">Học bài: <a href="lessons/0005-visibility-and-happens-before.vi.html">Visibility và happens-before</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">16.</span>JVM chọn GC và kích thước heap thế nào, và bạn làm gì khi chạy trong container?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> G1 trên server-class machine, ngược lại là Serial; heap ban đầu 1/64 và heap tối đa 1/4 bộ nhớ vật lý.</p>
+<p>Server-class nghĩa là từ hai processor trở lên và ít nhất 1792 MB bộ nhớ vật lý.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[26]</a> <code>-XX:MaxRAMPercentage</code> mặc định là 25 phần trăm; trên Linux, JVM mặc định phát hiện giới hạn của container (<code>-Xlog:os+container=trace</code> cho thấy nó nhìn thấy gì).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[27]</a> Trong lần chạy Docker của tôi, giới hạn 256 MB cho heap khoảng 121 MB, khớp với mặc định 50 phần trăm được ghi trong tài liệu cho heap nhỏ. Với một service, tôi sẽ chủ động đặt <code>MaxRAMPercentage</code> (ví dụ 70) để chừa chỗ cho bộ nhớ ngoài heap, bật GC logging và đo đạc. Trên JDK 21 có generational ZGC cho mục tiêu pause rất thấp.<a class="cite" href="https://openjdk.org/jeps/439">[23]</a> Nhiệm vụ của GC là cấp phát bộ nhớ và thu hồi phần không còn được dùng.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">[28]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Pod của bạn bị OOM-kill nhưng heap trông vẫn ổn. Vì sao? (Bộ nhớ ngoài heap: metaspace, thread stack, buffer; heap cộng với phần đó đã vượt giới hạn.)</div>
+<p class="see">Học bài: <a href="lessons/0007-heap-and-garbage-collection.vi.html">Heap và GC</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">17.</span>Bạn sẽ chạy phiên bản Java nào trên production, và vì sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một bản LTS: hiện nay là 17, 21 hoặc 25, tùy ràng buộc về library và hỗ trợ.</p>
+<p>Oracle liệt kê 8, 11, 17, 21 và 25 là các bản LTS, với chu kỳ hai năm từ nay về sau và bản LTS tiếp theo dự kiến là 29 vào tháng 9 năm 2027. Các bản cập nhật Java 25 dự kiến được cung cấp theo No-Fee Terms đến tháng 9 năm 2028.<a class="cite" href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">[19]</a> Lộ trình nâng cấp từ 8: lên 17 (có record, sealed class, text block, switch expression, <code>var</code>), rồi lên 21 (pattern switch, virtual thread, sequenced collection). Tôi sẽ lập luận bằng khoảng thời gian hỗ trợ và số đo GC/thời gian khởi động thực tế, chứ không theo trào lưu.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cái gì hỏng khi nâng cấp từ 8 lên 17? (Vượt ra ngoài các nguồn đã thu thập trong khóa học này; hãy tự chuẩn bị danh sách từ release note của từng phiên bản.)</div>
+<p class="see">Học bài: <a href="index.vi.html">Lộ trình Java</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">18.</span>Vì sao String là bất biến, và <code>==</code> khác <code>equals</code> thế nào khi dùng với chúng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Javadoc nói string là hằng, nên có thể chia sẻ an toàn; <code>==</code> so sánh reference, <code>equals</code> so sánh nội dung.</p>
+<p>"String là hằng; giá trị của chúng không thể thay đổi sau khi được tạo", đó là lý do các reference có thể dùng chung chúng. Literal trỏ tới các instance đã được intern, và <code>intern()</code> trả về một biểu diễn chuẩn tắc. Trong <code>StringDemo.java</code>: hai literal giống hệt nhau thì <code>==</code> là true, nhưng với <code>new String("abc")</code> thì không, trong khi <code>equals</code> đều true. Việc <code>+</code> được biên dịch thế nào là tùy compiler (<code>StringBuilder</code>, <code>StringBuffer</code> hoặc <code>StringConcatFactory</code>); trong vòng lặp hãy dùng <code>StringBuilder</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[29]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao String là key tốt cho HashMap? (Bất biến, nên hashCode của nó không thể đổi sau khi đưa vào map; xem bài tập về key mutable.)</div>
+<p class="see">Học bài: <a href="lessons/0018-strings-immutability-and-stringbuilder.vi.html">String</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">19.</span>Checked hay unchecked exception: bạn dùng loại nào và vì sao? try-with-resources là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> checked khi bên gọi có thể phục hồi một cách hợp lý, ngược lại là unchecked; try-with-resources tự động đóng các resource <code>AutoCloseable</code>.</p>
+<p>Checked exception chịu quy tắc catch-or-specify; <code>RuntimeException</code> và <code>Error</code> thì không. Hướng dẫn của tutorial: cho thành checked nếu client có thể phục hồi một cách hợp lý, unchecked nếu không; đừng dùng <code>RuntimeException</code> chỉ để né việc khai báo.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[30]</a> Try-with-resources đóng resource theo thứ tự ngược với lúc tạo; nếu phần thân ném exception và <code>close()</code> cũng ném, exception của phần thân được lan truyền và cái còn lại bị suppressed (<code>getSuppressed()</code>); <code>catch</code>/<code>finally</code> chạy sau khi resource đã được đóng.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[31]</a> Liên hệ với Spring: checked exception mặc định không làm <code>@Transactional</code> rollback.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Nếu dùng try/finally thay vào đó thì suppressed exception bị mất ở đâu? (Exception của finally có thể thay thế exception gốc; try-with-resources giữ exception gốc và đính kèm các exception còn lại.)</div>
+<p class="see">Học bài: <a href="lessons/0019-exceptions-checked-unchecked-try-with-resources.vi.html">Exception</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">20.</span>Giải thích tính bất biến kiểu của generic, wildcard (extends/super) và type erasure.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>List&lt;Integer&gt;</code> không phải là <code>List&lt;Number&gt;</code>; dùng <code>? extends</code> cho producer và <code>? super</code> cho consumer; type argument bị xóa lúc runtime.</p>
+<p>"Mặc dù Integer là subtype của Number, List&lt;Integer&gt; không phải là subtype của List&lt;Number&gt;": nếu không thì bạn có thể thêm một <code>Double</code> vào một list toàn <code>Integer</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[32]</a> Quy tắc của tutorial: biến "in" dùng wildcard có cận trên (<code>extends</code>), biến "out" dùng wildcard có cận dưới (<code>super</code>), không giới hạn khi chỉ dùng các method của <code>Object</code>, không dùng wildcard khi nó vừa in vừa out; tránh wildcard trong kiểu trả về.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">[33]</a> Compiler xóa type parameter thành cận của nó hoặc <code>Object</code>, chèn ép kiểu và sinh bridge method, nên các kiểu có tham số không reifiable: không có <code>instanceof List&lt;String&gt;</code> và không có mảng của kiểu có tham số.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">[34]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao không viết được <code>new T()</code>? (Erasure xóa T lúc runtime; hãy nói đây là hệ quả của erasure.)</div>
+<p class="see">Học bài: <a href="lessons/0021-wildcards-and-type-erasure.vi.html">Wildcard và erasure</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">21.</span>Viết một stream nhóm nhân viên theo phòng ban và cộng tổng lương. Chuyện gì xảy ra với <code>toMap</code> khi có key trùng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>Collectors.groupingBy(Emp::dept, Collectors.summingInt(Emp::salary))</code>; <code>toMap</code> ném <code>IllegalStateException</code> khi có key trùng, trừ khi bạn truyền merge function.</p>
+<p><code>groupingBy</code> phân loại vào một <code>Map</code> với downstream collector tùy chọn; <code>partitioningBy</code> luôn trả về cả key <code>true</code> và <code>false</code>; <code>joining</code> nối chuỗi; <code>toList</code>/<code>toSet</code> không hứa hẹn gì về kiểu hay khả năng sửa đổi (dùng <code>toCollection</code> nếu muốn kiểm soát); <code>toUnmodifiableList</code> và các method tương tự có từ Java 10.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[35]</a> Lần chạy của tôi: nhóm cho ra <code>{ops=9600, dev=9400}</code>, key trùng ném <code>IllegalStateException</code>, và một merge function đã gộp được chúng.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Trong SQL thì khác thế nào? (GROUP BY với SUM; xem bài aggregate của PostgreSQL.)</div>
+<p class="see">Học bài: <a href="lessons/0022-collectors-groupingby-tomap.vi.html">Collectors</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">22.</span>ThreadPoolExecutor quyết định chạy, đưa vào queue hay từ chối một task như thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> dưới core size thì khởi động thread mới; từ core trở lên thì đưa vào queue; nếu queue đầy và chưa tới max thì khởi động thêm thread; còn lại thì từ chối.</p>
+<p>Các quy tắc trong Javadoc cộng với các loại queue (chuyển giao trực tiếp, queue không giới hạn khiến max không có tác dụng, queue có giới hạn) và các rejection policy (<code>AbortPolicy</code> mặc định, <code>CallerRunsPolicy</code> làm chậm việc submit, các discard policy hiếm khi chấp nhận được).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[36]</a> Trong <code>PoolDemo.java</code> (core 2, max 4, queue 2), task 1-2 chiếm core thread, 3-4 vào queue, 5-6 tạo thêm thread và task 7 bị từ chối. Trên JDK 21, hãy cân nhắc virtual thread thay cho pool với I/O blocking.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao queue không giới hạn có rủi ro? (Lượng công việc tăng không giới hạn nếu task đến nhanh hơn tốc độ xử lý; Javadoc có nêu điều này.)</div>
+<p class="see">Học bài: <a href="lessons/0023-thread-pools-executors.vi.html">Thread pool</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">23.</span><code>volatile int count++</code> từ nhiều thread cho tổng sai. Vì sao, và sửa thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>count++</code> là đọc-sửa-ghi, không nguyên tử; hãy dùng atomic hoặc lock.</p>
+<p><code>volatile</code> cho visibility và thứ tự nhưng không cho thao tác gộp nguyên tử. Package atomic cung cấp các thao tác thread-safe không cần lock trên từng biến đơn lẻ (<code>compareAndSet</code>, <code>getAndUpdate</code>) với ngữ nghĩa volatile, và <code>LongAdder</code> cho counter bị tranh chấp.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">[37]</a> <code>ReentrantLock</code> có ngữ nghĩa giống <code>synchronized</code> cộng thêm fairness, <code>tryLock</code> và lock có thể ngắt; unlock trong <code>finally</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[38]</a> Trong <code>AtomicDemo.java</code>, 4 thread x 200.000 lần tăng: volatile int mất khoảng 1.600 lần cập nhật, còn <code>AtomicInteger</code> và lock đều ra 800.000.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào bạn chọn lock thay vì atomic? (Khi nhiều biến phải thay đổi cùng nhau.)</div>
+<p class="see">Học bài: <a href="lessons/0024-atomics-and-locks.vi.html">Atomic và lock</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">24.</span>HashMap so với ConcurrentHashMap: khác biệt, quy tắc về null, và cách đúng để cập nhật một counter?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> ConcurrentHashMap đọc không cần lock, iterator nhất quán yếu, cấm null, và có các method gộp nguyên tử như <code>merge</code>.</p>
+<p>Thao tác truy xuất không lock, cập nhật có mức đồng thời kỳ vọng cao, iterator không ném <code>ConcurrentModificationException</code>, key/value null ném NPE; <code>putIfAbsent</code>, <code>compute*</code> và <code>merge</code> là nguyên tử, và function truyền vào phải ngắn gọn, không sửa map; <code>size()</code> chỉ đáng tin khi không có cập nhật đồng thời.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[39]</a> <code>HashMap</code> không được synchronized và có iterator fail-fast.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a> Lần chạy của tôi: <code>merge("hits", 1, Integer::sum)</code> từ 4 thread cho đúng 400.000. Kiểu "kiểm tra rồi put" vẫn là race condition.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao ConcurrentHashMap cấm null? (Vì <code>get</code> trả về null sẽ gây mơ hồ; đây là một lập luận, Javadoc chỉ nêu quy tắc.)</div>
+<p class="see">Học bài: <a href="lessons/0025-concurrenthashmap.vi.html">ConcurrentHashMap</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">25.</span>Deadlock là gì, phát hiện nó thế nào, và phòng tránh ra sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các thread bị block vĩnh viễn chờ lẫn nhau; phát hiện bằng thread dump hoặc <code>ThreadMXBean</code>; phòng tránh bằng thứ tự lấy lock nhất quán.</p>
+<p>Định nghĩa của tutorial và ví dụ hai người bạn cúi chào nhau (cả hai method đều <code>synchronized</code>).<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[40]</a> <code>DeadlockDemo.java</code> đã tái hiện nó bằng thứ tự lock ngược nhau, <code>findDeadlockedThreads()</code> báo 2 thread, và dùng cùng một thứ tự lock thì hết lỗi. Các công cụ khác: <code>tryLock</code> có timeout,<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[38]</a> giữ ít lock hơn, không gọi code bên ngoài khi đang giữ lock (hai cách sau là thực hành chung).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> PostgreSQL xử lý cùng vấn đề này thế nào? (Phát hiện và hủy một transaction; hãy retry.)</div>
+<p class="see">Học bài: <a href="lessons/0026-deadlock-and-lock-ordering.vi.html">Deadlock</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">26.</span>Helpful NullPointerException là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> thông báo của JVM nêu tên biểu thức bị null, ví dụ <code>Cannot invoke "String.trim()" because "names[0]" is null</code>.</p>
+<p>JEP 358 (Java 14): "mô tả chính xác biến nào bị null"; mặc định tắt ở JDK 14, bật bằng <code>-XX:+ShowCodeDetailsInExceptionMessages</code>.<a class="cite" href="https://openjdk.org/jeps/358">[41]</a> Trên JDK 21, lần chạy của tôi in ra thông báo mà không cần flag nào; tên biến local chỉ hiện nếu biên dịch với <code>-g</code> (nếu không sẽ là <code>&lt;local1&gt;</code>).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Có còn nên validate đối số không? (Có: báo lỗi sớm với thông báo rõ ràng qua <code>Objects.requireNonNull</code>; helpful NPE là để debug.)</div>
+<p class="see">Học bài: <a href="lessons/0027-helpful-nullpointerexceptions.vi.html">Helpful NPE</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">27.</span>Vì sao một vòng lặp chỉ chạy trên một thread vẫn có thể ném ConcurrentModificationException, và làm sao xóa phần tử trong lúc duyệt?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> iterator fail-fast so sánh modCount của collection với giá trị nó đã ghi nhớ; xóa qua collection thay vì qua iterator sẽ làm phép kiểm tra này thất bại. Hãy dùng Iterator.remove hoặc removeIf.</p>
+<p>Javadoc nói exception này "không phải lúc nào cũng cho thấy object đã bị một thread khác thay đổi đồng thời" và được ném "theo kiểu best-effort", nên chỉ được dùng để phát hiện bug.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">[42]</a> Trong lần chạy của tôi, xóa phần tử áp chót của một ArrayList bên trong for-each không ném gì cả và âm thầm bỏ qua phần tử cuối.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao được phép gọi entry.setValue() trong lúc duyệt một HashMap? (Vì nó không phải thay đổi cấu trúc.)</div>
+<p class="see">Học bài: <a href="lessons/0029-iterators-and-fail-fast.vi.html">Iterator và fail-fast</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">28.</span>Bên trong HashMap đã thay đổi gì ở Java 8, và khi nào một bucket trở thành cây?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các bin dài được chuyển thành cây đỏ-đen: khi đạt 8 node, nếu bảng có ít nhất 64 bucket, nếu không thì resize; quay lại thành list khi xuống dưới 6. Trường hợp xấu nhất của mỗi bucket giảm từ O(n) xuống O(log n).</p>
+<p>Hash được trộn bằng h ^ (h &gt;&gt;&gt; 16), index là (n - 1) &amp; hash, và khi resize một entry giữ nguyên ở i hoặc chuyển sang i + oldCapacity.<a class="cite" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">[43]</a> Với 20.000 key dùng chung một hashCode, lần chạy của tôi mất 3.658 ms với key không Comparable và 69 ms với key Comparable.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn định kích thước trước cho một map 1 triệu entry thế nào? (JDK 21: HashMap.newHashMap(1_000_000); JDK 8/17: capacity bằng expected / 0.75 + 1.)</div>
+<p class="see">Học bài: <a href="lessons/0030-hashmap-internals.vi.html">Bên trong HashMap</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">29.</span>Comparable và Comparator khác nhau thế nào, và "nhất quán với equals" nghĩa là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Comparable là thứ tự tự nhiên của class; Comparator là thứ tự định nghĩa từ bên ngoài. Nhất quán với equals nghĩa là compareTo == 0 đúng vào những lúc equals trả về true; nếu không, sorted set và sorted map sẽ coi các object khác nhau là trùng nhau.</p>
+<p>Ví dụ trong Javadoc là BigDecimal 4.0 và 4.00: bằng nhau theo compareTo nhưng không bằng theo equals, nên TreeSet giữ một còn HashSet giữ hai.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">[44]</a> Trong lần chạy của tôi, một TreeSet với comparator chỉ theo lương giữ lại 3 trên 4 nhân viên. Hãy xây comparator bằng Comparator.comparing(...).thenComparing(...) và kết thúc bằng một key duy nhất; đừng bao giờ viết a - b.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> List.sort có ổn định không? (Có với object: TimSort, được đảm bảo ổn định.)</div>
+<p class="see">Học bài: <a href="lessons/0031-comparable-comparator-and-ordering.vi.html">Comparable và Comparator</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">30.</span>Unmodifiable và immutable: Arrays.asList, Collections.unmodifiableList, List.of?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Arrays.asList có kích thước cố định nhưng ghi xuyên xuống mảng; unmodifiableList là một view chỉ đọc nhưng vẫn thấy thay đổi của nguồn; List.of/copyOf là các bản sao unmodifiable độc lập và từ chối null. Không cách nào trong số đó làm cho các phần tử trở thành immutable.</p>
+<p>List.of và List.copyOf: "Không thể thêm, xóa hay thay thế phần tử", "Chúng không cho phép phần tử null", và các phần tử mutable vẫn có thể thay đổi.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">[45]</a> JDK 9 thêm List.of, JDK 10 thêm copyOf, nên trên JDK 8 hãy dùng Collections.unmodifiableList(new ArrayList&lt;&gt;(src)).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao List.of("a").contains(null) lại ném exception? (Các list này không cho phép null, và contains(null) ném NullPointerException.)</div>
+<p class="see">Học bài: <a href="lessons/0032-unmodifiable-vs-immutable.vi.html">Unmodifiable và immutable</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">31.</span>Viết một LRU cache bằng Java.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> kế thừa LinkedHashMap với accessOrder = true và override removeEldestEntry để trả về size() &gt; capacity.</p>
+<p>Constructor access order được tài liệu mô tả là "rất phù hợp để xây dựng LRU cache", và removeEldestEntry "được put và putAll gọi sau khi chèn một entry mới". Ở chế độ access order, ngay cả get cũng là thay đổi cấu trúc, nên dùng chung giữa các thread thì cần synchronization.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">[46]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Nếu không dùng LinkedHashMap? (HashMap từ key tới node, cộng với một danh sách liên kết đôi; get và put O(1).)</div>
+<p class="see">Học bài: <a href="lessons/0033-hashset-linkedhashmap-and-lru.vi.html">LinkedHashMap và LRU</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">32.</span>Khi nào bạn dùng TreeMap thay vì HashMap?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> khi cần duyệt theo thứ tự đã sắp xếp, view theo khoảng hoặc tra cứu key gần nhất (floor, ceiling, subMap); chi phí là log(n) được đảm bảo thay vì O(1) kỳ vọng.</p>
+<p>TreeMap là "một NavigableMap dựa trên cây đỏ-đen" với "chi phí thời gian log(n) được đảm bảo" cho get/put/remove; floorKey trả về key lớn nhất ≤ k và subMap là một view sống [from, to).<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">[47]</a> Ứng dụng điển hình: bậc giá hoặc bậc thuế, cửa sổ thời gian của time-series, bảng xếp hạng.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Sorted map thread-safe? (ConcurrentSkipListMap.)</div>
+<p class="see">Học bài: <a href="lessons/0034-treemap-and-navigable-maps.vi.html">TreeMap và NavigableMap</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">33.</span>PriorityQueue hoạt động thế nào, và làm sao tìm top K trong N phần tử?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một binary heap: phần tử đầu là nhỏ nhất, offer/poll là O(log n), duyệt thì không theo thứ tự. Để lấy K phần tử lớn nhất, giữ một min-heap kích thước K: O(n log k).</p>
+<p>"Iterator ... không đảm bảo duyệt các phần tử của priority queue theo bất kỳ thứ tự cụ thể nào"; contains và remove(Object) là tuyến tính; peek là hằng số.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">[48]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Max-heap thì sao? (new PriorityQueue&lt;&gt;(Comparator.reverseOrder()).)</div>
+<p class="see">Học bài: <a href="lessons/0035-priorityqueue-and-top-k.vi.html">PriorityQueue và top-K</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">34.</span>EnumMap, IdentityHashMap và WeakHashMap dùng để làm gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> EnumMap/EnumSet: cấu trúc gọn dựa trên mảng/bit-vector cho key là enum; IdentityHashMap: dùng == thay cho equals, cho các việc xử lý đồ thị object như deep copy; WeakHashMap: entry biến mất khi key không còn được tham chiếu.</p>
+<p>IdentityHashMap "không phải một implementation Map đa dụng" và "cố ý vi phạm contract chung của Map".<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/IdentityHashMap.html">[49]</a> Value của WeakHashMap được giữ bằng tham chiếu mạnh, nên một value trỏ ngược tới key sẽ giữ key đó sống mãi.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/WeakHashMap.html">[56]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> WeakHashMap có phải cache tốt không? (Không: không giới hạn kích thước hay thời gian, phụ thuộc thời điểm GC chạy; hãy dùng LRU hoặc một cache library.)</div>
+<p class="see">Học bài: <a href="lessons/0036-enummap-identity-and-weak-maps.vi.html">Các map chuyên dụng</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">35.</span>merge, computeIfAbsent, putIfAbsent: khi nào dùng cái nào, và có những cái bẫy gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> merge để gộp value (đếm), computeIfAbsent để khởi tạo lười (multimap, memo), putIfAbsent chỉ khi value rẻ. Trả về null sẽ xóa hoặc bỏ qua mapping; đừng bao giờ sửa map bên trong function.</p>
+<p>"Nếu mapping function trả về null thì không có mapping nào được ghi lại"; "Mapping function không nên sửa đổi map này trong lúc tính toán".<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">[50]</a> HashMap ném ConcurrentModificationException khi phát hiện điều đó, và đó chính là chuyện đã xảy ra với hàm fib đệ quy có memo của tôi.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Method nào trong số này là atomic? (Trên ConcurrentHashMap thì tất cả; trên HashMap thì không cái nào thread-safe.)</div>
+<p class="see">Học bài: <a href="lessons/0037-map-default-methods.vi.html">Các method mạnh của Map</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">36.</span>ArrayList tăng kích thước thế nào, và boxing tốn bao nhiêu trong collection?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> bắt đầu bằng một mảng rỗng dùng chung, cấp phát 10 phần tử ở lần add đầu tiên, sau đó tăng khoảng 1,5 lần kèm một lần copy mảng (O(1) khấu hao). Phần tử boxed tốn gấp nhiều lần so với mảng primitive.</p>
+<p>Trong OpenJDK 21, grow() dùng oldCapacity &gt;&gt; 1 làm mức tăng ưu tiên.<a class="cite" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">[51]</a> Identity của Integer chỉ được đảm bảo trong khoảng -128..127, nên hãy so sánh bằng equals.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">[52]</a> Theo phép đo thô của tôi, 1 triệu int chiếm ~4 MB dưới dạng int[], ~19 MB trong ArrayList&lt;Integer&gt;, ~38 MB trong LinkedList.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> list.remove(1) trên một List&lt;Integer&gt;? (Xóa phần tử ở index 1; muốn xóa theo giá trị thì dùng remove(Integer.valueOf(1)).)</div>
+<p class="see">Học bài: <a href="lessons/0038-capacity-boxing-and-memory.vi.html">Capacity, boxing và bộ nhớ</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">37.</span>Bạn sẽ chọn collection thread-safe nào, và vì sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> ConcurrentHashMap cho map dùng chung, ConcurrentSkipListMap cho map cần sắp xếp, CopyOnWriteArrayList khi số lần đọc áp đảo số lần ghi, một BlockingQueue có giới hạn cho mô hình producer-consumer; synchronized wrapper chỉ dùng khi tranh chấp thấp, và phải tự lock khi duyệt.</p>
+<p>BlockingQueue có bốn dạng cho mỗi thao tác (add/offer/put/offer có timeout) và được "thiết kế chủ yếu để dùng cho các queue producer-consumer".<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">[53]</a> CopyOnWriteArrayList sao chép mảng ở mỗi lần ghi và cung cấp iterator dạng snapshot.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">[54]</a> synchronizedList yêu cầu bọc synchronized (list) quanh vòng duyệt.<a class="cite" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">[55]</a> Trong lần chạy của tôi, một ArrayList thường dùng chung bởi 4 thread đã mất 26.757 trên 40.000 lần add mà không có exception nào.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao queue của ThreadPoolExecutor thường phải có giới hạn? (Backpressure: một queue không giới hạn che giấu tình trạng quá tải cho đến khi hết bộ nhớ.)</div>
+<p class="see">Học bài: <a href="lessons/0039-concurrent-collections.vi.html">Concurrent collection</a> · <a href="lessons/0023-thread-pools-executors.vi.html">Thread pool</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi tôi lần lượt từng câu Java (JDK 8, 17, 21) này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">Javadoc của Object</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">Javadoc của HashMap</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">Javadoc của ArrayList</a> · [4] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">Javadoc của LinkedList</a> · [5] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">Javadoc của ArrayDeque</a> · [6] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Tutorials: Lambda Expressions</a> · [7] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Tutorials: Default Methods</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">Tổng quan package java.util.stream</a> · [9] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Optional.html">Javadoc của Optional</a> · [10] <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Oracle Tutorials: Date-Time</a> · [11] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc của CompletableFuture</a> · [12] <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Oracle: Virtual Threads</a> · [13] <a href="https://openjdk.org/jeps/286">JEP 286 (var)</a> · [14] <a href="https://openjdk.org/jeps/361">JEP 361 (switch expression)</a> · [15] <a href="https://openjdk.org/jeps/378">JEP 378 (text block)</a> · [16] <a href="https://openjdk.org/jeps/394">JEP 394 (instanceof pattern)</a> · [17] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Javadoc của Record</a> · [18] <a href="https://openjdk.org/jeps/409">JEP 409 (sealed class)</a> · [19] <a href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">Oracle Java SE Support Roadmap</a> · [20] <a href="https://openjdk.org/jeps/441">JEP 441 (pattern matching cho switch)</a> · [21] <a href="https://openjdk.org/jeps/440">JEP 440 (record pattern)</a> · [22] <a href="https://openjdk.org/jeps/431">JEP 431 (sequenced collection)</a> · [23] <a href="https://openjdk.org/jeps/439">JEP 439 (generational ZGC)</a> · [24] <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">JLS chương 17</a> · [25] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/package-summary.html">Tổng quan package java.util.concurrent</a> · [26] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · [27] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">Tài liệu tham chiếu lệnh java</a> · [28] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a> · [29] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">Javadoc của String</a> · [30] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Java Tutorials: Exceptions</a> · [31] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Java Tutorials: try-with-resources</a> · [32] <a href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Java Tutorials: Generic và subtyping</a> · [33] <a href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Java Tutorials: Hướng dẫn dùng wildcard</a> · [34] <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type erasure</a> · [35] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">Javadoc của Collectors</a> · [36] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">Javadoc của ThreadPoolExecutor</a> · [37] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">Package java.util.concurrent.atomic</a> · [38] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">Javadoc của ReentrantLock</a> · [39] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">Javadoc của ConcurrentHashMap</a> · [40] <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a> · [41] <a href="https://openjdk.org/jeps/358">JEP 358 (helpful NPE)</a> · [42] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">Javadoc của ConcurrentModificationException (JDK 21)</a> · [43] <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">Mã nguồn OpenJDK 21: HashMap.java</a> · [44] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Javadoc của Comparable (JDK 21)</a> · [45] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">Javadoc của List (JDK 21)</a> · [46] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">Javadoc của LinkedHashMap (JDK 21)</a> · [47] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">Javadoc của TreeMap (JDK 21)</a> · [48] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">Javadoc của PriorityQueue (JDK 21)</a> · [49] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/IdentityHashMap.html">Javadoc của IdentityHashMap (JDK 21)</a> · [50] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Javadoc của Map (JDK 21)</a> · [51] <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">Mã nguồn OpenJDK 21: ArrayList.java</a> · [52] <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 21 §5.1.7 Boxing Conversion</a> · [53] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">Javadoc của BlockingQueue (JDK 21)</a> · [54] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">Javadoc của CopyOnWriteArrayList (JDK 21)</a> · [55] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Javadoc của Collections (JDK 21)</a> · [56] <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/WeakHashMap.html">Javadoc của WeakHashMap (JDK 21)</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

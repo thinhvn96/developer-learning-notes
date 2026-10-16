@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 27: Những pattern bạn vẫn đang dùng trong JDK</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Những pattern bạn vẫn đang dùng trong JDK</h1>
+<p class="meta">Design Patterns · Bài 0027 · bước 27/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0027-patterns-in-the-jdk.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> kể ra một ví dụ trong JDK cho mỗi pattern trong khoảng một chục pattern, và chạy thử chúng.</div>
+
+<p>Biết pattern ẩn ở đâu trong code bạn vẫn dùng hằng ngày giúp câu trả lời phỏng vấn trở nên cụ thể.</p>
+<pre><code>java design-patterns/examples/PatternsInJdkDemo.java
+Singleton  Runtime.getRuntime() same instance : true
+Factory    List.of(..) class chosen by the JDK : List12
+Flyweight  Integer.valueOf(100) == valueOf(100): true
+Builder    StringBuilder                       : x1
+Adapter    Arrays.asList write-through         : z
+Decorator  Collections.unmodifiableList        : [a, b]
+Decorator  BufferedReader(StringReader)        : hi
+Strategy   Comparator                          : [a, bb, ccc]
+Iterator   Iterator.next()                     : a
+Command    Runnable (a request as an object)   : run
+Template   AbstractList (get+size =&gt; the rest) : [0, 1, 2]
+Proxy      java.lang.reflect.Proxy             : true
+Observer   Flow / SubmissionPublisher          : SubmissionPublisher</code></pre>
+<table><tr><th>Pattern</th><th>Ví dụ trong JDK</th><th>Nguồn</th></tr>
+<tr><td>Singleton</td><td><code>Runtime.getRuntime()</code>: "một instance duy nhất của class Runtime"</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[1]</a></td></tr>
+<tr><td>Factory Method (static factory)</td><td><code>List.of</code>, <code>Integer.valueOf</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a></td></tr>
+<tr><td>Flyweight</td><td><code>Integer.valueOf</code> cache các giá trị từ -128 đến 127</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a></td></tr>
+<tr><td>Builder</td><td><code>StringBuilder</code></td><td>lần chạy ở trên</td></tr>
+<tr><td>Adapter</td><td><code>Arrays.asList</code>: "cầu nối giữa API dựa trên mảng và API dựa trên collection"</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[3]</a></td></tr>
+<tr><td>Decorator / wrapper</td><td><code>BufferedReader</code>, <code>Collections.unmodifiableList</code></td><td>lần chạy ở trên</td></tr>
+<tr><td>Strategy</td><td><code>Comparator</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[4]</a></td></tr>
+<tr><td>Iterator</td><td><code>Iterator</code> / <code>Iterable</code></td><td>lần chạy ở trên</td></tr>
+<tr><td>Command</td><td><code>Runnable</code></td><td>lần chạy ở trên</td></tr>
+<tr><td>Template Method</td><td><code>AbstractList</code>: implement <code>get</code>/<code>size</code></td><td>lần chạy ở trên</td></tr>
+<tr><td>Proxy</td><td><code>java.lang.reflect.Proxy</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[5]</a></td></tr>
+<tr><td>Observer</td><td><code>Flow</code>, <code>SubmissionPublisher</code> (<code>Observable</code> đã bị deprecate)</td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[6]</a></td></tr>
+<tr><td>Visitor</td><td><code>FileVisitor</code> cùng <code>Files.walkFileTree</code></td><td><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">[7]</a></td></tr></table>
+<p>Mã nguồn: <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a>. Việc gán một số class vào một pattern (ví dụ xếp các wrapper vào "decorator") là cách phân loại của tôi; Javadoc chỉ mô tả hành vi, không nêu tên pattern.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Singleton trong JDK?</p>
+  <button>ArrayList</button>
+  <button>Thread</button>
+  <button>Integer</button>
+  <button data-correct>Runtime</button>
+  <p class="explain">Mỗi ứng dụng Java có đúng một instance Runtime.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Strategy trong JDK?</p>
+  <button data-correct>Comparator</button>
+  <button>String</button>
+  <button>Object</button>
+  <button>Runtime</button>
+  <p class="explain">Comparator được truyền vào sort để chọn thứ tự.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[4]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Adapter trong JDK?</p>
+  <button data-correct>Arrays.asList</button>
+  <button>Runtime</button>
+  <button>Comparator</button>
+  <button>FileVisitor</button>
+  <p class="explain">Nó làm cầu nối giữa API mảng và API collection.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Visitor trong JDK?</p>
+  <button data-correct>FileVisitor</button>
+  <button>Runtime</button>
+  <button>Integer</button>
+  <button>Thread</button>
+  <p class="explain">Được truyền vào Files.walkFileTree để ghé thăm từng file.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">[7]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0027-find-a-pattern.vi.md">Bài tập 27: tìm một pattern</a></p>
+<p>Ví dụ chạy được: <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/catalog">Design patterns catalog (Refactoring.Guru)</a>. Sau đó lướt Javadoc của JDK cho từng class ở trên.</p>
+<p><a href="0026-choosing-between-similar-patterns.vi.html">← Chọn giữa các pattern giống nhau</a> &nbsp;|&nbsp; <a href="0028-patterns-in-modern-java.vi.html">Pattern trong Java hiện đại: lambda, record, sealed type →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">Runtime Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">Integer Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc</a> · [4] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc</a> · [5] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">Proxy Javadoc</a> · [6] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">Flow Javadoc</a> · [7] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">FileVisitor Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

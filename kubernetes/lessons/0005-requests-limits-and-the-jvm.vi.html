@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 5: Request, limit và JVM</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Request, limit và JVM</h1>
+<p class="meta">Kubernetes · Bài 0005 · bước 9/15 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-requests-limits-and-the-jvm.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> đặt request và limit cho một container JVM sao cho nó được lập lịch đúng, không bị OOM-kill, và không bị bất ngờ vì CPU throttling.</div>
+
+<h2>Request và limit</h2>
+<p><strong>Request</strong> là lượng tài nguyên container được đảm bảo, và "scheduler dùng request để quyết định node nào có thể chứa một Pod." <strong>Limit</strong> là mức tối đa nó được dùng, do kubelet thực thi.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a> CPU tính bằng core hoặc millicore (<code>500m</code> = 0.5 CPU); memory tính bằng byte (<code>256Mi</code>).<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+<h2>Chuyện gì xảy ra khi vượt ngưỡng</h2>
+<ul>
+<li><strong>CPU vượt limit:</strong> bị kernel throttle.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></li>
+<li><strong>Memory vượt limit:</strong> container có thể bị OOM-kill; việc thực thi mang tính phản ứng, xảy ra khi kernel phát hiện áp lực bộ nhớ.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></li>
+</ul>
+<p>Nếu bạn đặt limit mà không đặt request, Kubernetes dùng limit làm request.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+<h2>Áp dụng cho Java</h2>
+<pre><code>env:
+- name: JAVA_TOOL_OPTIONS
+  value: "-XX:MaxRAMPercentage=70"
+resources:
+  requests: { memory: "512Mi", cpu: "250m" }
+  limits:   { memory: "512Mi", cpu: "1" }</code></pre>
+<p>JVM trên Linux mặc định nhận diện được limit của container, và <code>MaxRAMPercentage</code> đặt kích thước heap theo phần trăm của lượng memory đó.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a> Đặt 70 là để chừa chỗ cho memory ngoài heap (non-heap). (<a href="../../docker/lessons/0005-memory-cpu-limits-and-the-jvm.vi.html">Bài Docker</a> đã đo điều này bằng <code>docker run --memory</code>; cơ chế nhận diện của JVM ở đây cũng y hệt vì chính container runtime là thứ thực thi limit.) Con số 70 là điểm xuất phát để đo đạc, không phải quy tắc. Bản phác thảo đầy đủ nằm trong <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a>.</p>
+<h2>Đã kiểm chứng: một lần OOM kill</h2>
+<pre><code>kubectl apply -f examples/memory-hog.yaml     # limit 20Mi, container runs: tail /dev/zero
+NAME         READY   STATUS      RESTARTS   AGE
+memory-hog   0/1     OOMKilled   0          12s
+reason=OOMKilled exit=137</code></pre>
+<p>Exit code 137 là 128 + 9 (SIGKILL). Xem <a href="../examples/memory-hog.yaml"><code>memory-hog.yaml</code></a>.</p>
+<div class="aside">Câu hỏi senior: "Memory request có nên bằng memory limit không?" Đặt bằng nhau giúp lượng memory sử dụng dễ dự đoán và tránh việc node over-commit phần memory mà Pod có thể cần; tài liệu giải thích rằng request quyết định việc lập lịch còn limit quyết định việc thực thi.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a> Hãy nêu ra trade-off, đừng trả lời bằng khẩu hiệu.</div>
+<p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Scheduler dựa vào gì để đặt một Pod?</p>
+  <button data-correct>Request</button>
+  <button>Tên Pod</button>
+  <button>Kích thước image</button>
+  <button>Limit</button>
+  <p class="explain">Scheduler dùng request để quyết định node nào có thể chứa một Pod.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một container vượt CPU limit. Kết quả?</p>
+  <button>Node bị restart</button>
+  <button>Bị OOM kill</button>
+  <button data-correct>Bị CPU throttling</button>
+  <button>Pod bị xoá</button>
+  <p class="explain">CPU limit được thực thi bằng cách throttle.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Một container vượt memory limit. Kết quả?</p>
+  <button data-correct>Có thể bị OOM kill</button>
+  <button>Scheduler thử lại</button>
+  <button>Được tăng thêm CPU</button>
+  <button>Tự động throttle</button>
+  <p class="explain">Memory limit được thực thi bằng OOM kill.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao MaxRAMPercentage nên dưới 100?</p>
+  <button data-correct>Cần chỗ cho memory non-heap</button>
+  <button>G1 bắt buộc như vậy</button>
+  <button>Nó giúp GC chạy nhanh hơn</button>
+  <button>Kubernetes từ chối giá trị 100</button>
+  <p class="explain">JVM dùng cả memory ngoài heap, và heap cộng phần đó phải nằm gọn dưới limit.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-size-a-java-pod.vi.md">Bài tập 0005: định cỡ cho một Pod Java</a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes Docs: Resource management for Pods and containers</a>. Đọc phần request và limit, và cách chúng được thực thi.</p>
+<p><a href="0011-jobs-and-cronjobs.vi.html">← Job và CronJob</a> &nbsp;|&nbsp; <a href="0006-probes.vi.html">Liveness, readiness và startup probe →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes Docs: Resource management for Pods and containers</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

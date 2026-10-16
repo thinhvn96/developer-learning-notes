@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 7: Bean scope: singleton và prototype</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bean scope: singleton và prototype</h1>
+<p class="meta">Spring Boot · Bài 0007 · bước 3/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-bean-scopes.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> kể ra sáu bean scope, scope mặc định, và vì sao một prototype được inject vào singleton lại không còn "mới" nữa.</div>
+
+<h2>Các scope</h2>
+<table><tr><th>Scope</th><th>Ý nghĩa<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></th></tr>
+<tr><td>singleton (mặc định)</td><td>một instance dùng chung cho mỗi container</td></tr>
+<tr><td>prototype</td><td>một instance mới mỗi lần được yêu cầu</td></tr>
+<tr><td>request, session, application, websocket</td><td>các scope dành cho web</td></tr></table>
+<p>Singleton của Spring "khác với singleton của GoF": nó tính theo container và theo bean, không phải theo class loader. Dùng prototype cho bean có trạng thái, singleton cho bean stateless. Với prototype, container không gọi các destruction callback; client phải tự dọn dẹp.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+<h2>Cái bẫy</h2>
+<p>"Khi một singleton bean phụ thuộc vào một prototype bean, prototype bean chỉ được inject đúng một lần vào thời điểm singleton được khởi tạo." Muốn có instance mới lúc runtime, bạn cần thứ gì đó như method injection, hoặc một <code>ObjectProvider</code>.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+<pre><code>RESULT singleton getBean twice, same instance: true
+RESULT prototype getBean twice, ids: 2 and 3
+RESULT injected prototype ids: 1, 1   ObjectProvider ids: 4, 5</code></pre>
+<p>Code: <a href="../examples/demo-app/src/main/java/com/example/demo/config/Scopes.java"><code>Scopes.java</code></a>, <a href="../examples/demo-app/src/test/java/com/example/demo/ScopeTest.java"><code>ScopeTest.java</code></a>. Hệ quả cần nói khi phỏng vấn: singleton bean phải thread-safe, vì rất nhiều request dùng chung chúng.</p><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Bean scope mặc định?</p>
+  <button>session</button>
+  <button>prototype</button>
+  <button>request</button>
+  <button data-correct>singleton</button>
+  <p class="explain">Singleton là scope mặc định.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Prototype được inject vào singleton. Mỗi lần gọi có instance mới không?</p>
+  <button>Chỉ trong test</button>
+  <button data-correct>Không, chỉ inject một lần</button>
+  <button>Có, mỗi lần gọi</button>
+  <button>Có, mỗi thread</button>
+  <p class="explain">Nó chỉ được inject một lần lúc singleton được khởi tạo (test cho ra id 1 và 1).<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Singleton của Spring nghĩa là...?</p>
+  <button>Một cái cho mỗi class trong JVM</button>
+  <button data-correct>Một cái cho mỗi bean trong container</button>
+  <button>Một cái cho mỗi request</button>
+  <button>Một cái cho mỗi thread</button>
+  <p class="explain">Nó tính theo container và theo bean, không phải theo class loader.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Ai dọn dẹp prototype bean?</p>
+  <button>Container</button>
+  <button>Không ai cả</button>
+  <button>Chỉ có GC</button>
+  <button data-correct>Code phía client</button>
+  <p class="explain">Destruction callback không được gọi cho prototype; client phải tự dọn dẹp.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-thread-safe-singleton.vi.md">Bài tập 0007: một singleton thread-safe</a></p>
+<p>Ví dụ chạy được: <a href="../examples/demo-app/src/main/java/com/example/demo/config/Scopes.java"><code>demo-app/src/main/java/com/example/demo/config/Scopes.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a>. Các phần Singleton, Prototype và 'Singleton beans with prototype-bean dependencies'.</p>
+<p><a href="0002-constructor-injection.vi.html">← Constructor injection so với setter injection</a> &nbsp;|&nbsp; <a href="0003-auto-configuration.vi.html">Auto-configuration và cách nhìn thấy nó →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -8,72 +8,306 @@
 </head>
 <body>
 <main>
-<h1>Strings: immutability, the pool and StringBuilder</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0018 · step 1 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Why a Java string never changes</h1>
+<p class="subtitle">Immutability, the string pool, the <code>==</code> trap, and when to reach for <code>StringBuilder</code>.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0018 · step 1 of 46 · Foundation · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0018-strings-immutability-and-stringbuilder.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> explain why <code>==</code> on strings is a trap and when to use <code>StringBuilder</code>.</div>
+<div class="mission"><strong>Why this lesson?</strong> Strings are in every line of backend code: IDs, JSON, SQL, log messages. Interviewers love <em>"Why is String immutable?"</em> and <em>"What is the difference between <code>==</code> and <code>equals()</code>?"</em> because the wrong answer causes real bugs that only show up sometimes.</div>
 
-<h2>Immutable</h2>
-<p>"Strings are constant; their values cannot be changed after they are created." Because they are immutable they can be shared safely between references.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a> Methods such as <code>concat</code> return a <em>new</em> string.</p>
-<h2>Literals and the pool</h2>
-<p>String literals are <code>String</code> instances, and <code>intern()</code> returns a canonical representation so equal contents can share one object.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a> Identical literals therefore refer to the same object, but <code>new String("abc")</code> creates another.</p>
-<pre><code>java java/examples/StringDemo.java
-a == b          : true      # same literal
-a == c          : false     # new String(...)
+<div class="win"><b>Today's win:</b> explain why <code>==</code> on strings is a trap, what the string pool is, and when to use <code>StringBuilder</code>, in about 60 seconds.</div>
+
+<dl class="words">
+  <dt>object</dt><dd>A thing your program creates in memory, for example one <code>String</code> with the text "abc".</dd>
+  <dt>reference</dt><dd>A variable that points to an object, like an address written on a card. Two variables can point to the same object.</dd>
+  <dt>immutable</dt><dd>Cannot be changed after it is created. To get a different value, you make a new object.</dd>
+  <dt>literal</dt><dd>A value written directly in the code, like <code>"abc"</code> between double quotes.</dd>
+  <dt>string pool</dt><dd>A private list of shared strings kept by the <code>String</code> class, so equal literals can use one object.</dd>
+  <dt>==</dt><dd>On objects, it asks "do both variables point to the <em>same</em> object?". It does not look at the text.</dd>
+  <dt>equals()</dt><dd>A method that asks "do these two strings contain the same characters?".</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"<code>String a = "abc"; String c = new String("abc");</code> What does <code>a == c</code> print, and why?"</em> Guess first, even if you are not sure. You will check your guess in section 3.</p>
+
+<h2>1. The picture: a printed label</h2>
+<p>Think of a printed label on a box. You cannot rub out the letters. If you want a different text, you print a <strong>new</strong> label and stick it on. The old label still exists until someone throws it away.</p>
+<p>A Java <code>String</code> works the same way. The documentation says: "Strings are constant; their values cannot be changed after they are created."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> Methods that look like they change a string, such as <code>concat</code>, <code>toUpperCase</code> or <code>replace</code>, really return a <em>new</em> string.</p>
+<pre><code>String s = "x";
+String t = s.concat("y");
+<span class="c">Step 1  s points to the object "x"</span>
+<span class="c">Step 2  concat builds a NEW object "xy" and returns it</span>
+<span class="c">Step 3  t points to "xy"; s still points to "x"</span>
+System.out.println(s + ", " + t);   <span class="hl">// x, xy</span></code></pre>
+<p>The runnable example prints exactly this:</p>
+<pre><code>$ java java/examples/StringDemo.java
+...
+s after concat  : x, t = xy</code></pre>
+<h3>Trap: calling a method and ignoring the result</h3>
+<pre><code>String name = "anna";
+name.toUpperCase();              <span class="c">// result thrown away</span>
+System.out.println(name);        <span class="hl">// still "anna"</span>
+
+name = name.toUpperCase();       <span class="c">// fix: keep the new string</span></code></pre>
+<p>Because strings never change, the result must be stored in a variable. Forgetting this is a classic beginner bug.</p>
+
+<h2>2. Why immutable is a good idea</h2>
+<p>The documentation gives the main reason in one sentence: "Because String objects are immutable they can be shared."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> If nobody can change an object, many variables (and many threads) can point to it without any risk.</p>
+<ul>
+  <li><strong>Safe sharing.</strong> You can pass a string to any method. That method cannot change your copy behind your back.</li>
+  <li><strong>Safe map keys.</strong> In <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a> you saw that a key that changes gets lost in a <code>HashMap</code>. A string key cannot change, so it cannot get lost.</li>
+  <li><strong>A shared pool is possible.</strong> Because sharing is safe, Java can keep one copy of each literal. That is the next section.</li>
+</ul>
+
+<h2>3. Where strings live: the string pool</h2>
+<p>Imagine an office with one shared dictionary on a shelf. Everybody who needs it walks to the same shelf. Nobody buys a second copy, because nobody is allowed to write in it.</p>
+<p>The <code>String</code> class keeps such a shelf. Its documentation for <code>intern()</code> says: "A pool of strings, initially empty, is maintained privately by the class String." and "All literal strings and string-valued constant expressions are interned."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> The language specification says the same thing from the other side: "a string literal always refers to the <em>same</em> instance of class String".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5</a></p>
+
+<figure>
+<svg viewBox="0 0 680 275" role="img" aria-label="Variables a and b both point to one abc object inside the string pool. Variable c points to a separate abc object created by new String. c.intern() returns the pooled object.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="65" y="28" text-anchor="middle" font-size="11" opacity=".75">variables</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="40" width="70" height="34" rx="4"/>
+      <rect x="30" y="100" width="70" height="34" rx="4"/>
+      <rect x="30" y="180" width="70" height="34" rx="4"/>
+      <rect x="150" y="20" width="510" height="220" rx="8" opacity=".5"/>
+      <rect x="220" y="45" width="220" height="100" rx="6" stroke-dasharray="5 4"/>
+      <rect x="480" y="177" width="120" height="40" rx="6"/>
+      <path d="M100 57H190V88H274M268 83l6 5-6 5"/>
+      <path d="M100 117H190V108H274M268 103l6 5-6 5"/>
+      <path d="M100 197H474M468 192l6 5-6 5"/>
+    </g>
+    <text x="65" y="62" text-anchor="middle">a</text>
+    <text x="65" y="122" text-anchor="middle">b</text>
+    <text x="65" y="202" text-anchor="middle">c</text>
+    <text x="645" y="40" text-anchor="end" font-size="11" opacity=".75">heap</text>
+    <text x="232" y="62" font-size="11" opacity=".75">string pool</text>
+    <rect x="280" y="75" width="120" height="46" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="103" text-anchor="middle" fill="var(--accent)">"abc"</text>
+    <text x="540" y="202" text-anchor="middle">"abc"</text>
+    <text x="300" y="190" text-anchor="middle" font-size="11" opacity=".75">new String("abc")</text>
+    <g fill="none" stroke="var(--accent)" stroke-dasharray="4 3">
+      <path d="M540 177V98H406"/>
+    </g>
+    <path d="M406 93l-6 5 6 5" fill="none" stroke="var(--accent)"/>
+    <text x="548" y="140" font-size="11" fill="var(--accent)">c.intern()</text>
+    <text x="340" y="262" text-anchor="middle" font-size="12">a == b → true  ·  a == c → false  ·  a == c.intern() → true</text>
+  </g>
+</svg>
+<figcaption>Two equal literals share one pooled object. <code>new String(...)</code> always makes another object; <code>intern()</code> leads back to the pooled one.</figcaption>
+</figure>
+
+<p>Now run the example and follow it line by line:</p>
+<pre><code>String a = "abc";
+String b = "abc";               <span class="c">// same literal</span>
+String c = new String("abc");   <span class="c">// explicitly a new object</span>
+
+$ java java/examples/StringDemo.java
+a == b          : true
+a == c          : false
 a.equals(c)     : true
 a == c.intern() : true</code></pre>
-<p><strong>Rule:</strong> compare contents with <code>equals</code>, never <code>==</code>.</p>
-<h2>Concatenation</h2>
-<p>How <code>+</code> is compiled is left to the compiler: it may use <code>StringBuffer</code>, <code>StringBuilder</code> or <code>StringConcatFactory</code> depending on the JDK version.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a> In a loop, build with an explicit <code>StringBuilder</code> instead of repeated <code>+=</code>, since each <code>+=</code> creates a new string (derived from immutability; measure before optimizing).</p>
-<p>Source: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a>.</p>
+<ol class="steps">
+  <li><strong><code>a == b</code> is true.</strong> Both are the literal <code>"abc"</code>, so both point to the one pooled object.</li>
+  <li><strong><code>a == c</code> is false.</strong> <code>new</code> always creates a new object, so <code>c</code> points somewhere else. The text is the same; the object is not.</li>
+  <li><strong><code>a.equals(c)</code> is true.</strong> <code>equals</code> compares the characters, not the address.</li>
+  <li><strong><code>a == c.intern()</code> is true.</strong> <code>intern()</code> looks in the pool, finds an equal string, and returns the pooled one. The documentation: for any two strings, "<code>s.intern() == t.intern()</code> is true if and only if <code>s.equals(t)</code> is true".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a></li>
+</ol>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Are Java strings mutable?</p>
-  <button>Yes, via intern</button>
-  <button data-correct>No, they are constant</button>
-  <button>Only literals are</button>
-  <button>Yes, via concat</button>
-  <p class="explain">Strings are constant; methods return new strings.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Two identical literals compared with ==. Result?</p>
-  <button>False, always</button>
-  <button data-correct>True, shared object</button>
-  <button>Compile error</button>
-  <button>Runtime error</button>
-  <p class="explain">Literals with the same contents refer to the same instance (demo: a == b true).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. What does intern() return?</p>
-  <button data-correct>A canonical instance</button>
-  <button>A char array</button>
-  <button>A mutable copy</button>
-  <button>A hash code</button>
-  <p class="explain">It returns a canonical representation of the string.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Best way to compare string contents?</p>
-  <button>intern only</button>
-  <button data-correct>equals method</button>
-  <button>hashCode only</button>
-  <button>== operator</button>
-  <p class="explain">equals compares the exact character sequence.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">[1]</a></p>
-</div>
+<h3>Strings built at run time are new objects</h3>
+<p>The specification also says that strings joined from constants "are computed at compile time and then treated as if they were literals", but "Strings computed by concatenation at run time are newly created and therefore distinct."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5</a> Its own example:</p>
+<pre><code>String hello = "Hello", lo = "lo";
+hello == ("Hel" + "lo")   <span class="c">// true: two constants, joined by javac</span>
+hello == ("Hel" + lo)     <span class="hl">// false: lo is a variable → new object</span></code></pre>
+<p>This is why <code>==</code> on strings is so dangerous: it <em>sometimes</em> works (in a small test with literals) and then fails in production, where the string came from a request, a file or a database.</p>
+
+<h2>4. The rule: compare text with <code>equals</code></h2>
+<div class="win">Compare string <strong>contents</strong> with <code>equals()</code>. Never with <code>==</code>.</div>
+<p><code>equals</code> is defined as: "The result is true if and only if the argument is not null and is a String object that represents the same sequence of characters as this object."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a></p>
+<h3>Trap: the user input check</h3>
+<pre><code><span class="c">// answer comes from an HTTP request: built at run time</span>
+String answer = request.getParameter("confirm");
+
+if (answer == "yes") { ... }        <span class="hl">// bug: almost never true</span>
+if (answer.equals("yes")) { ... }   <span class="c">// NPE if answer is null</span>
+if ("yes".equals(answer)) { ... }   <span class="c">// best: null gives false</span></code></pre>
+<p>The last line puts the literal first. Since the argument may be null and <code>equals</code> simply returns false for null, you avoid a <code>NullPointerException</code>.</p>
+<p class="muted">Should you call <code>intern()</code> everywhere so <code>==</code> works? No. It is a lookup in a shared pool, it does not fix code that forgets to call it, and <code>equals</code> is clear and correct. Know what <code>intern()</code> does; do not use it to fix comparisons.</p>
+
+<h2>5. Building strings: <code>+</code> versus <code>StringBuilder</code></h2>
+<p>Back to the printed labels. If you add one letter at a time, and every time you print a whole new label, you throw away many labels. Better: use a whiteboard, write all the letters, and print once at the end. <code>StringBuilder</code> is that whiteboard.</p>
+<p>Its documentation calls it "A mutable sequence of characters" and recommends it over the older <code>StringBuffer</code> "as it will be faster under most implementations". The price: "Instances of StringBuilder are not safe for use by multiple threads."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html">StringBuilder javadoc</a> That is fine, because you normally build a string inside one method, on one thread.</p>
+
+<figure>
+<svg viewBox="0 0 680 215" role="img" aria-label="Top: three += operations create four separate string objects, the first three become garbage. Bottom: one StringBuilder buffer of 16 slots is filled with 0,1,2, and toString creates one final string.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="30" y="28" font-size="11" opacity=".75">String s = ""; then 3 × s += i + ","</text>
+    <g fill="none" stroke="currentColor" opacity=".5">
+      <rect x="30" y="45" width="100" height="40" rx="6"/>
+      <rect x="160" y="45" width="100" height="40" rx="6"/>
+      <rect x="290" y="45" width="100" height="40" rx="6"/>
+    </g>
+    <rect x="420" y="45" width="100" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g opacity=".5">
+      <text x="80" y="70" text-anchor="middle">""</text>
+      <text x="210" y="70" text-anchor="middle">"0,"</text>
+      <text x="340" y="70" text-anchor="middle">"0,1,"</text>
+    </g>
+    <text x="470" y="70" text-anchor="middle" fill="var(--accent)">"0,1,2,"</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M130 65h24M150 60l4 5-4 5"/>
+      <path d="M260 65h24M280 60l4 5-4 5"/>
+      <path d="M390 65h24M410 60l4 5-4 5"/>
+    </g>
+    <text x="210" y="104" text-anchor="middle" font-size="11" opacity=".75">old copies: garbage (each += copies all chars)</text>
+    <text x="530" y="70" font-size="11" fill="var(--accent)">4 objects</text>
+    <text x="30" y="140" font-size="11" opacity=".75">StringBuilder sb = new StringBuilder(); then 3 × sb.append(i).append(',')</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="30" y="152" width="24" height="30"/><rect x="54" y="152" width="24" height="30"/>
+      <rect x="78" y="152" width="24" height="30"/><rect x="102" y="152" width="24" height="30"/>
+      <rect x="126" y="152" width="24" height="30"/><rect x="150" y="152" width="24" height="30"/>
+      <rect x="174" y="152" width="24" height="30"/><rect x="198" y="152" width="24" height="30"/>
+      <rect x="222" y="152" width="24" height="30"/><rect x="246" y="152" width="24" height="30"/>
+      <rect x="270" y="152" width="24" height="30"/><rect x="294" y="152" width="24" height="30"/>
+      <rect x="318" y="152" width="24" height="30"/><rect x="342" y="152" width="24" height="30"/>
+      <rect x="366" y="152" width="24" height="30"/><rect x="390" y="152" width="24" height="30"/>
+    </g>
+    <rect x="30" y="152" width="144" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="42" y="172">0</text><text x="66" y="172">,</text><text x="90" y="172">1</text>
+      <text x="114" y="172">,</text><text x="138" y="172">2</text><text x="162" y="172">,</text>
+    </g>
+    <text x="222" y="200" text-anchor="middle" font-size="11" opacity=".75">one buffer, 16 slots, filled in place</text>
+    <g fill="none" stroke="currentColor"><path d="M420 167h74M488 162l6 5-6 5"/></g>
+    <text x="457" y="157" text-anchor="middle" font-size="11">toString()</text>
+    <rect x="500" y="147" width="120" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="560" y="172" text-anchor="middle" fill="var(--accent)">"0,1,2,"</text>
+  </g>
+</svg>
+<figcaption>Top: every <code>+=</code> makes a new string and copies the old text into it. Bottom: <code>StringBuilder</code> writes into one buffer and makes the final string once.</figcaption>
+</figure>
+
+<p>Follow the loop from the example:</p>
+<pre><code>StringBuilder sb = new StringBuilder();
+for (int i = 0; i &lt; 5; i++) sb.append(i).append(',');
+<span class="c">Step 1  new StringBuilder(): empty buffer, room for 16 characters</span>
+<span class="c">Step 2  each append writes into the same buffer (no new String)</span>
+<span class="c">Step 3  printing sb calls toString(): one String is created at the end</span>
+
+$ java java/examples/StringDemo.java
+...
+StringBuilder   : 0,1,2,3,4,</code></pre>
+<p>The "room for 16" comes from the constructor's documentation: "an initial capacity of 16 characters".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html">StringBuilder javadoc</a> If you append more, the builder grows by itself.</p>
+
+<h3>So is <code>+</code> bad? JDK 8 versus 9+</h3>
+<p>No. For one expression like <code>"id=" + id + ", name=" + name</code>, just use <code>+</code>; it is readable. How <code>+</code> is compiled is the compiler's choice: "the javac compiler may implement the operator with StringBuffer, StringBuilder, or java.lang.invoke.StringConcatFactory depending on the JDK version."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> So the bytecode for <code>+</code> on JDK 8 differs from JDK 17 and 21, but your source code stays the same.</p>
+<p>The problem is <code>+=</code> <strong>inside a loop</strong>. Each round makes a new string and copies all the old characters into it, so the work grows with every round (this follows from immutability). In a loop, use one explicit <code>StringBuilder</code>. As always: measure before you optimize small cases.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">What happens to <code>s</code> after <code>String s = "x"; s.concat("y");</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is still "x"; concat returned a new string</button>
+    <button class="opt">It becomes "xy" because concat changes it</button>
+    <button class="opt">It becomes null because the old text is gone</button>
+    <button class="opt">It throws because strings cannot be joined</button>
+  </div>
+  <div class="why">Strings are constant. <code>concat</code> returns a <em>new</em> string; if you ignore the result, nothing changes.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>"abc" == "abc"</code> print for two identical literals?</p>
+  <div class="options">
+    <button class="opt" data-correct>true, both point to one pooled object</button>
+    <button class="opt">false, every literal is a new object</button>
+    <button class="opt">It does not compile for two literals</button>
+    <button class="opt">It depends on the length of the text</button>
+  </div>
+  <div class="why">"A string literal always refers to the same instance of class String" (JLS §3.10.5). The demo prints <code>a == b : true</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>String a = "abc"; String c = new String("abc");</code> What is <code>a == c</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>false, because new always makes another object</button>
+    <button class="opt">true, because the characters are the same</button>
+    <button class="opt">true, because new String reuses the pool</button>
+    <button class="opt">It throws a NullPointerException at run time</button>
+  </div>
+  <div class="why"><code>==</code> compares addresses. <code>new</code> creates a separate object, so the addresses differ even though the text is equal.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the bug in <code>if (status == "ACTIVE")</code> when <code>status</code> was read from the database?</p>
+  <div class="options">
+    <button class="opt" data-correct>It compares objects, and a run-time string is a new object</button>
+    <button class="opt">It compares lengths only, so "ACTIVE" and "PAUSED" match</button>
+    <button class="opt">It ignores upper and lower case, so "active" also matches</button>
+    <button class="opt">There is no bug; the database always returns pooled strings</button>
+  </div>
+  <div class="why">Strings computed at run time are new objects, so <code>==</code> is false. Use <code>"ACTIVE".equals(status)</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>intern()</code> return?</p>
+  <div class="options">
+    <button class="opt" data-correct>The one shared copy of that text from the pool</button>
+    <button class="opt">A new mutable copy that you are allowed to edit</button>
+    <button class="opt">The hash code of the string as a whole number</button>
+    <button class="opt">The characters of the string as a char array</button>
+  </div>
+  <div class="why">It returns "a canonical representation": the pooled string equal to this one, adding it to the pool first if needed.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You build a 10 000-line report in a <code>for</code> loop. Which is best?</p>
+  <div class="options">
+    <button class="opt" data-correct>One StringBuilder, append in the loop, toString once</button>
+    <button class="opt">report += line in the loop, since + is always optimized</button>
+    <button class="opt">One StringBuffer per line, then join them with +</button>
+    <button class="opt">Call intern() on each line so the pool reuses them</button>
+  </div>
+  <div class="why">Each <code>+=</code> creates a new string and copies the old text. A <code>StringBuilder</code> fills one buffer; it is the documented choice for single-threaded building.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Why is String immutable in Java, and what is the difference between <code>==</code> and <code>equals()</code>?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A String cannot change after creation; methods like <code>concat</code> return a new string.</label></li>
+      <li><label><input type="checkbox"> Immutability makes strings safe to share (between variables, threads, and as map keys).</label></li>
+      <li><label><input type="checkbox"> Equal literals share one object from the string pool; <code>intern()</code> returns the pooled copy.</label></li>
+      <li><label><input type="checkbox"> <code>==</code> compares references; <code>equals()</code> compares characters.</label></li>
+      <li><label><input type="checkbox"> Strings built at run time or with <code>new</code> are new objects, so <code>==</code> fails there. Use <code>"literal".equals(x)</code>.</label></li>
+      <li><label><input type="checkbox"> In a loop, use <code>StringBuilder</code> (not thread-safe, but fast); a single <code>+</code> expression is fine.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A String in Java is immutable: once it's created, its characters never change, and methods like <code>concat</code> or <code>toUpperCase</code> return a new string. The big benefit is that strings can be shared safely, between threads and as HashMap keys. It also lets Java keep a string pool: every literal with the same text points to one shared object, and <code>intern()</code> gives you that pooled copy. That's exactly why <code>==</code> is a trap. <code>==</code> compares references, so two literals look equal, but a string from <code>new</code> or from a request is a different object and <code>==</code> is false. To compare text I always use <code>equals</code>, usually <code>"yes".equals(input)</code> so null is safe. And when I build a string in a loop I use a <code>StringBuilder</code>, because each <code>+=</code> would create a new string and copy everything again."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0018-string-traps.md">Exercise 0018: string traps</a></p>
+<p><a href="../exercises/0018-string-traps.md">Exercise 0018: string traps</a>. Write down your predictions first, then run the code.</p>
 <p>Runnable example: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">String Javadoc</a>. Class description only.</p>
-<p> &nbsp;|&nbsp; <a href="0019-exceptions-checked-unchecked-try-with-resources.html">Exceptions: checked vs unchecked and try-with-resources →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may push on: <em>"Is StringBuilder thread-safe? Why are immutable objects good for concurrency? How would you make your own class immutable?"</em> The first is answered above (no, use it on one thread). For the others, see <a href="0032-unmodifiable-vs-immutable.html">lesson 0032</a> on immutable collections and <a href="0005-visibility-and-happens-before.html">lesson 0005</a> on sharing data between threads. Next in this ladder: what happens when something goes wrong, in <a href="0019-exceptions-checked-unchecked-try-with-resources.html">lesson 0019</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String Javadoc</a>: the class description and the <code>intern()</code> method. Then <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5</a> for the literal rules and the <code>"Hel" + lo</code> example.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What exactly is the heap?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p> &nbsp;|&nbsp; <a href="0019-exceptions-checked-unchecked-try-with-resources.html">What happens when Java code fails →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/String.html">String Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation and the Java Language Specification (Java SE 21), October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html">StringBuilder Javadoc</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5 String Literals</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

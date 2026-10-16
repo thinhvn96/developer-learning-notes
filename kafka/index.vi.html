@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình Kafka</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình Kafka · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a href="../reference/kafka-cheatsheet.vi.html">Cheat sheet</a> · <span data-progress-for="kafka" data-total="23">23 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Từ "topic là gì" đến KRaft, share group và thiết kế multi-region, gói trong 23 bài ngắn theo thứ tự nên đọc. Bài nào cũng trích dẫn tài liệu Apache Kafka 4.3 (hoặc tài liệu Spring / Confluent ở những chỗ có ghi chú), và phần lớn có một script chạy trên container <code>apache/kafka:4.3.1</code> dùng xong bỏ. Học xong bài nào thì đánh dấu bài đó (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Foundation</h2>
+<p class="aside">Kafka lưu những gì, producer ghi dữ liệu ra sao và một Java client nói chuyện với nó thế nào.</p>
+<ol class="steps" data-stack="kafka">
+<li data-id="0001-events-topics-partitions"><a href="lessons/0001-events-topics-partitions.vi.html">Event, topic và partition</a></li>
+<li data-id="0002-producers-keys-and-acks"><a href="lessons/0002-producers-keys-and-acks.vi.html">Producer, key và acks</a></li>
+<li data-id="0011-java-producer-and-consumer"><a href="lessons/0011-java-producer-and-consumer.vi.html">Producer và consumer Java đầu tiên</a></li>
+</ol>
+<h2>Core</h2>
+<p class="aside">Retention, consumer group, đảm bảo delivery, partitioning và Spring Kafka: những thứ mọi backend service dùng Kafka đều cần.</p>
+<ol class="steps" data-stack="kafka">
+<li data-id="0007-retention-and-topic-configs"><a href="lessons/0007-retention-and-topic-configs.vi.html">Retention và cấu hình topic</a></li>
+<li data-id="0003-consumers-groups-and-offsets"><a href="lessons/0003-consumers-groups-and-offsets.vi.html">Consumer, consumer group và offset</a></li>
+<li data-id="0004-delivery-semantics"><a href="lessons/0004-delivery-semantics.vi.html">Delivery semantics: at most, at least, exactly once</a></li>
+<li data-id="0012-partitioning-and-partition-count"><a href="lessons/0012-partitioning-and-partition-count.vi.html">Partitioning: key, partitioner và số partition</a></li>
+<li data-id="0013-spring-kafka"><a href="lessons/0013-spring-kafka.vi.html">Spring Kafka: KafkaTemplate, @KafkaListener và commit</a></li>
+</ol>
+<h2>Advanced</h2>
+<p class="aside">Độ bền dữ liệu, tinh chỉnh throughput, rebalance, xử lý lỗi, schema và stream processing.</p>
+<ol class="steps" data-stack="kafka">
+<li data-id="0008-log-compaction"><a href="lessons/0008-log-compaction.vi.html">Log compaction và tombstone</a></li>
+<li data-id="0005-replication-isr-and-durability"><a href="lessons/0005-replication-isr-and-durability.vi.html">Replication, ISR và độ bền dữ liệu</a></li>
+<li data-id="0014-producer-throughput-batching-compression"><a href="lessons/0014-producer-throughput-batching-compression.vi.html">Throughput của producer: batching và nén</a></li>
+<li data-id="0015-rebalancing-and-group-protocols"><a href="lessons/0015-rebalancing-and-group-protocols.vi.html">Rebalance: giao thức classic và giao thức consumer mới</a></li>
+<li data-id="0016-error-handling-and-dead-letter-topics"><a href="lessons/0016-error-handling-and-dead-letter-topics.vi.html">Xử lý lỗi: retry, poison pill, dead letter topic</a></li>
+<li data-id="0017-schemas-and-schema-registry"><a href="lessons/0017-schemas-and-schema-registry.vi.html">Schema, Schema Registry và tính tương thích</a></li>
+<li data-id="0009-kafka-streams-basics"><a href="lessons/0009-kafka-streams-basics.vi.html">Kafka Streams: stream, table và state</a></li>
+</ol>
+<h2>Senior</h2>
+<p class="aside">Exactly-once, stream có state, Connect, KRaft, vận hành, queue, bảo mật và thiết kế multi-cluster.</p>
+<ol class="steps" data-stack="kafka">
+<li data-id="0006-idempotence-and-transactions"><a href="lessons/0006-idempotence-and-transactions.vi.html">Idempotent producer và transaction</a></li>
+<li data-id="0018-streams-windows-joins-exactly-once"><a href="lessons/0018-streams-windows-joins-exactly-once.vi.html">Kafka Streams: window, join và exactly-once</a></li>
+<li data-id="0010-kafka-connect"><a href="lessons/0010-kafka-connect.vi.html">Kafka Connect: đưa dữ liệu vào và ra</a></li>
+<li data-id="0019-kraft-and-controllers"><a href="lessons/0019-kraft-and-controllers.vi.html">KRaft: controller và metadata quorum</a></li>
+<li data-id="0020-monitoring-and-operations"><a href="lessons/0020-monitoring-and-operations.vi.html">Giám sát và vận hành một cluster</a></li>
+<li data-id="0021-share-groups"><a href="lessons/0021-share-groups.vi.html">Share group: queue cho Kafka</a></li>
+<li data-id="0022-security-and-quotas"><a href="lessons/0022-security-and-quotas.vi.html">Bảo mật và quota</a></li>
+<li data-id="0023-multi-cluster-and-tiered-storage"><a href="lessons/0023-multi-cluster-and-tiered-storage.vi.html">Replication giữa nhiều cluster và tiered storage</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Capstone: thiết kế trọn vẹn một nền tảng đơn hàng trên Kafka <span class="meta">(dự kiến)</span></li>
+<li>Transactional outbox với Debezium CDC <span class="meta">(dự kiến; xem <a href="../system-design/lessons/0011-transactional-outbox.vi.html">bài outbox trong system-design</a>)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> để thêm, sắp xếp lại hoặc bỏ qua bài học, hoặc để chạy một buổi phỏng vấn thử dựa trên <a href="interview.vi.html">trang hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 8: Tìm kiếm trong Kibana: Discover và KQL</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Tìm kiếm trong Kibana: Discover và KQL</h1>
+<p class="meta">ELK Stack · Bài 0008 · bước 2/14 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-kql-and-discover.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết được KQL để tìm lỗi của một service, và nói được những gì KQL không làm được.</div>
+
+<h2>Discover</h2>
+<p>"Discover là công cụ chính để khám phá dữ liệu Elasticsearch trong Kibana": tìm kiếm và lọc document, phân tích cấu trúc field, trực quan hoá các pattern, lưu lại kết quả và dùng lại trong dashboard. Nó hỗ trợ KQL, Lucene hoặc ES|QL.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[2]</a></p>
+<h2>KQL cơ bản</h2>
+<p>KQL là "một ngôn ngữ query dạng văn bản dùng để lọc dữ liệu"; nó "không aggregate, không biến đổi và không sắp xếp dữ liệu".<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+<table><tr><th>Nhu cầu</th><th>KQL<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></th></tr>
+<tr><td>field khớp giá trị</td><td><code>http.request.method: GET</code></td></tr>
+<tr><td>cụm từ chính xác</td><td><code>http.request.body.content: "null pointer"</code></td></tr>
+<tr><td>logic boolean</td><td><code>AND</code>, <code>OR</code>, <code>NOT</code> (không phân biệt hoa thường)</td></tr>
+<tr><td>wildcard</td><td><code>machine.os: win*</code></td></tr>
+<tr><td>khoảng giá trị</td><td><code>http.response.bytes &gt; 10000 and http.response.bytes &lt;= 20000</code></td></tr></table>
+<pre><code>(http.request.method: GET OR http.request.method: POST) AND http.response.status_code: 400</code></pre>
+<p>Ví dụ tìm log: <code>level: ERROR and service: orders and message: "timeout"</code> (giả sử <code>level</code> và <code>service</code> là field keyword còn <code>message</code> là text, như trong <a href="0002-documents-indices-and-mappings.vi.html">bài mapping</a>). KQL chỉ để lọc, nên đếm số lượng hay tính percentile là việc của <a href="0011-aggregations.vi.html">aggregation</a> và dashboard.</p>
+<div class="aside">Mình không chạy Kibana trong khoá học này (nó cần một stack lớn hơn các ví dụ single-node dùng xong bỏ), nên bài này chỉ dựa trên tài liệu. Nếu muốn, hãy nhờ giáo viên thêm phần hướng dẫn chạy Kibana trong container.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Ngôn ngữ query nào lọc nhưng không aggregate?</p>
+  <button>Grok</button>
+  <button data-correct>KQL</button>
+  <button>Painless</button>
+  <button>SQL</button>
+  <p class="explain">KQL không aggregate, không biến đổi và không sắp xếp dữ liệu.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. KQL cho cụm từ chính xác?</p>
+  <button data-correct>Đặt trong ngoặc kép</button>
+  <button>Ngoặc nhọn</button>
+  <button>Dấu backtick</button>
+  <button>Ngoặc góc</button>
+  <p class="explain">Cụm từ trong ngoặc kép khớp đúng thứ tự các từ.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Toán tử boolean trong KQL?</p>
+  <button data-correct>AND, OR, NOT</button>
+  <button>&& and ||</button>
+  <button>PLUS và MINUS</button>
+  <button>Không có</button>
+  <p class="explain">AND, OR và NOT, không phân biệt hoa thường.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Discover dùng để...?</p>
+  <button data-correct>Khám phá dữ liệu</button>
+  <button>Parse bằng grok</button>
+  <button>Tính số shard</button>
+  <button>Gửi log đi</button>
+  <p class="explain">Đó là công cụ chính để khám phá dữ liệu Elasticsearch trong Kibana.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-write-five-queries.vi.md">Bài tập 0008: năm query KQL</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/reference/query-languages/kql">Kibana: Kibana Query Language</a>. Trang tham khảo ngắn.</p>
+<p><a href="0001-elk-overview-and-pipeline.vi.html">← Pipeline ELK: thu thập, phân tích, lưu trữ, khám phá</a> &nbsp;|&nbsp; <a href="0002-documents-indices-and-mappings.vi.html">Document, index và mapping →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/reference/query-languages/kql">Kibana: Kibana Query Language</a> · [2] <a href="https://www.elastic.co/docs/explore-analyze/discover">Kibana: Discover</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

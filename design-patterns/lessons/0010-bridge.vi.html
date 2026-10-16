@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 10: Bridge</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bridge</h1>
+<p class="meta">Design Patterns · Bài 0010 · bước 10/30 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-bridge.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tách một class có hai chiều biến đổi độc lập thành hai hệ phân cấp được nối với nhau bằng composition.</div>
+
+<h2>Mục đích</h2>
+<p>Bridge là "một structural design pattern cho phép bạn tách một class lớn, hoặc một nhóm class liên quan chặt chẽ, thành hai hệ phân cấp riêng biệt (abstraction và implementation) có thể phát triển độc lập với nhau." Hãy dùng nó để chia nhỏ một class nguyên khối có nhiều biến thể, để mở rộng một class theo nhiều chiều trực giao, hoặc để đổi implementation lúc runtime.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/BridgeDemo.java
+Remote toggled TV, on=true
+AdvancedRemote toggled Radio, on=true
+AdvancedRemote muted Radio
+2 remote types x 2 device types = 4 combinations from 4 classes; a third device adds ONE class, not two</code></pre><p><code>Remote</code> (abstraction) giữ một <code>Device</code> (implementation). Loại remote và loại device thay đổi độc lập: mỗi bên hai loại cho ra bốn tổ hợp từ bốn class, và thêm device thứ ba chỉ cần thêm một class thay vì hai. Đây là composition over inheritance ở quy mô lớn (<a href="../../oop/lessons/0011-composition-over-inheritance.vi.html">bài OOP</a>). Mã nguồn: <a href="../examples/BridgeDemo.java"><code>BridgeDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Class và ứng dụng không phụ thuộc nền tảng</li><li>Client làm việc với các abstraction mức cao</li><li>Có lợi về Open/Closed và Single Responsibility</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Phức tạp hơn nếu áp vào một class vốn đã rất gắn kết</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a> Bridge thường được thiết kế từ đầu, còn Adapter là để chắp vá về sau; nó có cấu trúc giống State và Strategy nhưng giải quyết vấn đề khác; nó đi cùng Abstract Factory rất hợp.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Bridge tách riêng...?</p>
+  <button data-correct>Abstraction và implementation</button>
+  <button>Client và server</button>
+  <button>Dữ liệu và code</button>
+  <button>Biên dịch và chạy</button>
+  <p class="explain">Hai hệ phân cấp phát triển độc lập.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Dùng khi một class biến đổi theo...?</p>
+  <button data-correct>Nhiều chiều trực giao</button>
+  <button>Một chiều</button>
+  <button>Chỉ dữ liệu</button>
+  <button>Không chiều nào</button>
+  <p class="explain">Mở rộng theo nhiều chiều trực giao là một trường hợp sử dụng được nêu rõ.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bridge và Adapter khác nhau về thời điểm?</p>
+  <button>Không cái nào</button>
+  <button>Như nhau</button>
+  <button>Adapter thiết kế từ đầu</button>
+  <button data-correct>Bridge thiết kế từ đầu</button>
+  <p class="explain">Bridge thường được thiết kế từ đầu; Adapter là để chắp vá về sau.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Rủi ro?</p>
+  <button>Không có interface</button>
+  <button data-correct>Làm rối một class gắn kết</button>
+  <button>Trạng thái toàn cục</button>
+  <button>GC chậm</button>
+  <p class="explain">Áp nó vào một class rất gắn kết sẽ làm tăng độ phức tạp.<a class="cite" href="https://refactoring.guru/design-patterns/bridge">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-two-dimensions.vi.md">Bài tập 10: hai chiều biến đổi</a></p>
+<p>Ví dụ chạy được: <a href="../examples/BridgeDemo.java"><code>BridgeDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/bridge">Bridge (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0009-adapter.vi.html">← Adapter</a> &nbsp;|&nbsp; <a href="0011-composite.vi.html">Composite →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/bridge">Bridge (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

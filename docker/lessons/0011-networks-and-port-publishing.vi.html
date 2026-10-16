@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 11: Network, DNS theo tên và publish port</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Network, DNS theo tên và publish port</h1>
+<p class="meta">Docker · Bài 0011 · bước 8/12 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-networks-and-port-publishing.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vì sao các container trên user-defined bridge gọi nhau được bằng tên còn trên default bridge thì không, và <code>-p</code> thực sự publish cái gì.</div>
+
+<h2>Các driver</h2>
+<p>Các driver có sẵn trên Linux: <code>bridge</code> (mặc định), <code>host</code> (bỏ cô lập), <code>none</code> (cô lập hoàn toàn), <code>overlay</code> (nhiều daemon), cùng với <code>ipvlan</code> và <code>macvlan</code>.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a></p>
+<h2>Default bridge vs user-defined bridge</h2>
+<ul><li>User-defined bridge tự động phân giải DNS giữa các container theo tên hoặc alias; container trên default bridge chỉ dùng được địa chỉ IP (hoặc <code>--link</code> kiểu cũ).<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></li>
+<li>User-defined bridge cô lập tốt hơn: chỉ những container gắn vào network đó mới nói chuyện được với nhau.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></li></ul>
+<pre><code>cd docker/examples &amp;&amp; ./04-networks.sh
+default bridge       : ping: bad address 'b-...'
+user-defined bridge  : PING d-... (172.18.0.3): 64 bytes ... time=0.056 ms
+c (user) -&gt; b (default) by name: ping: bad address</code></pre>
+<h2>Publish port</h2>
+<p>Không có <code>-p</code> thì các port "không truy cập được từ bên ngoài host, hoặc với cấu hình mặc định, từ các container ở network khác". Publish là chuyển tiếp traffic giữa port của host và port của container.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a><a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a> Các container trên cùng một user-defined bridge thấy được mọi port của nhau mà không cần publish.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a> Đó là lý do các service trong Compose kết nối tới database bằng <code>db:5432</code>. Source: <a href="../examples/04-networks.sh"><code>04-networks.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Gọi container khác bằng tên trên default bridge?</p>
+  <button>Chỉ khi có EXPOSE</button>
+  <button>Luôn luôn được</button>
+  <button data-correct>Không được</button>
+  <button>Chỉ khi có -p</button>
+  <p class="explain">Các container trên default bridge không gọi nhau bằng tên được.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Loại network nào có DNS tự động?</p>
+  <button>Driver none</button>
+  <button data-correct>User-defined bridge</button>
+  <button>Driver host</button>
+  <button>Default bridge</button>
+  <p class="explain">User-defined bridge cung cấp phân giải DNS tự động.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. -p làm gì?</p>
+  <button>Tạm dừng container</button>
+  <button>Pull image về</button>
+  <button data-correct>Publish một port ra host</button>
+  <button>Dọn dẹp các network</button>
+  <p class="explain">Nó chuyển tiếp traffic giữa port của host và port của container.<a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Driver nào bỏ cô lập network?</p>
+  <button>overlay</button>
+  <button>bridge</button>
+  <button>none</button>
+  <button data-correct>host</button>
+  <p class="explain">host bỏ cô lập giữa container và host.<a class="cite" href="https://docs.docker.com/engine/network/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-three-container-network.vi.md">Bài tập 0011: network với ba container</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-networks.sh"><code>04-networks.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/engine/network/">Docker networking overview</a>. Sau đó đọc trang về bridge driver.</p>
+<p><a href="0010-volumes-and-bind-mounts.vi.html">← Volume và bind mount</a> &nbsp;|&nbsp; <a href="0004-compose-app-and-database.vi.html">Compose: một ứng dụng và một database →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/engine/network/">Docker networking overview</a> · [2] <a href="https://docs.docker.com/engine/network/drivers/bridge/">Bridge network driver</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 15: Horizontal Pod Autoscaler</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Horizontal Pod Autoscaler</h1>
+<p class="meta">Kubernetes · Bài 0015 · bước 15/15 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0015-horizontal-pod-autoscaler.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tính số replica mong muốn bằng công thức của HPA và nêu được các điều kiện tiên quyết để nó hoạt động.</div>
+
+<h2>HPA làm gì</h2>
+<p>HorizontalPodAutoscaler cập nhật một workload (Deployment, StatefulSet) cho khớp với nhu cầu bằng cách thêm hoặc bớt Pod; nó không áp dụng cho các object không scale được, như DaemonSet.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+<p>Thuật toán:</p>
+<pre><code>desiredReplicas = ceil[ currentReplicas x ( currentMetricValue / desiredMetricValue ) ]</code></pre>
+<p>Ví dụ trong tài liệu: giá trị hiện tại 200m so với mục tiêu 100m sẽ làm số replica tăng gấp đôi.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a> Mặc định controller đánh giá lại sau mỗi 15 giây.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a> Ví dụ tính tay: 3 Pod với CPU trung bình 90 phần trăm, mục tiêu 70 phần trăm, cho ra ceil(3 x 90/70) = ceil(3.86) = 4 Pod (tôi tự tính theo công thức trong tài liệu).</p>
+<h2>Điều kiện tiên quyết</h2>
+<ul><li>Với mục tiêu dạng utilization, container phải khai báo <strong>resource request</strong>; nếu không thì CPU utilization không xác định được và autoscaler sẽ không làm gì với metric đó.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></li>
+<li>Một nguồn metric, thường là add-on Metrics Server, được cài riêng.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></li></ul>
+<pre><code>kubectl apply -f examples/hpa.yaml
+NAME        REFERENCE                     TARGETS              MINPODS MAXPODS REPLICAS
+nginx-hpa   Deployment/nginx-deployment   cpu: &lt;unknown&gt;/70%   2       6       3</code></pre>
+<p><code>&lt;unknown&gt;</code> là thứ bạn thấy khi không có metrics server (và Deployment nginx không khai báo request): HPA tồn tại nhưng không làm gì được. Liên hệ với <a href="0005-requests-limits-and-the-jvm.vi.html">bài về request</a>: không có request thì không có mốc nào để tính utilization. File: <a href="../examples/hpa.yaml"><code>hpa.yaml</code></a>.</p><p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Công thức dùng tỉ số nào?</p>
+  <button>Request chia limit</button>
+  <button>Số node chia số Pod</button>
+  <button>Mong muốn chia hiện tại</button>
+  <button data-correct>Metric hiện tại chia mong muốn</button>
+  <p class="explain">desired = ceil(số replica hiện tại x metric hiện tại / metric mong muốn).<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Mục tiêu utilization cần container có gì?</p>
+  <button data-correct>Resource request</button>
+  <button>Chỉ cần label</button>
+  <button>Chỉ cần resource limit</button>
+  <button>Probe</button>
+  <p class="explain">Không có request thì CPU utilization không xác định được.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. HPA lấy resource metric từ đâu?</p>
+  <button data-correct>Một Metrics Server</button>
+  <button>Trực tiếp từ etcd</button>
+  <button>Log của kubelet</button>
+  <button>Scheduler</button>
+  <p class="explain">Thường nó cần metrics API do add-on Metrics Server cung cấp.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. HPA không scale được workload nào?</p>
+  <button>ReplicaSet</button>
+  <button>StatefulSet</button>
+  <button>Deployment</button>
+  <button data-correct>DaemonSet</button>
+  <p class="explain">HPA không áp dụng cho các object không scale được, như DaemonSet.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0015-autoscale-math.vi.md">Bài tập 0015: tính toán autoscale</a></p>
+<p>Ví dụ chạy được: <a href="../examples/hpa.yaml"><code>hpa.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">Kubernetes Docs: Horizontal Pod Autoscaling</a>. Đọc phần 'How does a HorizontalPodAutoscaler work?' và phần thuật toán.</p>
+<p><a href="0014-ingress.vi.html">← Ingress: định tuyến HTTP vào cluster</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">Kubernetes Docs: Horizontal Pod Autoscaling</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 17: Command</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Command</h1>
+<p class="meta">Design Patterns · Bài 0017 · bước 17/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0017-command.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> biến một request thành object để có thể đưa vào queue, ghi log và undo.</div>
+
+<h2>Mục đích</h2>
+<p>Command là "một behavioral design pattern biến một request thành một object độc lập chứa toàn bộ thông tin về request đó." Hãy dùng nó để tham số hóa object bằng các thao tác, để đưa thao tác vào queue, lên lịch hoặc thực thi từ xa, và để cài đặt các thao tác có thể đảo ngược kèm lịch sử.<a class="cite" href="https://refactoring.guru/design-patterns/command">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/CommandDemo.java
+append(Hello) -&gt; &quot;Hello&quot;
+append(, world) -&gt; &quot;Hello, world&quot;
+upper -&gt; &quot;HELLO, WORLD&quot;
+undo upper -&gt; &quot;Hello, world&quot;
+undo append(, world) -&gt; &quot;Hello&quot;
+undo append(Hello) -&gt; &quot;&quot;
+a Runnable is a one-method Command</code></pre><p>Mỗi command biết cách <code>execute()</code> và <code>undo()</code>; một <code>Deque</code> chứa các command đã thực thi tạo thành lịch sử, được undo theo thứ tự ngược lại. Trong Java, một <code>Runnable</code> chính là một command chỉ có một method. Mã nguồn: <a href="../examples/CommandDemo.java"><code>CommandDemo.java</code></a>. So sánh với job queue (message trong Kafka/RabbitMQ là các command hoặc event đang trên đường đi: <a href="../../system-design/lessons/0007-queue-based-load-leveling.vi.html">load leveling</a>).</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Tách bên gọi khỏi bên thực hiện</li><li>Open/Closed: thoải mái thêm command</li><li>Undo/redo và thực thi trì hoãn</li><li>Ghép command đơn giản thành command phức tạp</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Thêm một tầng giữa bên gửi và bên nhận</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/command">[1]</a> Command đi cùng Memento để làm undo, khác với Strategy (một thao tác dưới dạng object so với một họ thuật toán), và có liên quan tới Chain of Responsibility, Mediator và Observer.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Command biến một request thành...?</p>
+  <button>Một class loader</button>
+  <button>Một thread</button>
+  <button>Một table</button>
+  <button data-correct>Một object</button>
+  <p class="explain">Một object độc lập chứa toàn bộ thông tin về request.<a class="cite" href="https://refactoring.guru/design-patterns/command">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Nó giúp có được tính năng nào?</p>
+  <button>Static typing</button>
+  <button>GC nhanh hơn</button>
+  <button>Reflection</button>
+  <button data-correct>Undo và redo</button>
+  <p class="explain">Lịch sử command hỗ trợ undo/redo.<a class="cite" href="https://refactoring.guru/design-patterns/command">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Ví dụ trong JDK?</p>
+  <button>Comparator</button>
+  <button data-correct>Runnable</button>
+  <button>Object</button>
+  <button>Iterator</button>
+  <p class="explain">Runnable là một request dưới dạng object.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái giá phải trả?</p>
+  <button>JIT chậm hơn</button>
+  <button>Không có interface</button>
+  <button>Trạng thái static</button>
+  <button data-correct>Thêm một tầng</button>
+  <p class="explain">Nó thêm một tầng giữa bên gửi và bên nhận.<a class="cite" href="https://refactoring.guru/design-patterns/command">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0017-macro-command.vi.md">Bài tập 17: một macro command</a></p>
+<p>Ví dụ chạy được: <a href="../examples/CommandDemo.java"><code>CommandDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/command">Command (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0016-chain-of-responsibility.vi.html">← Chain of Responsibility</a> &nbsp;|&nbsp; <a href="0018-iterator.vi.html">Iterator →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/command">Command (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

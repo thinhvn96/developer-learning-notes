@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn Spring Boot</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Spring Boot: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Spring Boot · 14 câu hỏi · <a href="index.vi.html">Lộ trình Spring Boot</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi Spring và Spring Boot cho vòng phỏng vấn backend Senior. Các câu trả lời có trích output đều lấy từ project demo trong <code>examples/demo-app</code> (test chạy bằng <code>./mvnw test</code>); các đoạn code khác lấy từ tài liệu Spring.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>IoC và dependency injection là gì? Bean là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> container tạo và nối các object với nhau; bean là object do container quản lý.</p>
+<p>DI là một dạng chuyên biệt của IoC, trong đó object chỉ khai báo dependency qua tham số constructor, tham số factory method hoặc property, và container inject chúng khi tạo bean, ngược lại với việc bean tự khởi tạo hoặc tự đi tìm dependency của mình. Bean là "một object được khởi tạo, lắp ráp và quản lý bởi Spring IoC container."<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a> Lợi ích: component phụ thuộc vào abstraction và có thể test bằng các bản giả (fake).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> BeanFactory khác ApplicationContext thế nào? (ApplicationContext là sub-interface và là superset đầy đủ, bổ sung tích hợp AOP, message resource, publish event và web context.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0001-ioc-and-beans.vi.html">IoC và bean</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Constructor, setter hay field injection: bạn dùng cái nào và vì sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> constructor injection cho các dependency bắt buộc.</p>
+<p>Theo tài liệu reference: dùng constructor cho dependency bắt buộc và setter cho dependency tuỳ chọn. Đội Spring ủng hộ constructor injection vì nó cho phép xây dựng component bất biến, đảm bảo các dependency bắt buộc không null, và trả về component đã khởi tạo đầy đủ. Setter injection hợp với dependency tuỳ chọn có giá trị mặc định, hoặc với class của bên thứ ba.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[2]</a> Constructor injection còn giúp unit test đơn giản: chỉ cần gọi <code>new OrderService(fake)</code> mà không cần container. (Trang reference tôi đọc không bàn về field injection; hãy giải thích lý do bạn phản đối nó dựa trên các điểm về khả năng test và tính bất biến ở trên.)</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Còn dependency vòng tròn thì sao? (Constructor injection làm lộ chúng ra dưới dạng <code>BeanCurrentlyInCreationException</code>; dùng setter injection cho một bean có thể phá vòng, nhưng thiết kế lại thì tốt hơn.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[2]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0002-constructor-injection.vi.html">Constructor injection</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Auto-configuration của Spring Boot hoạt động thế nào? Bạn debug nó ra sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> nó cấu hình bean có điều kiện dựa trên các jar trên classpath, và rút lui khi bạn tự định nghĩa bean của mình.</p>
+<p>Boot "cố gắng tự động cấu hình ứng dụng Spring của bạn dựa trên các jar dependency bạn đã thêm vào" (có HSQLDB trên classpath và không có bean kết nối nào thì nó cấu hình một database in-memory). Bạn bật nó bằng <code>@EnableAutoConfiguration</code> hoặc <code>@SpringBootApplication</code>. Nó không xâm lấn: tự định nghĩa <code>DataSource</code> là phần mặc định tự rút lui. Khởi động với <code>--debug</code> để log ra conditions report cho biết cái gì đã được áp dụng và vì sao; loại class bằng <code>exclude</code> hoặc <code>spring.autoconfigure.exclude</code>.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[3]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn sẽ viết starter của riêng mình thế nào? (Nằm ngoài các trang đã đọc ở đây; tài liệu reference của Boot có một phần về việc tạo auto-configuration.)</div>
+<p class="see">Học bài: <a href="lessons/0003-auto-configuration.vi.html">Auto-configuration</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Bạn thiết kế một REST controller trong Spring MVC thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>@RestController</code> với các composed mapping annotation, <code>@PathVariable</code>, <code>@RequestBody</code> và status code tường minh.</p>
+<p>Ưu tiên <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, <code>@DeleteMapping</code>, <code>@PatchMapping</code> thay vì <code>@RequestMapping</code> đứng một mình, vốn mặc định khớp với mọi HTTP method. <code>@ResponseStatus(HttpStatus.CREATED)</code> đặt 201 cho thao tác tạo mới.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[4]</a> Hãy nhắc tới idempotency (PUT và DELETE) vì client và gateway sẽ retry.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn validate input và xử lý lỗi tập trung thế nào? (Không nằm trong các trang đã đọc cho khoá học này; hãy nhờ giáo viên mở rộng bài học.)</div>
+<p class="see">Học bài: <a href="lessons/0004-rest-controllers.vi.html">REST controller</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>@Transactional hoạt động thế nào, và những cái bẫy kinh điển là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một proxy mở và commit/rollback transaction bao quanh các lời gọi từ bên ngoài; các bẫy là self-invocation, visibility và checked exception.</p>
+<p>Mặc định: propagation REQUIRED, isolation theo mặc định của database, read-write, rollback với <code>RuntimeException</code> và <code>Error</code> nhưng <strong>không</strong> rollback với checked exception (dùng <code>rollbackFor = Exception.class</code>). Ở chế độ proxy mặc định, chỉ lời gọi từ bên ngoài đi qua proxy mới bị chặn lại, nên một method gọi method khác trên cùng object sẽ bỏ qua transaction; method private không bao giờ có transaction. Chế độ AspectJ là phương án thay thế nếu bạn cần self-invocation.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[5]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Method service của bạn ném checked exception nhưng row vẫn được commit. Vì sao? (Do quy tắc rollback mặc định.)</div>
+<p class="see">Học bài: <a href="lessons/0005-transactional-proxies-and-rollback.vi.html">@Transactional</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>REQUIRED, REQUIRES_NEW và NESTED khác nhau thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> tham gia chung, luôn tạo transaction mới độc lập, hoặc dùng savepoint.</p>
+<p><strong>REQUIRED</strong> (mặc định): một physical transaction; tham gia vào transaction bên ngoài nếu có; đánh dấu rollback-only ở bên trong ảnh hưởng tới bên ngoài (có thể gây <code>UnexpectedRollbackException</code>). <strong>REQUIRES_NEW</strong>: một physical transaction độc lập với commit/rollback riêng; nó có thể làm cạn connection pool và gây deadlock nếu pool quá nhỏ, vì connection của transaction bên ngoài vẫn bị giữ. <strong>NESTED</strong>: một physical transaction với các savepoint; bên trong rollback được mà không kéo theo bên ngoài; chỉ hoạt động với JDBC resource transaction.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[6]</a> Ứng dụng kinh điển: REQUIRES_NEW cho bản ghi audit phải được lưu kể cả khi transaction nghiệp vụ thất bại.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao REQUIRES_NEW của tôi không mở transaction mới? (Self-invocation đã bỏ qua proxy.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[5]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0006-transaction-propagation.vi.html">Transaction propagation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Isolation của transaction trong Spring liên quan thế nào tới database?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> isolation của <code>@Transactional</code> mặc định theo mức mặc định của database; trên PostgreSQL là Read committed.</p>
+<p>Bảng thuộc tính liệt kê isolation với giá trị mặc định <code>ISOLATION_DEFAULT</code>.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[5]</a> Mặc định của PostgreSQL là Read committed, và mức Serializable của nó có thể thất bại với serialization error mà ứng dụng phải retry.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[7]</a> Vì vậy một service Spring dùng Serializable cần có logic retry bao quanh method có transaction.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Logic retry nên đặt ở đâu? (Bên ngoài ranh giới transaction, bọc toàn bộ lời gọi, để mỗi lần thử có một transaction mới.)</div>
+<p class="see">Học bài: <a href="lessons/0005-transactional-proxies-and-rollback.vi.html">@Transactional</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Derived query method trong Spring Data JPA là gì, và khi nào thì thôi dùng chúng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Spring phân tích tên method (ví dụ <code>findByEmailAddressAndLastname</code>) thành một query; hãy dùng <code>@Query</code> hoặc cách khác khi tên method trở nên quá cồng kềnh.</p>
+<p>Các từ khoá được hỗ trợ gồm <code>And</code>, <code>Or</code>, <code>Between</code>, <code>LessThan</code>, <code>Like</code>, <code>In</code>, <code>OrderBy</code>. Khi derived query trở nên quá phức tạp, hãy dùng <code>@Query</code>, named query, custom repository method, Query by Example hoặc Specification.<a class="cite" href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html">[8]</a> Vấn đề N+1 query là một bài dự kiến trong khoá học này; nguồn cho nó chưa được thu thập, nên tạm thời đừng dựa vào khoá học này cho chủ đề đó.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vấn đề N+1 là gì? (Chuẩn bị từ tài liệu Hibernate; đã được ghi nhận là lỗ hổng trong RESOURCES.md.)</div>
+<p class="see">Học bài: <a href="index.vi.html">Lộ trình Spring Boot</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Scope singleton so với prototype. Chuyện gì trục trặc khi một singleton phụ thuộc vào một prototype?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> prototype chỉ được inject một lần, nên singleton giữ mãi cùng một instance.</p>
+<p>Singleton (mặc định): một instance dùng chung cho mỗi container, không phải cho mỗi class loader; prototype: một instance mới cho mỗi lần yêu cầu, không có destruction callback. "Khi một singleton bean phụ thuộc vào một prototype bean, prototype bean chỉ được inject đúng một lần."<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[9]</a> Đã kiểm chứng trong demo project: id của prototype được inject là 1, 1; qua <code>ObjectProvider</code> là 4, 5. Thêm nữa: singleton phải thread-safe.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao lấy prototype mới mỗi lần gọi? (ObjectProvider hoặc method injection.)</div>
+<p class="see">Học bài: <a href="lessons/0007-bean-scopes.vi.html">Bean scope</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Spring Boot phân giải cấu hình thế nào, và profile là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các property source xếp lớp, nguồn sau thắng: file, env var, system property, dòng lệnh; profile kích hoạt các bean và file riêng cho từng môi trường.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[10]</a> Thứ tự (thấp tới cao): default, <code>@PropertySource</code>, file config, random, env var của OS, system property, JNDI, servlet param, <code>SPRING_APPLICATION_JSON</code>, tham số dòng lệnh. Profile tách riêng cấu hình; kích hoạt bằng <code>spring.profiles.active</code>, và có profile <code>default</code> khi không đặt profile nào.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/profiles.html">[11]</a> Đã kiểm chứng: một property đặt trong annotation của test đã ghi đè <code>application-dev.properties</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn cấu hình một container Spring Boot trong Kubernetes thế nào? (ConfigMap dưới dạng env var hoặc file properties được mount.)</div>
+<p class="see">Học bài: <a href="lessons/0008-externalized-configuration-and-profiles.vi.html">Cấu hình và profile</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span><code>@Value</code> so với <code>@ConfigurationProperties</code>?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> bind type-safe một nhóm property vào một object, bất biến nhờ constructor binding, có relaxed binding và validation.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[10]</a> Dùng được với record và <code>@DefaultValue</code>; <code>@Validated</code> bật kiểm tra constraint; relaxed binding ánh xạ <code>my-project</code>, <code>myProject</code> và <code>MY_PROJECT</code>. Demo của tôi đã bind <code>app.name</code> và một greeting mặc định vào một record.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khởi động khi thiếu một property bắt buộc thì sao? (Theo tài liệu thì sẽ thất bại nếu bật validation; tôi chưa chạy trường hợp này.)</div>
+<p class="see">Học bài: <a href="lessons/0009-configuration-properties-binding.vi.html">Configuration properties</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Bạn validate request body thế nào và client nhận được gì khi thất bại?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> constraint annotation cộng với <code>@Valid</code>; khi thất bại sẽ ném <code>MethodArgumentNotValidException</code> và thường trả về 400.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[12]</a> Đã kiểm chứng trong demo: tên để trống và tuổi âm trả về 400, body hợp lệ trả về 201.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Quy tắc này còn nên nằm ở đâu nữa? (Trong database, dưới dạng constraint.)</div>
+<p class="see">Học bài: <a href="lessons/0010-validation-and-400-errors.vi.html">Validation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Bạn expose health cho Kubernetes thế nào, và liveness không nên kiểm tra gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> dùng các group liveness và readiness của Actuator; liveness không được phụ thuộc vào hệ thống bên ngoài.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[13]</a> Mặc định chỉ expose health; các group nằm ở <code>/actuator/health/liveness</code> và <code>/readiness</code>; nếu liveness phụ thuộc database, một lần database sập có thể làm restart mọi instance và lan thành dây chuyền. Test của tôi: liveness và readiness trả về 200 UP, còn <code>/actuator/env</code> và <code>/actuator/beans</code> trả về 404 (không được expose).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Readiness nên bao gồm những gì? (Các dependency dùng chung thiết yếu, chọn có chủ đích.)</div>
+<p class="see">Học bài: <a href="lessons/0011-actuator-and-kubernetes-probes.vi.html">Actuator</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Bạn test một ứng dụng Spring Boot hiệu quả thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> nhiều slice test (<code>@WebMvcTest</code>, <code>@DataJpaTest</code>), ít <code>@SpringBootTest</code> đầy đủ hơn, và integration test với backend thật bằng Testcontainers.</p>
+<p><a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[14]</a> <code>@SpringBootTest</code> tạo context đầy đủ và mặc định không khởi động server (MOCK); <code>RANDOM_PORT</code> khởi động server thật. Slice chỉ load một phần cấu hình. <code>@MockitoBean</code> thay thế bean.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[14]</a> Testcontainers quản lý các backend chạy bằng Docker, và <code>@ServiceConnection</code> tự động cung cấp thông tin kết nối (tôi chưa chạy Testcontainers ở đây).<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[15]</a> Demo của tôi chạy 17 test theo cả hai kiểu.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao không dùng H2 cho mọi thứ? (Hành vi khác với PostgreSQL: isolation, locking, dialect.)</div>
+<p class="see">Học bài: <a href="lessons/0012-test-slices-and-springboottest.vi.html">Testing</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để làm một buổi phỏng vấn thử: "hỏi tôi lần lượt từng câu Spring Boot này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">Spring: IoC container and beans</a> · [2] <a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring: Dependency injection</a> · [3] <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot: Auto-configuration</a> · [4] <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">Spring MVC: Mapping requests</a> · [5] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring: @Transactional</a> · [6] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring: Transaction propagation</a> · [7] <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL: Transaction isolation</a> · [8] <a href="https://docs.spring.io/spring-data/jpa/reference/jpa/query-methods.html">Spring Data JPA: Query methods</a> · [9] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring: Bean scopes</a> · [10] <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized configuration</a> · [11] <a href="https://docs.spring.io/spring-boot/reference/features/profiles.html">Spring Boot: Profiles</a> · [12] <a href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">Spring: Bean Validation</a> · [13] <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot: Actuator endpoints</a> · [14] <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot: Testing</a> · [15] <a href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">Spring Boot: Testcontainers</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

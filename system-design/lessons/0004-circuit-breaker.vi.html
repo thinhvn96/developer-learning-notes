@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 4: Pattern circuit breaker</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pattern circuit breaker</h1>
+<p class="meta">System Design · Bài 0004 · bước 3/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-circuit-breaker.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được ba trạng thái của circuit breaker và nó khác retry ở điểm nào.</div>
+
+<h2>Mục đích</h2>
+<p>Pattern này giúp ứng dụng không liên tục thử lại một thao tác nhiều khả năng sẽ thất bại, để nó có thể tiếp tục chạy mà không phải chờ sự cố được khắc phục, đồng thời phát hiện được khi nào sự cố đã hết. Nó khác với Retry: "Pattern Retry cho phép ứng dụng thử lại một thao tác với kỳ vọng cuối cùng nó sẽ thành công. Pattern Circuit Breaker ngăn ứng dụng thực hiện một thao tác nhiều khả năng sẽ thất bại." Bạn có thể kết hợp cả hai bằng cách retry <em>thông qua</em> một breaker.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+<h2>Các trạng thái</h2>
+<ul><li><strong>Closed:</strong> request đi qua bình thường; breaker giữ một bộ đếm lỗi; quá nhiều lỗi trong một khoảng thời gian sẽ chuyển nó sang Open và khởi động một bộ đếm timeout.</li>
+<li><strong>Open:</strong> request "thất bại ngay lập tức và một exception được trả về".</li>
+<li><strong>Half-Open:</strong> sau timeout, một số lượng request giới hạn được cho đi qua; nếu thành công thì breaker đóng lại và reset bộ đếm; chỉ cần một lỗi là nó mở lại. Điều này giúp một service đang hồi phục không bị dội ngập request.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></li></ul>
+<pre><code>java system-design/examples/CircuitBreakerDemo.java
+call 1-2 -&gt; fallback state=CLOSED  real calls=1,2
+call 3   -&gt; fallback state=OPEN    real calls=3       # threshold of 3 failures reached
+call 4-8 -&gt; fallback state=OPEN    real calls=3       # service not touched
+-- service recovers, wait for the timeout
+call 9   -&gt; ok       state=CLOSED  real calls=4</code></pre>
+<p>Mã nguồn: <a href="../examples/CircuitBreakerDemo.java"><code>CircuitBreakerDemo.java</code></a> (bản cài đặt tối giản của mình cho các trạng thái được mô tả trong tài liệu, không phải code production; hãy dùng library). Những điểm cần cân nhắc theo tài liệu: xử lý các exception mà breaker ném ra (giảm chức năng, dùng phương án thay thế, hoặc báo cho người dùng), giám sát các lần đổi trạng thái, tinh chỉnh timeout, và nhớ rằng một timeout dài khi gọi ra ngoài vẫn có thể giữ chặt thread.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a> Không cần dùng khi một thiết kế hướng message đã đẩy các lỗi vào dead letter queue.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Trạng thái nào từ chối request ngay lập tức?</p>
+  <button>Closed</button>
+  <button>Half-Open</button>
+  <button>Reset</button>
+  <button data-correct>Open</button>
+  <p class="explain">Ở trạng thái Open, request thất bại ngay lập tức.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Half-Open làm gì?</p>
+  <button>Chặn mọi thứ</button>
+  <button data-correct>Cho vài request thử đi qua</button>
+  <button>Retry mãi mãi</button>
+  <button>Xóa bộ đếm</button>
+  <p class="explain">Một số lượng request giới hạn được phép gọi thao tác.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Circuit breaker so với retry?</p>
+  <button>Retry chặn lời gọi</button>
+  <button>Hai cái giống hệt nhau</button>
+  <button data-correct>Breaker chặn lời gọi dễ lỗi</button>
+  <button>Breaker thêm retry</button>
+  <p class="explain">Breaker ngăn thực hiện một thao tác nhiều khả năng sẽ thất bại.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Request thử ở Half-Open bị lỗi. Trạng thái tiếp theo?</p>
+  <button>Bị gỡ bỏ</button>
+  <button data-correct>Open</button>
+  <button>Lại Half-Open</button>
+  <button>Closed</button>
+  <p class="explain">Bất kỳ lỗi nào cũng đưa về Open và khởi động lại bộ đếm thời gian.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-tune-a-breaker.vi.md">Bài tập 0004: tinh chỉnh breaker</a></p>
+<p>Ví dụ chạy được: <a href="../examples/CircuitBreakerDemo.java"><code>CircuitBreakerDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">Azure: Circuit Breaker pattern</a>. Phần giải pháp và các điểm cần cân nhắc.</p>
+<p><a href="0002-retries-and-idempotency.vi.html">← Retry, backoff và idempotency</a> &nbsp;|&nbsp; <a href="0005-bulkhead.vi.html">Pattern bulkhead →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">Azure: Circuit Breaker pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

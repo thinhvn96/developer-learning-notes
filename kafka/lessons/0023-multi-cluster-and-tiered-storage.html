@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 23: Multi-cluster replication and tiered storage</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Multi-cluster replication and tiered storage</h1>
+<p class="meta">Kafka · Lesson 0023 · step 23 of 23 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0023-multi-cluster-and-tiered-storage.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> design disaster recovery across data centres with MirrorMaker 2, and cut storage cost for long retention with tiered storage.</div>
+
+<h2>Why more than one cluster</h2>
+<p>Replication inside a cluster survives broker and rack failures, not the loss of a region. Cross-cluster mirroring covers disaster recovery, geo-proximity, aggregating edge clusters into a central one, cloud migration and legal data placement.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></p>
+<h2>MirrorMaker 2</h2>
+<ul>
+<li>"MirrorMaker is built on top of the Kafka Connect framework"; flows are written <code>source-&gt;target</code>.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+<li><strong>Active/passive:</strong> one flow, <code>primary-&gt;secondary</code>, the standby takes over on failure. <strong>Active/active:</strong> <code>A-&gt;B, B-&gt;A</code>, both serve traffic.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+<li>Replicated topics are renamed: topic <code>foo</code> from cluster <code>us-west</code> becomes <code>us-west.foo</code> (<code>DefaultReplicationPolicy</code>). The prefix is what prevents infinite loops in active/active.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+<li>Consumer group offsets are replicated through checkpoints so applications can fail over and resume near where they were.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a> Offsets differ between clusters, which is why translation is needed at all.</li>
+<li>Exactly-once is supported for dedicated MirrorMaker clusters since 3.5.0.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+</ul>
+<div class="aside">Replication between clusters is asynchronous: on failover the last seconds of data may be missing in the standby (a non-zero RPO). Say this explicitly in a design interview.</div>
+<h2>Tiered storage</h2>
+<p>Long retention on broker disks is expensive and slows broker replacement (a new broker must copy everything). Tiered storage splits the log: "The local tier is the same as the current Kafka that uses the local disks", and the "remote tier uses external storage systems, such as HDFS or S3" for completed segments.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></p>
+<ul>
+<li>Broker: <code>remote.log.storage.system.enable=true</code>; topic: <code>remote.storage.enable=true</code>.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+<li><code>local.retention.ms</code> / <code>local.retention.bytes</code> decide how much stays local before moving to remote; <code>retention.ms</code> still decides total retention.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+<li>Kafka ships the <code>RemoteStorageManager</code> interface but no production plugin; you need one for S3, GCS or HDFS.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+<li>Limitation: "No support for compacted topics".<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+</ul>
+<div class="aside">Interview answer: "Inside a region: RF 3 across racks. Across regions: MirrorMaker 2 active/passive with checkpointed offsets, accepting a small RPO. For months of retention: tiered storage to S3 with a short local retention, except for compacted topics."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. MirrorMaker 2 is built on what?</p>
+  <button data-correct>Kafka Connect</button>
+  <button>Share groups</button>
+  <button>Kafka Streams</button>
+  <button>ZooKeeper</button>
+  <p class="explain">MirrorMaker is built on top of the Kafka Connect framework.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Topic foo mirrored from us-west is named?</p>
+  <button>foo.us-west</button>
+  <button>foo</button>
+  <button data-correct>us-west.foo</button>
+  <button>foo-mirror</button>
+  <p class="explain">The default format is {source}.{source_topic_name}.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Which topics cannot use tiered storage?</p>
+  <button>Keyed topics</button>
+  <button>Internal topics</button>
+  <button data-correct>Compacted topics</button>
+  <button>Large topics</button>
+  <p class="explain">Tiered storage has no support for compacted topics.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What moves to the remote tier?</p>
+  <button>The active segment</button>
+  <button>Consumer offsets</button>
+  <button>Producer buffers</button>
+  <button data-correct>Completed log segments</button>
+  <p class="explain">The remote tier stores completed log segments.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0023-design-dr.md">Exercise 0023: design disaster recovery</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">Kafka Operations: Geo-Replication (MirrorMaker)</a>. Read 'Overview', 'Configuring Geo-Replication' and the topology examples; then Tiered Storage.</p>
+<p><a href="0022-security-and-quotas.html">← Security and quotas</a> &nbsp;|&nbsp; <a href="../interview.html">Kafka interview Q&amp;A →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">Kafka Operations: Geo-Replication (MirrorMaker)</a> · [2] <a href="https://kafka.apache.org/43/operations/tiered-storage/">Kafka Operations: Tiered Storage</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

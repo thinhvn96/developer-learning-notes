@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 18: Iterator</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Iterator</h1>
+<p class="meta">Design Patterns · Bài 0018 · bước 18/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0018-iterator.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> duyệt một collection mà không để lộ cấu trúc bên trong của nó, bằng các iterator độc lập.</div>
+
+<h2>Mục đích</h2>
+<p>Iterator là "một behavioral design pattern cho phép bạn duyệt các phần tử của một collection mà không để lộ cách biểu diễn bên dưới (list, stack, tree, v.v.)." Hãy dùng nó để giấu cấu trúc phức tạp, giảm code duyệt bị lặp lại, và duyệt các cấu trúc khác nhau theo cùng một cách.<a class="cite" href="https://refactoring.guru/design-patterns/iterator">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/IteratorDemo.java
+3 2 1
+a is at 1, b is still at 3
+removed evens via iterator: [1, 3]</code></pre><p>Chỉ cần implement <code>Iterable</code> là vòng lặp for-each chạy được. Hai iterator trên cùng một collection giữ vị trí độc lập với nhau; <code>Iterator.remove()</code> là cách an toàn để xóa trong lúc duyệt (so sánh với <code>ConcurrentModificationException</code> trong <a href="../../java/lessons/0002-choosing-a-list.vi.html">bài về list</a>). Mã nguồn: <a href="../examples/IteratorDemo.java"><code>IteratorDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Logic duyệt được tách ra class riêng (Single Responsibility)</li><li>Thêm collection và iterator mới mà không sửa code cũ</li><li>Duyệt song song: mỗi iterator có trạng thái riêng</li><li>Có thể tạm dừng rồi tiếp tục duyệt</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Quá tay với collection đơn giản</li><li>Truy cập trực tiếp có thể hiệu quả hơn với collection chuyên biệt</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/iterator">[1]</a> Iterator đi cùng Composite (duyệt cây), Factory Method (collection trả về các iterator khác nhau), Memento (lưu trạng thái duyệt) và Visitor.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Iterator giấu đi...?</p>
+  <button>Tên của iterator</button>
+  <button>Heap</button>
+  <button data-correct>Cách biểu diễn của collection</button>
+  <button>Tên class</button>
+  <p class="explain">Duyệt mà không để lộ cách biểu diễn bên dưới.<a class="cite" href="https://refactoring.guru/design-patterns/iterator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Điều gì giúp for-each chạy được trên class của bạn?</p>
+  <button>Là static</button>
+  <button data-correct>Implement Iterable</button>
+  <button>Kế thừa Object</button>
+  <button>Là final</button>
+  <p class="explain">Iterable cung cấp iterator cho vòng lặp for-each.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Hai iterator trên một collection...?</p>
+  <button>Không thể tồn tại</button>
+  <button data-correct>Có trạng thái độc lập</button>
+  <button>Dùng chung một vị trí</button>
+  <button>Phải chạy lần lượt</button>
+  <p class="explain">a và b trong demo đứng ở hai vị trí khác nhau.<a class="cite" href="https://refactoring.guru/design-patterns/iterator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Xóa an toàn trong lúc duyệt?</p>
+  <button data-correct>Iterator.remove</button>
+  <button>Sort trước</button>
+  <button>list.remove trong vòng lặp</button>
+  <button>Gán null</button>
+  <p class="explain">Iterator.remove xóa các số chẵn mà không ném exception.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0018-tree-iterator.vi.md">Bài tập 18: một iterator cho cây</a></p>
+<p>Ví dụ chạy được: <a href="../examples/IteratorDemo.java"><code>IteratorDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/iterator">Iterator (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0017-command.vi.html">← Command</a> &nbsp;|&nbsp; <a href="0019-mediator.vi.html">Mediator →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/iterator">Iterator (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

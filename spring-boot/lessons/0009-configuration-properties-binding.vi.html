@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 9: @ConfigurationProperties: cấu hình type-safe</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>@ConfigurationProperties: cấu hình type-safe</h1>
+<p class="meta">Spring Boot · Bài 0009 · bước 6/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-configuration-properties-binding.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> bind một nhóm property vào một object bất biến có kiểu rõ ràng, kèm giá trị mặc định và validation.</div>
+
+<h2>Vì sao không dùng <code>@Value</code></h2>
+<p><code>@ConfigurationProperties</code> cung cấp cơ chế bind type-safe từ cấu hình bên ngoài vào các bean có kiểu chặt chẽ, và hợp với các property phân cấp hoặc phức tạp hơn là rải <code>@Value</code> khắp nơi.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+<h2>Một record bất biến</h2>
+<pre><code>@ConfigurationProperties("app")
+@Validated
+public record AppProperties(@NotBlank String name, @DefaultValue("hello") String greeting) { }
+
+@SpringBootApplication
+@EnableConfigurationProperties(AppProperties.class)
+class DemoApplication { ... }</code></pre>
+<ul><li><strong>Constructor binding</strong> cho bạn bean bất biến và dùng được với record; <code>@DefaultValue</code> cung cấp giá trị mặc định.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li>
+<li><strong>Relaxed binding:</strong> <code>my-project</code>, <code>myProject</code> và env var <code>MY_PROJECT</code> đều bind vào cùng một property.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li>
+<li><strong>Validation:</strong> thêm <code>@Validated</code> và các constraint annotation; thiếu một giá trị bắt buộc thì app khởi động thất bại.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li>
+<li>Bật bằng <code>@EnableConfigurationProperties</code> hoặc <code>@ConfigurationPropertiesScan</code>.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></li></ul>
+<p>Đã kiểm chứng: <code>app.name=demo-app</code> và greeting mặc định được bind thành <code>name=demo-app greeting=hello</code> (dòng RESULT ở <a href="0008-externalized-configuration-and-profiles.vi.html">bài trước</a>). Code: <a href="../examples/demo-app/src/main/java/com/example/demo/config/AppProperties.java"><code>AppProperties.java</code></a>. Tôi chưa chạy trường hợp lỗi "thiếu giá trị bắt buộc"; tài liệu nêu đó là một lợi ích của <code>@Validated</code>.</p><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Cấu hình theo nhóm, type-safe thì dùng...?</p>
+  <button>@Profile</button>
+  <button>Chỉ @Value</button>
+  <button data-correct>@ConfigurationProperties</button>
+  <button>@Scope</button>
+  <p class="explain">Nó bind cấu hình bên ngoài vào các bean có kiểu chặt chẽ.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Làm sao có được một object properties bất biến?</p>
+  <button>Field injection</button>
+  <button data-correct>Constructor binding</button>
+  <button>Setter binding</button>
+  <button>Field static</button>
+  <p class="explain">Constructor binding dùng được cho bean bất biến và record.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Env var MY_SERVICE_PORT bind vào property nào?</p>
+  <button>port</button>
+  <button>Chỉ MY_SERVICE_PORT</button>
+  <button>service.my.port</button>
+  <button data-correct>my.service.port</button>
+  <p class="explain">Relaxed binding ánh xạ dấu gạch dưới trong env var thành tên property.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái gì làm cho một properties class được validate?</p>
+  <button>@Scope</button>
+  <button data-correct>@Validated</button>
+  <button>@Lazy</button>
+  <button>@Async</button>
+  <p class="explain">@Validated bật validation JSR-303 cho các giá trị đã bind.<a class="cite" href="https://docs.spring.io/spring-boot/reference/features/external-config.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-typed-config.vi.md">Bài tập 0009: cấu hình có kiểu</a></p>
+<p>Ví dụ chạy được: <a href="../examples/demo-app/src/main/java/com/example/demo/config/AppProperties.java"><code>demo-app/src/main/java/com/example/demo/config/AppProperties.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration</a>. Phần 'Type-safe Configuration Properties'.</p>
+<p><a href="0008-externalized-configuration-and-profiles.vi.html">← Externalized configuration, thứ tự ưu tiên và profile</a> &nbsp;|&nbsp; <a href="0004-rest-controllers.vi.html">REST controller và request mapping →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-boot/reference/features/external-config.html">Spring Boot: Externalized Configuration (type-safe binding)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

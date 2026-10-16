@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How HashMap Works</title>
+<link rel="stylesheet" href="../assets/course.css">
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+
+<nav class="course-nav">
+  <span>Java Interview Prep</span>
+  <span>Lesson 0001</span>
+  <a href="../reference/hashmap-equals-hashcode.html">Reference sheet</a>
+</nav>
+
+<h1>How HashMap finds your value</h1>
+<p class="subtitle">And why <code>equals()</code> and <code>hashCode()</code> must work together.</p>
+
+<div class="mission">
+  <strong>Why this lesson?</strong> Interviewers often ask: <em>"How does HashMap work?"</em> You use HashMap every day. This lesson helps you <em>explain</em> it, in simple words.
+</div>
+
+<div class="win">
+  <strong>Your goal.</strong> At the end, you can explain HashMap out loud in about 60 seconds.
+</div>
+
+<dl class="words">
+  <dt>bucket</dt>
+  <dd>One "box" inside the HashMap. A HashMap has many buckets. Each bucket holds some of the entries.</dd>
+  <dt>entry</dt>
+  <dd>One key and its value, stored together. For example <code>"cat" → 1</code>.</dd>
+  <dt>hash code</dt>
+  <dd>A number made from an object. You get it by calling <code>hashCode()</code>. HashMap uses it to choose a bucket.</dd>
+  <dt>collision</dt>
+  <dd>When two different keys go into the same bucket.</dd>
+  <dt>immutable</dt>
+  <dd>Cannot be changed after it is created. <code>String</code> is immutable.</dd>
+  <dt>O(1)</dt>
+  <dd>Read as "O of one". It means the time stays about the same, even when the map gets bigger.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Try this first. Say out loud: <em>"How does <code>map.get(key)</code> find the value?"</em> Don't look anything up. It's OK if you don't know. Trying first helps you remember the lesson better. At the end, you will compare.</p>
+
+<h2>1. The picture: a wall of mailboxes</h2>
+<p>Imagine a wall with 16 mailboxes, numbered 0 to 15. Each mailbox is a <span class="term">bucket</span>.</p>
+<p>When you put something in the map, Java does not search for an empty place. It <strong>calculates</strong> the right mailbox from the key. When you get something, Java does the same calculation. It goes straight to the same mailbox.</p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="The key cat gives hash code 98262, which chooses mailbox 7 out of 16 mailboxes">
+  <g font-family="JetBrains Mono, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <rect x="30" y="20" width="120" height="44" rx="6"/>
+      <rect x="250" y="20" width="120" height="44" rx="6"/>
+      <path d="M150 42h94M244 37l6 5-6 5"/>
+      <path d="M370 42h255v90" stroke="var(--accent)"/>
+      <path d="M619 124l6 8 6-8" stroke="var(--accent)"/>
+    </g>
+    <text x="90" y="47" text-anchor="middle">"cat"</text>
+    <text x="197" y="34" text-anchor="middle" font-size="11" opacity=".75">hashCode()</text>
+    <text x="310" y="47" text-anchor="middle">98262</text>
+    <text x="495" y="34" text-anchor="middle" font-size="11" fill="var(--accent)">choose a mailbox (0 to 15)</text>
+
+    <g fill="none" stroke="currentColor" stroke-width="1" opacity=".6">
+      <rect x="30" y="140" width="70" height="54" rx="3"/><rect x="110" y="140" width="70" height="54" rx="3"/>
+      <rect x="190" y="140" width="70" height="54" rx="3"/><rect x="270" y="140" width="70" height="54" rx="3"/>
+      <rect x="350" y="140" width="70" height="54" rx="3"/><rect x="430" y="140" width="70" height="54" rx="3"/>
+      <rect x="510" y="140" width="70" height="54" rx="3"/>
+      <rect x="30" y="204" width="70" height="54" rx="3"/><rect x="110" y="204" width="70" height="54" rx="3"/>
+      <rect x="190" y="204" width="70" height="54" rx="3"/><rect x="270" y="204" width="70" height="54" rx="3"/>
+      <rect x="350" y="204" width="70" height="54" rx="3"/><rect x="430" y="204" width="70" height="54" rx="3"/>
+      <rect x="510" y="204" width="70" height="54" rx="3"/><rect x="590" y="204" width="70" height="54" rx="3"/>
+    </g>
+    <rect x="590" y="140" width="70" height="54" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g font-size="10" opacity=".6">
+      <text x="36" y="154">0</text><text x="116" y="154">1</text><text x="196" y="154">2</text><text x="276" y="154">3</text>
+      <text x="356" y="154">4</text><text x="436" y="154">5</text><text x="516" y="154">6</text>
+      <text x="36" y="218">8</text><text x="116" y="218">9</text><text x="196" y="218">10</text><text x="276" y="218">11</text>
+      <text x="356" y="218">12</text><text x="436" y="218">13</text><text x="516" y="218">14</text><text x="596" y="218">15</text>
+    </g>
+    <text x="596" y="154" font-size="10" fill="var(--accent)">7</text>
+    <text x="625" y="178" text-anchor="middle" font-size="12" fill="var(--accent)">cat→1</text>
+  </g>
+</svg>
+<figcaption>The key "cat" always gives the number 98262. That number always leads to mailbox 7.</figcaption>
+</figure>
+
+<p>This is why <code>get()</code> is fast. Java does not look in all 16 mailboxes. It looks in <strong>one</strong>. That's why interviewers say <code>get()</code> and <code>put()</code> are <span class="term">O(1)</span> on average. <a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+
+<h2>2. Follow one key, step by step</h2>
+<pre>map.put("cat", 1);
+
+<span class="c">Step 1  Java calls "cat".hashCode()        → 98262</span>
+<span class="c">Step 2  Java turns 98262 into a box number → 7</span>
+<span class="c">Step 3  Java stores the entry "cat" → 1 in box 7</span>
+
+map.get("cat");
+<span class="c">        Same steps → box 7 → found → returns 1</span></pre>
+<p class="muted">How does Java turn 98262 into 7? It uses a fast math trick. You will learn it in the next lesson. For now, remember this: <strong>same key → same number → same box.</strong></p>
+
+<h2>3. Two keys in the same box</h2>
+<p>There are only 16 boxes, but there are millions of possible keys. So sometimes two different keys go into the same box. This is called a <span class="term">collision</span>. It is normal.</p>
+<p>A real example: the strings <code>"Aa"</code> and <code>"BB"</code> have <strong>the same hash code</strong> (2112). So they go into the same box.</p>
+<pre>map.put("Aa", 1);
+map.put("BB", 2);   <span class="c">// same box as "Aa"</span>
+map.get("BB");      <span class="hl">// returns 2</span></pre>
+<p>How does Java find the right one? Inside the box, it checks each entry, one by one. For each entry, it asks two questions:</p>
+<ol class="steps">
+  <li><strong>Is the hash code the same?</strong> If not, skip it. (Comparing two numbers is very fast.)</li>
+  <li><strong>Is the key equal?</strong> Java calls <code>equals()</code>. If it returns <code>true</code>, this is the right entry. <a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java source</a></li>
+</ol>
+<p>So <code>hashCode()</code> finds the box. <code>equals()</code> finds the right entry inside the box.</p>
+
+<h2>4. The rule: equal objects, same hash code</h2>
+<p>Because of this, Java has a rule. You can find it in the documentation of <code>Object</code> <a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html#hashCode()">Object.hashCode</a>:</p>
+<div class="win">If two objects are <strong>equal</strong> (<code>equals()</code> returns <code>true</code>), they <strong>must</strong> have the <strong>same hash code</strong>.</div>
+<p>The opposite is <em>not</em> required. Two different objects <em>may</em> have the same hash code, like <code>"Aa"</code> and <code>"BB"</code>. That's allowed. It only makes the map a little slower.</p>
+<p class="muted">In interviews, people call this rule the <strong>equals/hashCode contract</strong>. "Contract" here just means "a rule you must follow".</p>
+
+<h3>What happens if you break the rule?</h3>
+<p>Here, the class overrides <code>equals()</code> but <strong>forgets</strong> <code>hashCode()</code>:</p>
+<pre>class Point {
+  final int x, y;
+  Point(int x, int y) { this.x = x; this.y = y; }
+
+  @Override public boolean equals(Object o) {
+    return o instanceof Point p &amp;&amp; p.x == x &amp;&amp; p.y == y;
+  }
+  <span class="c">// hashCode() is missing!</span>
+}
+
+map.put(new Point(1, 2), "A");
+map.get(new Point(1, 2));   <span class="hl">// almost always null!</span></pre>
+<p>Why? Without your own <code>hashCode()</code>, Java uses the default one from <code>Object</code>. The default gives each new object its <strong>own</strong> number, usually a different one. So the two <code>Point</code> objects have different numbers. Java looks in the wrong box, and finds nothing. There is no error message. You just get <code>null</code>.</p>
+<p><strong>The fix:</strong> always override both methods together. Or, even easier, use a <code>record</code>. A record writes <code>equals()</code> and <code>hashCode()</code> for you, based on its fields. <a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a></p>
+<pre>@Override public int hashCode() { return Objects.hash(x, y); }
+
+<span class="c">// or, even easier:</span>
+record Point(int x, int y) {}</pre>
+
+<h2>5. Don't change a key after you put it in</h2>
+<p>Back to the mailboxes. Imagine you write an address on a letter and put it in mailbox 7. Then you secretly change the address on the letter. Later you ask: "Where is my letter?" Java reads the <strong>new</strong> address, goes to a <strong>different</strong> mailbox, and finds nothing. The letter is still in mailbox 7, but nobody will find it.</p>
+<p>That's what happens when you change a key after <code>put()</code>. Its hash code changes, so Java looks in the wrong box. The Java documentation warns about this <a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> <a class="src" href="https://dev.java/learn/api/collections-framework/choosing-keys/">dev.java</a>.</p>
+<p><strong>The fix:</strong> use <span class="term">immutable</span> keys, meaning keys that cannot change. Good examples are <code>String</code>, <code>Integer</code>, <code>List.of(...)</code> and records with immutable fields.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory. Don't scroll up. The answers are in a different order every time you open the page.</p>
+<span class="score"></span>
+
+<div class="quiz">
+  <p class="q">Why is <code>map.get(key)</code> fast?</p>
+  <div class="options">
+    <button class="opt" data-correct>It goes straight to one bucket using hash</button>
+    <button class="opt">It keeps all keys sorted in a list</button>
+    <button class="opt">It checks every bucket but uses many threads</button>
+    <button class="opt">It saves the last result in a cache</button>
+  </div>
+  <div class="why">The hash code tells Java which bucket to use. Java looks in one bucket only, not all of them.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>"Aa"</code> and <code>"BB"</code> have the same hash code. After <code>map.put("Aa", 1)</code> and <code>map.put("BB", 2)</code>, what does <code>map.get("BB")</code> return?</p>
+  <div class="options">
+    <button class="opt" data-correct>Returns 2</button>
+    <button class="opt">Returns 1</button>
+    <button class="opt">Returns null</button>
+    <button class="opt">Throws exception</button>
+  </div>
+  <div class="why">Both keys are in the same bucket (a collision). Inside the bucket, <code>equals()</code> finds the right key, <code>"BB"</code>, so you get 2.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which sentence is the Java <em>rule</em>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Equal objects must have the same hash code</button>
+    <button class="opt">Same hash code means the objects are equal</button>
+    <button class="opt">Different objects must always have different hash codes</button>
+    <button class="opt">The hash code must stay the same forever</button>
+  </div>
+  <div class="why">The rule goes in one direction only: equal → same hash code. Different objects <em>can</em> share a hash code ("Aa" and "BB").</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The <code>Point</code> class overrides <code>equals()</code> but <strong>not</strong> <code>hashCode()</code>. What does <code>map.get(new Point(1, 2))</code> return after <code>map.put(new Point(1, 2), "A")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Almost always null</button>
+    <button class="opt">Always returns "A"</button>
+    <button class="opt">Throws an exception</button>
+    <button class="opt">Does not compile</button>
+  </div>
+  <div class="why">The default <code>hashCode()</code> gives each new object its own number. So Java looks in the wrong bucket. No error, just <code>null</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Now <code>Point</code> is a <code>record Point(int x, int y) {}</code>. What does <code>map.get(new Point(1, 2))</code> return after <code>map.put(new Point(1, 2), "A")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Always returns "A"</button>
+    <button class="opt">Almost always null</button>
+    <button class="opt">Throws an exception</button>
+    <button class="opt">Does not compile</button>
+  </div>
+  <div class="why">A record creates <code>equals()</code> <em>and</em> <code>hashCode()</code> from its fields. Two points with the same x and y are equal and have the same hash code.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You put a key in a HashMap. Then you change the key. Now <code>get()</code> cannot find it. What is the best way to avoid this?</p>
+  <div class="options">
+    <button class="opt" data-correct>Use keys that cannot be changed</button>
+    <button class="opt">Call map.clear() after changing the keys</button>
+    <button class="opt">Use a TreeMap instead of HashMap</button>
+    <button class="opt">Make the key list thread safe</button>
+  </div>
+  <div class="why">Changing the key changes its hash code, so Java looks in the wrong bucket. Use immutable keys: <code>String</code>, records, <code>List.of(...)</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How does a HashMap work?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> HashMap has many buckets (an array of buckets).</label></li>
+      <li><label><input type="checkbox"> It uses the key's <code>hashCode()</code> to choose a bucket.</label></li>
+      <li><label><input type="checkbox"> So <code>get()</code> and <code>put()</code> are fast: O(1) on average.</label></li>
+      <li><label><input type="checkbox"> Two keys can share a bucket (a collision). <code>equals()</code> finds the right one.</label></li>
+      <li><label><input type="checkbox"> Rule: equal objects must have the same hash code. Override both methods, or use a record.</label></li>
+      <li><label><input type="checkbox"> Keys should be immutable. If a key changes, the map can't find it.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A HashMap stores entries in an array of buckets. When I call <code>put</code>, Java calls <code>hashCode()</code> on the key and uses that number to choose a bucket. When I call <code>get</code>, it does the same thing, so it goes straight to the right bucket. That's why <code>get</code> and <code>put</code> are O(1) on average. Sometimes two keys go into the same bucket. That's a collision. Then Java uses <code>equals()</code> to find the right key inside the bucket. This is why equal objects must have the same hash code. If they don't, Java looks in the wrong bucket. Also, keys should be immutable. If a key changes after I put it in, the map can't find it again."</em></p>
+  </div>
+</div>
+
+<h2>What's next</h2>
+<p>This answer is good for a <strong>mid-level</strong> interview. A senior interviewer will ask more, for example: <em>"How does Java turn the hash code into a box number? What happens when the map gets full?"</em> We answer these in <a href="0002-hashmap-resize-and-trees.html">Lesson 2</a> and Lesson 3, step by step.</p>
+
+<h2>Read more</h2>
+<p><strong>Best source:</strong> <a href="https://dev.java/learn/api/collections-framework/choosing-keys/">dev.java: "Choosing Immutable Types for Your Key"</a>. It is Oracle's official Java tutorial. It shows the "changed key" problem with real code.</p>
+
+<div class="ask">
+  <strong>Have a question?</strong> Ask me in the chat. I'm your teacher. You can ask anything, for example: <em>"What does 'override' mean exactly?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score. They help me choose the next lesson.
+</div>
+
+<footer>
+  <div class="pager">
+    <a href="../reference/hashmap-equals-hashcode.html">Reference sheet</a>
+    <a href="0002-hashmap-resize-and-trees.html">Lesson 0002: When a HashMap gets full →</a>
+  </div>
+  <p>Facts checked against the Java 21 documentation and OpenJDK source code, September 2026.</p>
+</footer>
+
+</main>
+</body>
+</html>

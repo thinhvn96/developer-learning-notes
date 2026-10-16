@@ -3,75 +3,281 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 14: JDK 17: sealed classes and interfaces</title>
+<title>Java 14: Sealed classes and interfaces</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 17: sealed classes and interfaces</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0014 · step 22 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Sealed classes: a guest list for subclasses</h1>
+<p class="subtitle">How JDK 17 lets you say "a Shape is a Circle, a Square or a Rect, and nothing else", and why the compiler cares.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0014 · step 40 of 46 · Advanced · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0014-sealed-classes.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> declare a sealed hierarchy and explain what the three modifiers on permitted subclasses mean and why sealing helps exhaustive checks.</div>
+<div class="mission"><strong>Why this lesson?</strong> Real domains have closed sets: a payment is a card, a transfer or a voucher; an API result is a success or an error. Interviewers ask <em>"What are sealed classes for? How are they different from an enum or a final class?"</em> This lesson gives you that answer and prepares the JDK 21 <code>switch</code> of the next lessons.</div>
 
-<h2>What sealing does (final in JDK 17)</h2>
-<p>Sealed classes and interfaces restrict which other classes may extend or implement them. JEP 409's goals: let the author control which code implements a type, offer "a more declarative way than access modifiers to restrict the use of a superclass", and lay the foundation for exhaustive pattern analysis.<a class="cite" href="https://openjdk.org/jeps/409">[1]</a></p>
+<div class="win"><b>Today's win:</b> declare a sealed hierarchy, explain the three modifiers <code>final</code>, <code>sealed</code> and <code>non-sealed</code>, and say why sealing lets the compiler check that you handled every case.</div>
+
+<dl class="words">
+  <dt>extend / implement</dt><dd>Making a new type based on an existing one: a class <code>extends</code> a class, a class <code>implements</code> an interface.</dd>
+  <dt>subclass</dt><dd>The new type, for example <code>Circle</code> under <code>Shape</code>. The original is the superclass (or superinterface).</dd>
+  <dt>interface</dt><dd>A type that only lists methods (a contract). Classes and records can implement it.</dd>
+  <dt>hierarchy</dt><dd>The family tree of a type and all its subtypes.</dd>
+  <dt>sealed</dt><dd>A type that names exactly which subtypes are allowed. Nobody else may extend it.</dd>
+  <dt>permits</dt><dd>The keyword that lists the allowed subtypes: the guest list.</dd>
+  <dt>exhaustive</dt><dd>Covers every possible case. With a sealed type the compiler can check this.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"In JDK 8, how can I make sure that only my three classes can extend <code>Shape</code>?"</em> Think of at least one way, and what is wrong with it. You will compare in section 1.</p>
+
+<h2>1. The JDK 8 problem: open or locked, nothing in between</h2>
+<p>Think of a party. In JDK 8 the door has two settings. Open: anybody walks in. Locked (<code>final</code>): nobody walks in, not even your friends. There is no guest list.</p>
+<pre><code><span class="c">// JDK 8: Shape is open to the whole world</span>
+public abstract class Shape {}
+public final class Circle extends Shape { ... }
+public final class Square extends Shape { ... }
+
+<span class="c">// somebody else, in another package, months later:</span>
+public class Triangle extends Shape { ... }    <span class="c">// compiles fine</span>
+
+static double area(Shape s) {
+    if (s instanceof Circle) { ... }
+    if (s instanceof Square) { ... }
+    throw new IllegalStateException();          <span class="hl">// Triangle lands here, at runtime</span>
+}</code></pre>
+<p>The JDK 8 tricks (a package-private constructor, comments saying "do not extend") only half work, and the compiler still cannot know the full list. So every <code>if</code> chain needs a <code>throw</code> at the end "just in case".</p>
+<p>JDK 17 adds the guest list. JEP 409 lists its goals: let the author "control which code is responsible for implementing" a class or interface, provide "a more declarative way than access modifiers to restrict the use of a superclass", and lay "a foundation for the exhaustive analysis of patterns".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a> It was a preview in JDK 15 and 16 and became final in JDK 17.<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+
+<h2>2. Write the guest list: <code>sealed</code> and <code>permits</code></h2>
 <pre><code>public sealed interface Shape permits Circle, Square, Rect {}
-record Circle(double r) implements Shape {}     // records are implicitly final
+record Circle(double r) implements Shape {}     <span class="c">// records are implicitly final</span>
 record Square(double side) implements Shape {}
 record Rect(double w, double h) implements Shape {}</code></pre>
-<h2>The three modifiers</h2>
-<p>Each permitted subclass must use exactly one of: <code>final</code> (no further extension), <code>sealed</code> (further restricted extension through its own <code>permits</code>), or <code>non-sealed</code> (open again).<a class="cite" href="https://openjdk.org/jeps/409">[1]</a></p>
-<p>Records are a natural fit: a record is a shallowly immutable, transparent carrier of values.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[2]</a> Sealed interface plus records gives you algebraic data types (a closed set of variants), and on JDK 21 a <code>switch</code> over the interface needs no <code>default</code> because the compiler knows the full set (<a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 15</a>).</p>
-<p>Source: <a href="../examples/jdk17/Jdk17Features.java"><code>Jdk17Features.java</code></a> defines exactly this hierarchy.</p>
-<div class="aside">Interview angle: "Sealed versus enum versus final?" Enum: a closed set of <em>instances</em> of one type. Sealed: a closed set of <em>types</em>, each with its own shape of data. Final: no subclasses at all.</div>
+<ol class="steps">
+  <li><strong><code>sealed</code></strong> says "this type has a guest list".</li>
+  <li><strong><code>permits Circle, Square, Rect</code></strong> is the list. Only these three may implement <code>Shape</code>.</li>
+  <li>Each record is implicitly <code>final</code>, so the tree stops there.<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></li>
+</ol>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Keyword listing the allowed subtypes?</p>
-  <button>allows</button>
-  <button>implements</button>
-  <button data-correct>permits</button>
-  <button>extends</button>
-  <p class="explain">A sealed class uses a permits clause naming allowed subclasses.<a class="cite" href="https://openjdk.org/jeps/409">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. A permitted subclass must be which of these?</p>
-  <button>Public and static</button>
-  <button>Only final</button>
-  <button data-correct>final, sealed or non-sealed</button>
-  <button>Only abstract</button>
-  <p class="explain">Exactly one of final, sealed and non-sealed is required.<a class="cite" href="https://openjdk.org/jeps/409">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Which modifier reopens a branch for extension?</p>
-  <button>sealed</button>
-  <button data-correct>non-sealed</button>
-  <button>abstract</button>
-  <button>final</button>
-  <p class="explain">non-sealed reverts that branch to open extension.<a class="cite" href="https://openjdk.org/jeps/409">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Release where sealed classes became final?</p>
-  <button>JDK 8</button>
-  <button>JDK 21</button>
-  <button>JDK 11</button>
-  <button data-correct>JDK 17</button>
-  <p class="explain">Finalized in Java 17 after previews in 15 and 16.<a class="cite" href="https://openjdk.org/jeps/409">[1]</a></p>
-</div>
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Sealed interface Shape at the top, permits Circle, Square and Rect. Three record boxes below are connected to it and marked final. A dashed Triangle box on the right is crossed out: not permitted, and javac rejects it.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="200" y="20" width="280" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="43" text-anchor="middle">sealed interface Shape</text>
+    <text x="340" y="64" text-anchor="middle" fill="var(--accent)">permits Circle, Square, Rect</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M300 76L105 130M340 76v54M380 76L445 130"/>
+    </g>
+    <path d="M440 76L595 130" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <rect x="30" y="130" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="105" y="152" text-anchor="middle">record Circle</text>
+    <text x="105" y="170" text-anchor="middle" font-size="11" opacity=".75">final</text>
+    <rect x="200" y="130" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="275" y="152" text-anchor="middle">record Square</text>
+    <text x="275" y="170" text-anchor="middle" font-size="11" opacity=".75">final</text>
+    <rect x="370" y="130" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="445" y="152" text-anchor="middle">record Rect</text>
+    <text x="445" y="170" text-anchor="middle" font-size="11" opacity=".75">final</text>
+    <rect x="540" y="130" width="120" height="50" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <text x="600" y="152" text-anchor="middle" opacity=".75">Triangle</text>
+    <text x="600" y="170" text-anchor="middle" font-size="11" fill="var(--accent)">✗ not listed</text>
+    <text x="340" y="214" text-anchor="middle" font-size="11" fill="var(--accent)">javac: class is not allowed to extend sealed class: Shape</text>
+    <text x="340" y="236" text-anchor="middle" font-size="11" opacity=".8">so the compiler knows the complete list: Circle, Square, Rect</text>
+  </g>
+</svg>
+<figcaption>A sealed type and its guest list. Anything not on the list is rejected at compile time, not discovered at runtime.</figcaption>
+</figure>
+
+<h3>What the compiler does, step by step</h3>
+<p>Now somebody adds <code>Triangle</code> without changing the list. I compiled it with <code>javac</code> 21:</p>
+<pre><code>final class Triangle implements Shape {}
+<span class="c">Step 1  javac sees "implements Shape"</span>
+<span class="c">Step 2  Shape is sealed, so javac reads its permits list</span>
+<span class="c">Step 3  Triangle is not on the list → error</span>
+<span class="hl">error: class is not allowed to extend sealed class: Shape (as it is not listed in its 'permits' clause)</span></code></pre>
+<p>The list is also visible at runtime. JEP 409 added two methods to <code>java.lang.Class</code>: <code>isSealed()</code> and <code>getPermittedSubclasses()</code>.<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a> On the hierarchy above they print:</p>
+<pre><code>Shape.class.isSealed()                 <span class="hl">true</span>
+Shape.class.getPermittedSubclasses()   <span class="hl">Circle, Square, Rect</span></code></pre>
+<p class="muted">If all the subclasses are in the same source file, you may leave out <code>permits</code>: "the Java compiler will infer the permitted subclasses from the declarations in the source file".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+
+<h2>3. Every guest must say what happens next</h2>
+<p>A guest on the list may bring their own guests, or not. Java makes each permitted subclass decide, out loud. "Exactly one of the modifiers <code>final</code>, <code>sealed</code>, and <code>non-sealed</code> must be used by each permitted subclass."<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+<ul>
+  <li><strong><code>final</code></strong>: no further extension. The branch ends here.</li>
+  <li><strong><code>sealed</code></strong>: further extension, but again only through its own <code>permits</code> list.</li>
+  <li><strong><code>non-sealed</code></strong>: open again; any class may extend this branch.</li>
+</ul>
+<pre><code>sealed interface Vehicle permits Car, Truck, Bike {}
+final class Car implements Vehicle {}
+sealed class Truck implements Vehicle permits DumpTruck {}
+final class DumpTruck extends Truck {}
+non-sealed class Bike implements Vehicle {}
+class EBike extends Bike {}                    <span class="c">// allowed: Bike is open again</span></code></pre>
+<p>This compiles on JDK 21. Remove the modifier from <code>Bike</code> and <code>javac</code> says <code>error: sealed, non-sealed or final modifiers expected</code>.</p>
+
+<figure>
+<svg viewBox="0 0 680 280" role="img" aria-label="Sealed interface Vehicle with three permitted subclasses. Car is final and the branch ends. Truck is sealed and permits only DumpTruck. Bike is non-sealed, so any class such as EBike may extend it.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="210" y="20" width="260" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="45" text-anchor="middle">sealed interface Vehicle</text>
+    <g fill="none" stroke="currentColor"><path d="M280 60L120 100M340 60v40M400 60L560 100"/></g>
+    <rect x="30" y="100" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="123" text-anchor="middle"><tspan fill="var(--accent)">final</tspan> class Car</text>
+    <text x="120" y="143" text-anchor="middle" font-size="11" opacity=".75">branch closed</text>
+    <rect x="250" y="100" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="123" text-anchor="middle"><tspan fill="var(--accent)">sealed</tspan> class Truck</text>
+    <text x="340" y="143" text-anchor="middle" font-size="11" opacity=".75">permits DumpTruck</text>
+    <rect x="470" y="100" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="560" y="123" text-anchor="middle"><tspan fill="var(--accent)">non-sealed</tspan> Bike</text>
+    <text x="560" y="143" text-anchor="middle" font-size="11" opacity=".75">open again</text>
+    <g fill="none" stroke="currentColor"><path d="M340 156v40M560 156v40"/></g>
+    <rect x="265" y="196" width="150" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="221" text-anchor="middle">final DumpTruck</text>
+    <rect x="470" y="196" width="180" height="40" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="560" y="221" text-anchor="middle">EBike, any class...</text>
+    <text x="120" y="221" text-anchor="middle" font-size="11" opacity=".6">(nothing below)</text>
+    <text x="340" y="266" text-anchor="middle" font-size="11" opacity=".8">every permitted subclass must pick exactly one of the three modifiers</text>
+  </g>
+</svg>
+<figcaption>The three choices for a permitted subclass. Only <code>non-sealed</code> opens a branch to the whole world again.</figcaption>
+</figure>
+
+<h3>Two more rules (and the trap)</h3>
+<p>"The sealed class and its permitted subclasses must belong to the same module", or, without modules, "to the same package". And "Every permitted subclass must directly extend the sealed class."<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+<p><strong>Trap:</strong> you list a class in <code>permits</code> but put it in another package of a normal (non-module) application. It does not compile. <strong>The fix:</strong> keep a sealed hierarchy together in one package; it is one closed concept anyway.</p>
+
+<h2>4. Why it matters: records + sealed = closed data types</h2>
+<p>Records are a natural fit: a record is a shallowly immutable, transparent carrier of values.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> JEP 409 says "Sealed classes work well with record classes", and "Record classes are implicitly <code>final</code>".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a> A sealed interface plus records gives you an algebraic data type: a closed set of variants, each with its own fields.</p>
+<p>The course example defines exactly this hierarchy. On JDK 17 it still uses an <code>instanceof</code> chain with a <code>throw</code> at the end:</p>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+...
+<span class="hl">3.14 4.00 6.00</span>        <span class="c">← area of Circle(1), Square(2), Rect(2, 3)</span></code></pre>
+<p>On JDK 21, a <code>switch</code> over the interface needs no <code>default</code>, because the compiler knows the full set (<a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 15</a>). The payoff comes when someone adds a new shape. I added <code>Triangle</code> to the <code>permits</code> list but forgot it in the switch:</p>
+<pre><code>static double area(Shape s) {
+    return switch (s) {                         <span class="c">// JDK 21</span>
+        case Circle c -&gt; Math.PI * c.r() * c.r();
+        case Square q -&gt; q.side() * q.side();
+    };                                          <span class="c">// Triangle missing</span>
+}
+<span class="hl">error: the switch expression does not cover all possible input values</span></code></pre>
+<p>In JDK 8 that bug was an exception in production. With sealed types it is a compile error on your laptop.</p>
+<div class="aside"><strong>Interview angle: sealed vs enum vs final.</strong> Enum: a closed set of <em>instances</em> of one type, all with the same fields. Sealed: a closed set of <em>types</em>, each with its own shape of data. Final: no subclasses at all.</div>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Which keyword lists the subtypes that may extend a sealed type?</p>
+  <div class="options">
+    <button class="opt" data-correct>permits</button>
+    <button class="opt">allows</button>
+    <button class="opt">implements</button>
+    <button class="opt">extends</button>
+  </div>
+  <div class="why">A sealed class or interface uses a <code>permits</code> clause naming the allowed subtypes.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which modifier must a permitted subclass use?</p>
+  <div class="options">
+    <button class="opt" data-correct>Exactly one of final, sealed, non-sealed</button>
+    <button class="opt">Always final, nothing else is allowed</button>
+    <button class="opt">Always abstract, so it can be extended</button>
+    <button class="opt">Any modifier, or none at all</button>
+  </div>
+  <div class="why">Each permitted subclass must say how the tree continues: stop (final), restrict again (sealed) or reopen (non-sealed).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which modifier opens a branch of a sealed hierarchy to any class again?</p>
+  <div class="options">
+    <button class="opt" data-correct>non-sealed</button>
+    <button class="opt">sealed</button>
+    <button class="opt">abstract</button>
+    <button class="opt">final</button>
+  </div>
+  <div class="why"><code>non-sealed</code> reverts that branch to open extension, like a normal class.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Shape</code> permits Circle and Square. Someone writes <code>final class Triangle implements Shape</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compile error: Triangle is not permitted</button>
+    <button class="opt">It compiles, but throws at runtime</button>
+    <button class="opt">It compiles with a deprecation warning</button>
+    <button class="opt">It compiles, Shape is extended silently</button>
+  </div>
+  <div class="why">javac checks the <code>permits</code> list: "class is not allowed to extend sealed class". The error is at compile time.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why can a JDK 21 <code>switch</code> over a sealed interface skip the <code>default</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The compiler knows every permitted subtype</button>
+    <button class="opt">Sealed types can never be null at runtime</button>
+    <button class="opt">The JVM adds missing cases while running</button>
+    <button class="opt">Records always match the first case</button>
+  </div>
+  <div class="why">Sealing makes the set of subtypes closed and known, so the compiler can check exhaustiveness and report a missing case.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You need "a payment is a Card with a number, or a Voucher with a code". Which fits best?</p>
+  <div class="options">
+    <button class="opt" data-correct>A sealed interface with two records</button>
+    <button class="opt">An enum with two constants</button>
+    <button class="opt">A final class with a type field</button>
+    <button class="opt">An abstract class open to all</button>
+  </div>
+  <div class="why">The variants carry different data, so you need a closed set of <em>types</em>. An enum is a closed set of instances of one type.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In which release did sealed classes become a final (non-preview) feature?</p>
+  <div class="options">
+    <button class="opt" data-correct>JDK 17</button>
+    <button class="opt">JDK 8</button>
+    <button class="opt">JDK 11</button>
+    <button class="opt">JDK 21</button>
+  </div>
+  <div class="why">Sealed classes were previews in JDK 15 and 16 and were finalized in JDK 17 with no changes.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What are sealed classes, and when would you use one instead of an enum?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A sealed class or interface (final in JDK 17) restricts which types may extend it, listed with <code>permits</code>.</label></li>
+      <li><label><input type="checkbox"> Each permitted subclass must be <code>final</code>, <code>sealed</code> or <code>non-sealed</code>.</label></li>
+      <li><label><input type="checkbox"> A class not on the list is a compile error, not a runtime surprise.</label></li>
+      <li><label><input type="checkbox"> Records fit well: they are implicitly final carriers of data.</label></li>
+      <li><label><input type="checkbox"> The compiler knows the full set, so a JDK 21 <code>switch</code> is checked for exhaustiveness without <code>default</code>.</label></li>
+      <li><label><input type="checkbox"> Enum = fixed instances of one type; sealed = fixed set of types with different data.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Sealed classes, final since JDK 17, let me control who can extend a type. I write <code>sealed interface Shape permits Circle, Square, Rect</code>, and any other class that tries to implement <code>Shape</code> is a compile error. Each permitted subclass has to say <code>final</code>, <code>sealed</code> with its own list, or <code>non-sealed</code> to open that branch again; records are implicitly final, so they fit perfectly. The big benefit is that the compiler knows the complete set of subtypes. So in JDK 21 I can switch over a <code>Shape</code> without a <code>default</code>, and if someone adds a new shape, every switch that forgets it stops compiling. Compared to an enum: an enum is a fixed set of instances of one type with the same fields; a sealed hierarchy is a fixed set of types, each with its own data, like <code>Card(number)</code> versus <code>Voucher(code)</code>."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0014-model-payment-types.md">Exercise 0014: model payment types</a></p>
+<p><a href="../exercises/0014-model-payment-types.md">Exercise 0014: model payment types</a>. Send your design to the teacher before you compile it.</p>
 <p>Runnable example: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a>. Read Summary, Goals and 'Description'.</p>
-<p><a href="0003-records-and-immutability.html">← Records and shallow immutability</a> &nbsp;|&nbsp; <a href="0027-helpful-nullpointerexceptions.html">Helpful NullPointerExceptions (JDK 14+, in 17 and 21) →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will push: <em>"Show me the switch. How do you get the fields out of each record?"</em> That is pattern matching for <code>switch</code> and record patterns, in <a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 0015</a>. Before that, one small JDK 14+ feature that makes debugging much faster: <a href="0027-helpful-nullpointerexceptions.html">helpful NullPointerExceptions</a>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a>. Read Summary, Goals and Description.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When would I ever use non-sealed?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0003-records-and-immutability.html">← Records: one line instead of forty</a> &nbsp;|&nbsp; <a href="0027-helpful-nullpointerexceptions.html">Which part was null? Helpful NullPointerExceptions →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the OpenJDK JEPs and the Java 21 documentation, and compiled with JDK 21, October 2026.</p>
+  <p>References: <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

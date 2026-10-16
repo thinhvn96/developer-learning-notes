@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 9: Pattern saga: xử lý phân tán không cần distributed transaction</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pattern saga: xử lý phân tán không cần distributed transaction</h1>
+<p class="meta">System Design · Bài 0009 · bước 9/11 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-saga.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được saga, choreography so với orchestration, compensating transaction (transaction bù trừ), và chạy thử một orchestrator nhỏ.</div>
+
+<h2>Ý tưởng</h2>
+<p>Saga duy trì tính nhất quán dữ liệu giữa các service bằng cách "điều phối một chuỗi các local transaction". Mỗi local transaction commit trong service của chính nó và kích hoạt bước tiếp theo qua một event hoặc message; nếu một bước thất bại, các <em>compensating transaction</em> sẽ hoàn tác những bước đã xong. Nó phù hợp với microservice mà mỗi service sở hữu database riêng, nơi ACID truyền thống và two-phase commit không còn phù hợp.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+<h2>Thuật ngữ</h2>
+<ul><li>Transaction <strong>compensable</strong> là loại có thể hoàn tác; transaction <strong>pivot</strong> là điểm không thể quay đầu; các transaction <strong>retryable</strong> sau nó là idempotent và cuối cùng bắt buộc phải thành công.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></li>
+<li><strong>Choreography:</strong> các service trao đổi event với nhau, không có bộ điều khiển trung tâm (đơn giản, nhưng khó theo dõi khi hệ thống lớn dần; có nguy cơ phụ thuộc vòng).</li>
+<li><strong>Orchestration:</strong> một orchestrator trung tâm bảo các bên tham gia phải làm gì và xử lý việc bù trừ (tốt hơn cho luồng phức tạp; nhưng là một điểm có thể gây sự cố).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></li></ul>
+<pre><code>java system-design/examples/SagaDemo.java
+--- payment fails
+  do create order / do reserve stock / do charge payment
+  FAILED: card declined -&gt; compensating
+  compensate reserve stock  (stock released)
+  compensate create order   (order cancelled)</code></pre>
+<p>Mã nguồn: <a href="../examples/SagaDemo.java"><code>SagaDemo.java</code></a> (một orchestrator chạy trong bộ nhớ; orchestrator thật sẽ lưu trạng thái saga xuống storage). Những lưu ý từ tài liệu: saga thiếu isolation (lost update, dirty read, fuzzy read), bản thân bước bù trừ cũng có thể thất bại, và các bước phải idempotent; các biện pháp đối phó gồm semantic lock, cập nhật giao hoán (commutative update), đọc lại giá trị, và versioning.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a> Liên quan: <a href="0011-transactional-outbox.vi.html">outbox</a> để phát event tin cậy, <a href="../../spring-boot/lessons/0006-transaction-propagation.vi.html">local transaction trong Spring</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Saga là...?</p>
+  <button data-correct>Local transaction cộng các bước bù trừ</button>
+  <button>Một loại queue</button>
+  <button>Một transaction ACID toàn cục</button>
+  <button>Một cache</button>
+  <p class="explain">Nó điều phối các local transaction cùng với các compensating transaction.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Kiểu có bộ điều khiển trung tâm?</p>
+  <button>Sharding</button>
+  <button>Bulkhead</button>
+  <button>Choreography</button>
+  <button data-correct>Orchestration</button>
+  <p class="explain">Một orchestrator quản lý mọi transaction và bảo các bên tham gia phải làm gì.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Khi lỗi, bước bù trừ chạy cho...?</p>
+  <button>Chỉ bước bị lỗi</button>
+  <button data-correct>Các bước đã hoàn tất</button>
+  <button>Tất cả các bước</button>
+  <button>Không bao giờ chạy</button>
+  <p class="explain">Compensating transaction hoàn tác thay đổi của các bước đã hoàn tất.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Saga thiếu cái gì?</p>
+  <button>Độ bền dữ liệu</button>
+  <button data-correct>Isolation</button>
+  <button>Event</button>
+  <button>Service</button>
+  <p class="explain">Không có isolation sẵn có giữa các service.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-design-a-booking-saga.vi.md">Bài tập 0009: một saga đặt chỗ</a></p>
+<p>Ví dụ chạy được: <a href="../examples/SagaDemo.java"><code>SagaDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">Azure: Saga pattern</a>. Giải pháp, các cách tiếp cận và các bất thường dữ liệu.</p>
+<p><a href="0003-queue-versus-log.vi.html">← Queue hay log: chọn RabbitMQ hay Kafka</a> &nbsp;|&nbsp; <a href="0011-transactional-outbox.vi.html">Transactional outbox →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/saga">Azure: Saga pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

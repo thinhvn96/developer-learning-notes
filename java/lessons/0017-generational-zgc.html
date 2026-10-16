@@ -3,73 +3,304 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 17: JDK 21: generational ZGC</title>
+<title>Java 17: Generational ZGC (JDK 21)</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 21: generational ZGC</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0017 · step 27 of 27 · Senior · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Generational ZGC: tiny pauses, now with young and old (JDK 21)</h1>
+<p class="subtitle">Why ZGC learned to treat new objects differently, how to turn it on in JDK 21, and how to read its log.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0017 · step 45 of 46 · Senior · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0017-generational-zgc.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> When a service has a strict latency target ("99% of requests under 50 ms"), garbage collection pauses can break it. Senior interviews often ask <em>"Which GC would you choose, and why?"</em> Knowing what generational ZGC is, and when it beats the default G1, lets you give a measured answer instead of folklore.</div>
 
 <div class="win"><b>Today's win:</b> say what generational ZGC is, how to enable it on JDK 21, and what workload it targets.</div>
 
-<h2>What it is (JDK 21)</h2>
-<p>JEP 439 aims to "improve application performance by extending the Z Garbage Collector to maintain separate generations for young and old objects."<a class="cite" href="https://openjdk.org/jeps/439">[1]</a> Its goals: lower risk of allocation stalls, lower heap memory overhead, lower GC CPU overhead, pause times under one millisecond, heaps from hundreds of megabytes to multiple terabytes, and little manual tuning.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
-<h2>Enabling it on JDK 21</h2>
+<dl class="words">
+  <dt>heap</dt><dd>The memory area where Java keeps your objects (lesson 0007).</dd>
+  <dt>garbage collector (GC)</dt><dd>The part of the JVM that finds objects nobody uses any more and frees their memory.</dd>
+  <dt>pause</dt><dd>A moment when the GC stops all your threads. While paused, your service answers nobody.</dd>
+  <dt>concurrent</dt><dd>"At the same time": GC work that runs while your threads keep running.</dd>
+  <dt>generation</dt><dd>A part of the heap for objects of a certain age: <em>young</em> for new objects, <em>old</em> for objects that have lived a long time.</dd>
+  <dt>allocation stall</dt><dd>Your thread wants memory for a new object, but the GC has not freed enough yet, so the thread has to wait.</dd>
+  <dt>G1</dt><dd>The default collector on server-class machines since JDK 9: a balance of throughput and short pauses.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"In a web service, which objects die quickly, and which live for a long time?"</em> Think of a request object, a JSON string, a cache, a database connection pool. Your answer is the idea behind this whole lesson.</p>
+
+<h2>1. The idea: most objects die young</h2>
+<p>Think of your kitchen. The bin fills up every day with wrappers, peels and paper: you empty it daily, it takes a minute. The attic holds things you keep for years: you clear it maybe once a year, and that takes a whole afternoon. It would be silly to search the attic every time the kitchen bin is full.</p>
+<p>Java objects behave the same way. "The weak generational hypothesis states that young objects tend to die young, while old objects tend to stick around."<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> A request's JSON string, its DTOs and temporary lists die when the request ends. A cache or a connection pool lives as long as the application.</p>
+<p>So a GC that keeps young and old objects apart can clean the young part often and cheaply, and leave the old part alone most of the time. G1 already does this (lesson 0007). ZGC, before JDK 21, did not.</p>
+
+<h2>2. The old way: ZGC without generations</h2>
+<p>ZGC is the low-pause collector. It became a product feature in JDK 15<a class="src" href="https://openjdk.org/jeps/377">JEP 377</a>, so it is available on JDK 17 too. Its trick is to do almost all the work concurrently, while your threads run.</p>
+<p>But it had one weakness. JEP 439: "ZGC currently stores all objects together, regardless of age, so it must collect all objects every time it runs." That "works well as long as there are sufficient resources (i.e., memory and CPU) available".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> In the kitchen picture: every time the bin is full, you also search the whole attic.</p>
+<p>I ran the course's GC demo with non-generational ZGC on JDK 21, with a deliberately small 64 MB heap:</p>
+<pre><code>$ java -XX:+UseZGC -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.018s][info][gc] Using The Z Garbage Collector
+[0.138s][info][gc] GC(0) Garbage Collection (Warmup) 8M(12%)->6M(9%)
+[0.344s][info][gc] GC(1) Garbage Collection (Warmup) 20M(31%)->12M(19%)
+max heap (MB): 64
+<span class="hl">[0.390s][info][gc] Allocation Stall (main) 9.720ms</span>
+[0.391s][info][gc] GC(2) Garbage Collection (Allocation Stall) 64M(100%)->12M(19%)
+<span class="hl">[0.404s][info][gc] Allocation Stall (main) 7.194ms</span>
+[0.405s][info][gc] GC(3) Garbage Collection (Allocation Stall) 64M(100%)->12M(19%)</code></pre>
+<p>Every cycle is a full "Garbage Collection" of the whole heap. The heap reached 100%, and the main thread had to wait almost 10 ms for memory: an <span class="term">allocation stall</span>. ZGC's pauses are tiny, but a stall still makes your code wait.</p>
+
+<h2>3. The new way: young and old generations (JDK 21)</h2>
+<p>JEP 439 aims to "improve application performance by extending the Z Garbage Collector to maintain separate generations for young and old objects."<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> "The young generation is for recently allocated objects while the old generation is for long-lived objects", and "Each generation is collected independently of the other, so ZGC can focus on collecting the profitable young objects."<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="The heap is split into a young generation, where most new objects die, and an old generation for long-lived objects. Survivors move from young to old. A pointer from an old object to a young object is recorded in the remembered set. A minor collection cleans young only; a major collection cleans both.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="24" y="22" font-size="11" opacity=".75">heap</text>
+    <rect x="20" y="30" width="640" height="174" rx="6" fill="none" stroke="currentColor" opacity=".6"/>
+    <rect x="36" y="46" width="270" height="138" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="374" y="46" width="270" height="138" rx="4" fill="none" stroke="currentColor"/>
+    <text x="171" y="68" text-anchor="middle" fill="var(--accent)">young generation</text>
+    <text x="509" y="68" text-anchor="middle">old generation</text>
+    <g fill="none" stroke="currentColor" opacity=".45">
+      <rect x="56" y="84" width="36" height="22" rx="3"/>
+      <rect x="102" y="84" width="36" height="22" rx="3"/>
+      <rect x="194" y="84" width="36" height="22" rx="3"/>
+      <rect x="56" y="118" width="36" height="22" rx="3"/>
+      <rect x="148" y="118" width="36" height="22" rx="3"/>
+      <rect x="194" y="118" width="36" height="22" rx="3"/>
+    </g>
+    <g text-anchor="middle" font-size="12" opacity=".55">
+      <text x="74" y="100">×</text><text x="120" y="100">×</text><text x="212" y="100">×</text>
+      <text x="74" y="134">×</text><text x="166" y="134">×</text><text x="212" y="134">×</text>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <rect x="148" y="84" width="36" height="22" rx="3"/>
+      <rect x="240" y="118" width="36" height="22" rx="3"/>
+      <rect x="394" y="84" width="36" height="22" rx="3"/>
+      <rect x="450" y="84" width="36" height="22" rx="3"/>
+      <rect x="506" y="84" width="36" height="22" rx="3"/>
+      <rect x="562" y="84" width="36" height="22" rx="3"/>
+      <rect x="394" y="118" width="36" height="22" rx="3"/>
+      <rect x="450" y="118" width="36" height="22" rx="3"/>
+    </g>
+    <text x="171" y="170" text-anchor="middle" font-size="11">most die young (×)</text>
+    <text x="509" y="170" text-anchor="middle" font-size="11">long-lived: caches, pools</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M306 95h62M362 90l6 5-6 5"/>
+    </g>
+    <text x="340" y="86" text-anchor="middle" font-size="10" opacity=".8">survivors</text>
+    <text x="340" y="114" text-anchor="middle" font-size="10" opacity=".8">move</text>
+    <g fill="none" stroke="var(--accent)" stroke-dasharray="4 3">
+      <path d="M394 135C350 150 320 150 282 135"/>
+    </g>
+    <path d="M290 131l-8 4 8 4" fill="none" stroke="var(--accent)"/>
+    <text x="340" y="198" text-anchor="middle" font-size="10" fill="var(--accent)">old → young pointer: kept in the remembered set</text>
+    <text x="20" y="232" font-size="12">minor collection = young only  <tspan opacity=".7">(frequent, cheap)</tspan></text>
+    <text x="20" y="254" font-size="12">major collection = young + old  <tspan opacity=".7">(less often)</tspan></text>
+  </g>
+</svg>
+<figcaption>Generational ZGC collects the young part often. To do that without scanning the old part, it remembers which old objects point into young.</figcaption>
+</figure>
+
+<p>The JEP's goals: applications "should enjoy" lower risks of allocation stalls, lower required heap memory overhead and lower GC CPU overhead, "without significant throughput reduction compared to non-generational ZGC". The essential properties stay: "Pause times should not exceed 1 millisecond", heap sizes "from a few hundred megabytes up to many terabytes", and "Minimal manual configuration".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> You do not set the size of the generations or how long objects stay young.<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+
+<h2>4. Turning it on in JDK 21</h2>
 <pre><code>java -XX:+UseZGC -XX:+ZGenerational -jar app.jar</code></pre>
-<p>Both flags together enable the generational mode in JDK 21.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a> Without them the default collector rules apply: G1 on server-class machines, Serial otherwise.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
-<h2>Try it</h2>
+<p>Both flags together enable the generational mode in JDK 21.<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> This is the classic trap: "The <code>-XX:+UseZGC</code> command-line option will select non-generational ZGC" in JDK 21; the generational mode was made "available alongside non-generational ZGC".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+<table>
+<tr><th>You write (on JDK 21)</th><th>You get</th></tr>
+<tr><td>no GC flag</td><td>the default: G1 on server-class machines, Serial otherwise<a class="src" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC tuning guide</a></td></tr>
+<tr><td><code>-XX:+UseZGC</code></td><td>non-generational ZGC</td></tr>
+<tr><td><code>-XX:+UseZGC -XX:+ZGenerational</code></td><td><strong>generational ZGC</strong></td></tr>
+</table>
+<p class="muted">After 21: JEP 474, delivered in JDK 23, made generational the default mode of ZGC, so there <code>-XX:+UseZGC</code> alone is enough and <code>ZGenerational</code> is deprecated.<a class="src" href="https://openjdk.org/jeps/474">JEP 474</a> If you upgrade later, drop the extra flag.</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<ul>
+  <li><strong>JDK 8:</strong> no ZGC. The default on servers was the Parallel GC; G1 became the default only in JDK 9.<a class="src" href="https://openjdk.org/jeps/248">JEP 248</a></li>
+  <li><strong>JDK 17:</strong> G1 by default; ZGC available, non-generational only.</li>
+  <li><strong>JDK 21:</strong> G1 by default; ZGC in both modes, generational with the extra flag.</li>
+</ul>
+
+<h2>5. Try it and read the log</h2>
 <pre><code>java -XX:+UseZGC -XX:+ZGenerational -Xmx64m -Xlog:gc java/examples/GcDemo.java</code></pre>
-<p>Compare the log with the G1 run from <a href="0007-heap-and-garbage-collection.html">lesson 7</a>. I ran the G1 version there; the ZGC comparison is your exercise.</p>
+<p>The demo allocates two million 1 KB arrays that die at once: pure "young garbage". My run on JDK 21 (first lines):</p>
+<pre><code>[0.019s][info][gc] Using The Z Garbage Collector
+[0.156s][info][gc] GC(0) Major Collection (Warmup)
+[0.184s][info][gc] GC(0) Major Collection (Warmup) 8M(12%)->8M(12%) 0.028s
+...
+max heap (MB): 64
+<span class="hl">[0.407s][info][gc] GC(3) Minor Collection (Allocation Rate)</span>
+[0.417s][info][gc] Allocation Stall (main) 4.328ms
+[0.420s][info][gc] GC(3) Minor Collection (Allocation Rate) 44M(69%)->58M(91%) 0.013s</code></pre>
+<p>Read it line by line:</p>
+<ol class="steps">
+  <li><strong>Major Collection:</strong> young and old together. The first ones are "Warmup" cycles while the JVM starts.</li>
+  <li><strong>Minor Collection:</strong> young generation only. Trigger: "Allocation Rate", the program creates objects fast.</li>
+  <li><strong>The last number</strong> (<code>0.013s</code>) is how long the whole cycle took. Most of it runs <em>concurrently</em>; it is <strong>not</strong> a pause.</li>
+  <li><strong>Allocation Stall</strong> still appears: 64 MB is too small for this allocation rate. ZGC needs headroom.</li>
+</ol>
+<p>To see the real pauses, add the <code>gc+phases</code> tag. I gave it 256 MB this time:</p>
+<pre><code>$ java -XX:+UseZGC -XX:+ZGenerational -Xmx256m -Xlog:gc,gc+phases java/examples/GcDemo.java
+[0.437s][info][gc       ] GC(3) Minor Collection (Allocation Rate)
+[0.437s][info][gc,phases] GC(3) y: Young Generation
+[0.437s][info][gc,phases] GC(3) y: <span class="hl">Pause Mark Start 0.007ms</span>
+[0.439s][info][gc,phases] GC(3) y: Concurrent Mark 1.514ms
+[0.439s][info][gc,phases] GC(3) y: <span class="hl">Pause Mark End 0.006ms</span>
+...
+[0.442s][info][gc       ] GC(3) Minor Collection (Allocation Rate) 78M(30%)->64M(25%) 0.005s</code></pre>
+<p>The pauses are about 0.007 ms, far below the 1 ms goal; the 1.5 ms of marking runs concurrently. With 256 MB the full run printed no allocation stall at all. For comparison, the default G1 on the same demo with 64 MB:</p>
+<pre><code>$ java -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.001s][info][gc] Using G1
+max heap (MB): 64
+[0.348s][info][gc] GC(0) <span class="hl">Pause Young (Normal)</span> (G1 Evacuation Pause) 24M->3M(64M) 3.235ms
+[0.356s][info][gc] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 38M->3M(64M) 2.563ms</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Two timelines. G1: the application runs in blocks separated by pauses of about 2 milliseconds. Generational ZGC: the application runs almost without gaps, with pauses of about 0.007 milliseconds, while GC threads work concurrently underneath.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="49">G1</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="120" y="32" width="110" height="26"/>
+      <rect x="250" y="32" width="120" height="26"/>
+      <rect x="390" y="32" width="120" height="26"/>
+      <rect x="530" y="32" width="120" height="26"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="230" y="32" width="20" height="26"/>
+      <rect x="370" y="32" width="20" height="26"/>
+      <rect x="510" y="32" width="20" height="26"/>
+    </g>
+    <text x="175" y="49" text-anchor="middle" font-size="11">app runs</text>
+    <text x="380" y="78" text-anchor="middle" font-size="11" fill="var(--accent)">pauses ~2–3 ms: every thread stopped</text>
+    <text x="20" y="129">gen. ZGC</text>
+    <rect x="120" y="112" width="530" height="26" fill="none" stroke="currentColor"/>
+    <g stroke="var(--accent)" stroke-width="2">
+      <path d="M240 108v34M380 108v34M520 108v34"/>
+    </g>
+    <text x="175" y="129" text-anchor="middle" font-size="11">app runs</text>
+    <rect x="245" y="148" width="120" height="16" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7"/>
+    <rect x="385" y="148" width="120" height="16" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7"/>
+    <text x="305" y="160" text-anchor="middle" font-size="10" opacity=".8">GC threads</text>
+    <text x="445" y="160" text-anchor="middle" font-size="10" opacity=".8">GC threads</text>
+    <text x="385" y="190" text-anchor="middle" font-size="11" fill="var(--accent)">pauses ~0.007 ms; marking and moving run alongside the app</text>
+  </g>
+</svg>
+<figcaption>Not to scale: the numbers come from my runs above. G1 stops the app for each young collection; ZGC stops it only for tiny moments.</figcaption>
+</figure>
+
+<h2>6. How does it work without long pauses? (Senior detail)</h2>
+<p>Moving objects while your threads use them sounds impossible. ZGC solves it with small pieces of code it adds to your program. "A load barrier is a fragment of code injected by ZGC into the application" when it reads a reference, and ZGC uses <em>colored pointers</em>: "A colored pointer is a pointer to an object in the heap" with extra bits that tell the barrier what state the object is in.<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+<p>Generations add one problem: to clean the young part alone, ZGC must know which old objects point to young ones (the dashed arrow in the first diagram). So "Generational ZGC also uses store barriers": "The remembered set contains all memory addresses in the old generation that potentially contain pointers to objects in the young generation", and "Store barriers add entries to the remembered set."<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> Unlike the old mode, it no longer needs multi-mapped memory: "Generational ZGC instead uses explicit code in the load and store barriers".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+<h3>Trap: "ZGC is always better"</h3>
+<p>Barriers cost a little CPU on every reference read and write, and ZGC wants free heap to work concurrently (you saw the stall at 64 MB). For a batch job that only cares about total throughput, G1 or Parallel may finish sooner. Choose by your target, and measure.</p>
 <div class="aside">Interview answer shape: "Default G1 for balanced throughput. If the SLA is sub-millisecond pauses on large heaps, evaluate generational ZGC on JDK 21, measured against my workload's GC logs, not by folklore."</div>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. What did JDK 21 add to ZGC?</p>
-  <button>A JIT compiler</button>
-  <button>Native threads</button>
-  <button data-correct>Separate generations</button>
-  <button>A new language</button>
-  <p class="explain">Generational ZGC maintains separate young and old generations.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. How is generational ZGC enabled on JDK 21?</p>
-  <button>Xmx flag alone</button>
-  <button data-correct>UseZGC plus ZGenerational</button>
-  <button>UseG1GC alone</button>
-  <button>UseSerialGC alone</button>
-  <p class="explain">Both -XX:+UseZGC and -XX:+ZGenerational are used together.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Stated pause-time goal?</p>
-  <button>No pause goal</button>
-  <button>Under one second</button>
-  <button data-correct>Under one millisecond</button>
-  <button>Under ten seconds</button>
-  <p class="explain">The JEP targets pause times under one millisecond.<a class="cite" href="https://openjdk.org/jeps/439">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Default collector on a server-class machine?</p>
-  <button data-correct>G1</button>
-  <button>Epsilon</button>
-  <button>Serial</button>
-  <button>ZGC</button>
-  <p class="explain">G1 on server-class machines, Serial otherwise.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
-</div>
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">What did JDK 21 add to ZGC?</p>
+  <div class="options">
+    <button class="opt" data-correct>Separate young and old generations</button>
+    <button class="opt">A new just-in-time compiler for it</button>
+    <button class="opt">Native OS threads for the GC work</button>
+    <button class="opt">Stop-the-world pauses for young data</button>
+  </div>
+  <div class="why">Generational ZGC maintains separate generations for young and old objects (JEP 439).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">How do you enable generational ZGC on JDK 21?</p>
+  <div class="options">
+    <button class="opt" data-correct>-XX:+UseZGC -XX:+ZGenerational</button>
+    <button class="opt">-XX:+UseZGC on its own</button>
+    <button class="opt">-XX:+UseG1GC -XX:+ZGenerational</button>
+    <button class="opt">-Xmx with a bigger heap size</button>
+  </div>
+  <div class="why">Both flags together. On JDK 21, <code>-XX:+UseZGC</code> alone selects non-generational ZGC.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What pause-time goal does generational ZGC keep?</p>
+  <div class="options">
+    <button class="opt" data-correct>Under one millisecond</button>
+    <button class="opt">Under ten milliseconds</button>
+    <button class="opt">Under one second</button>
+    <button class="opt">There is no pause goal</button>
+  </div>
+  <div class="why">"Pause times should not exceed 1 millisecond" is one of the preserved properties. My runs showed pauses near 0.007 ms.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which collector does JDK 21 use on a server-class machine when you pass no GC flag?</p>
+  <div class="options">
+    <button class="opt" data-correct>G1</button>
+    <button class="opt">ZGC</button>
+    <button class="opt">Serial</button>
+    <button class="opt">Parallel</button>
+  </div>
+  <div class="why">G1 on server-class machines, Serial otherwise. G1 has been the server default since JDK 9; before that it was Parallel.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does it pay to collect the young generation more often than the old one?</p>
+  <div class="options">
+    <button class="opt" data-correct>Most new objects die young, so it frees a lot cheaply</button>
+    <button class="opt">Old objects are smaller, so they are cheap to skip</button>
+    <button class="opt">Young objects are never referenced by old objects</button>
+    <button class="opt">The old generation cannot be collected concurrently</button>
+  </div>
+  <div class="why">The weak generational hypothesis: "young objects tend to die young". Old objects can point to young ones; that is what the remembered set tracks.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In a ZGC log, <code>Minor Collection ... 0.013s</code>. What is 0.013 s?</p>
+  <div class="options">
+    <button class="opt" data-correct>The whole cycle, mostly concurrent</button>
+    <button class="opt">One pause where all threads stopped</button>
+    <button class="opt">The time spent on the old generation</button>
+    <button class="opt">The time the JVM took to start up</button>
+  </div>
+  <div class="why">The number is the duration of the cycle; most of it runs alongside the app. The real pauses show up with <code>-Xlog:gc+phases</code> as "Pause Mark Start" and similar, around 0.007 ms here.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is generational ZGC, and when would you use it instead of G1?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> ZGC is the low-pause collector; it does almost all work concurrently, pauses under 1 ms.</label></li>
+      <li><label><input type="checkbox"> Before 21 it had no generations: every cycle collected the whole heap.</label></li>
+      <li><label><input type="checkbox"> JDK 21 (JEP 439) adds young and old generations: young objects die young, so collect young often.</label></li>
+      <li><label><input type="checkbox"> Benefits: lower risk of allocation stalls, less heap overhead, less GC CPU.</label></li>
+      <li><label><input type="checkbox"> On 21 enable with <code>-XX:+UseZGC -XX:+ZGenerational</code>; <code>UseZGC</code> alone is non-generational.</label></li>
+      <li><label><input type="checkbox"> G1 stays the default; choose ZGC for strict latency on large heaps, and decide with GC logs.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"ZGC is the low-latency collector: it marks and moves objects concurrently, using load barriers and colored pointers, so pauses stay under a millisecond even on very large heaps. Until JDK 21 it had no generations, so every cycle had to collect the whole heap, which needs a lot of spare memory and CPU and can cause allocation stalls. JEP 439 in JDK 21 adds a young and an old generation, based on the idea that most objects die young: it collects the young generation often and cheaply, and uses store barriers and a remembered set to track old-to-young pointers. On 21 I enable it with <code>-XX:+UseZGC -XX:+ZGenerational</code>, because <code>UseZGC</code> alone still gives the old mode. I'd keep G1, the default, for most services, and evaluate generational ZGC when the SLA needs very short pauses on a big heap, comparing GC logs from my own workload."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0017-compare-g1-and-zgc.md">Exercise 0017: compare G1 and ZGC</a></p>
+<p><a href="../exercises/0017-compare-g1-and-zgc.md">Exercise 0017: compare G1 and ZGC</a>. Write your prediction to the teacher first, then run the code. Compare your log with the G1 run from <a href="0007-heap-and-garbage-collection.html">lesson 7</a>.</p>
 <p>Runnable example: <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a>. Read the Summary, Goals and 'Description'.</p>
-<p><a href="0006-virtual-threads.html">← Virtual threads: scale, not speed</a> &nbsp;|&nbsp; <a href="../index.html">Back to the ladder</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Your p99 latency jumps every few seconds. How do you find out if GC is the cause? What would you change first?"</em> Start with <code>-Xlog:gc</code>, match pause times to the latency spikes, check heap headroom, and only then try another collector. Review heap sizing and G1 in <a href="0007-heap-and-garbage-collection.html">lesson 0007</a>. You have reached the end of the JDK 21 section: test yourself in the review, then try the <a href="../interview.html">Java interview Q&amp;A</a>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a>. Read the Summary, Goals and 'Description'.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What exactly does a load barrier do?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0006-virtual-threads.html">← Virtual threads: scale, not speed</a> &nbsp;|&nbsp; <a href="0046-review-jdk17-21.html">Review 7: what JDK 17 and 21 added →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against JEP 439, JEP 474, JEP 377, JEP 248, the GC tuning guide and runs on JDK 21.0.12, October 2026.</p>
+  <p>References: <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a> · <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · <a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> · <a href="https://openjdk.org/jeps/377">JEP 377: ZGC: A Scalable Low-Latency Garbage Collector (Production)</a> · <a href="https://openjdk.org/jeps/248">JEP 248: Make G1 the Default Garbage Collector</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

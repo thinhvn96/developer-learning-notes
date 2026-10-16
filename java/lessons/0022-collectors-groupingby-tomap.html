@@ -3,79 +3,278 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 22: Collectors: groupingBy, partitioningBy and toMap</title>
+<title>Java 22: Collectors: groupingBy and toMap</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>Collectors: groupingBy, partitioningBy and toMap</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0022 · step 10 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Collectors: sorting a stream into boxes</h1>
+<p class="subtitle"><code>groupingBy</code>, <code>partitioningBy</code>, <code>joining</code> and <code>toMap</code>, and the one that throws when two keys collide.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0022 · step 26 of 46 · Core · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0022-collectors-groupingby-tomap.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> write <code>groupingBy</code>, <code>partitioningBy</code>, <code>joining</code> and <code>toMap</code> pipelines, and know when <code>toMap</code> throws.</div>
+<div class="mission"><strong>Why this lesson?</strong> Real services build reports all the time: orders per customer, total salary per department, "active vs inactive" users. In Java you write these with collectors. Interviewers often give a list of employees and ask you to group them live, then ask <em>"What happens if <code>toMap</code> sees a duplicate key?"</em></div>
 
-<h2>The four you need</h2>
-<ul>
-<li><code>groupingBy(classifier[, downstream])</code>: a "group by" into a <code>Map</code>; downstream collectors like <code>summingInt</code>, <code>counting</code>, <code>mapping</code> aggregate each group.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
-<li><code>partitioningBy(predicate)</code>: a <code>Map&lt;Boolean, List&lt;T&gt;&gt;</code> that "always contains mappings for both false and true keys".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
-<li><code>joining(delimiter, prefix, suffix)</code>: concatenates into one String.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
-<li><code>toMap(keyMapper, valueMapper[, merge])</code>: "If the mapped keys contain duplicates ... an IllegalStateException is thrown"; supply a merge function to combine them.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></li>
-</ul>
-<p>Also: <code>toList()</code>/<code>toSet()</code> give "no guarantees on the type, mutability, serializability, or thread-safety"; use <code>toCollection(Supplier)</code> for control. Java 10 added <code>toUnmodifiableList/Set/Map</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
-<pre><code>java java/examples/CollectorsDemo.java
+<div class="win"><b>Today's win:</b> write <code>groupingBy</code>, <code>partitioningBy</code>, <code>joining</code> and <code>toMap</code> pipelines from memory, and say exactly when <code>toMap</code> throws and how to fix it.</div>
+
+<dl class="words">
+  <dt>collector</dt><dd>A recipe that tells <code>collect(...)</code> how to pack stream elements into one result: a list, a map, a number, a string.</dd>
+  <dt>classifier</dt><dd>A function that gives each element its group key, e.g. <code>Emp::dept</code>.</dd>
+  <dt>downstream collector</dt><dd>A second collector that runs inside each group, e.g. "sum the salaries of this group".</dd>
+  <dt>record</dt><dd>A short way (JDK 16+) to write a data class: <code>record Emp(String name, String dept, int salary) {}</code>.</dd>
+  <dt>merge function</dt><dd>A function that says how to combine two values that ended up with the same key.</dd>
+  <dt>unmodifiable</dt><dd>A collection you can read but not change; <code>add</code> throws an exception.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Two employees both earn 4800. I build a map from salary to name with <code>Collectors.toMap(Emp::salary, Emp::name)</code>. What happens?"</em> Pick one: first wins, last wins, or an exception.</p>
+
+<h2>1. The picture: a post office sorting room</h2>
+<p>At a post office, letters arrive on a belt. A worker reads the city on each letter and drops it into the bin for that city. If a city has no bin yet, the worker opens a new one. At the end you have one bin per city.</p>
+<p>That is <code>groupingBy</code>. The city is the <span class="term">classifier</span>; each bin is a map entry. Its Javadoc calls it a "group by" operation, like SQL.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a> All examples in this lesson use this data:</p>
+<pre><code>record Emp(String name, String dept, int salary) {}
+
+List&lt;Emp&gt; emps = List.of(
+    new Emp("ann", "dev", 5200), new Emp("bob", "dev", 4200),
+    new Emp("cy",  "ops", 4800), new Emp("dee", "ops", 4800));</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="groupingBy by dept: ann and bob go to the dev bin, cy and dee go to the ops bin. The downstream collector summingInt turns the bins into 9400 and 9600.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="30" width="150" height="34" rx="4"/><rect x="20" y="74" width="150" height="34" rx="4"/>
+      <rect x="20" y="118" width="150" height="34" rx="4"/><rect x="20" y="162" width="150" height="34" rx="4"/>
+    </g>
+    <text x="95" y="52" text-anchor="middle">ann dev 5200</text>
+    <text x="95" y="96" text-anchor="middle">bob dev 4200</text>
+    <text x="95" y="140" text-anchor="middle">cy  ops 4800</text>
+    <text x="95" y="184" text-anchor="middle">dee ops 4800</text>
+    <text x="250" y="20" text-anchor="middle" font-size="11" fill="var(--accent)">classifier Emp::dept</text>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M170 47L322 72"/><path d="M170 91L322 82"/>
+      <path d="M170 135L322 146"/><path d="M170 179L322 156"/>
+    </g>
+    <rect x="325" y="50" width="160" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="405" y="72" text-anchor="middle" fill="var(--accent)">"dev" bin</text>
+    <text x="405" y="92" text-anchor="middle" font-size="11">[ann, bob]</text>
+    <rect x="325" y="124" width="160" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="405" y="146" text-anchor="middle" fill="var(--accent)">"ops" bin</text>
+    <text x="405" y="166" text-anchor="middle" font-size="11">[cy, dee]</text>
+    <g fill="none" stroke="currentColor"><path d="M485 78h58M537 73l6 5-6 5"/><path d="M485 152h58M537 147l6 5-6 5"/></g>
+    <text x="580" y="20" text-anchor="middle" font-size="11">downstream</text>
+    <text x="580" y="36" text-anchor="middle" font-size="11">summingInt(salary)</text>
+    <rect x="545" y="58" width="115" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="602" y="83" text-anchor="middle">9400</text>
+    <rect x="545" y="132" width="115" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="602" y="157" text-anchor="middle">9600</text>
+    <text x="340" y="236" text-anchor="middle" font-size="12">result: {ops=9600, dev=9400}   (a Map&lt;String, Integer&gt;)</text>
+  </g>
+</svg>
+<figcaption>The classifier picks the bin. Without a downstream collector each bin is a <code>List</code>; with one, each bin is reduced to a single value.</figcaption>
+</figure>
+
+<h2>2. groupingBy, with and without a downstream collector</h2>
+<pre><code>emps.stream().collect(Collectors.groupingBy(Emp::dept));
+<span class="c">// {ops=[Emp[cy..], Emp[dee..]], dev=[Emp[ann..], Emp[bob..]]}  bins of whole Emps</span>
+
+emps.stream().collect(Collectors.groupingBy(Emp::dept,
+        Collectors.mapping(Emp::name, Collectors.toList())));
+<span class="c">// {ops=[cy, dee], dev=[ann, bob]}   each bin keeps only the names</span>
+
+emps.stream().collect(Collectors.groupingBy(Emp::dept,
+        Collectors.summingInt(Emp::salary)));
+<span class="c">// {ops=9600, dev=9400}              each bin becomes one number</span></code></pre>
+<p>The second argument is the <span class="term">downstream collector</span>: it decides what happens <em>inside</em> each bin. Common ones are <code>counting()</code>, <code>summingInt(...)</code>, <code>mapping(...)</code> and <code>toList()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a></p>
+<h3>Trace it step by step</h3>
+<pre><code>groupingBy(Emp::dept, summingInt(Emp::salary))
+<span class="c">Step 1  ann → key "dev" → no bin yet → new bin, sum = 5200</span>
+<span class="c">Step 2  bob → key "dev" → bin exists  → sum = 5200 + 4200 = 9400</span>
+<span class="c">Step 3  cy  → key "ops" → new bin     → sum = 4800</span>
+<span class="c">Step 4  dee → key "ops" → bin exists  → sum = 4800 + 4800 = 9600</span>
+<span class="c">Result  </span><span class="hl">{ops=9600, dev=9400}</span></code></pre>
+<p class="muted">Why is <code>ops</code> printed before <code>dev</code>? The result is a plain map, and the docs give "no guarantees on the type, mutability, serializability, or thread-safety of the <code>Map</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a> Need sorted keys? Use the three-argument form: <code>groupingBy(Emp::dept, TreeMap::new, downstream)</code>.</p>
+
+<h2>3. partitioningBy and joining</h2>
+<p><strong>partitioningBy</strong> is a sorting room with exactly two bins: "yes" and "no". You give it a test (a <code>Predicate</code>) instead of a classifier. The result is a <code>Map&lt;Boolean, ...&gt;</code> that "always contains mappings for both <code>false</code> and <code>true</code> keys", even if one bin is empty.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a></p>
+<pre><code>emps.stream().collect(Collectors.partitioningBy(e -&gt; e.salary() &gt;= 5000,
+                                                Collectors.counting()));
+<span class="hl">// {false=3, true=1}</span></code></pre>
+<p>With <code>groupingBy(e -&gt; e.salary() &gt;= 5000)</code> instead, a missing group would simply be absent. That is the difference interviewers look for.</p>
+<p><strong>joining</strong> threads strings like beads on a string. <code>joining(delimiter, prefix, suffix)</code> "concatenates the input elements, separated by the specified delimiter, with the specified prefix and suffix, in encounter order".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a></p>
+<pre><code>emps.stream().map(Emp::name).collect(Collectors.joining(", ", "[", "]"));
+<span class="hl">// [ann, bob, cy, dee]</span></code></pre>
+
+<h2>4. toMap: one key, one value, or it throws</h2>
+<p>Think of a phone book where every name may appear only once. <code>toMap(keyMapper, valueMapper)</code> builds such a book. If two elements produce the same key, Java doesn't silently pick one. The docs: "If the mapped keys contain duplicates (according to <code>Object.equals(Object)</code>), an <code>IllegalStateException</code> is thrown when the collection operation is performed."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="toMap from salary to name. 5200 to ann, 4200 to bob, 4800 to cy. Then dee also has key 4800. Without a merge function this throws IllegalStateException; with the merge function the value becomes cy+dee.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11">toMap(Emp::salary, Emp::name)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="36" width="200" height="32" rx="4"/><rect x="20" y="76" width="200" height="32" rx="4"/>
+      <rect x="20" y="116" width="200" height="32" rx="4"/>
+    </g>
+    <text x="120" y="57" text-anchor="middle">5200 → "ann"</text>
+    <text x="120" y="97" text-anchor="middle">4200 → "bob"</text>
+    <text x="120" y="137" text-anchor="middle">4800 → "cy"</text>
+    <rect x="20" y="170" width="200" height="40" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="195" text-anchor="middle" fill="var(--accent)">dee: key 4800 again!</text>
+    <g fill="none" stroke="var(--accent)"><path d="M220 190h40l40-60h18M312 125l6 5-6 5"/><path d="M260 190l40 40h18M312 225l6 5-6 5"/></g>
+    <rect x="320" y="108" width="340" height="44" rx="6" fill="none" stroke="var(--accent)"/>
+    <text x="490" y="128" text-anchor="middle" fill="var(--accent)">no merge function</text>
+    <text x="490" y="144" text-anchor="middle" font-size="11" fill="var(--accent)">IllegalStateException</text>
+    <rect x="320" y="200" width="340" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="490" y="218" text-anchor="middle" font-size="11">merge (x, y) -&gt; x + "+" + y</text>
+    <text x="490" y="236" text-anchor="middle">4800 → "cy+dee"</text>
+    <text x="490" y="60" text-anchor="middle" font-size="11" opacity=".8">first three keys are new:</text>
+    <text x="490" y="78" text-anchor="middle" font-size="11" opacity=".8">they go straight in</text>
+  </g>
+</svg>
+<figcaption>The fourth element repeats key 4800. Without a merge function, <code>toMap</code> throws; with one, it combines the two values.</figcaption>
+</figure>
+
+<p>The fix: "If the mapped keys might have duplicates, use <code>toMap(Function, Function, BinaryOperator)</code> instead."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a> The third argument is the <span class="term">merge function</span>: it receives the old value and the new value and returns the one to keep.</p>
+<pre><code>Map&lt;Integer, String&gt; merged = emps.stream().collect(
+    Collectors.toMap(Emp::salary, Emp::name, (x, y) -&gt; x + "+" + y));
+<span class="c">Step 1  ann: 5200 new → put "ann"</span>
+<span class="c">Step 2  bob: 4200 new → put "bob"</span>
+<span class="c">Step 3  cy:  4800 new → put "cy"</span>
+<span class="c">Step 4  dee: 4800 exists → merge("cy", "dee") → "cy+dee"</span></code></pre>
+<p class="muted">Common merge choices: <code>(a, b) -&gt; a</code> keeps the first, <code>(a, b) -&gt; b</code> keeps the last, <code>Integer::sum</code> adds them. Pick one on purpose; "duplicates can't happen" is the assumption the exception protects you from.</p>
+
+<h3>Run it</h3>
+<pre><code>$ java java/examples/CollectorsDemo.java
 groupingBy      : {ops=[cy, dee], dev=[ann, bob]}
 sum by dept     : {ops=9600, dev=9400}
 partitioningBy : {false=3, true=1}
+joining         : [ann, bob, cy, dee]
 toMap duplicate: IllegalStateException
 toMap w/ merge  : {4200=bob, 4800=cy+dee, 5200=ann}</code></pre>
-<p>Source: <a href="../examples/CollectorsDemo.java"><code>CollectorsDemo.java</code></a>. Compare with the SQL <code>GROUP BY</code> in the <a href="../../postgresql/index.html">PostgreSQL ladder</a>.</p>
+<p>The last line is printed through a <code>TreeMap</code> so the keys come out sorted. Compare all of this with SQL <code>GROUP BY</code> in the <a href="../../postgresql/index.html">PostgreSQL ladder</a>.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. toMap sees two equal keys and no merge function. Result?</p>
-  <button>First value wins</button>
-  <button>Last value wins</button>
-  <button>Silent drop</button>
-  <button data-correct>IllegalStateException</button>
-  <p class="explain">Duplicate keys throw IllegalStateException unless you pass a merge function.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Which collector always yields true and false keys?</p>
-  <button data-correct>partitioningBy</button>
-  <button>counting</button>
-  <button>groupingBy</button>
-  <button>joining</button>
-  <p class="explain">partitioningBy's map contains both keys.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Which collector builds a delimited String?</p>
-  <button>toMap</button>
-  <button>filtering</button>
-  <button data-correct>joining</button>
-  <button>mapping</button>
-  <p class="explain">joining concatenates elements with optional delimiter.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Does toList guarantee a mutable list?</p>
-  <button data-correct>No guarantee is given</button>
-  <button>Yes, always</button>
-  <button>Yes, ArrayList only</button>
-  <button>No, always immutable</button>
-  <p class="explain">No guarantees on type or mutability.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">[1]</a></p>
-</div>
+<h2>5. What kind of list or map do you get?</h2>
+<p><code>Collectors.toList()</code> and <code>toSet()</code> give "no guarantees on the type, mutability, serializability, or thread-safety"; if you need control, use <code>toCollection(Supplier)</code>, e.g. <code>toCollection(ArrayList::new)</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a></p>
+<table>
+<tr><th>You write</th><th>You get</th><th>Since</th></tr>
+<tr><td><code>collect(Collectors.toList())</code></td><td>some List, no promise about changing it</td><td>JDK 8</td></tr>
+<tr><td><code>collect(Collectors.toCollection(ArrayList::new))</code></td><td>exactly an <code>ArrayList</code></td><td>JDK 8</td></tr>
+<tr><td><code>collect(Collectors.toUnmodifiableList())</code></td><td>an unmodifiable List</td><td>JDK 10</td></tr>
+<tr><td><code>stream.toList()</code></td><td>an unmodifiable List</td><td>JDK 16</td></tr>
+</table>
+<p>Sources: Collectors javadoc for the first three<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a>, Stream javadoc for <code>toList()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Stream javadoc</a> The unmodifiable <code>toUnmodifiableMap</code> also "disallows null keys and values".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors javadoc</a></p>
+
+<h3>Common mistakes</h3>
+<ul>
+  <li><strong><code>toMap</code> on data that can repeat a key.</strong> It works in tests and throws in production. Fix: pass a merge function, or use <code>groupingBy</code> if you want all values.</li>
+  <li><strong>Relying on the order of a <code>groupingBy</code> map.</strong> Fix: pass <code>TreeMap::new</code> or <code>LinkedHashMap::new</code> as the map factory.</li>
+  <li><strong>Adding to the result of <code>stream.toList()</code>.</strong> It throws <code>UnsupportedOperationException</code>. Fix: <code>toCollection(ArrayList::new)</code>.</li>
+</ul>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q"><code>toMap</code> sees two equal keys and you gave no merge function. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>IllegalStateException</button>
+    <button class="opt">The first value wins</button>
+    <button class="opt">The last value wins</button>
+    <button class="opt">One is silently dropped</button>
+  </div>
+  <div class="why">Duplicate keys throw <code>IllegalStateException</code> unless you pass a merge function as the third argument.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>groupingBy(Emp::dept, summingInt(Emp::salary))</code> return for the lesson's data?</p>
+  <div class="options">
+    <button class="opt" data-correct>A map like {ops=9600, dev=9400}</button>
+    <button class="opt">A map like {ops=[cy, dee], dev=[ann, bob]}</button>
+    <button class="opt">One number: the total salary 19000</button>
+    <button class="opt">A list like [9400, 9600] sorted by dept</button>
+  </div>
+  <div class="why">The classifier makes one bin per department; the downstream <code>summingInt</code> reduces each bin to one number.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which collector always gives you both a <code>true</code> and a <code>false</code> key?</p>
+  <div class="options">
+    <button class="opt" data-correct>partitioningBy</button>
+    <button class="opt">groupingBy</button>
+    <button class="opt">counting</button>
+    <button class="opt">toMap</button>
+  </div>
+  <div class="why"><code>partitioningBy</code>'s map "always contains mappings for both false and true keys". <code>groupingBy</code> on a boolean only has the keys it saw.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which collector builds <code>"[ann, bob, cy, dee]"</code> from a stream of names?</p>
+  <div class="options">
+    <button class="opt" data-correct>joining(", ", "[", "]")</button>
+    <button class="opt">mapping(", ", "[", "]")</button>
+    <button class="opt">toList(", ", "[", "]")</button>
+    <button class="opt">reducing(", ", "[", "]")</button>
+  </div>
+  <div class="why"><code>joining(delimiter, prefix, suffix)</code> concatenates elements in encounter order with the delimiter, prefix and suffix.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Does <code>Collectors.toList()</code> guarantee a mutable <code>ArrayList</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No: there is no guarantee on type or mutability</button>
+    <button class="opt">Yes: it always returns a new, mutable ArrayList</button>
+    <button class="opt">No: it always returns an unmodifiable list</button>
+    <button class="opt">Yes, but only when the stream is sequential</button>
+  </div>
+  <div class="why">The docs give "no guarantees on the type, mutability, serializability, or thread-safety". Use <code>toCollection(ArrayList::new)</code> for control.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You need departments in alphabetical order in the result map. What do you change?</p>
+  <div class="options">
+    <button class="opt" data-correct>Use groupingBy(Emp::dept, TreeMap::new, downstream)</button>
+    <button class="opt">Call sorted() on the stream before groupingBy</button>
+    <button class="opt">Nothing: groupingBy always sorts its keys</button>
+    <button class="opt">Use partitioningBy, which keeps keys sorted</button>
+  </div>
+  <div class="why">The map type is not guaranteed. The three-argument <code>groupingBy</code> takes a map factory, so <code>TreeMap::new</code> gives sorted keys.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How would you group employees by department and sum their salaries? And what are the pitfalls of toMap?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>collect(groupingBy(Emp::dept, summingInt(Emp::salary)))</code>: classifier plus downstream collector.</label></li>
+      <li><label><input type="checkbox"> Downstream collectors (<code>counting</code>, <code>mapping</code>, <code>summingInt</code>) work inside each group.</label></li>
+      <li><label><input type="checkbox"> <code>partitioningBy</code> splits on a predicate and always has both true and false keys.</label></li>
+      <li><label><input type="checkbox"> <code>toMap</code> throws <code>IllegalStateException</code> on a duplicate key.</label></li>
+      <li><label><input type="checkbox"> Fix: pass a merge function as the third argument (or use <code>groupingBy</code>).</label></li>
+      <li><label><input type="checkbox"> The map/list type isn't guaranteed; use a map factory or <code>toCollection</code> when it matters.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"I'd stream the employees and call <code>collect(Collectors.groupingBy(Emp::dept, Collectors.summingInt(Emp::salary)))</code>. The first argument is the classifier, which picks the group key; the second is a downstream collector that runs inside each group, so I get a map from department to total. If I only need two groups, like high and low earners, I use <code>partitioningBy</code>, which always has both true and false keys. The main pitfall with <code>toMap</code> is duplicate keys: by default it throws <code>IllegalStateException</code>, so if keys can repeat I pass a merge function as the third argument, for example to keep the first or sum the values. And the docs don't guarantee the type of the map or list, so if I need sorted keys or a mutable list, I pass <code>TreeMap::new</code> or use <code>toCollection</code>."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0022-report-with-collectors.md">Exercise 0022: report with collectors</a></p>
+<p><a href="../exercises/0022-report-with-collectors.md">Exercise 0022: report with collectors</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/CollectorsDemo.java"><code>CollectorsDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a>. Class description and its examples.</p>
-<p><a href="0004-streams-and-optional.html">← Streams and Optional without the traps</a> &nbsp;|&nbsp; <a href="0011-java-time.html">JDK 8: java.time, the date and time API →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer might ask <em>"Would you use a parallel stream for this report?"</em> or switch to time: <em>"Now group the orders by day, in the customer's time zone."</em> Dates and zones are the next lesson: <a href="0011-java-time.html">lesson 0011, java.time</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a>: the class description and its examples.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"How do I group by two fields?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0004-streams-and-optional.html">← Streams and Optional without the traps</a> &nbsp;|&nbsp; <a href="0011-java-time.html">java.time: which clock do you need? →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Stream Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

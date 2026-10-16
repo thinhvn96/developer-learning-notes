@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 11: Job và CronJob</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Job và CronJob</h1>
+<p class="meta">Kubernetes · Bài 0011 · bước 8/15 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-jobs-and-cronjobs.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn giữa Job và CronJob, đặt <code>restartPolicy</code> và <code>backoffLimit</code>, và giải thích vì sao job chạy theo lịch phải idempotent.</div>
+
+<h2>Job</h2>
+<p>Một Job "tạo một hoặc nhiều Pod và sẽ tiếp tục retry việc chạy các Pod cho đến khi một số lượng chỉ định trong số chúng kết thúc thành công". Yêu cầu: <code>restartPolicy</code> phải là <code>Never</code> hoặc <code>OnFailure</code>; <code>backoffLimit</code> mặc định là 6; <code>completions</code> và <code>parallelism</code> mặc định là 1.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[1]</a></p>
+<h2>CronJob</h2>
+<p>"Tạo các Job theo một lịch lặp lại", mỗi object tương ứng một dòng crontab, dùng cú pháp cron chuẩn (<code>0 3 * * 1</code> = thứ Hai lúc 03:00). <code>concurrencyPolicy</code>: <code>Allow</code> (mặc định), <code>Forbid</code> (bỏ qua nếu lần chạy trước vẫn chưa xong), <code>Replace</code>.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+<p><strong>Lưu ý:</strong> "trong một số tình huống, một CronJob có thể tạo ra nhiều Job chạy đồng thời, kể cả khi dùng Forbid", nên các Job "phải idempotent".<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+<pre><code>kubectl apply -f examples/job-cronjob.yaml
+hello-job  Complete  1/1  3s          logs: job ran on hello-job-pr6rb
+nightly    0 3 * * *   SUSPEND False  ACTIVE 0
+kubectl create job manual-run --from=cronjob/nightly   -&gt; logs: generating report</code></pre>
+<p>Lệnh cuối là cách tiện để test một CronJob mà không phải chờ đến giờ chạy. File: <a href="../examples/job-cronjob.yaml"><code>job-cronjob.yaml</code></a>. Cùng chủ đề idempotency với bài về <a href="../../system-design/lessons/0002-retries-and-idempotency.vi.html">retry</a>.</p><p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. restartPolicy nào hợp lệ cho một Job?</p>
+  <button>Chỉ Always</button>
+  <button data-correct>Never hoặc OnFailure</button>
+  <button>Always</button>
+  <button>None</button>
+  <p class="explain">restartPolicy phải là Never hoặc OnFailure.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. backoffLimit mặc định?</p>
+  <button data-correct>Sáu</button>
+  <button>Một</button>
+  <button>Không</button>
+  <button>Vô hạn</button>
+  <p class="explain">backoffLimit mặc định là 6.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Policy nào bỏ qua lần chạy nếu lần trước còn đang chạy?</p>
+  <button>Allow</button>
+  <button>Skip</button>
+  <button>Replace</button>
+  <button data-correct>Forbid</button>
+  <p class="explain">Forbid không cho phép các lần chạy đồng thời.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao việc CronJob làm phải idempotent?</p>
+  <button data-correct>Có thể bị chạy trùng</button>
+  <button>Pod là immutable</button>
+  <button>Cron chạy chậm</button>
+  <button>Job quá lớn</button>
+  <p class="explain">Trong một số tình huống, CronJob có thể tạo ra nhiều Job chạy đồng thời.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-nightly-report.vi.md">Bài tập 0011: báo cáo hằng đêm</a></p>
+<p>Ví dụ chạy được: <a href="../examples/job-cronjob.yaml"><code>job-cronjob.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">Kubernetes Docs: CronJob</a>. Sau đó đọc trang Job.</p>
+<p><a href="0010-secrets.vi.html">← Secret: bảo vệ được gì và không bảo vệ được gì</a> &nbsp;|&nbsp; <a href="0005-requests-limits-and-the-jvm.vi.html">Request, limit và JVM →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">Kubernetes Docs: Jobs</a> · [2] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">Kubernetes Docs: CronJob</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

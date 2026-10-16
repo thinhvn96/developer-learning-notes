@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 1: Container, image và layer</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Container, image và layer</h1>
+<p class="meta">Docker · Bài 0001 · bước 1/12 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-containers-images-layers.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích trong ba câu container, image và layer là gì, và vì sao container không phải là VM.</div>
+
+<h2>Container</h2>
+<p>Theo tài liệu của Docker, container là một process được cô lập, chạy một thành phần của ứng dụng "trong môi trường riêng của nó mà không ảnh hưởng đến hệ thống host hay các container khác". Container tự chứa đủ mọi thứ cần thiết và mang đi chạy ở đâu cũng được, đồng thời "nhẹ hơn máy ảo vì nhiều container dùng chung một kernel thay vì mỗi cái cần nguyên một hệ điều hành".<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a></p>
+<h2>Image</h2>
+<p>"Container image là một gói chuẩn hóa chứa tất cả file, binary, library và cấu hình cần để chạy một container." Image là bất biến (immutable): "Một khi image đã được tạo thì không thể sửa nó. Bạn chỉ có thể tạo image mới hoặc thêm thay đổi lên trên nó."<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a></p>
+<h2>Layer</h2>
+<p>"Container image được tạo thành từ các layer. Mỗi layer là một tập thay đổi trên file system: thêm, xóa hoặc sửa file."<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a> Image của ứng dụng Java của bạn gồm một layer nền (OS cộng JRE), các layer của ứng dụng được xếp chồng lên trên.</p>
+<div class="aside">Câu trả lời một dòng khi phỏng vấn: <strong>image</strong> là sản phẩm bất biến build ra từ "công thức", <strong>container</strong> là một process đang chạy (được cô lập) khởi tạo từ image đó, và các container trên cùng một host dùng chung kernel của host.</div>
+<h2>Xem tận mắt</h2>
+<pre><code>docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}'
+docker history hello-multi      # one row per layer</code></pre>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Các container trên cùng một host dùng chung cái gì?</p>
+  <button>Mỗi cái một hypervisor</button>
+  <button>Mỗi cái một guest OS</button>
+  <button>Kernel riêng của từng cái</button>
+  <button data-correct>Kernel của host</button>
+  <p class="explain">Nhiều container dùng chung một kernel; đó là lý do chúng nhẹ hơn VM.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Mô tả nào đúng nhất về image?</p>
+  <button>Một thư mục sửa được</button>
+  <button>Một máy ảo</button>
+  <button data-correct>Một gói bất biến</button>
+  <button>Một process đang chạy</button>
+  <p class="explain">Image là bất biến; mọi thay đổi đều tạo ra image mới hoặc thêm layer.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Một layer đại diện cho cái gì?</p>
+  <button>Một network interface</button>
+  <button data-correct>Một tập thay đổi file</button>
+  <button>Một container đang chạy</button>
+  <button>Cả một hệ điều hành</button>
+  <p class="explain">Mỗi layer là một tập thay đổi trên file system: thêm, xóa hoặc sửa file.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Đặc tính cô lập quan trọng nhất của container?</p>
+  <button data-correct>Chạy như một process riêng</button>
+  <button>Chạy một kernel riêng</button>
+  <button>Cần dùng cùng một image</button>
+  <button>Không thể dùng network</button>
+  <p class="explain">Container là các process được cô lập chạy trên host.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-inspect-layers.vi.md">Bài tập 0001: xem các layer</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker Docs: Docker concepts, the basics</a>. Đọc trang về container và trang về image.</p>
+<p> &nbsp;|&nbsp; <a href="0007-run-flags-and-container-lifecycle.vi.html">docker run: các flag và vòng đời của container →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker Docs: What is a container?</a> · [2] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">Docker Docs: What is an image?</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

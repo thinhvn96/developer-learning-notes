@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 3: Record và tính bất biến nông</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Record: một dòng thay cho bốn mươi dòng</h1>
+<p class="subtitle"><code>record</code> viết sẵn những gì cho bạn, và một chữ, <em>nông</em> (shallow), vẫn có thể làm bạn dính bug.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0003 · bước 39/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-records-and-immutability.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Các service Java hiện đại dùng record cho DTO, event, key của map và kết quả query. Interviewer hỏi <em>"Record là gì? Nó có immutable không?"</em> Câu trả lời mong đợi là "có, nhưng chỉ ở mức nông", và bạn nên chỉ ra được cách sửa.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> kể ra record sinh ra những gì, giải thích vì sao record chứa một <code>ArrayList</code> thì chưa thật sự immutable, và sửa nó bằng compact constructor cùng <code>List.copyOf</code>.</div>
+
+<dl class="words">
+  <dt>field</dt><dd>Biến thuộc về một object, như <code>x</code> bên trong một <code>Point</code>.</dd>
+  <dt>final</dt><dd>Với field: chỉ được gán một lần, trong constructor. Với class: không ai kế thừa (subclass) được nó.</dd>
+  <dt>immutable (bất biến)</dt><dd>Không thay đổi được sau khi tạo. <code>String</code> là immutable; <code>ArrayList</code> thì không.</dd>
+  <dt>reference (tham chiếu)</dt><dd>Field kiểu object không chứa chính object đó, mà chỉ chứa một mũi tên trỏ tới nó trong bộ nhớ.</dd>
+  <dt>constructor</dt><dd>Method đặc biệt chạy khi bạn viết <code>new Point(1, 2)</code>. Nó gán giá trị cho các field.</dd>
+  <dt>accessor</dt><dd>Method trả về giá trị của một field. Code JDK 8 gọi nó là getter: <code>getX()</code>.</dd>
+  <dt>record component</dt><dd>Một trong các giá trị liệt kê ở phần đầu record, như <code>x</code> và <code>y</code> trong <code>record Point(int x, int y)</code>.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói to: <em>"Nếu mọi field của một class đều là <code>final</code>, object đó có immutable không?"</em> Có hay không, và vì sao? Bạn sẽ kiểm tra ở mục 4.</p>
+
+<h2>1. Cách của JDK 8: gõ rất nhiều cho hai con số</h2>
+<p>Hãy nghĩ tới một nhãn bưu kiện. Nó chứa vài giá trị (tên, đường, thành phố) và bạn chỉ đọc chúng. Bạn không bao giờ "làm" gì với cái nhãn. Rất nhiều class trong backend giống vậy: một order event, một mức giá, một toạ độ. Chúng chỉ <em>mang dữ liệu</em>.</p>
+<p>Ở JDK 8, ngay cả một nhãn chỉ có hai con số cũng cần cả đống code này:</p>
+<pre><code><span class="c">// JDK 8: a correct immutable value class</span>
+public final class Point {
+    private final int x;
+    private final int y;
+
+    public Point(int x, int y) { this.x = x; this.y = y; }
+
+    public int getX() { return x; }
+    public int getY() { return y; }
+
+    @Override public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x &amp;&amp; y == p.y;
+    }
+    @Override public int hashCode() { return Objects.hash(x, y); }
+    @Override public String toString() { return "Point[x=" + x + ", y=" + y + "]"; }
+}
+
+<span class="c">// JDK 16+: the same thing</span>
+record Point(int x, int y) {}</code></pre>
+<p>Phiên bản JDK 8 rất dễ viết sai. Sau này thêm field <code>z</code> mà quên cập nhật <code>equals</code> hoặc <code>hashCode</code> là bạn dính ngay bug <code>HashMap</code> âm thầm ở <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a>. Record chính thức từ JDK 16, nên bạn có nó trên 17 và 21.<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a></p>
+
+<h2>2. Record sinh ra những gì</h2>
+<p>Javadoc định nghĩa: "Record class là một vật chứa trong suốt, bất biến ở mức nông, cho một tập giá trị cố định, gọi là các record component."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> Từ phần đầu <code>record Point(int x, int y)</code>, compiler tạo ra:</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Record Point một dòng với int x và int y đi vào javac. Đi ra là một final class kế thừa Record, có hai field private final, một canonical constructor, accessor x và y, và equals, hashCode, toString dựng từ x và y.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="110" y="22" text-anchor="middle" font-size="11" opacity=".75">bạn viết</text>
+    <text x="460" y="22" text-anchor="middle" font-size="11" opacity=".75">compiler tạo ra</text>
+    <rect x="20" y="78" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="34" y="100">record Point(</text>
+    <text x="34" y="120">&#160;&#160;&#160;&#160;int x, int y) {}</text>
+    <g fill="none" stroke="currentColor"><path d="M200 106h54M248 101l6 5-6 5"/></g>
+    <text x="228" y="96" text-anchor="middle" font-size="11" opacity=".75">javac</text>
+    <rect x="260" y="32" width="400" height="160" rx="6" fill="none" stroke="currentColor"/>
+    <text x="276" y="56">final class Point extends Record</text>
+    <text x="276" y="84">private final int x, y;</text>
+    <text x="276" y="112">Point(int x, int y)</text>
+    <text x="276" y="140">int x(), int y()</text>
+    <rect x="268" y="152" width="384" height="28" rx="4" fill="var(--accent-soft)"/>
+    <text x="276" y="170" fill="var(--accent)">equals hashCode toString</text>
+    <g font-size="11" opacity=".75">
+      <text x="480" y="84">// mỗi component một field</text>
+      <text x="480" y="112">// canonical constructor</text>
+      <text x="480" y="140">// accessor, không có "get"</text>
+    </g>
+    <text x="480" y="170" font-size="11" fill="var(--accent)">// từ mọi component</text>
+    <text x="340" y="218" text-anchor="middle" font-size="11" opacity=".8">một dòng vào, cả class JDK 8 đi ra, và vẫn đúng khi bạn thêm component</text>
+  </g>
+</svg>
+<figcaption>Mọi thứ trong khung bên phải đều được sinh ra. Bạn vẫn có thể tự viết bất kỳ phần nào nếu cần hành vi khác.</figcaption>
+</figure>
+
+<p>Javadoc liệt kê các "mandated member" (thành viên bắt buộc): một <em>canonical constructor</em>, "một field private final tương ứng với mỗi component", và "một accessor method public tương ứng với mỗi component, có tên và kiểu trả về giống hệt component đó".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> Còn <code>equals</code>, <code>hashCode</code> và <code>toString</code> ngầm định thì "được suy ra từ tất cả các field của component".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a></p>
+<p>Chạy ví dụ của khoá học và theo dõi từng dòng:</p>
+<pre><code>$ java java/examples/RecordDemo.java
+Point[x=1, y=2]             <span class="c">← toString: name and every component</span>
+true                        <span class="c">← equals: same class, every component equal</span>
+true                        <span class="c">← hashCode: equal points, equal hash codes</span>
+LeakyTeam sees outside change: [ann, bob]
+Team (copyOf) is protected:    [ann]</code></pre>
+<p>Điều này nối với <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a>: record tuân thủ contract equals/hashCode<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html">Object javadoc</a> miễn phí, nên nó là key tốt cho <code>HashMap</code>, miễn là các component của nó cũng an toàn. (Hai dòng cuối dành cho mục 4.)</p>
+<p class="muted">Để ý tên accessor: <code>p.x()</code>, không phải <code>p.getX()</code>. Code chờ tên kiểu JDK 8 <code>getX()</code> sẽ không tìm thấy chúng trên record.</p>
+
+<h2>3. Quy tắc: những gì record không làm được</h2>
+<p>Record chỉ để mang dữ liệu, nên JEP 395 đặt ra vài giới hạn cứng:<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a></p>
+<ol class="steps">
+  <li>"Record class ngầm định là <code>final</code>, và không thể là <code>abstract</code>." Không ai kế thừa nó được.</li>
+  <li>"Superclass của một record class luôn là <code>java.lang.Record</code>." Bạn không được viết <code>extends</code>.</li>
+  <li>"Record class không được khai báo tường minh instance field". Mọi trạng thái nằm ở phần đầu record.</li>
+  <li>Nhưng "record class có thể implement interface", và "có thể khai báo method, field và initializer <code>static</code>".</li>
+</ol>
+<p>Mình đã thử các trường hợp bị cấm với <code>javac</code> 21:</p>
+<pre><code>record P(int x) { int y; }
+<span class="c">error: field declaration must be static</span>
+
+System.out.println(P.class.getSuperclass() + " final=" + Modifier.isFinal(P.class.getModifiers()));
+<span class="hl">class java.lang.Record final=true</span></code></pre>
+<p>Bạn có thể tự viết accessor (ví dụ để trả về một bản copy). JEP 395 cho phép, miễn là kiểu trả về khớp chính xác.<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a></p>
+
+<h2>4. Chữ quan trọng: nông (shallow)</h2>
+<p>Hình dung một tủ kính khoá kín trong bảo tàng. Bên trong là một tấm thẻ ghi địa chỉ một ngôi nhà. Không ai sửa được tấm thẻ: nó bị khoá. Nhưng <em>ngôi nhà</em> ở địa chỉ đó vẫn có thể bị sơn lại. Tủ kính bảo vệ tấm thẻ, không bảo vệ ngôi nhà.</p>
+<p>Field <code>final</code> chính là tấm thẻ bị khoá. Nếu field là một <span class="term">reference</span> tới <code>ArrayList</code>, field sẽ luôn trỏ tới <em>cùng một</em> list, nhưng ai đang giữ list đó vẫn add thêm được. Đó là ý nghĩa của "bất biến ở mức nông".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> Vậy câu trả lời cho "Trước khi bắt đầu" là <strong>không</strong>: mọi field đều final vẫn chưa đủ khi có field trỏ tới thứ có thể thay đổi.</p>
+<pre><code>record LeakyTeam(String name, List&lt;String&gt; members) {}
+
+List&lt;String&gt; shared = new ArrayList&lt;&gt;(List.of("ann"));
+LeakyTeam leaky = new LeakyTeam("a", shared);
+shared.add("bob");                         <span class="c">// change the list from outside</span>
+leaky.members();                           <span class="hl">// [ann, bob]: the record changed!</span></code></pre>
+<pre><code><span class="c">Step 1  shared points to a list [ann]</span>
+<span class="c">Step 2  the record's members field gets a copy of the ARROW, not of the list</span>
+<span class="c">Step 3  shared.add("bob") changes the one list both arrows point to</span>
+<span class="c">Step 4  leaky.members() follows its arrow and finds [ann, bob]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Bên trái: field members của LeakyTeam và biến bên ngoài shared cùng trỏ tới một list chứa ann và bob. Bên phải: field members của Team trỏ tới bản copy không sửa được của riêng nó chứa ann, còn shared2 trỏ tới một list khác chứa ann và bob.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="22" text-anchor="middle" font-size="11" opacity=".75">LeakyTeam (không copy)</text>
+    <text x="510" y="22" text-anchor="middle" font-size="11" opacity=".75">Team (List.copyOf)</text>
+    <rect x="30" y="40" width="130" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="44" y="60" font-size="11" opacity=".75">leaky</text>
+    <text x="44" y="86">members ●</text>
+    <rect x="30" y="140" width="130" height="40" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="44" y="165">shared&#160;&#160;●</text>
+    <rect x="210" y="90" width="110" height="44" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="265" y="117" text-anchor="middle" fill="var(--accent)">[ann, bob]</text>
+    <g fill="none" stroke="currentColor"><path d="M128 82L204 106M197 100l7 6-9 2"/><path d="M128 160L204 122M195 120l9 2-6 7"/></g>
+    <rect x="360" y="40" width="130" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="374" y="60" font-size="11" opacity=".75">safe</text>
+    <text x="374" y="86">members ●</text>
+    <rect x="540" y="58" width="110" height="44" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="595" y="85" text-anchor="middle" fill="var(--accent)">[ann]</text>
+    <text x="595" y="118" text-anchor="middle" font-size="11" fill="var(--accent)">bản copy không sửa được</text>
+    <rect x="360" y="140" width="130" height="40" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="374" y="165">shared2 ●</text>
+    <rect x="540" y="138" width="110" height="44" rx="4" fill="none" stroke="currentColor"/>
+    <text x="595" y="165" text-anchor="middle">[ann, bob]</text>
+    <g fill="none" stroke="currentColor"><path d="M458 82h76M528 77l6 5-6 5M458 160h76M528 155l6 5-6 5"/></g>
+    <text x="170" y="212" text-anchor="middle" font-size="11" fill="var(--accent)">một list, hai mũi tên: thay đổi lọt vào</text>
+    <text x="510" y="212" text-anchor="middle" font-size="11" fill="var(--accent)">hai list: record có list của riêng nó</text>
+    <text x="340" y="238" text-anchor="middle" font-size="11" opacity=".8">khung nét đứt = biến bên ngoài record; sau đó gọi shared.add("bob")</text>
+  </g>
+</svg>
+<figcaption>Field <code>final</code> cố định mũi tên, không cố định cái list. Copy trong constructor cho record một list mà không ai khác chạm tới được.</figcaption>
+</figure>
+
+<h3>Cách sửa: compact constructor với defensive copy</h3>
+<p>Record có thể có constructor <em>compact</em>: bạn viết tên record và phần thân, không lặp lại danh sách tham số. JEP 395 nói các tham số được khai báo sẵn cho bạn, và các field được gán tự động ở cuối.<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a> Đây là chỗ lý tưởng để kiểm tra dữ liệu và copy:</p>
+<pre><code>record Team(String name, List&lt;String&gt; members) {
+    Team {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("name");
+        members = List.copyOf(members);    <span class="c">// replace the parameter with a copy</span>
+    }                                      <span class="c">// fields are assigned here, from the parameters</span>
+}</code></pre>
+<pre><code>$ java java/examples/RecordDemo.java
+...
+LeakyTeam sees outside change: [ann, bob]
+<span class="hl">Team (copyOf) is protected:    [ann]</span></code></pre>
+<p>Vì sao dùng <code>List.copyOf</code> chứ không phải <code>new ArrayList&lt;&gt;(members)</code>? <code>List.copyOf</code> trả về một "unmodifiable List", và theo Javadoc, "nếu Collection đầu vào bị sửa sau đó, List trả về sẽ không phản ánh những thay đổi ấy".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> Vì nó không sửa được, ai gọi <code>team.members().add("x")</code> cũng thất bại. Mình đã chạy: <code>UnsupportedOperationException</code>. Một bản copy <code>ArrayList</code> thường chặn được thay đổi từ bên ngoài, nhưng không chặn được trường hợp này.</p>
+
+<h3>Bẫy: null bên trong list</h3>
+<p><code>List.copyOf</code> ném <code>NullPointerException</code> "nếu coll là null, hoặc chứa bất kỳ phần tử null nào".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> Thường đó chính là điều bạn muốn với một value object (báo lỗi sớm). Nếu dữ liệu của bạn hợp lệ khi có null, hãy quyết định rõ ràng và ghi lại.</p>
+<p class="muted">Javadoc của <code>Record</code> là nguồn cho những gì được sinh ra. Mẫu compact constructor là thực hành phổ biến; demo ở trên cho thấy nó chạy thật thay vì trích dẫn.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>equals()</code> ngầm định của record dựa trên cái gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Giá trị của mọi component</button>
+    <button class="opt">Chỉ component đầu tiên</button>
+    <button class="opt">Chỉ địa chỉ trong bộ nhớ</button>
+    <button class="opt">Chỉ riêng hash code</button>
+  </div>
+  <div class="why">equals, hashCode và toString được suy ra từ mọi field của component: cùng record class và mọi component bằng nhau.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Với <code>record Point(int x, int y)</code>, compiler tạo ra những field nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>private final int x và y</button>
+    <button class="opt">public final int x và y</button>
+    <button class="opt">private int x và y, không final</button>
+    <button class="opt">public static int x và y</button>
+  </div>
+  <div class="why">Javadoc quy định mỗi component có một field private final, cùng một accessor public cùng tên.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Đọc <code>x</code> từ <code>Point p</code> thế nào khi <code>Point</code> là record?</p>
+  <div class="options">
+    <button class="opt" data-correct>p.x()</button>
+    <button class="opt">p.getX()</button>
+    <button class="opt">p.get("x")</button>
+    <button class="opt">p.x</button>
+  </div>
+  <div class="why">Accessor cùng tên với component, không có tiền tố <code>get</code>. Bản thân field là private.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Chuyện gì xảy ra với <code>record P(int x) { int y; }</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lỗi compile: field phải là static</button>
+    <button class="opt">Compile được; y là field private final</button>
+    <button class="opt">Compile được; y bị bỏ khỏi equals</button>
+    <button class="opt">Compile được nhưng y luôn bằng 0</button>
+  </div>
+  <div class="why">Record không được khai báo instance field; mọi trạng thái nằm ở phần đầu. Trong thân chỉ cho phép field static.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Record có một component <code>ArrayList</code> mà caller vẫn đang giữ. Record đó có immutable không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, nó chỉ bất biến ở mức nông</button>
+    <button class="opt">Có, record luôn bất biến hoàn toàn</button>
+    <button class="opt">Có, list bị đóng băng khi được lưu</button>
+    <button class="opt">Không, record không thể chứa list</button>
+  </div>
+  <div class="why">Field final luôn trỏ tới cùng một list, nhưng bản thân list vẫn thay đổi được từ bên ngoài.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cách sửa tốt nhất cho component list bị rò rỉ đó là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>List.copyOf trong compact constructor</button>
+    <button class="opt">Override toString để giấu cái list đi</button>
+    <button class="opt">Đánh dấu component list là static</button>
+    <button class="opt">Thêm keyword final cho record</button>
+  </div>
+  <div class="why"><code>List.copyOf</code> lưu một bản copy không sửa được, nên cả caller bên ngoài lẫn <code>members().add()</code> đều không đổi được nó.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Record có kế thừa class khác được không, như <code>record P(int x) extends Base</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, superclass luôn là Record</button>
+    <button class="opt">Được, nếu Base là abstract class</button>
+    <button class="opt">Được, nhưng chỉ sâu một tầng</button>
+    <button class="opt">Không, nhưng class khác kế thừa nó được</button>
+  </div>
+  <div class="why">Record luôn kế thừa <code>java.lang.Record</code> và ngầm định là final. Tuy vậy nó có thể implement interface.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Record trong Java là gì, và nó có immutable không?"</strong> Bấm giờ. Trả lời to, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Record (chính thức ở JDK 16) là vật chứa trong suốt cho một tập giá trị cố định.</label></li>
+      <li><label><input type="checkbox"> Nó sinh field private final, canonical constructor và accessor kiểu <code>x()</code>.</label></li>
+      <li><label><input type="checkbox"> <code>equals</code>, <code>hashCode</code>, <code>toString</code> lấy từ mọi component, nên là key <code>HashMap</code> an toàn.</label></li>
+      <li><label><input type="checkbox"> Giới hạn: ngầm định final, kế thừa <code>Record</code>, không thêm instance field; implement interface được.</label></li>
+      <li><label><input type="checkbox"> Chỉ bất biến <em>nông</em>: field final vẫn có thể trỏ tới một list thay đổi được.</label></li>
+      <li><label><input type="checkbox"> Cách sửa: compact constructor kiểm tra dữ liệu và dùng <code>List.copyOf</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Record, chính thức từ JDK 16, là class chỉ để mang dữ liệu. Em viết <code>record Point(int x, int y)</code> là compiler sinh ra field private final, canonical constructor, accessor <code>x()</code> và <code>y()</code>, cùng <code>equals</code>, <code>hashCode</code>, <code>toString</code> dựa trên mọi component. Nó thay cho khoảng bốn mươi dòng code JDK 8 và dùng làm key của map rất an toàn. Record ngầm định là final, kế thừa <code>java.lang.Record</code>, không được khai báo thêm instance field, nhưng implement interface thì được. Còn immutable không? Chỉ ở mức nông. Field là final, nhưng nếu một component là <code>ArrayList</code> thì caller vẫn sửa được list đó. Nên trong compact constructor em kiểm tra đầu vào và làm <code>members = List.copyOf(members)</code>; vậy là record có list riêng, không sửa được."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-record-as-key.vi.md">Bài tập 0003: dùng record làm key của map</a>. Viết dự đoán gửi giáo viên trước, rồi chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/RecordDemo.java"><code>RecordDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer senior có thể hỏi: <em>"Record chứa dữ liệu. Vậy bạn mô hình hoá 'một payment là thẻ, chuyển khoản hoặc voucher, và không gì khác' thế nào?"</em> Việc đó cần một tập kiểu đóng: <a href="0014-sealed-classes.vi.html">sealed class, bài 0014</a>. Record cộng sealed interface là nền tảng của pattern matching ở <a href="0015-pattern-matching-switch-and-record-patterns.vi.html">bài 0015</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/395">JEP 395: Records</a> (phần Description giải thích từng quy tắc kèm code), và <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Javadoc của class Record</a>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Record có dùng làm JPA entity được không?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ báo luôn điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0013-switch-expressions-and-instanceof-patterns.vi.html">← switch trả về giá trị, instanceof tự cast giúp bạn</a> &nbsp;|&nbsp; <a href="0014-sealed-classes.vi.html">Sealed class: danh sách khách mời cho subclass →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và các JEP của OpenJDK, và chạy thử trên JDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html">Object Javadoc (equals/hashCode)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc</a> · <a href="https://openjdk.org/jeps/395">JEP 395: Records</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 40: Review 1: strings, exceptions and generics</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 1: strings, exceptions and generics</h1>
+<p class="subtitle">Mixed questions from lessons 0018 to 0021, so the ideas stick together and come back fast in an interview.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0040 · step 5 of 46 · Review · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0040-review-fundamentals.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Reading a lesson once feels like learning, but interviews test what you can <em>pull out of memory</em>, mixed and out of order. This review gives you no new facts. It makes you retrieve the four lessons you just finished, in a random mix, which is what makes them last.</div>
+
+<div class="win"><b>Today's win:</b> score at least 10 of 12 on the mixed quiz, give three 60-second answers, and find the bugs in one small piece of code.</div>
+
+<dl class="words">
+  <dt>immutable</dt><dd>Cannot change after creation; a "change" makes a new object (<a href="0018-strings-immutability-and-stringbuilder.html">0018</a>).</dd>
+  <dt>string pool</dt><dd>The shared set of strings kept by <code>String</code>; equal literals point to one object (<a href="0018-strings-immutability-and-stringbuilder.html">0018</a>).</dd>
+  <dt>checked</dt><dd>An exception you must catch or declare with <code>throws</code> (<a href="0019-exceptions-checked-unchecked-try-with-resources.html">0019</a>).</dd>
+  <dt>suppressed</dt><dd>An exception from <code>close()</code> that is attached to the body's exception instead of replacing it (<a href="0019-exceptions-checked-unchecked-try-with-resources.html">0019</a>).</dd>
+  <dt>invariant</dt><dd><code>List&lt;Integer&gt;</code> and <code>List&lt;Number&gt;</code> are unrelated types (<a href="0020-generics-basics-and-invariance.html">0020</a>).</dd>
+  <dt>PECS</dt><dd>Producer <code>extends</code>, consumer <code>super</code>: the wildcard rule (<a href="0021-wildcards-and-type-erasure.html">0021</a>).</dd>
+  <dt>erasure</dt><dd>Type arguments are checked by the compiler, then removed (<a href="0021-wildcards-and-type-erasure.html">0021</a>).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking back, say out loud <strong>one bug from each of the four lessons that compiles fine but fails or misbehaves at run time</strong>. If you can only find two, that already tells you where to look in the table at the end.</p>
+
+<h2>1. The big picture: who catches the bug?</h2>
+<p>Think of two safety nets. The first is the compiler: it stops a bug before the program ever runs. The second is the running program: the bug shows up later, often in production, as a wrong answer or an exception. Many lessons in this section are about the same idea: <strong>prefer code where the first net catches the bug</strong>.</p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="Left column, bugs javac stops: uncaught checked exception, List of Number equals ints, List of int, add on extends wildcard, instanceof List of String. Right column, bugs that reach run time: string comparison with ==, += in a loop, array store, wrong cast from raw list, close in finally hiding the error.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <text x="175" y="30" text-anchor="middle" font-size="12">javac stops it (compile time)</text>
+    <text x="505" y="30" text-anchor="middle" font-size="12" fill="var(--accent)">it reaches run time</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="44" width="310" height="34" rx="5"/>
+      <rect x="20" y="88" width="310" height="34" rx="5"/>
+      <rect x="20" y="132" width="310" height="34" rx="5"/>
+      <rect x="20" y="176" width="310" height="34" rx="5"/>
+      <rect x="20" y="220" width="310" height="34" rx="5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="350" y="44" width="310" height="34" rx="5"/>
+      <rect x="350" y="88" width="310" height="34" rx="5"/>
+      <rect x="350" y="132" width="310" height="34" rx="5"/>
+      <rect x="350" y="176" width="310" height="34" rx="5"/>
+      <rect x="350" y="220" width="310" height="34" rx="5"/>
+    </g>
+    <text x="32" y="65">uncaught checked IOException (0019)</text>
+    <text x="32" y="109">List&lt;Number&gt; nums = ints;   (0020)</text>
+    <text x="32" y="153">List&lt;int&gt; scores;           (0020)</text>
+    <text x="32" y="197">add(1) to List&lt;? extends N&gt; (0021)</text>
+    <text x="32" y="241">obj instanceof List&lt;String&gt; (0021)</text>
+    <g fill="var(--accent)">
+      <text x="362" y="65">role == "ADMIN" on input   (0018)</text>
+      <text x="362" y="109">s += x in a loop: copies   (0018)</text>
+      <text x="362" y="153">arr[0] = 3.14 in Integer[] (0020)</text>
+      <text x="362" y="197">wrong cast from a raw List (0020)</text>
+      <text x="362" y="241">close() in finally hides the error (0019)</text>
+    </g>
+    <text x="340" y="284" text-anchor="middle" font-size="12">generics and checked exceptions move bugs to the left column</text>
+  </g>
+</svg>
+<figcaption>Ten bugs from this section, sorted by which safety net catches them. The right column is where interviews (and incidents) come from.</figcaption>
+</figure>
+
+<p>Take ten seconds per box and say why it lands in that column. If one is unclear, the lesson number is right there.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>String a = "hi"; String b = new String("hi");</code> What is <code>a == b</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>false, new always makes another object</button>
+    <button class="opt">true, both have the same characters</button>
+    <button class="opt">true, new String reuses the pool copy</button>
+    <button class="opt">It does not compile for String objects</button>
+  </div>
+  <div class="why"><code>==</code> compares references, and <code>new</code> creates a separate object. See <a href="0018-strings-immutability-and-stringbuilder.html">lesson 0018</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which exceptions does the compiler force you to catch or declare?</p>
+  <div class="options">
+    <button class="opt" data-correct>Exception subclasses that are not RuntimeException</button>
+    <button class="opt">RuntimeException and every one of its subclasses</button>
+    <button class="opt">Error and every one of its subclasses as well</button>
+    <button class="opt">Every Throwable, with no exceptions to the rule</button>
+  </div>
+  <div class="why">Unchecked = <code>RuntimeException</code>, <code>Error</code> and their subclasses; the rest are checked. See <a href="0019-exceptions-checked-unchecked-try-with-resources.html">lesson 0019</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A method must accept <code>List&lt;Integer&gt;</code> and <code>List&lt;Double&gt;</code> and only reads them. Which parameter type?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? extends Number&gt;</button>
+    <button class="opt">List&lt;? super Number&gt;</button>
+    <button class="opt">List&lt;Number&gt;</button>
+    <button class="opt">List&lt;Object&gt;</button>
+  </div>
+  <div class="why">A producer ("in") uses <code>extends</code>; <code>List&lt;Number&gt;</code> would reject both (invariance). See <a href="0021-wildcards-and-type-erasure.html">lesson 0021</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">try-with-resources opens A, then B. The body throws X, and B's <code>close()</code> throws Y. What does the catch see?</p>
+  <div class="options">
+    <button class="opt" data-correct>X, with Y in getSuppressed(); B closed before A</button>
+    <button class="opt">Y, with X in getSuppressed(); A closed before B</button>
+    <button class="opt">Only Y, because the last exception always wins</button>
+    <button class="opt">Only X; Y is lost and A is never closed at all</button>
+  </div>
+  <div class="why">Reverse close order, and the body's exception wins with the close exception suppressed. See <a href="0019-exceptions-checked-unchecked-try-with-resources.html">lesson 0019</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why is <code>List&lt;Integer&gt;</code> not a <code>List&lt;Number&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>You could add a Double to it through the Number view</button>
+    <button class="opt">Integer is final, so it has no relationship to Number</button>
+    <button class="opt">Generic types are erased, so subtyping is impossible</button>
+    <button class="opt">Lists of numbers must be converted with a stream first</button>
+  </div>
+  <div class="why">Allowing it would break type safety. See <a href="0020-generics-basics-and-invariance.html">lesson 0020</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does this print? <code>String s = "a"; s.toUpperCase(); System.out.println(s);</code></p>
+  <div class="options">
+    <button class="opt" data-correct>a</button>
+    <button class="opt">A</button>
+    <button class="opt">null</button>
+    <button class="opt">aA</button>
+  </div>
+  <div class="why">Strings are immutable; the new string from <code>toUpperCase()</code> was thrown away. See <a href="0018-strings-immutability-and-stringbuilder.html">lesson 0018</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is true at run time about <code>List&lt;String&gt;</code> and <code>List&lt;Integer&gt;</code> created as <code>ArrayList</code>s?</p>
+  <div class="options">
+    <button class="opt" data-correct>They share one class: getClass() is equal</button>
+    <button class="opt">Each one has its own generated class file</button>
+    <button class="opt">The JVM checks the type on every add() call</button>
+    <button class="opt">instanceof can tell the two apart reliably</button>
+  </div>
+  <div class="why">Type erasure creates no new classes for parameterized types. See <a href="0021-wildcards-and-type-erasure.html">lesson 0021</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Your method reads a config file and the caller could fall back to defaults if it is missing. Checked or unchecked?</p>
+  <div class="options">
+    <button class="opt" data-correct>Checked, because the caller can reasonably recover</button>
+    <button class="opt">Unchecked, because files are outside the program</button>
+    <button class="opt">An Error, because a missing file is serious</button>
+    <button class="opt">Neither; return null and log a short warning</button>
+  </div>
+  <div class="why">The tutorial's guideline: recoverable → checked; not recoverable → unchecked. See <a href="0019-exceptions-checked-unchecked-try-with-resources.html">lesson 0019</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Number[] arr = new Integer[2]; arr[0] = 1.5;</code> What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It compiles, then throws ArrayStoreException</button>
+    <button class="opt">It does not compile, like the List version</button>
+    <button class="opt">It stores 1.5, since arrays hold any Number</button>
+    <button class="opt">It throws ClassCastException at the first line</button>
+  </div>
+  <div class="why">Arrays are covariant and checked at run time; generics are invariant and checked at compile time. See <a href="0020-generics-basics-and-invariance.html">lesson 0020</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which line is the safest way to check user input?</p>
+  <div class="options">
+    <button class="opt" data-correct>if ("yes".equals(answer))</button>
+    <button class="opt">if (answer == "yes")</button>
+    <button class="opt">if (answer.equals("yes"))</button>
+    <button class="opt">if (answer.compareTo("yes") <button class="opt">if (answer.intern() == "yes".hashCode())</button>gt; 0)</button>
+  </div>
+  <div class="why">Compare contents with <code>equals</code>, literal first so <code>null</code> just gives false. See <a href="0018-strings-immutability-and-stringbuilder.html">lesson 0018</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A method only <em>adds</em> Integers into a list given by the caller. Which type lets the caller pass a <code>List&lt;Object&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? super Integer&gt;</button>
+    <button class="opt">List&lt;? extends Integer&gt;</button>
+    <button class="opt">List&lt;Integer&gt;</button>
+    <button class="opt">List&lt;? extends Object&gt;</button>
+  </div>
+  <div class="why">A consumer ("out") uses <code>super</code>. See <a href="0021-wildcards-and-type-erasure.html">lesson 0021</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which is the best reason to build a long string with <code>StringBuilder</code> in a loop?</p>
+  <div class="options">
+    <button class="opt" data-correct>Each += would create a new String and copy the old text</button>
+    <button class="opt">StringBuilder is thread-safe, so the loop is faster</button>
+    <button class="opt">The + operator does not work inside loop bodies at all</button>
+    <button class="opt">StringBuilder puts every piece into the string pool</button>
+  </div>
+  <div class="why">Strings are immutable; <code>StringBuilder</code> fills one buffer (and it is <em>not</em> thread-safe). See <a href="0018-strings-immutability-and-stringbuilder.html">lesson 0018</a>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<p>Three questions this time. Do them one by one, with a timer, out loud.</p>
+
+<div class="recall">
+  <p class="prompt">Question 1: <strong>"Why is String immutable, and what goes wrong with <code>==</code>?"</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Strings cannot change; methods return new strings.</label></li>
+      <li><label><input type="checkbox"> So they can be shared safely: threads, map keys, the string pool.</label></li>
+      <li><label><input type="checkbox"> <code>==</code> compares references; literals share one pooled object, run-time strings do not.</label></li>
+      <li><label><input type="checkbox"> Use <code>equals</code>, literal first; use <code>StringBuilder</code> in loops.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Strings are immutable, so any change gives me a new string. That makes them safe to share, and lets Java keep a pool where equal literals are one object. That's the trap with <code>==</code>: it compares references, so it works for two literals but fails for a string from a request. I always compare with <code>"x".equals(value)</code>, and in a loop I build text with a <code>StringBuilder</code>."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Question 2: <strong>"Checked versus unchecked exceptions, and how does try-with-resources behave when things fail?"</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Unchecked = <code>RuntimeException</code>, <code>Error</code> and subclasses; others are checked.</label></li>
+      <li><label><input type="checkbox"> Checked must be caught or declared; use it when the caller can recover.</label></li>
+      <li><label><input type="checkbox"> try-with-resources closes <code>AutoCloseable</code>s in reverse order, before catch/finally.</label></li>
+      <li><label><input type="checkbox"> Body exception wins; close exceptions are in <code>getSuppressed()</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Runtime exceptions and errors are unchecked; every other exception is checked, so I must catch it or declare it with <code>throws</code>. I make an exception checked when the caller can reasonably recover. For resources I use try-with-resources: it closes them in reverse order before my catch runs, and if both the body and <code>close</code> fail, I get the body's exception with the close one attached as suppressed."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Question 3: <strong>"Is a <code>List&lt;Integer&gt;</code> a <code>List&lt;Number&gt;</code>? Explain wildcards and erasure."</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> No: generics are invariant, otherwise you could add a Double through the Number view.</label></li>
+      <li><label><input type="checkbox"> Arrays are covariant and fail later with <code>ArrayStoreException</code>.</label></li>
+      <li><label><input type="checkbox"> PECS: read → <code>? extends</code>, write → <code>? super</code> (<code>Collections.copy</code>).</label></li>
+      <li><label><input type="checkbox"> Erasure: type arguments are removed after compile; one runtime class, no <code>instanceof List&lt;String&gt;</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"No. Generics are invariant: if a <code>List&lt;Integer&gt;</code> were a <code>List&lt;Number&gt;</code>, I could add a Double into it. Arrays allow that and fail at run time with <code>ArrayStoreException</code>. To accept several list types I use wildcards: <code>? extends</code> for a list I read from, <code>? super</code> for one I write into, like in <code>Collections.copy</code>. And generics are erased after compilation, so at run time all ArrayLists are one class and I can't check <code>instanceof List&lt;String&gt;</code>."</em></p>
+  </div>
+</div>
+
+<h2>Mixed task: find the bugs</h2>
+<p>This small class compiles (assume <code>Order</code> is a record with an <code>id()</code>). It hides <strong>four</strong> problems from three different lessons. Find at least three, say which lesson each comes from, and how to fix it. Then open the answer.</p>
+<pre><code>class ReportService {
+    String build(List&lt;Order&gt; orders) {
+        String report = "";
+        for (Order o : orders) report += o.id() + "\n";
+        return report;
+    }
+
+    boolean isAdmin(String role) {           <span class="c">// role comes from a request</span>
+        return role == "ADMIN";
+    }
+
+    void save(String text) {
+        try {
+            FileWriter w = new FileWriter("report.txt");
+            w.write(text);
+            w.close();
+        } catch (IOException e) { }
+    }
+
+    double total(List&lt;Number&gt; amounts) {     <span class="c">// callers have List&lt;Integer&gt;</span>
+        double t = 0;
+        for (Number n : amounts) t += n.doubleValue();
+        return t;
+    }
+}</code></pre>
+<details>
+<summary>Show the answer</summary>
+<ol class="steps">
+  <li><strong><code>report +=</code> in a loop</strong> (<a href="0018-strings-immutability-and-stringbuilder.html">0018</a>): a new String per order. Use one <code>StringBuilder</code>.</li>
+  <li><strong><code>role == "ADMIN"</code></strong> (<a href="0018-strings-immutability-and-stringbuilder.html">0018</a>): compares references; a run-time string is a new object. Use <code>"ADMIN".equals(role)</code>.</li>
+  <li><strong>Writer not closed if <code>write</code> fails, and the error is swallowed</strong> (<a href="0019-exceptions-checked-unchecked-try-with-resources.html">0019</a>): use <code>try (FileWriter w = new FileWriter(...))</code> and log or rethrow in the catch.</li>
+  <li><strong><code>List&lt;Number&gt;</code> parameter</strong> (<a href="0020-generics-basics-and-invariance.html">0020</a>, <a href="0021-wildcards-and-type-erasure.html">0021</a>): callers with <code>List&lt;Integer&gt;</code> get a compile error. Use <code>List&lt;? extends Number&gt;</code>.</li>
+</ol>
+</details>
+
+<h2>Where to go back</h2>
+<table>
+<tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+<tr><td><code>==</code> vs <code>equals</code>, the string pool, <code>intern()</code>, <code>StringBuilder</code></td><td><a href="0018-strings-immutability-and-stringbuilder.html">Lesson 0018</a></td></tr>
+<tr><td>checked vs unchecked, catch or specify, close order, suppressed exceptions</td><td><a href="0019-exceptions-checked-unchecked-try-with-resources.html">Lesson 0019</a></td></tr>
+<tr><td>benefits of generics, invariance, arrays vs generics, primitives in <code>&lt;&gt;</code></td><td><a href="0020-generics-basics-and-invariance.html">Lesson 0020</a></td></tr>
+<tr><td><code>? extends</code> / <code>? super</code>, PECS, erasure and its restrictions</td><td><a href="0021-wildcards-and-type-erasure.html">Lesson 0021</a></td></tr>
+</table>
+
+<h2>Now do the exercise</h2>
+<p>If one of the four exercises felt shaky, redo it from scratch without looking at your old answer: <a href="../exercises/0018-string-traps.md">0018 string traps</a> · <a href="../exercises/0019-design-an-exception-hierarchy.md">0019 design exceptions</a> · <a href="../exercises/0020-generic-utility.md">0020 a generic utility</a> · <a href="../exercises/0021-copy-with-wildcards.md">0021 copy with wildcards</a>.</p>
+<p>Runnable examples: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a> · <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a> · <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
+
+<h2>What's next</h2>
+<p>The next section is the Collections Framework. Generics are everywhere there (<code>List&lt;E&gt;</code>, <code>Map&lt;K, V&gt;</code>), and so are wildcards (<code>Collections.copy</code>, <code>addAll(Collection&lt;? extends E&gt;)</code>). Start with <a href="0028-collections-framework-map.html">lesson 0028: the Collections Framework map</a>.</p>
+<p><strong>Read more:</strong> the "Read more" links at the end of lessons 0018 to 0021. They are the primary sources for everything in this review.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Give me five more mixed questions"</em> or <em>"Please check my three 60-second answers"</em> (type what you said). Please also tell me your quiz score, your checklist scores and how many bugs you found: they help me choose your next lesson.</div>
+
+<p><a href="0021-wildcards-and-type-erasure.html">← When to write ? extends and when ? super</a> &nbsp;|&nbsp; <a href="0028-collections-framework-map.html">A map of Java collections →</a></p>
+
+<footer>
+  <p>Review lesson: no new facts. Everything here comes from lessons 0018 to 0021, which were checked against the Java 21 documentation, the Java Tutorials and the Java Language Specification, October 2026.</p>
+  <p>References: <a href="0018-strings-immutability-and-stringbuilder.html">Lesson 0018</a> · <a href="0019-exceptions-checked-unchecked-try-with-resources.html">Lesson 0019</a> · <a href="0020-generics-basics-and-invariance.html">Lesson 0020</a> · <a href="0021-wildcards-and-type-erasure.html">Lesson 0021</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 17: Schema, Schema Registry và tính tương thích</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Schema, Schema Registry và tính tương thích</h1>
+<p class="meta">Kafka · Bài 0017 · bước 14/23 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0017-schemas-and-schema-registry.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được vì sao topic cần một hợp đồng schema, serializer của Schema Registry hoạt động thế nào, và chế độ tương thích (compatibility mode) nào quyết định bên nào nâng cấp trước.</div>
+
+<h2>Vì sao cần schema</h2>
+<p>Với Kafka, record chỉ là các byte. Producer và consumer được deploy độc lập, thường bởi các team khác nhau, nên hợp đồng thực sự giữa chúng là định dạng payload. Không có gì ràng buộc thì chỉ cần một producer đổi tên một field JSON là mọi consumer đều vỡ lúc runtime.</p>
+<h2>Schema Registry hoạt động thế nào</h2>
+<p>Schema Registry là một service riêng (của Confluent, không thuộc Apache Kafka) lưu các schema có đánh version. Nó hỗ trợ serializer cho Avro, Protobuf và JSON Schema.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></p>
+<ul>
+<li>Serializer đăng ký hoặc tra cứu schema rồi ghi một header nhỏ: một byte version <code>0</code>, tiếp theo là schema ID 4 byte dạng big-endian, rồi mới tới dữ liệu.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a> Consumer đọc ID đó rồi lấy (và cache) schema.</li>
+<li>Schema được lưu dưới một <strong>subject</strong>. <code>TopicNameStrategy</code> mặc định suy ra subject từ topic (ví dụ <code>orders-value</code>).<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></li>
+<li>Serializer "mặc định tự động đăng ký schema" (<code>auto.register.schemas</code>); trên production, nhiều team tắt nó đi và đăng ký schema từ CI.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></li>
+</ul>
+<h2>Tính tương thích quyết định thứ tự nâng cấp</h2>
+<table>
+<tr><th>Chế độ</th><th>Đảm bảo<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></th><th>Nâng cấp trước</th></tr>
+<tr><td><code>BACKWARD</code> (mặc định)</td><td>consumer dùng schema mới đọc được dữ liệu ghi bằng schema gần nhất trước đó</td><td>consumer</td></tr>
+<tr><td><code>FORWARD</code></td><td>dữ liệu ghi bằng schema mới đọc được bởi consumer còn dùng schema gần nhất trước đó</td><td>producer</td></tr>
+<tr><td><code>FULL</code></td><td>cả hai chiều, giữa schema mới và schema gần nhất</td><td>bên nào cũng được</td></tr>
+<tr><td><code>*_TRANSITIVE</code></td><td>như trên, nhưng so với <em>tất cả</em> version cũ, không chỉ version gần nhất</td><td>như trên</td></tr>
+<tr><td><code>NONE</code></td><td>không kiểm tra gì</td><td>tự bạn chịu trách nhiệm</td></tr>
+</table>
+<p>Trong Avro, thêm một field <strong>có giá trị mặc định</strong> vẫn giữ được tương thích: dữ liệu cũ sẽ nhận giá trị mặc định khi đọc bằng schema mới. Thêm field không có mặc định sẽ phá vỡ backward compatibility.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a> Vì các topic compacted và topic có retention dài sẽ được replay từ đầu, các chế độ transitive đặc biệt quan trọng ở đó: một consumer mới có thể phải đọc dữ liệu ghi bằng schema version 1.</p>
+<div class="aside">Câu trả lời khi phỏng vấn: "Dùng Avro hoặc Protobuf với Schema Registry, mỗi topic value một subject, <code>BACKWARD</code> hoặc <code>BACKWARD_TRANSITIVE</code> cho các event topic, nâng cấp consumer trước, chỉ thêm field có giá trị mặc định, đăng ký schema trong CI và tắt auto-register trên prod."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Chế độ tương thích mặc định của Schema Registry?</p>
+  <button>NONE</button>
+  <button data-correct>BACKWARD</button>
+  <button>FULL</button>
+  <button>FORWARD</button>
+  <p class="explain">Chế độ tương thích mặc định là BACKWARD.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Với BACKWARD, bên nào nâng cấp trước?</p>
+  <button>Broker trước</button>
+  <button data-correct>Consumer trước</button>
+  <button>Thứ tự nào cũng được</button>
+  <button>Producer trước</button>
+  <p class="explain">Consumer dùng schema mới đọc được dữ liệu cũ, nên consumer nâng cấp trước.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Trong wire format, ngay sau magic byte là gì?</p>
+  <button>Toàn bộ nội dung schema</button>
+  <button>Một checksum CRC</button>
+  <button data-correct>Schema ID 4 byte</button>
+  <button>Tên topic</button>
+  <p class="explain">Byte 0 là version định dạng, byte 1-4 là schema ID dạng big-endian.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Thay đổi Avro nào vẫn tương thích hoàn toàn?</p>
+  <button>Đổi tên một field</button>
+  <button data-correct>Thêm field có mặc định</button>
+  <button>Đổi kiểu một field</button>
+  <button>Thêm field bắt buộc</button>
+  <p class="explain">Thêm hoặc xoá một field có giá trị mặc định là thay đổi tương thích hoàn toàn.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0017-evolve-an-order-schema.vi.md">Bài tập 0017: tiến hoá schema của order</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">Confluent Docs: Schema Evolution and Compatibility</a>. Đọc mục 'Compatibility types' và các ví dụ Avro.</p>
+<p><a href="0016-error-handling-and-dead-letter-topics.vi.html">← Xử lý lỗi: retry, poison pill, dead letter topic</a> &nbsp;|&nbsp; <a href="0009-kafka-streams-basics.vi.html">Kafka Streams: stream, table và state →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">Confluent Docs: Formats, Serializers and Deserializers</a> · [2] <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">Confluent Docs: Schema Evolution and Compatibility</a> · [3] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

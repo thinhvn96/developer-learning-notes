@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 8: Stream: một append-only log ngay trong RabbitMQ</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Stream: một append-only log ngay trong RabbitMQ</h1>
+<p class="meta">RabbitMQ · Bài 0008 · bước 8/9 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-streams.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được stream khác queue ở điểm nào (đọc không xoá, replay được) và khi nào nên chọn stream.</div>
+
+<h2>Stream là gì</h2>
+<p>Stream là "một cấu trúc dữ liệu persistent, có replication, làm được những việc giống như queue" nhưng dùng append-only log và có "ngữ nghĩa consumer không phá huỷ (non-destructive)". Queue xoá message khi đã được consume; stream giữ message cho tới khi retention được áp dụng, nên nhiều consumer có thể đọc cùng các message một cách độc lập.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+<h2>Khi nào chọn stream</h2>
+<ol><li>Fan-out lớn: rất nhiều subscriber đọc cùng các message mà không cần mỗi consumer một queue.</li><li>Replay: consumer có thể gắn vào bất kỳ điểm nào trên log.</li><li>Throughput cao hơn các persistent queue truyền thống.</li><li>Giữ backlog lớn với chi phí thấp.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></li></ol>
+<p>Consumer chọn điểm bắt đầu đọc bằng argument <code>x-stream-offset</code>: <code>first</code>, <code>last</code>, một offset cụ thể, một timestamp, hoặc một khoảng thời gian.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+<h2>Những gì mình quan sát được</h2>
+<pre><code>declare queue with x-queue-type=stream, publish 3 messages
+rabbitmqctl list_queues -&gt; q.stream  type=stream
+basic.get against it -&gt; {"error":"bad_request","reason":"540 basic.get not supported by stream queues"}</code></pre>
+<p>Stream được khai báo giống queue (<code>x-queue-type: stream</code>) nhưng được consume theo cách khác, dùng <code>basic.consume</code> kèm một offset chứ không phải <code>basic.get</code>. Mình không demo được việc replay không phá huỷ bằng bộ công cụ HTTP dùng ở đây, nên hành vi replay ở trên chỉ dựa vào tài liệu. So sánh với log của Kafka: <a href="../../system-design/lessons/0003-queue-versus-log.vi.html">queue và log</a> (stream khiến RabbitMQ giao thoa với mô hình đó). Mã nguồn: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Ngữ nghĩa consumer của stream?</p>
+  <button data-correct>Không phá huỷ</button>
+  <button>Phá huỷ</button>
+  <button>Ngẫu nhiên</button>
+  <button>Chỉ transaction</button>
+  <p class="explain">Stream cung cấp ngữ nghĩa consumer không phá huỷ.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Consumer của stream có thể bắt đầu từ đâu?</p>
+  <button data-correct>first, last, offset hoặc timestamp</button>
+  <button>Chỉ last</button>
+  <button>Chỉ lúc publish</button>
+  <button>Chỉ first</button>
+  <p class="explain">x-stream-offset nhận first, last, offset dạng số, timestamp và khoảng thời gian.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Stream hợp với workload nào?</p>
+  <button data-correct>Fan-out lớn và replay</button>
+  <button>Trả lời RPC</button>
+  <button>Queue tạm rất nhỏ</button>
+  <button>Task có độ ưu tiên</button>
+  <p class="explain">Fan-out và replay là các use case chính.<a class="cite" href="https://www.rabbitmq.com/docs/streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. basic.get trên stream trong lần chạy của mình?</p>
+  <button>Trả về một message</button>
+  <button data-correct>Không được hỗ trợ</button>
+  <button>Xoá message đi</button>
+  <button>Tạo ra một queue</button>
+  <p class="explain">Broker trả lời 540 basic.get not supported by stream queues.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-stream-or-queue.vi.md">Bài tập 0008: stream hay queue</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/streams">RabbitMQ: Streams</a>. Phần tổng quan và phần consume.</p>
+<p><a href="0006-quorum-queues-and-poison-messages.vi.html">← Quorum queue và poison message</a> &nbsp;|&nbsp; <a href="0009-clustering-and-replicated-queues.vi.html">Clustering: node, số lẻ và replicated queue →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/streams">RabbitMQ: Streams</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 1: Table và constraint</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Table và constraint</h1>
+<p class="meta">PostgreSQL · Bài 0001 · bước 1/13 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-tables-and-constraints.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng constraint (ràng buộc) để dữ liệu sai không thể lọt vào, và nói được mỗi loại ngăn chặn điều gì.</div>
+
+<h2>Để database nói "không"</h2>
+<p>Constraint chuyển các quy tắc dữ liệu ra khỏi code ứng dụng và đưa vào schema, nơi mọi bên ghi dữ liệu đều phải tuân theo. Tài liệu PostgreSQL định nghĩa chúng như sau.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+<ul>
+<li><strong>CHECK</strong>: giá trị phải thỏa một biểu thức Boolean, ví dụ <code>price numeric CHECK (price &gt; 0)</code>.</li>
+<li><strong>NOT NULL</strong>: cột không được nhận giá trị null.</li>
+<li><strong>UNIQUE</strong>: dữ liệu là duy nhất trên toàn bộ các dòng, áp dụng cho một cột hoặc một nhóm cột.</li>
+<li><strong>PRIMARY KEY</strong>: vừa unique vừa not null; "một table có tối đa một primary key".</li>
+<li><strong>FOREIGN KEY</strong>: giá trị phải khớp với một dòng ở table khác (toàn vẹn tham chiếu). <code>ON DELETE RESTRICT</code> chặn việc xóa một dòng đang được tham chiếu; <code>ON DELETE CASCADE</code> xóa luôn các dòng đang tham chiếu tới nó.</li>
+</ul>
+<h2>Xem từng constraint "nổ"</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 01-constraints.sql
+ERROR:  new row for relation "products" violates check constraint "products_price_check"
+ERROR:  duplicate key value violates unique constraint "products_pkey"
+ERROR:  insert or update on table "orders" violates foreign key constraint "orders_product_no_fkey"
+ERROR:  update or delete on table "products" violates RESTRICT setting of foreign key constraint ...
+ERROR:  null value in column "name" of relation "products" violates not-null constraint</code></pre>
+<p>Source: <a href="../examples/01-constraints.sql"><code>01-constraints.sql</code></a>. Script chạy sẽ start một container <code>postgres:18</code> dùng một lần (cần có Docker) và xóa nó sau khi chạy xong.</p>
+<p class="aside">Góc độ phỏng vấn: "Bạn đảm bảo tính duy nhất ở đâu, trong app hay trong database?" Trong database. Một bước kiểm tra ở tầng app sẽ bị race condition với các bên ghi đồng thời (xem <a href="0006-mvcc-and-isolation-levels.vi.html">bài về isolation</a>); unique constraint thì không.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Constraint nào chặn <code>price = 0</code> khi price bắt buộc phải dương?</p>
+  <button>Một PRIMARY KEY</button>
+  <button data-correct>Một CHECK constraint</button>
+  <button>Một quy tắc NOT NULL</button>
+  <button>Một UNIQUE constraint</button>
+  <p class="explain">CHECK yêu cầu một biểu thức Boolean phải đúng.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một table có thể có bao nhiêu primary key?</p>
+  <button data-correct>Tối đa một</button>
+  <button>Chỉ với kiểu text</button>
+  <button>Bao nhiêu cũng được</button>
+  <button>Đúng hai cái</button>
+  <p class="explain">Một table có tối đa một primary key.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Xóa một product đang được orders tham chiếu với <code>ON DELETE RESTRICT</code>?</p>
+  <button>Orders cũng bị xóa</button>
+  <button>Orders bị set null</button>
+  <button>Lệnh xóa bị hoãn lại</button>
+  <button data-correct>Lệnh xóa bị từ chối</button>
+  <p class="explain">RESTRICT chặn việc xóa một dòng đang được tham chiếu.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Option nào tự động xóa các dòng đang tham chiếu?</p>
+  <button>ON DELETE RESTRICT</button>
+  <button>Một CHECK constraint</button>
+  <button>Một UNIQUE constraint</button>
+  <button data-correct>ON DELETE CASCADE</button>
+  <p class="explain">CASCADE xóa các dòng đang tham chiếu tới dòng bị xóa.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-model-a-library.vi.md">Bài tập 0001: mô hình hóa một thư viện</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-constraints.sql"><code>01-constraints.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/ddl-constraints.html">PostgreSQL Docs: Constraints</a>. Đọc các mục 5.5.1 đến 5.5.5.</p>
+<p> &nbsp;|&nbsp; <a href="0007-aggregates-group-by-having.vi.html">Hàm tổng hợp, GROUP BY và HAVING →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/ddl-constraints.html">PostgreSQL Docs: Constraints</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

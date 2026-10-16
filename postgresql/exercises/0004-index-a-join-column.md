@@ -1,5 +1,7 @@
 # Exercise 0004: index a join column
 
+[Tiếng Việt](0004-index-a-join-column.vi.md)
+
 Companion to [lesson 4](../lessons/0004-indexes-what-they-buy.html).
 
 1. Create `orders(id, customer_id, total)` with 500,000 rows and `customers(id, name)` with 10,000 rows (`generate_series` and `random()`).

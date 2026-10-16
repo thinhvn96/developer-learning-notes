@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình PostgreSQL</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>PostgreSQL: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình PostgreSQL · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="postgresql" data-total="13">13 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Từ constraint đến MVCC: join, window function, index, query plan, lock, vacuum. 13 bài theo thứ tự nên đọc, học xong bài nào thì đánh dấu bài đó (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Foundation</h2>
+<ol class="steps" data-stack="postgresql">
+<li data-id="0001-tables-and-constraints"><a href="lessons/0001-tables-and-constraints.vi.html">Table và constraint</a></li>
+<li data-id="0007-aggregates-group-by-having"><a href="lessons/0007-aggregates-group-by-having.vi.html">Hàm tổng hợp, GROUP BY và HAVING</a></li>
+<li data-id="0002-joins-inner-and-left"><a href="lessons/0002-joins-inner-and-left.vi.html">Inner join, left join và cái bẫy WHERE</a></li>
+<li data-id="0008-transactions-commit-rollback-savepoints"><a href="lessons/0008-transactions-commit-rollback-savepoints.vi.html">Transaction: COMMIT, ROLLBACK và savepoint</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="postgresql">
+<li data-id="0003-window-functions"><a href="lessons/0003-window-functions.vi.html">Window function</a></li>
+<li data-id="0009-ctes-with-and-recursive"><a href="lessons/0009-ctes-with-and-recursive.vi.html">CTE: WITH và WITH RECURSIVE</a></li>
+<li data-id="0004-indexes-what-they-buy"><a href="lessons/0004-indexes-what-they-buy.vi.html">Index: được gì và mất gì</a></li>
+<li data-id="0010-index-types"><a href="lessons/0010-index-types.vi.html">Các loại index: B-tree, hash, GIN, BRIN</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="postgresql">
+<li data-id="0011-multicolumn-and-partial-indexes"><a href="lessons/0011-multicolumn-and-partial-indexes.vi.html">Index nhiều cột và partial index</a></li>
+<li data-id="0005-reading-explain"><a href="lessons/0005-reading-explain.vi.html">Đọc EXPLAIN và EXPLAIN ANALYZE</a></li>
+<li data-id="0006-mvcc-and-isolation-levels"><a href="lessons/0006-mvcc-and-isolation-levels.vi.html">MVCC và isolation level</a></li>
+<li data-id="0012-row-locks-and-deadlocks"><a href="lessons/0012-row-locks-and-deadlocks.vi.html">Row lock, SELECT FOR UPDATE và deadlock</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="postgresql">
+<li data-id="0013-vacuum-and-dead-tuples"><a href="lessons/0013-vacuum-and-dead-tuples.vi.html">VACUUM, dead tuple và autovacuum</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Partition table và replication <span class="meta">(dự kiến)</span></li>
+<li>Connection pooling <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> nếu muốn thêm, sắp xếp lại hoặc bỏ qua bài nào, hoặc nhờ chạy một buổi phỏng vấn thử từ <a href="interview.vi.html">trang hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

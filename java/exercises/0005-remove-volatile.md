@@ -1,5 +1,7 @@
 # Exercise 0005: remove volatile and observe
 
+[Tiếng Việt](0005-remove-volatile.vi.md)
+
 Companion to [lesson 5](../lessons/0005-visibility-and-happens-before.html).
 
 1. Run `java java/examples/StopFlag.java`. It should finish.

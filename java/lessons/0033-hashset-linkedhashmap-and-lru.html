@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 33: Sets, order and an LRU cache</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Which collections remember order, and an LRU cache in ten lines</h1>
+<p class="subtitle"><code>HashSet</code> is secretly a <code>HashMap</code>, and <code>LinkedHashMap</code> can become a cache.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0033 · step 14 of 46 · Core · ~22 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0033-hashset-linkedhashmap-and-lru.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> "Why does my set print in a strange order?" is a common surprise, and <em>"Implement an LRU cache"</em> is a classic interview task. Java gives you the cache almost for free, if you know one constructor flag and one method to override.</div>
+
+<div class="win"><b>Today's win:</b> explain how HashSet is built, choose between HashSet, LinkedHashSet and TreeSet by ordering need, and build an LRU cache in ten lines.</div>
+
+<dl class="words">
+  <dt>Set</dt><dd>A collection with no duplicates. Adding something that is already there does nothing.</dd>
+  <dt>iteration order</dt><dd>The order in which a loop (or <code>println</code>) visits the elements.</dd>
+  <dt>doubly linked list</dt><dd>A chain where each item points to the one before it and the one after it, so you can unlink an item quickly.</dd>
+  <dt>cache</dt><dd>A small, fast store of recent results, so you don't recompute or refetch them. It has a size limit.</dd>
+  <dt>LRU</dt><dd>"Least recently used": when the cache is full, throw away the item that nobody has touched for the longest time.</dd>
+  <dt>eviction</dt><dd>Removing an item from a cache to make room for a new one.</dd>
+  <dt>extends, override</dt><dd><code>class A extends B</code> makes A a child class of B; A can then override (replace) some of B's methods.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Predict: a cache holds at most 3 items. You <code>put</code> a, b, c, then <code>get(a)</code>, then <code>put(d)</code>. Which key gets thrown out? Say it out loud with the reason. Section 3 traces it.</p>
+
+<h2>1. HashSet is a HashMap in disguise</h2>
+<p>Imagine a hotel guest list kept in the hotel's key-card system: each guest name is a card key, and the "value" on every card is the same blank sticker. You only care whether the name is there. That is <code>HashSet</code>.</p>
+<p>"This class implements the Set interface, backed by a hash table (actually a HashMap instance)."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashSet.html">HashSet javadoc</a> Each element is a key whose value is a shared dummy object. In the OpenJDK source it is literally:<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashSet.java">HashSet.java</a></p>
+<pre><code>static final Object PRESENT = new Object();
+
+public boolean add(E e) {
+    return map.put(e, PRESENT)==null;   <span class="c">// true if the key was new</span>
+}</code></pre>
+<p>So everything from <a href="0030-hashmap-internals.html">HashMap internals</a> applies: constant-time add/contains "assuming the hash function disperses the elements properly", one null allowed, and "no guarantees as to the iteration order ... in particular, it does not guarantee that the order will remain constant over time".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashSet.html">HashSet javadoc</a> The order you see is just the bucket order from lesson 0030, and a resize can change it.</p>
+
+<h2>2. Linked variants keep insertion order</h2>
+<p>Now picture the same hotel, plus a paper guest book at the reception: every new guest signs at the bottom. The key-card system still finds a guest fast; the guest book remembers who came first.</p>
+<p><code>LinkedHashMap</code> adds a doubly linked list through the entries. Its encounter order is "normally the order in which keys were inserted"; re-inserting a key with <code>put</code> does not move it.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> In the source each entry gets two extra fields, <code>before</code> and <code>after</code>, and the map keeps <code>head</code> (oldest) and <code>tail</code> (newest).<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/LinkedHashMap.java">LinkedHashMap.java</a> <code>LinkedHashSet</code> is the same idea for sets.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="A LinkedHashMap: entries c, a, b sit in different buckets of the hash table, and a separate chain links them head c, then a, then b tail in insertion order.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11" opacity=".75">hash table (finds a key fast)</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="20" y="34" width="80" height="40"/><rect x="100" y="34" width="80" height="40"/><rect x="180" y="34" width="80" height="40"/><rect x="260" y="34" width="80" height="40"/>
+      <rect x="340" y="34" width="80" height="40"/><rect x="420" y="34" width="80" height="40"/><rect x="500" y="34" width="80" height="40"/><rect x="580" y="34" width="80" height="40"/>
+    </g>
+    <g font-size="10" opacity=".6"><text x="24" y="46">0</text><text x="104" y="46">1</text><text x="184" y="46">2</text><text x="264" y="46">3</text><text x="344" y="46">4</text><text x="424" y="46">5</text><text x="504" y="46">6</text><text x="584" y="46">7</text></g>
+    <text x="140" y="64" text-anchor="middle">a=10</text>
+    <text x="380" y="64" text-anchor="middle">c=3</text>
+    <text x="620" y="64" text-anchor="middle">b=2</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="3 3" opacity=".5">
+      <path d="M140 74L340 150M380 74L130 150M620 74L550 150"/>
+    </g>
+    <text x="20" y="104" font-size="11" fill="var(--accent)">linked list</text>
+    <rect x="60" y="150" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="270" y="150" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="480" y="150" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="130" y="177" text-anchor="middle">c=3</text>
+    <text x="340" y="177" text-anchor="middle">a=10</text>
+    <text x="550" y="177" text-anchor="middle">b=2</text>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M200 165h64M258 160l6 5-6 5M270 180h-64M212 175l-6 5 6 5"/>
+      <path d="M410 165h64M468 160l6 5-6 5M480 180h-64M422 175l-6 5 6 5"/>
+    </g>
+    <text x="235" y="158" text-anchor="middle" font-size="10">after</text>
+    <text x="235" y="198" text-anchor="middle" font-size="10">before</text>
+    <text x="130" y="216" text-anchor="middle" font-size="11" fill="var(--accent)">head (oldest)</text>
+    <text x="550" y="216" text-anchor="middle" font-size="11" fill="var(--accent)">tail (newest)</text>
+    <text x="340" y="240" text-anchor="middle" font-size="11" opacity=".8">put c, a, b, then put a=10 again: a keeps its place</text>
+  </g>
+</svg>
+<figcaption>Same entries, two structures: the buckets give fast lookup, the before/after chain gives a stable order. Iterating follows the chain, not the buckets.</figcaption>
+</figure>
+
+<pre><code>$ java java/examples/collections/LruCache.java
+insertion order (re-put 'a' keeps its place): {c=3, a=10, b=2}
+HashSet: [java, kafka, redis, docker, sql]   LinkedHashSet: [kafka, java, docker, sql, redis]</code></pre>
+<p>Both sets got <code>kafka, java, docker, sql, redis</code> in that order. The <code>HashSet</code> prints bucket order; the <code>LinkedHashSet</code> prints the order you added them.</p>
+<p>A bonus: iteration costs time proportional to size, while a plain HashMap's iteration is proportional to capacity.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a></p>
+
+<h3>Which set do I pick?</h3>
+<table>
+<tr><th>You need</th><th>Pick</th><th>Order when you loop</th></tr>
+<tr><td>Just "is it there?", fastest</td><td><code>HashSet</code></td><td>none promised, may change</td></tr>
+<tr><td>Order you added things</td><td><code>LinkedHashSet</code></td><td>insertion order</td></tr>
+<tr><td>Sorted order, ranges</td><td><code>TreeSet</code></td><td>sorted by compare (<a href="0031-comparable-comparator-and-ordering.html">lesson 0031</a>)</td></tr>
+</table>
+
+<h2>3. Access order and the LRU cache</h2>
+<p>Change the guest book rule: every time a guest <em>uses</em> the bar, they cross out their line and sign again at the bottom. Now the top line is always the guest who has been quiet the longest. When the hotel is full, that is who you ask to leave. That is an LRU cache.</p>
+<p>A special constructor <code>LinkedHashMap(initialCapacity, loadFactor, accessOrder)</code> orders entries from least to most recently accessed: "This kind of map is well-suited to building LRU caches."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> <code>get</code>, <code>put</code>, <code>getOrDefault</code>, the <code>compute*</code> methods and <code>merge</code> count as access.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> Then override <code>removeEldestEntry</code>, which "is invoked by put and putAll after inserting a new entry".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a></p>
+<pre><code>class LruCache&lt;K, V&gt; extends LinkedHashMap&lt;K, V&gt; {
+    private final int capacity;
+    LruCache(int capacity) {
+        super(16, 0.75f, <span class="hl">true</span>);       <span class="c">// accessOrder = true</span>
+        this.capacity = capacity;
+    }
+    @Override
+    protected boolean removeEldestEntry(Map.Entry&lt;K, V&gt; eldest) {
+        return size() &gt; capacity;      <span class="c">// true = drop the eldest</span>
+    }
+}</code></pre>
+<p>Line by line: <code>extends LinkedHashMap</code> reuses the whole map. <code>super(16, 0.75f, true)</code> calls the parent constructor with access order switched on. <code>removeEldestEntry</code> is asked after every insert; returning <code>true</code> removes the head of the chain, the least recently used entry.</p>
+
+<h3>Trace it with capacity 3</h3>
+<pre><code><span class="c">                          chain: eldest → newest</span>
+<span class="c">Step 1  put a, b, c       [a, b, c]           size 3, nothing to evict</span>
+<span class="c">Step 2  get(a)            [b, c, a]           a moves to the end</span>
+<span class="c">Step 3  put d             [b, c, a, d]        size 4 &gt; 3 → evict b</span>
+<span class="c">                          [c, a, d]</span>
+<span class="c">Step 4  put e             [c, a, d, e]        size 4 &gt; 3 → evict c</span>
+<span class="c">                          [a, d, e]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="LRU cache of size 3. After get a, the chain is b, c, a. put d appends d and evicts b from the head. put e appends e and evicts c.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="22" font-size="11" opacity=".75">eldest (head) → newest (tail)</text>
+    <text x="20" y="62" font-size="12">after get(a)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="200" y="40" width="70" height="36" rx="4"/><rect x="290" y="40" width="70" height="36" rx="4"/>
+    </g>
+    <rect x="380" y="40" width="70" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="235" y="63" text-anchor="middle">b</text><text x="325" y="63" text-anchor="middle">c</text><text x="415" y="63" text-anchor="middle" fill="var(--accent)">a</text>
+    <text x="470" y="63" font-size="11" fill="var(--accent)">← a moved to the end</text>
+
+    <text x="20" y="122" font-size="12">put(d)</text>
+    <rect x="200" y="100" width="70" height="36" rx="4" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <g fill="none" stroke="currentColor">
+      <rect x="290" y="100" width="70" height="36" rx="4"/><rect x="380" y="100" width="70" height="36" rx="4"/><rect x="470" y="100" width="70" height="36" rx="4"/>
+    </g>
+    <text x="235" y="123" text-anchor="middle" fill="var(--accent)" text-decoration="line-through">b</text>
+    <text x="325" y="123" text-anchor="middle">c</text><text x="415" y="123" text-anchor="middle">a</text><text x="505" y="123" text-anchor="middle">d</text>
+    <text x="560" y="123" font-size="11" fill="var(--accent)">evict b</text>
+
+    <text x="20" y="182" font-size="12">put(e)</text>
+    <rect x="290" y="160" width="70" height="36" rx="4" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <g fill="none" stroke="currentColor">
+      <rect x="380" y="160" width="70" height="36" rx="4"/><rect x="470" y="160" width="70" height="36" rx="4"/><rect x="560" y="160" width="70" height="36" rx="4"/>
+    </g>
+    <text x="325" y="183" text-anchor="middle" fill="var(--accent)" text-decoration="line-through">c</text>
+    <text x="415" y="183" text-anchor="middle">a</text><text x="505" y="183" text-anchor="middle">d</text><text x="595" y="183" text-anchor="middle">e</text>
+    <text x="340" y="220" text-anchor="middle" font-size="11" opacity=".8">removeEldestEntry: size() &gt; 3 → remove the head of the chain</text>
+  </g>
+</svg>
+<figcaption>Every access moves an entry to the tail. Every insert past the limit removes the head. The head is always the least recently used key.</figcaption>
+</figure>
+
+<p>The real run agrees:</p>
+<pre><code>LRU after get(a), put(d): [c, a, d]     <span class="c">// b was least recently used</span>
+LRU after put(e):         [a, d, e]</code></pre>
+
+<h3>Two senior-level caveats</h3>
+<ul>
+  <li><strong>Threads.</strong> In access-order mode "merely querying the map with get is a structural modification", so even reads need a lock when threads share it; wrap with <code>Collections.synchronizedMap</code> or use a cache library (Caffeine) in production.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap javadoc</a> This also means a <code>get</code> inside a loop over the map is a structural change (lesson 0029).</li>
+  <li><strong>JDK 21.</strong> A <code>LinkedHashMap</code> is a <code>SequencedMap</code>, so <code>putFirst</code>/<code>putLast</code> and <code>reversed()</code> also exist (<a href="0016-sequenced-collections.html">lesson 0016</a>). On JDK 8 and 17 they do not.</li>
+</ul>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">What is inside a <code>HashSet</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>A HashMap whose values are one dummy object</button>
+    <button class="opt">A sorted array searched with binary search</button>
+    <button class="opt">A linked list that is checked from the start</button>
+    <button class="opt">A TreeMap that keeps the elements sorted</button>
+  </div>
+  <div class="why">HashSet is "backed by a hash table (actually a HashMap instance)". Each element is a key; the value is the shared <code>PRESENT</code> object.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You add five words to a <code>HashSet</code> and print it. Which statement is true?</p>
+  <div class="options">
+    <button class="opt" data-correct>The order is not promised and may change later</button>
+    <button class="opt">The words always print in the order you added them</button>
+    <button class="opt">The words always print in alphabetical order</button>
+    <button class="opt">The words always print in reverse order of adding</button>
+  </div>
+  <div class="why">HashSet gives "no guarantees as to the iteration order", not even that it stays constant. Use <code>LinkedHashSet</code> for insertion order.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In a normal (insertion-order) <code>LinkedHashMap</code>, you <code>put("a", 10)</code> when <code>a</code> is already there. Where is <code>a</code> now?</p>
+  <div class="options">
+    <button class="opt" data-correct>In its old position, with the new value</button>
+    <button class="opt">At the end, because it was inserted again</button>
+    <button class="opt">At the front, as the most recently used one</button>
+    <button class="opt">Twice: once with 1 and once with 10</button>
+  </div>
+  <div class="why">Insertion order "is not affected if a key is re-inserted". The run printed <code>{c=3, a=10, b=2}</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which constructor argument turns a <code>LinkedHashMap</code> into access order?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>accessOrder = true</code></button>
+    <button class="opt"><code>loadFactor = 1.0f</code></button>
+    <button class="opt"><code>initialCapacity = 0</code></button>
+    <button class="opt"><code>ordered = false</code></button>
+  </div>
+  <div class="why">The three-argument constructor <code>LinkedHashMap(int, float, boolean accessOrder)</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">An LRU cache of size 3 gets <code>put a, b, c</code>, then <code>get(a)</code>, then <code>put(d)</code>. Which key is evicted?</p>
+  <div class="options">
+    <button class="opt" data-correct>b</button>
+    <button class="opt">a</button>
+    <button class="opt">c</button>
+    <button class="opt">d</button>
+  </div>
+  <div class="why"><code>get(a)</code> moved <code>a</code> to the end, so the chain is <code>[b, c, a]</code>. <code>b</code> is the head: least recently used.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">When does <code>LinkedHashMap</code> call <code>removeEldestEntry</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>After put or putAll inserts a new entry</button>
+    <button class="opt">Before every get, to make room in advance</button>
+    <button class="opt">Only when the table resizes to double size</button>
+    <button class="opt">Every second, from a background thread</button>
+  </div>
+  <div class="why">It "is invoked by put and putAll after inserting a new entry". Returning <code>true</code> removes the eldest entry.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Two threads share your access-order <code>LruCache</code> but only call <code>get</code>. Why is that still unsafe?</p>
+  <div class="options">
+    <button class="opt" data-correct>Each get moves an entry, so it is a write</button>
+    <button class="opt">get throws when two threads call it together</button>
+    <button class="opt">get clears the cache when it is called twice</button>
+    <button class="opt">It is safe, because get never changes a map</button>
+  </div>
+  <div class="why">In access-order mode "merely querying the map with get is a structural modification". Use a lock or a cache library such as Caffeine.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How would you implement an LRU cache in Java?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Extend <code>LinkedHashMap</code>: a hash table plus a doubly linked list.</label></li>
+      <li><label><input type="checkbox"> Use the constructor with <code>accessOrder = true</code>, so <code>get</code>/<code>put</code> move the entry to the end.</label></li>
+      <li><label><input type="checkbox"> Override <code>removeEldestEntry</code> to return <code>size() &gt; capacity</code>.</label></li>
+      <li><label><input type="checkbox"> It is called after <code>put</code> inserts; the head is the least recently used entry.</label></li>
+      <li><label><input type="checkbox"> <code>get</code>/<code>put</code> stay O(1) on average (hash lookup + relinking).</label></li>
+      <li><label><input type="checkbox"> Not thread safe: even <code>get</code> is a structural change; lock it or use Caffeine.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"In Java I'd extend <code>LinkedHashMap</code>. It's a HashMap plus a doubly linked list through the entries. Normally the list keeps insertion order, but if I call the constructor with <code>accessOrder</code> set to true, every <code>get</code> or <code>put</code> moves that entry to the end, so the head is always the least recently used one. Then I override <code>removeEldestEntry</code> to return <code>size() &gt; capacity</code>; the map calls it after each insert and removes the head when I return true. Lookups stay O(1) on average. The catch is concurrency: in access order even <code>get</code> modifies the list, so if threads share it I'd need a lock, and in production I'd rather use a library like Caffeine. If they want it from scratch, it's the same idea: a HashMap from key to node, plus my own doubly linked list."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0033-build-an-lru.md">Exercise 0033: build an LRU cache</a>. Predict each eviction on paper first, then run your cache.</p>
+<p>Runnable example: <a href="../examples/collections/LruCache.java"><code>LruCache.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may push: <em>"Now implement it without LinkedHashMap"</em> (a HashMap plus your own doubly linked list, as in the example answer), or <em>"What if I need the nearest key, not an exact one?"</em> That is <code>TreeMap</code> and <code>NavigableMap</code>: <a href="0034-treemap-and-navigable-maps.html">lesson 0034</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap Javadoc (JDK 21)</a>. Read the class description including access order, then removeEldestEntry.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"How would I write the LRU cache with my own linked list?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0032-unmodifiable-vs-immutable.html">← Lists nobody can change (or can they?)</a> &nbsp;|&nbsp; <a href="0042-review-collections-core.html">Review 3: HashMap internals, ordering and immutability →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation and the OpenJDK 21 source, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashSet.html">HashSet Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashSet.java">OpenJDK 21 source: HashSet.java</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/LinkedHashMap.java">OpenJDK 21 source: LinkedHashMap.java</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 10: Volume và bind mount</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Volume và bind mount</h1>
+<p class="meta">Docker · Bài 0010 · bước 7/12 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-volumes-and-bind-mounts.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giữ dữ liệu sống lâu hơn container bằng volume, chia sẻ file của host bằng bind mount, và biết khi nào chọn cái nào.</div>
+
+<h2>Volume</h2>
+<p>"Volume là nơi lưu trữ dữ liệu lâu dài cho container, do Docker tạo và quản lý." Nội dung của volume "tồn tại bên ngoài vòng đời của một container cụ thể"; khi container bị hủy, writable layer của nó cũng bị hủy theo.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a> Tạo bằng <code>docker volume create</code>, liệt kê bằng <code>docker volume ls</code>, xóa bằng <code>docker volume rm</code>; mount bằng <code>-v myvolume:/app</code> hoặc cách viết tường minh hơn <code>--mount source=myvolume,target=/app</code>.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a></p>
+<h2>Bind mount</h2>
+<p>Bind mount gắn một file hoặc thư mục của host vào container. Phù hợp khi dev (chia sẻ source code hoặc artifact của build) và để phân phối file cấu hình. Nhược điểm: "Container dùng bind mount gắn chặt với host" vì nó phụ thuộc vào cấu trúc thư mục của host. Thêm <code>readonly</code> để chặn container ghi vào.<a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[2]</a></p>
+<h2>Xem cả hai</h2>
+<pre><code>cd docker/examples &amp;&amp; ./03-volumes-and-bind-mounts.sh
+without a volume: cat: can't open '/data.txt': No such file or directory
+named volume    : persisted
+bind mount      : from host
+readonly bind   : sh: can't create /mnt/new.txt: Read-only file system</code></pre>
+<p>Chọn <strong>volume</strong> cho dữ liệu mà Docker nên quản lý (database; xem <a href="0004-compose-app-and-database.vi.html">bài về Compose</a>); chọn <strong>bind mount</strong> khi bạn cần truy cập các file đó từ host.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a> Source: <a href="../examples/03-volumes-and-bind-mounts.sh"><code>03-volumes-and-bind-mounts.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Container bị xóa. Named volume của nó thì sao?</p>
+  <button>Volume thành read-only</button>
+  <button data-correct>Dữ liệu vẫn còn</button>
+  <button>Dữ liệu bị xóa</button>
+  <button>Dữ liệu bị mã hóa</button>
+  <p class="explain">Nội dung của volume tồn tại bên ngoài vòng đời của container.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Kiểu mount nào phụ thuộc cấu trúc thư mục của host?</p>
+  <button>Không kiểu nào</button>
+  <button>Named volume</button>
+  <button data-correct>Bind mount</button>
+  <button>Cả hai như nhau</button>
+  <p class="explain">Container dùng bind mount gắn chặt với host.<a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Làm sao để bind mount chỉ đọc?</p>
+  <button>Dùng -d</button>
+  <button>Thêm --rm</button>
+  <button>Dùng EXPOSE</button>
+  <button data-correct>Thêm readonly</button>
+  <p class="explain">Option readonly ngăn container sửa file của host.<a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Dữ liệu ghi ra khi không có mount nằm ở đâu?</p>
+  <button data-correct>Writable layer</button>
+  <button>Các layer của image</button>
+  <button>Một named volume</button>
+  <button>Thư mục home của host</button>
+  <p class="explain">Writable layer bị hủy cùng với container.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-persist-postgres.vi.md">Bài tập 0010: giữ dữ liệu của database</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-volumes-and-bind-mounts.sh"><code>03-volumes-and-bind-mounts.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/engine/storage/volumes/">Docker volumes</a>. Sau đó đọc trang về bind mount.</p>
+<p><a href="0003-multi-stage-java-image.vi.html">← Image multi-stage cho ứng dụng Java</a> &nbsp;|&nbsp; <a href="0011-networks-and-port-publishing.vi.html">Network, DNS theo tên và publish port →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/engine/storage/volumes/">Docker volumes</a> · [2] <a href="https://docs.docker.com/engine/storage/bind-mounts/">Docker bind mounts</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

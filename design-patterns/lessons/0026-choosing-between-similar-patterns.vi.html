@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 26: Chọn giữa các pattern giống nhau</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Chọn giữa các pattern giống nhau</h1>
+<p class="meta">Design Patterns · Bài 0026 · bước 26/30 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0026-choosing-between-similar-patterns.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> phân biệt được các cặp pattern trông giống nhau trong code nhưng khác nhau về mục đích.</div>
+
+<p>Nhiều pattern có chung hình dạng class (một object giữ một object khác sau một interface). Thứ khác nhau là <em>mục đích</em> (intent), và người phỏng vấn rất thích hỏi những phép so sánh này. Mọi nhận định dưới đây đều lấy từ chính trang mô tả của các pattern.</p>
+<table><tr><th>Cặp</th><th>Khác biệt</th></tr>
+<tr><td>Strategy vs State</td><td>Cả hai đều dùng composition. "Các trạng thái cụ thể có thể biết về nhau và tự khởi phát việc chuyển trạng thái ... trong khi các strategy hầu như không bao giờ biết về nhau."<a class="cite" href="https://refactoring.guru/design-patterns/state">[2]</a> Strategy do client chọn; State tự thay đổi chính nó.</td></tr>
+<tr><td>Strategy vs Template Method</td><td>Template Method dùng kế thừa (tĩnh, ở mức class); Strategy dùng composition (lúc runtime).<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></td></tr>
+<tr><td>Decorator vs Strategy</td><td>Decorator thay đổi "vỏ" của object (hành vi bên ngoài), Strategy thay đổi "ruột" của nó.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[3]</a></td></tr>
+<tr><td>Decorator vs Proxy</td><td>Cả hai đều giữ nguyên interface. Việc ghép Decorator do client điều khiển; Proxy thường tự quản lý vòng đời của service object.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[4]</a> Decorator thêm trách nhiệm, Proxy kiểm soát truy cập.</td></tr>
+<tr><td>Adapter vs Decorator vs Proxy vs Facade</td><td>Adapter thay đổi interface; Decorator giữ nguyên hoặc mở rộng nó; Proxy giữ y hệt; Facade định nghĩa một interface mới, đơn giản hơn, cho cả một subsystem.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[3]</a><a class="cite" href="https://refactoring.guru/design-patterns/proxy">[4]</a></td></tr>
+<tr><td>Mediator vs Observer</td><td>Mediator loại bỏ phụ thuộc qua lại bằng cách bắt các component cùng phụ thuộc vào một mediator; Observer tạo ra các subscription một chiều, linh động. Mediator có thể được xây bằng Observer.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[5]</a></td></tr></table>
+<h2>Các câu hỏi để ra quyết định</h2>
+<ol><li>Mình đang <em>tạo</em>, <em>lắp ráp</em> hay <em>điều phối</em>? (ba nhóm pattern)</li><li>Client chọn biến thể, hay object tự thay đổi theo thời gian?</li><li>Mình cần cùng một interface (Decorator/Proxy) hay một interface khác (Adapter/Facade)?</li><li>Biến thể được biết lúc compile (kế thừa) hay lúc runtime (composition)?</li></ol>
+<p>Chạy demo <a href="../examples/StrategyDemo.java">Strategy</a> và <a href="../examples/StateDemo.java">State</a> cạnh nhau và xem object nào quyết định chuyện gì xảy ra tiếp theo.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Cặp nào khác nhau ở chỗ ai khởi phát thay đổi?</p>
+  <button>Adapter vs Facade</button>
+  <button data-correct>Strategy vs State</button>
+  <button>Iterator vs Visitor</button>
+  <button>Builder vs Prototype</button>
+  <p class="explain">State tự kích hoạt việc chuyển trạng thái; các strategy thì độc lập.<a class="cite" href="https://refactoring.guru/design-patterns/state">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Giữ nguyên interface, kiểm soát truy cập?</p>
+  <button>Adapter</button>
+  <button data-correct>Proxy</button>
+  <button>Facade</button>
+  <button>Builder</button>
+  <p class="explain">Proxy giữ interface y hệt để kiểm soát truy cập và vòng đời.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[4]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thay đổi interface?</p>
+  <button data-correct>Adapter</button>
+  <button>Strategy</button>
+  <button>Decorator</button>
+  <button>Proxy</button>
+  <p class="explain">Adapter cung cấp một interface khác.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Biến thể thuật toán dựa trên kế thừa?</p>
+  <button>Command</button>
+  <button data-correct>Template Method</button>
+  <button>Strategy</button>
+  <button>State</button>
+  <p class="explain">Template Method là tĩnh và dựa trên kế thừa.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0026-compare-and-contrast.vi.md">Bài tập 26: so sánh và đối chiếu</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a>. Sau đó đọc phần Relations của Decorator và Proxy.</p>
+<p><a href="0025-visitor.vi.html">← Visitor</a> &nbsp;|&nbsp; <a href="0027-patterns-in-the-jdk.vi.html">Những pattern bạn vẫn đang dùng trong JDK →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a> · [2] <a href="https://refactoring.guru/design-patterns/state">State (Refactoring.Guru)</a> · [3] <a href="https://refactoring.guru/design-patterns/decorator">Decorator (Refactoring.Guru)</a> · [4] <a href="https://refactoring.guru/design-patterns/proxy">Proxy (Refactoring.Guru)</a> · [5] <a href="https://refactoring.guru/design-patterns/mediator">Mediator (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

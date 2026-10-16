@@ -1,5 +1,7 @@
 # Exercise 0002: order the Dockerfile
 
+[Tiếng Việt](0002-order-the-dockerfile.vi.md)
+
 Companion to [lesson 2](../lessons/0002-layer-cache-and-dockerfile-order.html).
 
 1. In `docker/examples/hello-java`, run `docker build -t h1 .` twice. What does the second build print for each step?

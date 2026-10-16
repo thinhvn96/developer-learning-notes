@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 11: Aggregation: bucket và metric</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Aggregation: bucket và metric</h1>
+<p class="meta">ELK Stack · Bài 0011 · bước 9/14 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-aggregations.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết được một terms aggregation có metric lồng bên trong, và giải thích vì sao aggregate trên field text lại thất bại.</div>
+
+<h2>Ba nhóm</h2>
+<p>"Một aggregation tóm tắt dữ liệu của bạn dưới dạng metric, thống kê hoặc các phân tích khác." Aggregation <strong>metric</strong> tính các giá trị như tổng hay trung bình; aggregation <strong>bucket</strong> gom document vào các bucket theo giá trị field hoặc theo khoảng; aggregation <strong>pipeline</strong> lấy đầu vào từ các aggregation khác.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+<pre><code>{ "aggs": { "by_service": { "terms": { "field": "service.keyword" },
+    "aggs": { "avg_ms": { "avg": { "field": "ms" } }, "max_ms": { "max": { "field": "ms" } } } } } }
+orders   docs=2 avg_ms=75.0  max_ms=120.0
+payments docs=2 avg_ms=472.5 max_ms=900.0</code></pre>
+<h2>Lại chuyện text và keyword</h2>
+<p>Terms trên field đã analyze <code>service</code> bị từ chối: "Fielddata is disabled on [service]. Text fields are not optimised for operations that require per-document field data..." (từ lần chạy của mình). Với dynamic mapping, index có sẵn sub-field <code>service.keyword</code>, và mình aggregate trên field đó (quan sát trong lần chạy; dùng explicit mapping thì khỏi phải đoán). Chuyện này nối với phần text analysis ở <a href="0009-text-analysis.vi.html">bài trước</a> và với field <code>keyword</code> trong <a href="0005-query-dsl-term-match-bool.vi.html">bài 5</a> (trang term query nói giá trị chính xác nên nằm trong field keyword).<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[2]</a> Script: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a>. Tương đương bên SQL: <a href="../../postgresql/lessons/0007-aggregates-group-by-having.vi.html"><code>GROUP BY</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Aggregation nào gom document vào bucket?</p>
+  <button>Scripted</button>
+  <button data-correct>Bucket</button>
+  <button>Pipeline</button>
+  <button>Metric</button>
+  <p class="explain">Bucket aggregation gom document theo giá trị hoặc theo khoảng.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Loại nào tính giá trị trung bình?</p>
+  <button data-correct>Metric</button>
+  <button>Term query</button>
+  <button>Bucket</button>
+  <button>Chỉ pipeline</button>
+  <p class="explain">Metric aggregation tính tổng và trung bình.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Terms aggregation trên field text...?</p>
+  <button data-correct>Mặc định bị từ chối</button>
+  <button>Không cần mapping</button>
+  <button>Chạy nhanh hơn</button>
+  <button>Chạy tốt nhất</button>
+  <p class="explain">Lần chạy trả về: Fielddata is disabled on text fields.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Pipeline aggregation lấy đầu vào từ...?</p>
+  <button>Chỉ document gốc</button>
+  <button>Kibana</button>
+  <button>Logstash</button>
+  <button data-correct>Các aggregation khác</button>
+  <p class="explain">Chúng dùng kết quả của các aggregation khác.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-latency-report.vi.md">Bài tập 0011: báo cáo latency</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">Elasticsearch: Aggregations</a>. Tổng quan về metric, bucket, pipeline.</p>
+<p><a href="0010-bulk-api.vi.html">← Bulk API và lỗi theo từng item</a> &nbsp;|&nbsp; <a href="0006-logstash-grok-and-persistent-queues.vi.html">Logstash: pipeline, grok và persistent queue →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">Elasticsearch: Aggregations</a> · [2] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">Elasticsearch: Term query</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 28: Bản đồ Collections Framework: interface và implementation</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bản đồ các collection trong Java</h1>
+<p class="subtitle">Các interface, những class đứng sau chúng, và ba câu hỏi giúp chọn đúng.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0028 · bước 6/46 · Foundation · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0028-collections-framework-map.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Method backend nào cũng truyền qua lại list, set và map. Interviewer hỏi <em>"Chỗ này bạn dùng collection nào, vì sao?"</em> và <em>"Map có phải là Collection không?"</em>. Có sẵn một tấm bản đồ rõ ràng trong đầu, các bài sau (ArrayList, HashMap, TreeMap, …) mỗi bài chỉ cần điền vào một ô.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> vẽ lại cây interface của collection theo trí nhớ và chọn implementation bằng ba câu hỏi: có trùng lặp không? thứ tự thế nào? có tra theo key không?</div>
+
+<dl class="words">
+  <dt>interface</dt><dd>Danh sách method mà một class hứa sẽ có. <code>List</code> là interface: nó nói bạn làm được gì, không nói làm thế nào.</dd>
+  <dt>implementation</dt><dd>Một class thật giữ lời hứa đó bằng một cấu trúc dữ liệu thật, như <code>ArrayList</code> (bên trong là một mảng).</dd>
+  <dt>element</dt><dd>Phần tử: một món được lưu trong collection.</dd>
+  <dt>duplicate</dt><dd>Hai phần tử <code>equals()</code> với nhau. <code>List</code> cho phép; <code>Set</code> thì không.</dd>
+  <dt>insertion order</dt><dd>Thứ tự chèn: phần tử trả ra theo đúng thứ tự bạn đã thêm vào.</dd>
+  <dt>sorted order</dt><dd>Thứ tự sắp xếp: phần tử trả ra từ nhỏ tới lớn, bất kể bạn thêm theo thứ tự nào.</dd>
+  <dt>view</dt><dd>Một "cửa sổ" sống nhìn vào dữ liệu của object khác, không phải bản sao. Thay đổi bên này hiện ra bên kia.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Kể ba interface collection và mỗi cái một class. <code>Map</code> có phải là một trong các interface collection không?"</em> Trả lời trước khi cuộn xuống. Bạn sẽ đối chiếu với sơ đồ ở phần 2.</p>
+
+<h2>1. Hình dung: chức danh và con người</h2>
+<p>Một nhà hàng tuyển "thu ngân". Đó là mô tả công việc: nhận tiền, thối tiền. Nhiều người khác nhau làm được việc đó. Quản lý xếp lịch theo chức danh, không theo tên người, nên người mới vào thay mà không phải viết lại lịch.</p>
+<p>Trong Java, <strong>interface</strong> là chức danh (<code>List</code>) và <strong>implementation</strong> là con người (<code>ArrayList</code>, <code>LinkedList</code>). Tài liệu chính thức mô tả Collections Framework là "một kiến trúc thống nhất để biểu diễn và thao tác với collection", gồm các <strong>interface</strong> (thứ bạn lập trình dựa vào), các <strong>implementation</strong> (cấu trúc dữ liệu) và các <strong>thuật toán</strong> (method static như sắp xếp).<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Java SE 21: Collections Framework</a></p>
+<pre><code>List&lt;Order&gt; orders = new ArrayList&lt;&gt;();   <span class="c">// declare the job title</span>
+orders.add(order);
+process(orders);
+
+void process(List&lt;Order&gt; orders) { ... }   <span class="c">// accepts ANY List</span></code></pre>
+<p>Bạn khai báo <code>List&lt;Order&gt;</code>, không phải <code>ArrayList&lt;Order&gt;</code>, để có thể đổi cấu trúc mà không đụng tới bên gọi. Để ý <code>&lt;Order&gt;</code>: mọi collection đều là generic, như bạn đã thấy ở <a href="0020-generics-basics-and-invariance.vi.html">bài 0020</a>.</p>
+
+<h2>2. Cây gia phả (JDK 21)</h2>
+<p>Trên cùng là <code>Collection</code>, "interface gốc của cây collection". JDK không implement nó trực tiếp: "nó cung cấp implementation cho các interface con cụ thể hơn như Set và List".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html">Collection javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Iterable là cha của Collection. Collection có List, Set và Queue. Set dẫn tới SortedSet rồi NavigableSet. Queue dẫn tới Deque. Map là một gốc riêng với SortedMap và NavigableMap, và cho các collection view qua keySet, values và entrySet. List, Deque, SortedSet và SortedMap cũng là kiểu sequenced trong JDK 21.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="185" y="20" width="120" height="32" rx="6"/>
+      <rect x="185" y="75" width="120" height="32" rx="6"/>
+      <rect x="185" y="135" width="120" height="32" rx="6"/>
+      <rect x="350" y="135" width="120" height="32" rx="6"/>
+      <rect x="185" y="255" width="120" height="32" rx="6"/>
+      <rect x="515" y="75" width="120" height="32" rx="6"/>
+      <rect x="515" y="195" width="120" height="32" rx="6"/>
+      <path d="M245 52V75"/>
+      <path d="M245 107V121H70V135M245 121V135M245 121H410V135"/>
+      <path d="M245 167V195M245 227V255M410 167V195"/>
+      <path d="M575 107V135M575 167V195"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="10" y="135" width="120" height="32" rx="6"/>
+      <rect x="185" y="195" width="120" height="32" rx="6"/>
+      <rect x="350" y="195" width="120" height="32" rx="6"/>
+      <rect x="515" y="135" width="120" height="32" rx="6"/>
+    </g>
+    <path d="M515 91H311" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <path d="M317 86l-6 5 6 5" fill="none" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="245" y="41">Iterable</text>
+      <text x="245" y="96">Collection</text>
+      <text x="70" y="156" fill="var(--accent)">List</text>
+      <text x="245" y="156">Set</text>
+      <text x="410" y="156">Queue</text>
+      <text x="245" y="216" fill="var(--accent)">SortedSet</text>
+      <text x="410" y="216" fill="var(--accent)">Deque</text>
+      <text x="245" y="276">NavigableSet</text>
+      <text x="575" y="96">Map</text>
+      <text x="575" y="156" fill="var(--accent)">SortedMap</text>
+      <text x="575" y="216">NavigableMap</text>
+      <text x="575" y="62" font-size="11" opacity=".75">gốc riêng</text>
+      <text x="413" y="82" font-size="10" fill="var(--accent)">keySet() values() entrySet()</text>
+      <text x="70" y="186" font-size="11" opacity=".75">index, cho phép trùng</text>
+      <text x="410" y="246" font-size="11" opacity=".75">hai đầu</text>
+    </g>
+    <rect x="20" y="304" width="14" height="14" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="42" y="316" font-size="11">cũng là SequencedCollection / SequencedMap: first, last, reversed (mới ở JDK 21)</text>
+  </g>
+</svg>
+<figcaption>Các interface collection. <code>Map</code> đứng riêng; mũi tên nét đứt cho thấy nó cung cấp các collection <em>view</em>.</figcaption>
+</figure>
+
+<p>Tài liệu của package mô tả các ô quan trọng:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary</a></p>
+<ul>
+  <li><strong>List</strong>: có thứ tự, truy cập theo index, cho phép trùng lặp.</li>
+  <li><strong>Set</strong>: không trùng lặp. <code>SortedSet</code> cung cấp "một thứ tự toàn phần trên các phần tử"; <code>NavigableSet</code> thêm "các method điều hướng trả về phần tử gần khớp nhất".</li>
+  <li><strong>Queue / Deque</strong>: <code>Deque</code> hỗ trợ "chèn và xóa ở cả hai đầu".</li>
+  <li><strong>Map</strong>: từ key tới value, với <code>SortedMap → NavigableMap</code> cho key được sắp xếp.</li>
+</ul>
+
+<h3>Map có phải là Collection không?</h3>
+<p>Không. Đây là câu hỏi mẹo rất được ưa chuộng. <code>Map</code> là "một object ánh xạ key tới value", và nó không kế thừa <code>Collection</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Thay vào đó nó cho bạn các collection để nhìn vào: "Interface Map cung cấp ba collection view, cho phép xem nội dung map như một set các key, một collection các value, hoặc một set các cặp key-value." Đó là <code>keySet()</code>, <code>values()</code> và <code>entrySet()</code>.</p>
+
+<h3>JDK 8 so với 21: sequenced collection</h3>
+<p>JDK 21 thêm ba interface: <code>SequencedCollection</code>, <code>SequencedSet</code> và <code>SequencedMap</code>. Một sequenced collection là "một collection có thứ tự duyệt xác định rõ, hỗ trợ thao tác ở cả hai đầu, và đảo ngược được." Nó mang theo các method như <code>getFirst()</code>, <code>getLast()</code> và <code>reversed()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/SequencedCollection.html">SequencedCollection javadoc</a> Trên JDK 8 và 17 các interface này chưa có; bạn viết <code>list.get(list.size() - 1)</code> thay cho <code>list.getLast()</code>.</p>
+
+<h2>3. Mỗi class thật ra là gì</h2>
+<p>Chương trình ví dụ tạo một object cho mỗi class thông dụng và hỏi Java xem nó implement những interface nào:</p>
+<pre><code>$ java java/examples/collections/FrameworkMap.java
+ArrayList          List, SequencedCollection, RandomAccess
+LinkedList         List, Queue, Deque, SequencedCollection
+ArrayDeque         Queue, Deque, SequencedCollection
+PriorityQueue      Queue
+HashSet            Set
+LinkedHashSet      Set, SequencedCollection
+TreeSet            Set, SortedSet, NavigableSet, SequencedCollection
+HashMap            Map
+LinkedHashMap      Map, SequencedMap
+TreeMap            Map, NavigableMap, SequencedMap
+ConcurrentHashMap  Map</code></pre>
+<p>Đọc nó như một bảng quyết định, từng bước:</p>
+<ol class="steps">
+  <li><strong>Tiền tố cho biết thứ tự.</strong> <code>HashSet</code> và <code>HashMap</code> không hứa thứ tự nào cả. Các biến thể <code>Linked*</code> giữ thứ tự chèn. Các biến thể <code>Tree*</code> giữ thứ tự sắp xếp. Đó là lý do chỉ <code>LinkedHashSet</code>, <code>TreeSet</code>, <code>LinkedHashMap</code> và <code>TreeMap</code> là sequenced.</li>
+  <li><strong><code>RandomAccess</code> đánh dấu <code>get(i)</code> nhanh.</strong> Chỉ <code>ArrayList</code> có nó: mảng nhảy thẳng tới ô <em>i</em>, còn linked list phải đi bộ.</li>
+  <li><strong><code>LinkedList</code> là hai thứ một lúc.</strong> Nó vừa là <code>List</code> vừa là <code>Deque</code>. <a href="0002-choosing-a-list.vi.html">Bài 0002</a> giải thích vì sao <code>ArrayDeque</code> thường là deque tốt hơn.</li>
+  <li><strong><code>PriorityQueue</code> chỉ là <code>Queue</code>.</strong> Nó không có thứ tự từ đầu tới cuối; nó chỉ hứa lần sau đưa ra phần tử nhỏ nhất.</li>
+</ol>
+
+<h2>4. Ba câu hỏi chọn ra cấu trúc</h2>
+<p>Hãy nghĩ tới bác sĩ hỏi vài câu trước khi kê thuốc. Bạn hỏi ba câu: <em>Mình có tra cứu theo key không? Phần tử có phải duy nhất không? Mình cần thứ tự nào?</em></p>
+
+<figure>
+<svg viewBox="0 0 680 285" role="img" aria-label="Cây quyết định. Tra theo key? Có dẫn tới HashMap, LinkedHashMap hoặc TreeMap. Không dẫn tới: chỉ phần tử duy nhất? Có dẫn tới HashSet, LinkedHashSet hoặc TreeSet. Không dẫn tới ArrayList, ArrayDeque hoặc PriorityQueue. Mặc định là ArrayList, HashSet và HashMap.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="240" y="16" width="200" height="34" rx="17"/>
+      <rect x="130" y="72" width="200" height="30" rx="15"/>
+      <path d="M440 33H565V104M560 98l5 6 5-6"/>
+      <path d="M340 50V61H230V72"/>
+      <path d="M130 87H115V104M110 98l5 6 5-6"/>
+      <path d="M330 87H340V104M335 98l5 6 5-6"/>
+      <rect x="20" y="172" width="190" height="32" rx="5"/><rect x="20" y="214" width="190" height="32" rx="5"/>
+      <rect x="245" y="172" width="190" height="32" rx="5"/><rect x="245" y="214" width="190" height="32" rx="5"/>
+      <rect x="470" y="172" width="190" height="32" rx="5"/><rect x="470" y="214" width="190" height="32" rx="5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="20" y="130" width="190" height="32" rx="5"/>
+      <rect x="245" y="130" width="190" height="32" rx="5"/>
+      <rect x="470" y="130" width="190" height="32" rx="5"/>
+    </g>
+    <g text-anchor="middle" font-size="12">
+      <text x="340" y="38">tra cứu theo key?</text>
+      <text x="230" y="92">chỉ phần tử duy nhất?</text>
+    </g>
+    <g text-anchor="middle">
+      <text x="500" y="27">có</text>
+      <text x="346" y="59" text-anchor="start" opacity=".75">không</text>
+      <text x="100" y="82">có</text>
+      <text x="354" y="82">không</text>
+      <text x="115" y="124" opacity=".75">một Set, theo thứ tự:</text>
+      <text x="340" y="124" opacity=".75">một List hoặc Queue:</text>
+      <text x="565" y="124" opacity=".75">một Map, theo thứ tự:</text>
+    </g>
+    <g fill="var(--accent)">
+      <text x="32" y="150">HashSet: không thứ tự</text>
+      <text x="257" y="150">ArrayList: theo index</text>
+      <text x="482" y="150">HashMap: không thứ tự</text>
+    </g>
+    <text x="32" y="192">LinkedHashSet: thứ tự chèn</text>
+    <text x="32" y="234">TreeSet: sắp xếp</text>
+    <text x="257" y="192">ArrayDeque: hai đầu</text>
+    <text x="257" y="234">PriorityQueue: nhỏ nhất trước</text>
+    <text x="482" y="192">LinkedHashMap: thứ tự chèn</text>
+    <text x="482" y="234">TreeMap: sắp xếp, khoảng</text>
+    <text x="340" y="272" text-anchor="middle" fill="var(--accent)">tô màu = mặc định; chỉ đi xuống khi bạn cần tính chất đó</text>
+  </g>
+</svg>
+<figcaption>Hai câu hỏi có/không chọn ra họ; thứ tự bạn cần chọn ra class.</figcaption>
+</figure>
+
+<p>Cũng những lựa chọn đó dưới dạng bảng, kèm bài học tương ứng:</p>
+<table>
+<tr><th>Nhu cầu</th><th>Lựa chọn mặc định</th><th>Bài</th></tr>
+<tr><td>Dãy có thứ tự, truy cập theo index</td><td><code>ArrayList</code></td><td><a href="0002-choosing-a-list.vi.html">0002</a></td></tr>
+<tr><td>Queue hoặc stack</td><td><code>ArrayDeque</code></td><td><a href="0002-choosing-a-list.vi.html">0002</a></td></tr>
+<tr><td>Không trùng lặp, contains nhanh</td><td><code>HashSet</code> (giữ thứ tự: <code>LinkedHashSet</code>, sắp xếp: <code>TreeSet</code>)</td><td><a href="0033-hashset-linkedhashmap-and-lru.vi.html">0033</a></td></tr>
+<tr><td>Tra cứu theo key</td><td><code>HashMap</code> (giữ thứ tự: <code>LinkedHashMap</code>, sắp xếp/khoảng: <code>TreeMap</code>)</td><td><a href="0030-hashmap-internals.vi.html">0030</a>, <a href="0034-treemap-and-navigable-maps.vi.html">0034</a></td></tr>
+<tr><td>Luôn lấy phần tử nhỏ nhất/lớn nhất tiếp theo</td><td><code>PriorityQueue</code></td><td><a href="0035-priorityqueue-and-top-k.vi.html">0035</a></td></tr>
+<tr><td>Dùng chung giữa nhiều thread</td><td><code>ConcurrentHashMap</code>, <code>BlockingQueue</code>, ...</td><td><a href="0039-concurrent-collections.vi.html">0039</a></td></tr>
+</table>
+<p>Lần theo một ví dụ: <em>"Lưu các user ID đã gửi email, để không bao giờ gửi hai lần."</em></p>
+<pre><code><span class="c">Bước 1  tra cứu theo key?    không, chỉ hỏi "đã thấy ID này chưa?"</span>
+<span class="c">Bước 2  chỉ phần tử duy nhất? có, một ID hoặc có hoặc không</span>
+<span class="c">Bước 3  cần thứ tự?          không</span>
+Set&lt;Long&gt; emailed = new HashSet&lt;&gt;();
+emailed.add(id);   <span class="hl">// returns false if id was already there</span></code></pre>
+
+<h2>5. Bẫy: các thao tác "optional"</h2>
+<p>Một số method của interface là "optional" (tùy chọn): implementation có thể ném <code>UnsupportedOperationException</code> thay vì hỗ trợ chúng, và Javadoc đánh dấu từng method là "(optional operation)".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> Đó là cách các collection không sửa được vẫn khớp vào cùng các interface:</p>
+<pre><code>List&lt;String&gt; names = List.of("Ann", "Bob");
+names.add("Cid");     <span class="hl">// UnsupportedOperationException</span></code></pre>
+<p>Kiểu ghi là <code>List</code>, nên code compile được; object thì từ chối lúc chạy. <a href="0032-unmodifiable-vs-immutable.vi.html">Bài 0032</a> nói kỹ về chuyện này.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>Map</code> có kế thừa <code>Collection</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, nó là một gốc riêng và cung cấp collection view</button>
+    <button class="opt">Có, nó kế thừa Collection thông qua interface Set</button>
+    <button class="opt">Có, nó kế thừa Collection thông qua interface List</button>
+    <button class="opt">Chỉ HashMap có; TreeMap là một interface gốc riêng</button>
+  </div>
+  <div class="why"><code>Map</code> chứa các cặp key-value; <code>keySet()</code>, <code>values()</code> và <code>entrySet()</code> là collection view.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cái nào giữ phần tử theo thứ tự sắp xếp?</p>
+  <div class="options">
+    <button class="opt" data-correct>TreeSet</button>
+    <button class="opt">LinkedHashSet</button>
+    <button class="opt">HashSet</button>
+    <button class="opt">ArrayDeque</button>
+  </div>
+  <div class="why"><code>TreeSet</code> implement <code>NavigableSet</code>, một <code>SortedSet</code>. <code>LinkedHashSet</code> giữ thứ tự chèn, không phải thứ tự sắp xếp.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">List nào implement <code>RandomAccess</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayList</button>
+    <button class="opt">LinkedList</button>
+    <button class="opt">PriorityQueue</button>
+    <button class="opt">ArrayDeque</button>
+  </div>
+  <div class="why">Chỉ <code>ArrayList</code> in ra <code>RandomAccess</code> trong lần chạy ở trên: mảng nhảy thẳng tới index <em>i</em>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Chuyện gì xảy ra khi bạn gọi một method thay đổi mà collection không hỗ trợ, như <code>List.of("a").add("b")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>UnsupportedOperationException</button>
+    <button class="opt">IllegalStateException</button>
+    <button class="opt">ClassCastException</button>
+    <button class="opt">NullPointerException</button>
+  </div>
+  <div class="why">Các thao tác optional ném <code>UnsupportedOperationException</code> khi không được hỗ trợ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn phải giữ các lượt xem trang theo đúng thứ tự xảy ra và không bao giờ lưu cùng một URL hai lần. Dùng class nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>LinkedHashSet</button>
+    <button class="opt">HashSet</button>
+    <button class="opt">TreeSet</button>
+    <button class="opt">ArrayList</button>
+  </div>
+  <div class="why">Duy nhất → một Set; thứ tự chèn → biến thể <code>Linked</code>. <code>TreeSet</code> sẽ sắp các URL theo bảng chữ cái.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao khai báo tham số là <code>List&lt;Order&gt;</code> thay vì <code>ArrayList&lt;Order&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Bên gọi truyền được mọi List, và bạn đổi class về sau được</button>
+    <button class="opt">List nhanh hơn ArrayList vì bên trong có ít code hơn</button>
+    <button class="opt">Trong Java không dùng ArrayList làm kiểu tham số được</button>
+    <button class="opt">List làm collection thread-safe cho mọi bên gọi nó</button>
+  </div>
+  <div class="why">Lập trình dựa vào interface (chức danh), không dựa vào implementation (con người).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">JDK 21 có gì mới cho <code>List</code>, <code>Deque</code> và <code>LinkedHashMap</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Interface sequenced: getFirst(), getLast(), reversed()</button>
+    <button class="opt">Chúng mặc định thread-safe mà không cần thêm lock</button>
+    <button class="opt">Chúng giờ giữ phần tử được sắp xếp như TreeSet</button>
+    <button class="opt">Chúng chuyển từ java.util sang package java.collections</button>
+  </div>
+  <div class="why"><code>SequencedCollection</code> và <code>SequencedMap</code> (từ bản 21) thêm thao tác ở hai đầu và một view đảo ngược.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Cho tôi cái nhìn tổng quan về Java Collections Framework, và bạn chọn collection thế nào."</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Interface, implementation và thuật toán; mình lập trình dựa vào interface.</label></li>
+      <li><label><input type="checkbox"> <code>Collection</code> là gốc; <code>List</code>, <code>Set</code> và <code>Queue</code>/<code>Deque</code> kế thừa nó.</label></li>
+      <li><label><input type="checkbox"> <code>Map</code> không phải <code>Collection</code>; nó cho các view: <code>keySet</code>, <code>values</code>, <code>entrySet</code>.</label></li>
+      <li><label><input type="checkbox"> Thứ tự: Hash = không có, Linked = thứ tự chèn, Tree = sắp xếp.</label></li>
+      <li><label><input type="checkbox"> Cách chọn: tra theo key → Map; duy nhất → Set; còn lại List hoặc Deque; mặc định ArrayList, HashSet, HashMap.</label></li>
+      <li><label><input type="checkbox"> JDK 21 thêm interface sequenced; thao tác optional không hỗ trợ thì ném <code>UnsupportedOperationException</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Collections Framework là một bộ gồm interface, implementation và thuật toán. Em code dựa vào interface, như <code>List</code> hay <code>Map</code>, để sau này đổi implementation được. <code>Collection</code> là gốc, có <code>List</code> cho dãy có thứ tự và cho phép trùng, <code>Set</code> cho phần tử duy nhất, và <code>Queue</code>, <code>Deque</code> cho hàng đợi và stack. <code>Map</code> thì tách riêng: nó không phải Collection, nhưng cho em các view qua <code>keySet</code>, <code>values</code> và <code>entrySet</code>. Để chọn, em hỏi: có tra theo key không? Có thì dùng Map. Phần tử phải duy nhất? Thì dùng Set. Còn lại là List hoặc Deque. Sau đó thứ tự quyết định class: Hash là không thứ tự, Linked là thứ tự chèn, Tree là sắp xếp. Mặc định của em là ArrayList, HashSet và HashMap. Từ JDK 21 còn có các interface sequenced với <code>getFirst</code> và <code>reversed</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0028-pick-the-structure.vi.md">Bài tập 0028: chọn cấu trúc</a>. Với mỗi tình huống, nói ba câu trả lời của bạn (key? duy nhất? thứ tự?) trước khi gọi tên class.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/FrameworkMap.java"><code>FrameworkMap.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior sẽ zoom vào một ô: <em>"ArrayList hay LinkedList? HashMap bên trong hoạt động thế nào? Khi nào bạn dùng TreeMap?"</em> Bắt đầu với các list ở <a href="0002-choosing-a-list.vi.html">bài 0002</a>, rồi tới <a href="0030-hashmap-internals.vi.html">bên trong HashMap</a> và <a href="0034-treemap-and-navigable-maps.vi.html">TreeMap</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Java SE 21 Core Libraries: Java Collections Framework</a>. Trang ngắn; sau đó mở phần Collections Framework trong java.util package summary.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Iterable dùng để làm gì?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0040-review-fundamentals.vi.html">← Ôn tập 1: string, exception và generic</a> &nbsp;|&nbsp; <a href="0002-choosing-a-list.vi.html">ArrayList, LinkedList hay ArrayDeque? →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Java SE 21 Core Libraries: Java Collections Framework</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html">Collection Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/SequencedCollection.html">SequencedCollection Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

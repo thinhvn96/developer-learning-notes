@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 45: Review 6: concurrency and the JVM</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 6: concurrency and the JVM</h1>
+<p class="subtitle">Six lessons, one practice session: visibility, atomics, ConcurrentHashMap, thread pools, deadlock and the heap.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0045 · step 36 of 46 · Review · ~30 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0045-review-concurrency-jvm.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> In a real interview the questions don't come one topic at a time. "Is this counter safe?" leads to "and the map?", then "and the pool that runs it?", then "the service froze, what do you check?". Mixing the topics now, while you still remember them a little, makes them stick much better than re-reading.</div>
+
+<div class="win"><b>Today's win:</b> answer mixed questions from all six lessons, find three bugs in one piece of code, and give three 60-second answers out loud.</div>
+
+<dl class="words">
+  <dt>happens-before</dt><dd>The rule that guarantees one thread sees another thread's write (<a href="0005-visibility-and-happens-before.html">lesson 0005</a>).</dd>
+  <dt>lost update</dt><dd>Two threads read the same value and one write overwrites the other (<a href="0024-atomics-and-locks.html">lesson 0024</a>).</dd>
+  <dt>check-then-act</dt><dd>Two safe calls with a gap between them where another thread can act (<a href="0025-concurrenthashmap.html">lesson 0025</a>).</dd>
+  <dt>core / queue / max</dt><dd>The order in which a thread pool grows: core threads, then the queue, then extra threads (<a href="0023-thread-pools-executors.html">lesson 0023</a>).</dd>
+  <dt>deadlock</dt><dd>Threads blocked forever, waiting for each other's locks in a circle (<a href="0026-deadlock-and-lock-ordering.html">lesson 0026</a>).</dd>
+  <dt>generations</dt><dd>Young and old parts of the heap, because most objects die young (<a href="0007-heap-and-garbage-collection.html">lesson 0007</a>).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking anything up, say one sentence for each of the six terms above. Count how many you could say clearly. Keep that number; you will compare it with your quiz score at the end.</p>
+
+<h2>1. The whole section on one page</h2>
+<p>Every lesson in this section answered one problem with one main tool. If you can rebuild this table from memory, you have the skeleton of every answer.</p>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Six problems and their fixes: a write not seen is fixed by happens-before; count++ losing updates by atomics or a lock; get then put racing by merge and compute; too many tasks by a bounded pool; a cycle of locks by one lock order; memory growth by heap sizing and GC logs.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="160" y="22" text-anchor="middle" font-size="13">problem</text>
+    <text x="500" y="22" text-anchor="middle" font-size="13">main fix</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="36" width="280" height="40" rx="4"/>
+      <rect x="20" y="84" width="280" height="40" rx="4"/>
+      <rect x="20" y="132" width="280" height="40" rx="4"/>
+      <rect x="20" y="180" width="280" height="40" rx="4"/>
+      <rect x="20" y="228" width="280" height="40" rx="4"/>
+      <rect x="20" y="276" width="280" height="40" rx="4"/>
+      <path d="M300 56h54M348 51l6 5-6 5"/>
+      <path d="M300 104h54M348 99l6 5-6 5"/>
+      <path d="M300 152h54M348 147l6 5-6 5"/>
+      <path d="M300 200h54M348 195l6 5-6 5"/>
+      <path d="M300 248h54M348 243l6 5-6 5"/>
+      <path d="M300 296h54M348 291l6 5-6 5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="360" y="36" width="300" height="40" rx="4"/>
+      <rect x="360" y="84" width="300" height="40" rx="4"/>
+      <rect x="360" y="132" width="300" height="40" rx="4"/>
+      <rect x="360" y="180" width="300" height="40" rx="4"/>
+      <rect x="360" y="228" width="300" height="40" rx="4"/>
+      <rect x="360" y="276" width="300" height="40" rx="4"/>
+    </g>
+    <text x="34" y="61">0005  a write is never seen</text>
+    <text x="34" y="109">0024  count++ loses updates</text>
+    <text x="34" y="157">0025  get, then put races</text>
+    <text x="34" y="205">0023  tasks pile up / reject</text>
+    <text x="34" y="253">0026  locks wait in a circle</text>
+    <text x="34" y="301">0007  memory fills up</text>
+    <g fill="var(--accent)">
+      <text x="374" y="61">happens-before: volatile, lock</text>
+      <text x="374" y="109">AtomicInteger (CAS) or a lock</text>
+      <text x="374" y="157">merge / compute (atomic)</text>
+      <text x="374" y="205">bounded queue + policy</text>
+      <text x="374" y="253">one global lock order</text>
+      <text x="374" y="301">size heap + read GC log</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Six problems, six fixes. Cover the right column with your hand and say each fix out loud.</figcaption>
+</figure>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Four threads each run <code>count++</code> 200,000 times on a <code>volatile int</code>. What do you expect?</p>
+  <div class="options">
+    <button class="opt" data-correct>A total below 800,000 that changes each run</button>
+    <button class="opt">Exactly 800,000, because the field is volatile</button>
+    <button class="opt">A deadlock between the four worker threads</button>
+    <button class="opt">A compile error: volatile cannot be incremented</button>
+  </div>
+  <div class="why"><code>count++</code> is read, add, write; <code>volatile</code> doesn't make it atomic, so updates are lost. See <a href="0024-atomics-and-locks.html">lesson 0024</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">No heap flags, a machine with 16 GB of RAM. Roughly how large can the heap grow?</p>
+  <div class="options">
+    <button class="opt" data-correct>About 4 GB</button>
+    <button class="opt">About 2 GB</button>
+    <button class="opt">About 8 GB</button>
+    <button class="opt">About 16 GB</button>
+  </div>
+  <div class="why">The default maximum heap is 1/4 of physical memory. See <a href="0007-heap-and-garbage-collection.html">lesson 0007</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A pool has core 4, max 8 and a bounded queue with free space. All 4 core threads are busy. A task arrives. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It waits in the queue</button>
+    <button class="opt">A fifth thread starts</button>
+    <button class="opt">It is rejected at once</button>
+    <button class="opt">The caller runs it</button>
+  </div>
+  <div class="why">The order is core → queue → max → reject. Extra threads start only when the queue is full. See <a href="0023-thread-pools-executors.html">lesson 0023</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which of these creates a happens-before edge between two threads?</p>
+  <div class="options">
+    <button class="opt" data-correct>Calling start() on a thread, then its first action</button>
+    <button class="opt">Two threads writing the same plain field in turn</button>
+    <button class="opt">Two threads that lock two different objects</button>
+    <button class="opt">A thread reading a field after Thread.sleep(100)</button>
+  </div>
+  <div class="why"><code>start()</code> happens-before the started thread's actions. Sleeping or locking different objects gives no ordering. See <a href="0005-visibility-and-happens-before.html">lesson 0005</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A thread dump says: T1 "waiting to lock … which is held by T2", and T2 "waiting to lock … which is held by T1". What is it?</p>
+  <div class="options">
+    <button class="opt" data-correct>A deadlock caused by opposite lock order</button>
+    <button class="opt">A lost update on a shared volatile field</button>
+    <button class="opt">A full GC pause stopping both threads</button>
+    <button class="opt">A rejected task in an overloaded pool</button>
+  </div>
+  <div class="why">Each holds what the other wants: a cycle. Fix with one global lock order. See <a href="0026-deadlock-and-lock-ordering.html">lesson 0026</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>new ConcurrentHashMap&lt;String, Integer&gt;().put("a", null)</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Throws NullPointerException</button>
+    <button class="opt">Stores the key with null</button>
+    <button class="opt">Removes the key "a"</button>
+    <button class="opt">Does nothing at all</button>
+  </div>
+  <div class="why">ConcurrentHashMap allows no null keys and no null values. See <a href="0025-concurrenthashmap.html">lesson 0025</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In <code>Pause Young … 38M-&gt;3M(64M) 2.0ms</code>, what does <code>3M</code> mean?</p>
+  <div class="options">
+    <button class="opt" data-correct>Heap in use after the collection</button>
+    <button class="opt">Memory freed during the collection</button>
+    <button class="opt">Size of the young generation only</button>
+    <button class="opt">Number of objects that were moved</button>
+  </div>
+  <div class="why">Before → after (total heap), then pause time. 3M survived. See <a href="0007-heap-and-garbage-collection.html">lesson 0007</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">An <code>AtomicInteger</code> holds 7. A thread calls <code>compareAndSet(6, 7)</code>. Result?</p>
+  <div class="options">
+    <button class="opt" data-correct>Returns false; the value stays 7</button>
+    <button class="opt">Returns true; the value stays 7</button>
+    <button class="opt">Blocks until the value is 6 again</button>
+    <button class="opt">Throws an IllegalStateException</button>
+  </div>
+  <div class="why">CAS writes only if the current value equals the expected one (6). It is 7, so nothing changes and the caller must retry. See <a href="0024-atomics-and-locks.html">lesson 0024</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Main writes <code>config = load()</code> (plain field), then <code>ready = true</code> (volatile). A worker sees <code>ready == true</code>. Is <code>config</code> guaranteed visible to it?</p>
+  <div class="options">
+    <button class="opt" data-correct>Yes: program order and the volatile edge chain</button>
+    <button class="opt">No: config would need to be volatile as well</button>
+    <button class="opt">Only if the worker calls Thread.yield() first</button>
+    <button class="opt">Only on JDK 21; on JDK 8 it is not guaranteed</button>
+  </div>
+  <div class="why">Happens-before is transitive: write config → write ready → read ready → read config. See <a href="0005-visibility-and-happens-before.html">lesson 0005</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Core 4, max 50, unbounded <code>LinkedBlockingQueue</code>. Under a huge load, how many threads run?</p>
+  <div class="options">
+    <button class="opt" data-correct>4, and the queue keeps growing</button>
+    <button class="opt">50, then tasks start being rejected</button>
+    <button class="opt">54: the core plus the max threads</button>
+    <button class="opt">As many threads as there are tasks</button>
+  </div>
+  <div class="why">An unbounded queue never fills, so max has no effect. This is also the trap of <code>newFixedThreadPool</code>. See <a href="0023-thread-pools-executors.html">lesson 0023</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Two threads each run <code>map.put(k, map.get(k) + 1)</code> on a ConcurrentHashMap. Which fix is correct?</p>
+  <div class="options">
+    <button class="opt" data-correct>map.merge(k, 1, Integer::sum)</button>
+    <button class="opt">Make the map field volatile</button>
+    <button class="opt">Wrap get() in a synchronized block</button>
+    <button class="opt">Check map.size() before calling put</button>
+  </div>
+  <div class="why">Each call is safe, but the get-then-put gap is not. <code>merge</code> does both atomically. See <a href="0025-concurrenthashmap.html">lesson 0025</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>transfer(a, b)</code> locks <code>a</code> then <code>b</code>. Two threads call <code>transfer(x, y)</code> and <code>transfer(y, x)</code>. Best fix?</p>
+  <div class="options">
+    <button class="opt" data-correct>Always lock the account with the smaller ID first</button>
+    <button class="opt">Make both account balance fields volatile</button>
+    <button class="opt">Run every transfer on a bigger thread pool</button>
+    <button class="opt">Use an AtomicInteger for each of the balances</button>
+  </div>
+  <div class="why">Opposite orders make a cycle possible. A stable global order (by ID) prevents it. See <a href="0026-deadlock-and-lock-ordering.html">lesson 0026</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why is a young-generation collection usually short?</p>
+  <div class="options">
+    <button class="opt" data-correct>Most objects there are dead, and it only copies the live ones</button>
+    <button class="opt">It runs at the same time as the old generation collection</button>
+    <button class="opt">It only scans objects that are larger than one megabyte</button>
+    <button class="opt">It is skipped whenever the old generation has free space</button>
+  </div>
+  <div class="why">Most objects die young; a minor GC pays for survivors, not for garbage. See <a href="0007-heap-and-garbage-collection.html">lesson 0007</a>.</div>
+</div>
+
+<h2>2. Mixed task: find the bugs</h2>
+<p>Read this class slowly. It has <strong>at least three bugs</strong>, each from a different lesson. Write them down (line and lesson) before you open the answers.</p>
+<pre><code>class TrafficStats {
+    private boolean running = true;                                   <span class="c">// line 2</span>
+    private final Map&lt;String, Integer&gt; hits = new ConcurrentHashMap&lt;&gt;();
+    private final ExecutorService pool = Executors.newFixedThreadPool(8); <span class="c">// line 4</span>
+
+    void record(String page) {
+        Integer old = hits.get(page);                                 <span class="c">// line 7</span>
+        hits.put(page, old == null ? 1 : old + 1);                    <span class="c">// line 8</span>
+    }
+
+    void reporterLoop() {               <span class="c">// runs in its own thread</span>
+        while (running) { report(); }                                 <span class="c">// line 12</span>
+    }
+    void stop() { running = false; }    <span class="c">// called from another thread</span>
+
+    void merge(Account a, Account b) {
+        synchronized (a) {                                            <span class="c">// line 17</span>
+            synchronized (b) { a.add(b.drain()); }
+        }
+    }
+}</code></pre>
+<details class="qa">
+  <summary>Show the answers</summary>
+  <ol>
+    <li><strong>Line 2 and 12 (lesson 0005):</strong> <code>running</code> is a plain field written by one thread and read in a loop by another. There is no happens-before edge, so the reporter may never stop. Fix: <code>private volatile boolean running</code>.</li>
+    <li><strong>Lines 7 and 8 (lesson 0025):</strong> get-then-put on a ConcurrentHashMap is check-then-act; two threads can lose a hit. Fix: <code>hits.merge(page, 1, Integer::sum)</code>.</li>
+    <li><strong>Line 17 (lesson 0026):</strong> the lock order depends on the argument order. <code>merge(x, y)</code> and <code>merge(y, x)</code> at the same time can deadlock. Fix: lock the account with the smaller ID first.</li>
+    <li><strong>Bonus, line 4 (lesson 0023):</strong> <code>newFixedThreadPool</code> uses an unbounded queue; under load tasks pile up until memory runs out. Fix: a <code>ThreadPoolExecutor</code> with a bounded queue and an explicit rejection policy. If it does fill the heap, the GC log from lesson 0007 shows the "after" value growing.</li>
+  </ol>
+</details>
+
+<h2>The final test: say it in 60 seconds</h2>
+<p>Three questions. Do them one at a time, each with its own timer.</p>
+
+<div class="recall">
+  <p class="prompt">Question 1: <strong>"Is <code>volatile int count; count++</code> thread-safe? What does volatile actually guarantee?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> volatile gives visibility and ordering: a volatile write happens-before every later read.</label></li>
+      <li><label><input type="checkbox"> Without an edge it is a data race: no guarantee the reader ever sees the write.</label></li>
+      <li><label><input type="checkbox"> count++ is read, add, write: not atomic, so updates get lost.</label></li>
+      <li><label><input type="checkbox"> Fix with AtomicInteger (CAS, retries, lock-free) or a lock with unlock in finally.</label></li>
+      <li><label><input type="checkbox"> Several fields that change together need one lock; hot counters: LongAdder.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"No, it isn't. volatile gives visibility and ordering: a write to a volatile field happens-before every later read of it, so readers see the newest value and everything written before it. But count++ is three steps, read, add one, write, and volatile doesn't glue them together, so two threads can read the same value and one increment is lost. I'd use an AtomicInteger, which does compare-and-set and retries if another thread got there first, or a lock if several fields must change together, with unlock in a finally block. For a very hot statistics counter, LongAdder scales better."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Question 2: <strong>"Under load, our service stops responding. Walk me through what you check."</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Take a thread dump (jstack): look for "Found one Java-level deadlock" or many threads blocked on one lock.</label></li>
+      <li><label><input type="checkbox"> Deadlock fix: one global lock order, or tryLock with a timeout.</label></li>
+      <li><label><input type="checkbox"> Check the thread pools: queue size growing, tasks rejected, unbounded queues.</label></li>
+      <li><label><input type="checkbox"> Pool fix: bounded queue plus an explicit policy (e.g. CallerRunsPolicy for back-pressure).</label></li>
+      <li><label><input type="checkbox"> Check the GC log: long or full pauses, "after" value growing (leak), heap size set on purpose.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"First I take a thread dump with jstack, a few seconds apart. If the JVM prints 'Found one Java-level deadlock', I look at which locks each thread holds and fix the order so every path takes them in the same global order, or use tryLock with a timeout. If there's no deadlock, I check what the request threads are doing: if they're all waiting, I look at the thread pools, whether the queue is growing or tasks are being rejected; a newFixedThreadPool has an unbounded queue, so I'd switch to a bounded queue with an explicit rejection policy. In parallel I read the GC log: if pauses are long or full GCs repeat and the after-value keeps growing, live data is piling up, which is a leak or an unbounded cache, and I check that the heap size was set on purpose."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Question 3: <strong>"HashMap vs ConcurrentHashMap, and how does a thread pool decide what to do with a new task?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> HashMap is not synchronized; ConcurrentHashMap is safe per call and reads don't lock.</label></li>
+      <li><label><input type="checkbox"> Check-then-act still races: use merge / compute / computeIfAbsent.</label></li>
+      <li><label><input type="checkbox"> CHM: no nulls, weakly consistent iterators (no ConcurrentModificationException).</label></li>
+      <li><label><input type="checkbox"> Pool: below core → new thread; then queue; queue full → threads up to max; then reject.</label></li>
+      <li><label><input type="checkbox"> Default AbortPolicy throws; an unbounded queue makes max useless.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"HashMap isn't synchronized, so concurrent writes need external locking. ConcurrentHashMap makes every single call thread-safe, gets don't lock, it doesn't allow nulls, and its iterators are weakly consistent, so they never throw ConcurrentModificationException. But a get followed by a put can still lose updates, so I use merge or computeIfAbsent, which run atomically. Those maps are usually updated from a thread pool. When I submit a task, the pool starts a new thread if it has fewer than core threads; otherwise it queues the task; only when the queue is full does it add threads up to max; after that the task is rejected, and the default AbortPolicy throws. With an unbounded queue the max size never matters, which is why I prefer a bounded queue."</em></p>
+  </div>
+</div>
+
+<h2>If you missed questions, re-read</h2>
+<table>
+  <tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+  <tr><td>threads, caches, volatile, happens-before</td><td><a href="0005-visibility-and-happens-before.html">Lesson 0005: visibility and happens-before</a></td></tr>
+  <tr><td>count++, compare-and-set, AtomicInteger, ReentrantLock</td><td><a href="0024-atomics-and-locks.html">Lesson 0024: atomics and locks</a></td></tr>
+  <tr><td>null keys, merge, iterators, check-then-act</td><td><a href="0025-concurrenthashmap.html">Lesson 0025: ConcurrentHashMap</a></td></tr>
+  <tr><td>core, queue, max, rejection policies</td><td><a href="0023-thread-pools-executors.html">Lesson 0023: thread pools</a></td></tr>
+  <tr><td>lock cycles, jstack, lock ordering</td><td><a href="0026-deadlock-and-lock-ordering.html">Lesson 0026: deadlock</a></td></tr>
+  <tr><td>heap defaults, generations, GC log lines</td><td><a href="0007-heap-and-garbage-collection.html">Lesson 0007: heap and GC</a></td></tr>
+</table>
+
+<h2>Now do the exercise</h2>
+<p>Pick the exercise of the lesson where you scored lowest, and do it again without notes:</p>
+<ul>
+  <li><a href="../exercises/0005-remove-volatile.md">Exercise 0005: remove volatile and observe</a> · <a href="../examples/StopFlag.java"><code>StopFlag.java</code></a></li>
+  <li><a href="../exercises/0024-fix-the-counter.md">Exercise 0024: fix the counter</a> · <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a></li>
+  <li><a href="../exercises/0025-word-count-concurrently.md">Exercise 0025: concurrent word count</a> · <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a></li>
+  <li><a href="../exercises/0023-size-a-pool.md">Exercise 0023: size a pool</a> · <a href="../examples/PoolDemo.java"><code>PoolDemo.java</code></a></li>
+  <li><a href="../exercises/0026-find-the-deadlock.md">Exercise 0026: find the deadlock</a> · <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a></li>
+  <li><a href="../exercises/0007-gc-log-reading.md">Exercise 0007: two collectors, one program</a> · <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></li>
+</ul>
+
+<h2>What's next</h2>
+<p>The next section moves to modern Java syntax, starting with <a href="0012-var-and-text-blocks.html">var and text blocks</a>. For more depth on this section later: <a href="0006-virtual-threads.html">virtual threads</a> (how JDK 21 changes thread pools), <a href="0039-concurrent-collections.html">concurrent collections</a>, and <a href="0017-generational-zgc.html">Generational ZGC</a>.</p>
+<p><strong>Read more:</strong> the primary sources of the six lessons, in one place: <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide</a>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Give me five more mixed questions"</em> or <em>"Please check my answer to question 2"</em> (type what you said). Please also tell me your quiz score and your three checklist scores: they tell me which lesson to repeat.</div>
+
+<p><a href="0007-heap-and-garbage-collection.html">← Where your objects live, and who cleans them up</a> &nbsp;|&nbsp; <a href="0012-var-and-text-blocks.html">var and text blocks: less typing, same types →</a></p>
+
+<footer>
+  <p>A review lesson: no new facts. Every fact here comes from lessons 0005, 0024, 0025, 0023, 0026 and 0007, which were checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17: Threads and Locks</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

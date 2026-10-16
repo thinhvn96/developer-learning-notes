@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 11: Your first Java producer and consumer</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Your first Java producer and consumer</h1>
+<p class="meta">Kafka · Lesson 0011 · step 3 of 23 · Foundation · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0011-java-producer-and-consumer.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> write and run a plain Java producer and consumer with <code>kafka-clients</code>, and explain the poll loop, callbacks and thread-safety rules an interviewer will ask about.</div>
+
+<h2>The producer: send is asynchronous</h2>
+<p>"The send() method is asynchronous. When called, it adds the record to a buffer of pending record sends" and returns at once; a background I/O thread ships batches to the brokers.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a> You learn the outcome through the returned <code>Future</code> or a <code>Callback</code>. Callbacks "will generally execute in the I/O thread of the producer and so should be reasonably fast".<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a></p>
+<pre><code>try (Producer&lt;String, String&gt; producer = new KafkaProducer&lt;&gt;(props)) {
+    producer.send(new ProducerRecord&lt;&gt;("orders", "u1", "created"), (meta, ex) -&gt; {
+        if (ex != null) log.error("send failed", ex);       // after retries + delivery.timeout.ms
+        else log.info("p{} offset {}", meta.partition(), meta.offset());
+    });
+    producer.flush();   // block until buffered records are sent
+}</code></pre>
+<p>"The producer is thread safe and sharing a single producer instance across threads will generally be faster" than one per thread.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a> Create one per application and close it on shutdown, otherwise buffered records are lost.</p>
+<h2>The consumer: the poll loop</h2>
+<pre><code>consumer.subscribe(List.of("orders"));
+while (running) {
+    ConsumerRecords&lt;String, String&gt; records = consumer.poll(Duration.ofMillis(500));
+    for (var r : records) process(r);
+    consumer.commitSync();          // process, then commit: at-least-once
+}</code></pre>
+<p>The opposite rule applies: "The consumer is not thread-safe."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a> Use one consumer per thread. <code>poll()</code> is also how the consumer stays in its group: if you take longer than <code>max.poll.interval.ms</code> (default 5 minutes) between polls, the consumer is considered failed and its partitions are reassigned.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+<h2>Run it</h2>
+<p><a href="../examples/java-clients/run.sh"><code>java-clients/run.sh</code></a> copies <code>kafka-clients 4.3.1</code> from the Kafka image and runs the two single-file programs with JDK 21. Real output:</p>
+<pre><code>=== producer
+sent key=u2 value=created  -&gt; partition 0 offset 0
+sent key=u2 value=paid     -&gt; partition 0 offset 1
+sent key=u1 value=created  -&gt; partition 1 offset 0
+sent key=u1 value=paid     -&gt; partition 1 offset 1
+sent key=u3 value=created  -&gt; partition 1 offset 2
+sent key=u1 value=shipped  -&gt; partition 1 offset 3
+=== consumer, classic protocol
+[classic] p0@0 u2=created
+[classic] p0@1 u2=paid
+[classic] p1@0 u1=created
+...</code></pre>
+<p>Look at the producer lines: the code sent <code>u1</code> first, yet the <code>u2</code> callbacks printed first. Order is guaranteed per partition ("Callbacks for records being sent to the same partition are guaranteed to execute in order"<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a>), not across partitions. Every <code>u1</code> event kept its order inside partition 1.</p>
+<div class="aside">Interview answer: "One shared <code>KafkaProducer</code> per service, async send with a callback that logs or metrics failures, <code>flush</code>/<code>close</code> on shutdown. One <code>KafkaConsumer</code> per thread, keep the processing inside <code>max.poll.interval.ms</code>, commit after processing."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Can several threads share one KafkaProducer?</p>
+  <button>No, one per thread</button>
+  <button data-correct>Yes, it is thread-safe</button>
+  <button>Only with acks zero</button>
+  <button>Only inside a lock</button>
+  <p class="explain">The Javadoc says the producer is thread safe and sharing one instance is generally faster.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. What does producer.send() do when called?</p>
+  <button data-correct>Buffers, returns early</button>
+  <button>Opens a new socket</button>
+  <button>Blocks until written</button>
+  <button>Commits an offset</button>
+  <p class="explain">send() adds the record to a buffer of pending sends and returns immediately.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Can several threads share one KafkaConsumer?</p>
+  <button data-correct>No, one per thread</button>
+  <button>Only for poll calls</button>
+  <button>Only when paused</button>
+  <button>Yes, it is thread-safe</button>
+  <p class="explain">The consumer is not thread-safe.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Processing takes longer than max.poll.interval.ms. Result?</p>
+  <button>Producer slows down</button>
+  <button>Records are deleted</button>
+  <button data-correct>Partitions reassigned</button>
+  <button>Nothing happens</button>
+  <p class="explain">The consumer is considered failed and the group rebalances its partitions.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0011-write-a-java-client.md">Exercise 0011: write a Java client</a></p>
+<p>Runnable example: <a href="../examples/java-clients/run.sh"><code>run.sh</code></a></p>
+<p>Runnable example: <a href="../examples/java-clients/OrderProducer.java"><code>OrderProducer.java</code></a></p>
+<p>Runnable example: <a href="../examples/java-clients/OrderConsumer.java"><code>OrderConsumer.java</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a>. Read the class description, then the KafkaConsumer Javadoc sections on the poll loop and multi-threaded processing.</p>
+<p><a href="0002-producers-keys-and-acks.html">← Producers, keys and acks</a> &nbsp;|&nbsp; <a href="0007-retention-and-topic-configs.html">Retention and topic configuration →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a> · [2] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [3] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

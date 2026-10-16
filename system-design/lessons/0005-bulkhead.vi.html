@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 5: Pattern bulkhead</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pattern bulkhead</h1>
+<p class="meta">System Design · Bài 0005 · bước 4/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-bulkhead.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được pattern bulkhead và chứng minh một dependency chậm có thể làm cạn kiệt một pool dùng chung.</div>
+
+<h2>Ý tưởng</h2>
+<p>"Cô lập các thành phần của ứng dụng vào các pool, để nếu một thành phần gặp sự cố thì các thành phần khác vẫn tiếp tục hoạt động." Tên gọi lấy từ các khoang ngăn cách trong thân tàu thủy. Vấn đề: một consumer gọi tới một service không phản hồi có thể dùng hết connection pool của nó, và khi đó các lời gọi tới những service <em>khác</em> cũng thất bại theo.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+<h2>Cách làm</h2>
+<p>Cho mỗi dependency một pool riêng (connection, thread hoặc semaphore); chia các instance của service theo tải của consumer và yêu cầu về tính sẵn sàng. Lợi ích: cô lập các sự cố dây chuyền, giữ lại được một phần chức năng, cho phép các mức chất lượng dịch vụ khác nhau. Nên cân nhắc kết hợp với retry, circuit breaker và throttling; dùng container hoặc process để phân vùng service; ưu tiên giới hạn có sẵn của nền tảng (ví dụ resource limit của Kubernetes) thay vì tự chế lại.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+<pre><code>java system-design/examples/BulkheadDemo.java
+shared pool of 4 threads   : healthy calls took 2010 ms (stuck behind the slow service)
+separate pools (bulkheads) : healthy calls took 20 ms</code></pre>
+<p>Bốn lời gọi 2 giây tới một service chậm đã lấp đầy pool dùng chung, nên bốn lời gọi 10 ms tới một service khỏe mạnh phải chờ khoảng 2 giây. Pool tách riêng giữ chúng ở mức khoảng 20 ms. Mã nguồn: <a href="../examples/BulkheadDemo.java"><code>BulkheadDemo.java</code></a>. Liên quan: <a href="../../java/lessons/0023-thread-pools-executors.vi.html">thread pool</a> và <a href="../../kubernetes/lessons/0005-requests-limits-and-the-jvm.vi.html">requests và limits</a> của Kubernetes như những bulkhead ở cấp container.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Bulkhead cô lập...?</p>
+  <button>Chỉ database</button>
+  <button data-correct>Tài nguyên theo từng dependency</button>
+  <button>Chỉ queue</button>
+  <button>Log</button>
+  <p class="explain">Các thành phần được cô lập vào các pool để sự cố không lan dây chuyền.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Service chậm và pool dùng chung. Ảnh hưởng tới lời gọi khỏe?</p>
+  <button data-correct>Chúng cũng bị chậm theo</button>
+  <button>Không bị ảnh hưởng gì</button>
+  <button>Chúng fail fast</button>
+  <button>Chúng chạy nhanh hơn</button>
+  <p class="explain">Trong demo, các lời gọi khỏe mất khoảng 2 giây khi dùng pool chung.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cơ chế để xây bulkhead?</p>
+  <button>Chỉ firewall</button>
+  <button data-correct>Thread pool, semaphore, container</button>
+  <button>Chỉ DNS</button>
+  <button>Chỉ cache</button>
+  <p class="explain">Tài liệu nêu process, thread pool, semaphore và container.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái giá của bulkhead?</p>
+  <button>Build chậm hơn</button>
+  <button>Bảo mật yếu hơn</button>
+  <button data-correct>Dùng tài nguyên kém hiệu quả hơn</button>
+  <button>Không giám sát được</button>
+  <p class="explain">Pattern này có thể không phù hợp khi không chấp nhận được việc dùng tài nguyên kém hiệu quả hơn.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-size-the-bulkheads.vi.md">Bài tập 0005: định cỡ các bulkhead</a></p>
+<p>Ví dụ chạy được: <a href="../examples/BulkheadDemo.java"><code>BulkheadDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">Azure: Bulkhead pattern</a>. Phần giải pháp và các điểm cần cân nhắc.</p>
+<p><a href="0004-circuit-breaker.vi.html">← Pattern circuit breaker</a> &nbsp;|&nbsp; <a href="0006-rate-limiting.vi.html">Rate limiting và token bucket →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead">Azure: Bulkhead pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 5: Thứ tự khởi tạo: static block, field, constructor</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Thứ tự khởi tạo: static block, field, constructor</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0005 · bước 6/22 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-initialization-order.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dự đoán chính xác thứ tự chạy của static block, field initializer, instance block và constructor trong một hệ thống class kế thừa.</div>
+
+<h2>Các thành phần</h2>
+<ul><li><strong>Static initialization block</strong> chạy theo thứ tự trong mã nguồn khi class được khởi tạo.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[1]</a></li>
+<li><strong>Instance initializer block</strong> "trông y hệt static initializer block, chỉ là không có từ khoá static"; compiler sẽ chép chúng vào mọi constructor.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[1]</a></li></ul>
+<h2>Thứ tự (quan sát thực tế)</h2>
+<pre><code>java oop/examples/InitializationOrder.java
+main starts
+1 Parent static block
+2 Child static block
+3 Parent field initializer
+4 Parent instance block
+5 Parent constructor
+6 Child field initializer
+7 Child instance block
+8 Child constructor
+--- second object: static parts do not run again
+3 Parent field initializer
+4 Parent instance block
+5 Parent constructor
+6 Child field initializer
+7 Child instance block
+8 Child constructor</code></pre>
+<p>Đọc output: phần static của class cha, rồi tới của class con (mỗi class một lần); sau đó, với mỗi lần <code>new Child()</code>: field initializer và instance block của class cha, constructor của class cha, rồi tới field initializer, instance block và constructor của class con. Tutorial chỉ mô tả các block; thứ tự đầy đủ ở trên là những gì chương trình này in ra trên JDK 21. Mã nguồn: <a href="../examples/InitializationOrder.java"><code>InitializationOrder.java</code></a>.</p>
+<div class="aside">Bẫy phỏng vấn: gọi một method có thể override từ trong constructor. Constructor của class cha chạy trước khi các field của class con được khởi tạo, nên bản override có thể nhìn thấy giá trị mặc định (một rủi ro ai cũng biết; hãy tự tái hiện nó trong bài tập).</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Với một new Child, cái gì chạy đầu tiên?</p>
+  <button>Field initializer của Child</button>
+  <button data-correct>Static block của Parent (lần dùng đầu)</button>
+  <button>Constructor của Child</button>
+  <button>Constructor của Parent</button>
+  <p class="explain">Khởi tạo class diễn ra trước; class cha trước class con.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một static block chạy bao nhiêu lần?</p>
+  <button>Mỗi object một lần</button>
+  <button>Không bao giờ</button>
+  <button>Mỗi object hai lần</button>
+  <button data-correct>Mỗi class một lần</button>
+  <p class="explain">Object thứ hai trong demo không chạy lại static block.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Compiler chép instance initializer block vào...?</p>
+  <button data-correct>Mọi constructor</button>
+  <button>Chỉ main</button>
+  <button>Các static method</button>
+  <button>Các interface</button>
+  <p class="explain">Đó là cách chúng được dùng chung giữa các constructor.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Constructor của Parent so với field initializer của Child?</p>
+  <button>Ngẫu nhiên</button>
+  <button data-correct>Constructor của Parent trước</button>
+  <button>Xen kẽ nhau</button>
+  <button>Initializer của Child trước</button>
+  <p class="explain">Output cho thấy bước 5 (ctor cha) chạy trước bước 6 (field con).</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-constructor-trap.vi.md">Bài tập 5: cái bẫy constructor</a></p>
+<p>Ví dụ chạy được: <a href="../examples/InitializationOrder.java"><code>InitializationOrder.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">Java Tutorials: Initializing Fields</a>. Static và instance initialization block.</p>
+<p><a href="0006-inheritance.vi.html">← Kế thừa: extends, super và quan hệ is-a</a> &nbsp;|&nbsp; <a href="0007-overriding-and-hiding.vi.html">Override và hiding →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/initial.html">Java Tutorials: Initializing Fields</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

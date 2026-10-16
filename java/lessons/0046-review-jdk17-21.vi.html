@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 46: Ôn tập 7: JDK 17 và 21 đã thêm gì</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ôn tập 7: JDK 17 và 21 đã thêm gì</h1>
+<p class="subtitle">Chín bài, một dòng thời gian: các tính năng ngôn ngữ bạn viết mỗi ngày kể từ 17, và bốn thay đổi lớn của 21.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0046 · bước 46/46 · Review · ~30 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0046-review-jdk17-21.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Người phỏng vấn rất thích hỏi <em>"Java đã thay đổi gì kể từ 8?"</em> và <em>"Vì sao nên nâng cấp lên 21?"</em> Câu trả lời nhảy qua lại giữa các phiên bản và chủ đề: một record, rồi virtual thread, rồi một flag GC. Bài ôn tập này trộn các bài <a href="0012-var-and-text-blocks.vi.html">0012</a>, <a href="0013-switch-expressions-and-instanceof-patterns.vi.html">0013</a>, <a href="0003-records-and-immutability.vi.html">0003</a>, <a href="0014-sealed-classes.vi.html">0014</a>, <a href="0027-helpful-nullpointerexceptions.vi.html">0027</a>, <a href="0015-pattern-matching-switch-and-record-patterns.vi.html">0015</a>, <a href="0016-sequenced-collections.vi.html">0016</a>, <a href="0006-virtual-threads.vi.html">0006</a> và <a href="0017-generational-zgc.vi.html">0017</a> theo đúng cách đó. Ở đây không có kiến thức mới.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> trả lời đúng ít nhất 11 trên 13 câu hỏi trộn, tìm ra ba lỗi trong bài tập trộn, và nói đủ cả ba câu trả lời 60 giây, mỗi câu đạt ít nhất 5 ý trong checklist.</div>
+
+<dl class="words">
+  <dt>LTS</dt><dd>"Long-term support" (hỗ trợ dài hạn): bản phát hành được các vendor vá lỗi trong nhiều năm. JDK 8, 17 và 21 là những bản các công ty chạy trên production.</dd>
+  <dt>final (feature)</dt><dd>Tính năng đã hoàn thiện và cố định trong một bản phát hành, không phải bản "preview" phải tự bật.</dd>
+  <dt>record</dt><dd>Một class chỉ để chở dữ liệu; Java tự viết constructor, accessor, <code>equals</code>, <code>hashCode</code> và <code>toString</code> (bài 0003).</dd>
+  <dt>sealed type</dt><dd>Class hoặc interface liệt kê mọi subtype được phép bằng <code>permits</code> (bài 0014).</dd>
+  <dt>pattern</dt><dd>Một phép thử trong <code>instanceof</code> hoặc <code>case</code>, kiểm tra hình dạng và đặt tên cho các phần, như <code>String s</code> hay <code>Point(int x, int y)</code>.</dd>
+  <dt>virtual thread</dt><dd>Thread Java rẻ, chỉ mượn một OS thread thật trong lúc chạy code (bài 0006).</dd>
+  <dt>generation</dt><dd>Một phần của heap dành cho object trẻ hoặc già; generational ZGC tách riêng chúng (bài 0017).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Không nhìn lại bài cũ, hãy kể <strong>một tính năng cho mỗi bản</strong>: 10, 14, 15, 16, 17 và 21. Rồi ghi lại bạn chắc chắn bao nhiêu (0 tới 100%). Cuối bài, so với điểm của bạn: khoảng cách giữa "chắc chắn" và "đúng" chính là thứ bài ôn tập sửa.</p>
+
+<h2>1. Một dòng thời gian cho tất cả</h2>
+<p>Hãy nghĩ tới một ngôi nhà được sửa từng phòng một. Nếu bạn chỉ ghé vào những ngày khánh thành, bạn bỏ lỡ phần việc ở giữa. Các công ty nhảy từ LTS này sang LTS kế tiếp (8, rồi 17, rồi 21), nên "JDK 17" nghĩa là <em>mọi</em> tính năng đã chính thức cho tới 17, không chỉ những gì riêng bản 17 thêm vào (bài 0013).</p>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Dòng thời gian: JDK 10 var; JDK 14 switch expression và helpful NullPointerException; JDK 15 text block và ZGC chính thức; JDK 16 record và instanceof pattern; JDK 17 sealed class; JDK 21 pattern matching cho switch, record pattern, sequenced collection, virtual thread và generational ZGC. Mọi thứ từ 10 tới 17 đều có trong JDK 17.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <path d="M30 80h620" stroke="currentColor" fill="none"/>
+    <g stroke="currentColor"><path d="M40 74v12M120 74v12M215 74v12M300 74v12M385 74v12"/></g>
+    <g stroke="var(--accent)" stroke-width="2"><path d="M470 70v20M600 70v20"/></g>
+    <path d="M120 44v-8h350v8" fill="none" stroke="var(--accent)"/>
+    <text x="295" y="28" text-anchor="middle" font-size="11" fill="var(--accent)">tất cả đều có trong JDK 17</text>
+    <g text-anchor="middle">
+      <text x="40" y="66">8</text>
+      <text x="120" y="66">10</text>
+      <text x="215" y="66">14</text>
+      <text x="300" y="66">15</text>
+      <text x="385" y="66">16</text>
+      <text x="470" y="62" fill="var(--accent)">17 LTS</text>
+      <text x="600" y="62" fill="var(--accent)">21 LTS</text>
+    </g>
+    <g text-anchor="middle" font-size="10">
+      <text x="40" y="104" opacity=".6">LTS</text>
+      <text x="120" y="104">var</text>
+      <text x="215" y="104">switch expr</text>
+      <text x="215" y="119">helpful NPE</text>
+      <text x="300" y="104">text blocks</text>
+      <text x="300" y="119">ZGC product</text>
+      <text x="385" y="104">records</text>
+      <text x="385" y="119">instanceof</text>
+      <text x="470" y="104">sealed</text>
+    </g>
+    <g text-anchor="middle" font-size="10" fill="var(--accent)">
+      <text x="600" y="104">pattern switch</text>
+      <text x="600" y="119">record patterns</text>
+      <text x="600" y="134">sequenced coll.</text>
+      <text x="600" y="149">virtual threads</text>
+      <text x="600" y="164">generational ZGC</text>
+    </g>
+    <text x="340" y="196" text-anchor="middle" font-size="11" opacity=".8">bản phát hành mà mỗi tính năng trở thành chính thức</text>
+  </g>
+</svg>
+<figcaption>JDK 17 gom công sức ngôn ngữ của năm bản phát hành; JDK 21 thêm bốn mảnh lớn lên trên.</figcaption>
+</figure>
+
+<p>Bản đồ nhanh của chín bài:</p>
+<table>
+<tr><th>Tính năng</th><th>Chính thức ở</th><th>Một dòng cần nhớ</th><th>Bài</th></tr>
+<tr><td><code>var</code></td><td>10</td><td>chỉ cho biến local có giá trị khởi tạo; vẫn là kiểu tĩnh</td><td><a href="0012-var-and-text-blocks.vi.html">0012</a></td></tr>
+<tr><td>text block</td><td>15</td><td><code>"""</code> + xuống dòng; phần thụt lề chung bị bỏ đi</td><td><a href="0012-var-and-text-blocks.vi.html">0012</a></td></tr>
+<tr><td>switch expression</td><td>14</td><td><code>-&gt;</code> không bao giờ fall-through; <code>yield</code> trả về từ một block; exhaustive</td><td><a href="0013-switch-expressions-and-instanceof-patterns.vi.html">0013</a></td></tr>
+<tr><td><code>instanceof</code> pattern</td><td>16</td><td>kiểm tra và cast trong một bước; biến có phạm vi ở nơi chắc chắn đã khớp</td><td><a href="0013-switch-expressions-and-instanceof-patterns.vi.html">0013</a></td></tr>
+<tr><td>record</td><td>16</td><td>equals/hashCode từ mọi component; bất biến <em>nông</em> (shallow)</td><td><a href="0003-records-and-immutability.vi.html">0003</a></td></tr>
+<tr><td>sealed class</td><td>17</td><td><code>permits</code>; mỗi subtype là final, sealed hoặc non-sealed</td><td><a href="0014-sealed-classes.vi.html">0014</a></td></tr>
+<tr><td>helpful NPE</td><td>14</td><td>thông báo nêu tên thứ bị null; trên 21 không cần flag</td><td><a href="0027-helpful-nullpointerexceptions.vi.html">0027</a></td></tr>
+<tr><td>pattern switch, record pattern</td><td>21</td><td>type pattern và record pattern trong <code>case</code>, <code>when</code>, <code>case null</code>, không cần default với sealed</td><td><a href="0015-pattern-matching-switch-and-record-patterns.vi.html">0015</a></td></tr>
+<tr><td>sequenced collection</td><td>21</td><td><code>getFirst</code>, <code>getLast</code>, view <code>reversed()</code></td><td><a href="0016-sequenced-collections.vi.html">0016</a></td></tr>
+<tr><td>virtual thread</td><td>21</td><td>mở rộng quy mô, không phải tốc độ; không pool; Semaphore để giới hạn</td><td><a href="0006-virtual-threads.vi.html">0006</a></td></tr>
+<tr><td>generational ZGC</td><td>21</td><td><code>-XX:+UseZGC -XX:+ZGenerational</code>; object trẻ chết sớm</td><td><a href="0017-generational-zgc.vi.html">0017</a></td></tr>
+</table>
+
+<h2>2. Bộ ba mô hình hoá: record + sealed + pattern switch</h2>
+<p>Ba bài thật ra là một ý tưởng. <strong>Record</strong> nói một biến thể chứa <em>dữ liệu gì</em>. Interface <strong>sealed</strong> nói <em>có những biến thể nào</em>. <strong>Pattern switch</strong> xử lý từng biến thể, và compiler kiểm tra bạn đã xử lý đủ. Hãy nghĩ tới một thực đơn có danh sách món cố định, mỗi món có một thẻ công thức riêng: nhà bếp có thể kiểm tra món nào cũng có người nấu.</p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Một sealed interface Shape permit hai record là Circle và Rect. Một switch trên Shape có một case cho mỗi record và không có default, vì compiler biết đủ danh sách từ permits.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="150" y="20" width="380" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="43" text-anchor="middle" fill="var(--accent)">sealed interface Shape permits Circle, Rect</text>
+    <text x="545" y="43" font-size="10" opacity=".7">0014</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="40" y="94" width="270" height="36" rx="6"/>
+      <rect x="370" y="94" width="270" height="36" rx="6"/>
+      <path d="M260 56L175 94M420 56L505 94"/>
+    </g>
+    <text x="175" y="117" text-anchor="middle">record Circle(Point c, double r)</text>
+    <text x="505" y="117" text-anchor="middle">record Rect(Point a, Point b)</text>
+    <text x="340" y="84" text-anchor="middle" font-size="10" opacity=".7">permits · record là final · 0003</text>
+    <rect x="40" y="166" width="600" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <g fill="none" stroke="currentColor"><path d="M175 130v30M170 154l5 6 5-6M505 130v30M500 154l5 6 5-6"/></g>
+    <text x="56" y="188" style="white-space:pre">switch (s) {  case Circle(var c, var r) -&gt; ...</text>
+    <text x="56" y="208" style="white-space:pre">              case Rect(var a, var b)   -&gt; ...  }</text>
+    <text x="630" y="198" text-anchor="end" font-size="11" fill="var(--accent)">không default · 0015</text>
+  </g>
+</svg>
+<figcaption>Sealed liệt kê các biến thể, record giữ dữ liệu, pattern switch xử lý từng cái. Thêm record thứ ba là mọi switch không có <code>default</code> sẽ không compile được.</figcaption>
+</figure>
+
+<p>Cách cũ đặt cạnh cách mới, cho cùng một việc:</p>
+<pre><code><span class="c">// JDK 8: open class hierarchy, test and cast, a default "just in case"</span>
+if (s instanceof Circle) { Circle c = (Circle) s; return Math.PI * c.r() * c.r(); }
+else if (s instanceof Rect) { Rect r = (Rect) s; return ...; }
+else throw new IllegalStateException("unknown shape");
+
+<span class="c">// JDK 17: sealed + records + instanceof patterns</span>
+<span class="c">//         (switching on types is not allowed yet)</span>
+if (s instanceof Circle c) return Math.PI * c.r() * c.r();
+
+<span class="c">// JDK 21: pattern switch, exhaustive, no default</span>
+return switch (s) {
+    case Circle(var c, var r) -&gt; Math.PI * r * r;
+    case Rect(var a, var b)   -&gt; ...;
+};</code></pre>
+<p>Hai cái bẫy nối các bài với nhau. Record chỉ bất biến <em>nông</em>, nên component kiểu <code>List</code> cần <code>List.copyOf</code> trong compact constructor (0003). Và một <code>switch</code> không có <code>case null</code> vẫn ném <code>NullPointerException</code>; trên 17 và 21, thông báo của nó cho biết biểu thức nào bị null (0015, 0027).</p>
+
+<h2>3. Cặp đôi runtime: virtual thread và generational ZGC</h2>
+<p>Hai thay đổi còn lại của JDK 21 không đổi cú pháp của bạn; chúng thay đổi cách JVM chạy code của bạn. Cả hai trả lời cùng một chủ đề phỏng vấn: <em>throughput và latency</em>.</p>
+<table>
+<tr><th></th><th>Virtual thread (0006)</th><th>Generational ZGC (0017)</th></tr>
+<tr><td>Cải thiện</td><td>throughput của code blocking, nặng I/O</td><td>chi phí GC và allocation stall, với pause dưới 1 ms</td></tr>
+<tr><td>Cách làm</td><td>unmount khỏi carrier trong lúc bị block</td><td>thu gom young generation thường xuyên; đa số object chết sớm</td></tr>
+<tr><td>Bật lên (JDK 21)</td><td><code>Executors.newVirtualThreadPerTaskExecutor()</code></td><td><code>-XX:+UseZGC -XX:+ZGenerational</code></td></tr>
+<tr><td>Không giúp được</td><td>việc nặng CPU: không phải thread nhanh hơn</td><td>heap nhỏ không có dư địa; job batch chỉ cần throughput</td></tr>
+<tr><td>Bẫy</td><td>pool chúng; I/O lâu trong <code>synchronized</code> pin carrier</td><td>trên 21, chỉ <code>-XX:+UseZGC</code> là chế độ không generational</td></tr>
+</table>
+
+<h2>4. Bài tập trộn: tìm ba lỗi</h2>
+<p>Đọc đoạn code JDK 21 này như một reviewer. Có ba lỗi, mỗi lỗi từ một bài khác nhau. Hãy tìm chúng, gọi tên bài, và nói cách sửa <em>trước khi</em> mở đáp án.</p>
+<pre><code>sealed interface Payment permits Card, Transfer {}
+
+<span class="c">// (A) a card is a value object: nobody may change it after creation</span>
+record Card(String number, List&lt;String&gt; tags) implements Payment {}
+record Transfer(String iban) implements Payment {}
+
+<span class="c">// (B) label every payment</span>
+static String label(Payment p) {
+    return switch (p) {
+        case Payment x  -&gt; "payment";
+        case Card c     -&gt; "card " + c.number();
+        case Transfer t -&gt; "transfer " + t.iban();
+    };
+}
+
+<span class="c">// (C) the bank API allows at most 10 calls at once</span>
+ExecutorService calls = Executors.newFixedThreadPool(10, Thread.ofVirtual().factory());</code></pre>
+<details class="qa">
+<summary>Hiện ba lỗi</summary>
+<div class="ans">
+<p><strong>(B) Bài 0015.</strong> Các case được thử từ trên xuống, và <code>case Payment x</code> khớp với mọi thứ, nên các case sau bị lấn át (dominated). Nó thậm chí không compile; mình đã kiểm tra trên JDK 21: "this case label is dominated by a preceding case label". Cách sửa: xoá case tổng quát. Vì <code>Payment</code> là sealed, <code>Card</code> và <code>Transfer</code> đã bao phủ đủ, không cần default.</p>
+<p><strong>(A) Bài 0003.</strong> Record chỉ bất biến nông. Bên gọi vẫn giữ list <code>tags</code> và có thể thêm vào, thế là thẻ "bị đổi". Cách sửa: compact constructor <code>Card { tags = List.copyOf(tags); }</code>.</p>
+<p><strong>(C) Bài 0006.</strong> Đó là một pool virtual thread, dùng để giới hạn mức đồng thời. "Đừng bao giờ pool virtual thread"; hãy giới hạn bằng <code>Semaphore</code>: <code>new Semaphore(10)</code>, <code>acquire()</code> trước lời gọi, <code>release()</code> trong <code>finally</code>, và chạy mỗi task trên <code>newVirtualThreadPerTaskExecutor()</code>.</p>
+</div>
+</details>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Ở đâu KHÔNG được dùng <code>var</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Làm kiểu của tham số method</button>
+    <button class="opt">Cho biến local có giá trị khởi tạo</button>
+    <button class="opt">Cho biến chỉ số của vòng lặp for</button>
+    <button class="opt">Cho biến local trong thân lambda</button>
+  </div>
+  <div class="why"><code>var</code> chỉ dành cho biến local có giá trị khởi tạo và chỉ số vòng lặp; không cho tham số, field, kiểu trả về hay tham số catch. Xem bài 0012.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một <code>switch</code> trên <code>Shape</code> sealed có case cho mọi record được phép. Trên JDK 21, có cần <code>default</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không; compiler biết đủ danh sách từ permits</button>
+    <button class="opt">Có; mọi switch trên object đều phải có default</button>
+    <button class="opt">Chỉ khi các record có nhiều hơn một component</button>
+    <button class="opt">Chỉ khi switch là statement, không phải expression</button>
+  </div>
+  <div class="why">Switch dùng pattern phải exhaustive, và với kiểu sealed việc kiểm tra dùng mệnh đề <code>permits</code>. Xem bài 0015 và 0014.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>record Team(String name, List&lt;String&gt; members)</code>. Bên gọi giữ lại list đã truyền vào và thêm một tên. Team thấy gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Thấy tên mới, vì record chỉ bất biến nông</button>
+    <button class="opt">Không thấy gì mới, vì field của record là private final</button>
+    <button class="opt">Một exception, vì record cấm component có thể thay đổi</button>
+    <button class="opt">Không thấy gì mới, vì record tự copy các component</button>
+  </div>
+  <div class="why">Field là final, nhưng nó trỏ tới cùng một list có thể thay đổi. Sửa bằng <code>List.copyOf</code> trong compact constructor. Xem bài 0003.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Service của bạn chạy 10.000 lời gọi HTTP blocking trên virtual thread, nhưng đối tác chỉ cho 20 lời gọi cùng lúc. Bạn thêm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một Semaphore có 20 permit</button>
+    <button class="opt">Một pool cố định 20 virtual thread</button>
+    <button class="opt">Một block synchronized quanh lời gọi</button>
+    <button class="opt">Chuyển sang dùng -XX:+ZGenerational</button>
+  </div>
+  <div class="why">Đừng pool virtual thread; giới hạn mức đồng thời bằng <code>Semaphore</code>. Block <code>synchronized</code> chỉ cho một lời gọi và còn pin carrier trên 21. Xem bài 0006.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Từ khoá nào mở lại một nhánh của cây sealed để ai cũng có thể extend?</p>
+  <div class="options">
+    <button class="opt" data-correct>non-sealed</button>
+    <button class="opt">permits</button>
+    <button class="opt">final</button>
+    <button class="opt">open</button>
+  </div>
+  <div class="why">Mỗi subtype được phép phải là <code>final</code>, <code>sealed</code> hoặc <code>non-sealed</code>; <code>non-sealed</code> mở lại nhánh đó. Xem bài 0014.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn khởi động một service JDK 21 chỉ với <code>-XX:+UseZGC</code>. Collector nào chạy?</p>
+  <div class="options">
+    <button class="opt" data-correct>ZGC không generational</button>
+    <button class="opt">ZGC có generational</button>
+    <button class="opt">G1, collector mặc định</button>
+    <button class="opt">Collector Serial</button>
+  </div>
+  <div class="why">Trên JDK 21 bạn cần <code>-XX:+UseZGC -XX:+ZGenerational</code> cho chế độ generational. Xem bài 0017.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Arrow label <code>case 6, 7 -&gt; "weekend";</code> làm gì sau khi chạy xong?</p>
+  <div class="options">
+    <button class="opt" data-correct>Dừng lại; arrow label không bao giờ fall-through</button>
+    <button class="opt">Fall-through sang case label tiếp theo</button>
+    <button class="opt">Cần break, nếu không case sau sẽ chạy</button>
+    <button class="opt">Chỉ trả về nếu bạn viết thêm yield</button>
+  </div>
+  <div class="why">Với <code>-&gt;</code> chỉ code bên phải chạy. <code>yield</code> dùng để trả giá trị từ một block. Xem bài 0013.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>rev = list.reversed()</code> trên <code>[1, 2, 3]</code>, rồi <code>list.add(4)</code>. <code>rev</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>[4, 3, 2, 1]</button>
+    <button class="opt">[3, 2, 1]</button>
+    <button class="opt">[1, 2, 3, 4]</button>
+    <button class="opt">[3, 2, 1, 4]</button>
+  </div>
+  <div class="why"><code>reversed()</code> trả về một view, không phải bản copy, nên nó thấy phần tử mới. Xem bài 0016.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trên JDK 21 bạn thấy <code>Cannot invoke "String.trim()" because "&lt;local2&gt;[0]" is null</code>. Vì sao là <code>&lt;local2&gt;</code> chứ không phải tên biến?</p>
+  <div class="options">
+    <button class="opt" data-correct>Class được compile không có debug info (-g)</button>
+    <button class="opt">Helpful NPE mặc định đang bị tắt</button>
+    <button class="opt">JVM không bao giờ biết tên biến local</button>
+    <button class="opt">Mảng được tạo ở một thread khác</button>
+  </div>
+  <div class="why">Tên biến local cần debug info; với <code>javac -g</code> thông báo sẽ là <code>"names[0]"</code>. Bản thân thông báo không cần flag trên 21. Xem bài 0027.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Việc nào được lợi nhiều nhất từ virtual thread?</p>
+  <div class="options">
+    <button class="opt" data-correct>Server mà mỗi request phải chờ database</button>
+    <button class="opt">Job resize hàng nghìn ảnh trong bộ nhớ</button>
+    <button class="opt">Vòng lặp tính số nguyên tố tới một tỉ</button>
+    <button class="opt">Chương trình sort một mảng rất lớn một lần</button>
+  </div>
+  <div class="why">Virtual thread cho khả năng mở rộng với việc blocking, không cho tốc độ với việc nặng CPU. Xem bài 0006.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Selector của một <code>switch</code> JDK 21 là <code>null</code>; switch có <code>default</code> nhưng không có <code>case null</code>. Kết quả?</p>
+  <div class="options">
+    <button class="opt" data-correct>NullPointerException</button>
+    <button class="opt">Nhánh default chạy</button>
+    <button class="opt">Switch bị bỏ qua</button>
+    <button class="opt">Lỗi lúc compile</button>
+  </div>
+  <div class="why">Không có <code>case null</code> thì switch ném NPE "như trước đây"; <code>default</code> không bắt null. Xem bài 0015.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Sau <code>if (!(obj instanceof String s)) return;</code>, dòng tiếp theo có dùng được <code>s</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Có; ở đó chắc chắn đã khớp, nên s nằm trong phạm vi</button>
+    <button class="opt">Không; s chỉ tồn tại bên trong câu lệnh if</button>
+    <button class="opt">Không; pattern bị phủ định không khai báo s</button>
+    <button class="opt">Có, nhưng phải cast tường minh sang String</button>
+  </div>
+  <div class="why">Flow scoping: biến pattern có phạm vi ở nơi chắc chắn đã khớp, kể cả sau một lệnh return sớm có phủ định. Xem bài 0013.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao generational ZGC thu gom young generation thường xuyên hơn?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đa số object chết sớm, nên dọn ở đó giải phóng nhiều nhất</button>
+    <button class="opt">Object trẻ lớn hơn, nên chúng làm đầy heap trước</button>
+    <button class="opt">Old generation không thể thu gom trong lúc chạy</button>
+    <button class="opt">Object trẻ không bao giờ bị object già trỏ tới</button>
+  </div>
+  <div class="why">Giả thuyết thế hệ yếu: object trẻ thường chết sớm. Con trỏ từ old sang young vẫn có; remembered set theo dõi chúng. Xem bài 0017.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Câu 1. Người phỏng vấn hỏi: <strong>"Từ Java 8 tới 17 có gì thay đổi mà bạn dùng hằng ngày?"</strong> Bấm giờ. Trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>var</code> (10): suy luận kiểu cho biến local, vẫn là kiểu tĩnh, chỉ dùng cho local.</label></li>
+      <li><label><input type="checkbox"> Text block (15): chuỗi nhiều dòng không phải escape dấu nháy.</label></li>
+      <li><label><input type="checkbox"> Switch expression (14): mũi tên không fall-through, <code>yield</code>, exhaustive.</label></li>
+      <li><label><input type="checkbox"> <code>instanceof</code> pattern (16): kiểm tra và cast trong một bước.</label></li>
+      <li><label><input type="checkbox"> Record (16): sinh sẵn equals/hashCode/toString; bất biến nông.</label></li>
+      <li><label><input type="checkbox"> Sealed class (17): tập subtype đóng với <code>permits</code>.</label></li>
+      <li><label><input type="checkbox"> Helpful NPE (14): thông báo nêu tên thứ bị null.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Từ 8 lên 17 chủ yếu thay đổi lượng code em phải viết. Em dùng <code>var</code> cho biến local khi vế phải đã rõ kiểu; nó vẫn là static typing. Text block cho em dán JSON hay SQL mà không phải escape. Switch trở thành expression với arrow label, nên không còn chuyện quên <code>break</code>, và nó phải exhaustive. <code>instanceof</code> giờ vừa check vừa cast trong một bước. Record thay gần hết boilerplate của DTO, equals và hashCode lấy từ mọi component, nhưng nó chỉ bất biến nông, nên em copy list trong compact constructor. Sealed class cho em đóng một hierarchy bằng <code>permits</code>. Còn trên production, NullPointerException giờ nói rõ biểu thức nào bị null, đỡ mất rất nhiều thời gian debug."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 2. Người phỏng vấn hỏi: <strong>"Record, sealed type và pattern matching phối hợp với nhau thế nào trong Java 21?"</strong> Bấm giờ. Trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Sealed interface liệt kê các biến thể bằng <code>permits</code>.</label></li>
+      <li><label><input type="checkbox"> Mỗi biến thể là một record chứa dữ liệu của nó (record mặc định là final).</label></li>
+      <li><label><input type="checkbox"> Pattern switch xử lý từng biến thể; record pattern lấy field ra, kể cả lồng nhau.</label></li>
+      <li><label><input type="checkbox"> Switch exhaustive: không cần default; biến thể mới làm hỏng compile đúng chỗ cần xử lý.</label></li>
+      <li><label><input type="checkbox"> Case khớp đầu tiên thắng; case bị lấn át là lỗi compile; <code>when</code> thêm guard.</label></li>
+      <li><label><input type="checkbox"> <code>case null</code> hoặc là NPE; pattern switch và record pattern là của 21, không phải 17.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Kết hợp lại chúng cho Java kiểu algebraic data type. Em khai báo một sealed interface, ví dụ <code>Payment permits Card, Transfer</code>, và mỗi biến thể là một record giữ dữ liệu riêng. Rồi em xử lý bằng pattern switch: <code>case Card(var number, var tags)</code> vừa check kiểu vừa lấy field ra, và pattern có thể lồng nhau. Vì interface là sealed, compiler biết hết các biến thể, nên switch exhaustive mà không cần default, và nếu ai thêm biến thể thứ ba thì mọi switch chưa xử lý nó sẽ không compile được. Các case được thử từ trên xuống, case bị case trước dominate là lỗi compile, và em có thể thêm guard bằng <code>when</code>. Null vẫn ném exception trừ khi em viết <code>case null</code>. Sealed và record có từ 17, nhưng switch theo pattern thì cần 21."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 3. Người phỏng vấn hỏi: <strong>"Vì sao nâng cấp backend từ 17 lên 21? Bạn sẽ cẩn thận điều gì?"</strong> Bấm giờ. Trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Virtual thread: thread-per-request với code blocking mà throughput vẫn cao; mở rộng quy mô, không phải tốc độ.</label></li>
+      <li><label><input type="checkbox"> Không pool chúng; dùng Semaphore để giới hạn; cẩn thận pinning trong <code>synchronized</code> trên 21.</label></li>
+      <li><label><input type="checkbox"> Generational ZGC: pause dưới một mili giây với chi phí thấp hơn; cần <code>-XX:+ZGenerational</code> trên 21.</label></li>
+      <li><label><input type="checkbox"> Giữ G1 làm mặc định; chọn GC bằng cách đo GC log so với SLA.</label></li>
+      <li><label><input type="checkbox"> Pattern switch và record pattern cho code domain gọn hơn.</label></li>
+      <li><label><input type="checkbox"> Sequenced collection: <code>getFirst</code>, <code>getLast</code>, <code>reversed()</code> ở mọi nơi.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"21 là LTS tiếp theo và nó mang lại bốn lợi ích thật. Thứ nhất là virtual thread: em giữ được code blocking đơn giản, mỗi request một thread, mà xử lý được nhiều request đồng thời hơn hẳn, vì virtual thread unmount khỏi carrier trong lúc chờ. Đó là throughput, không phải tốc độ. Em sẽ để ý ba điều: không bao giờ pool chúng, dùng Semaphore để bảo vệ downstream service, và tìm chỗ bị pinning, vì trên 21 I/O lâu bên trong <code>synchronized</code> sẽ chặn luôn carrier. Thứ hai, generational ZGC cho pause dưới một mili giây với chi phí thấp hơn ZGC cũ, nhưng trên 21 phải thêm <code>-XX:+ZGenerational</code>, và em chỉ đổi khỏi G1 sau khi so sánh GC log. Thứ ba, pattern matching cho switch và record pattern làm code domain với sealed type gọn hơn nhiều. Và sequenced collection cuối cùng cho một API chung để lấy đầu, cuối và đảo ngược."</em></p>
+  </div>
+</div>
+
+<h2>Nếu bạn trả lời sai, hãy đọc lại</h2>
+<table>
+<tr><th>Nếu bạn sai các câu về…</th><th>Đọc lại</th></tr>
+<tr><td>chỗ được dùng <code>var</code>, dấu mở text block và thụt lề</td><td><a href="0012-var-and-text-blocks.vi.html">Bài 0012: var và text block</a></td></tr>
+<tr><td>arrow label, <code>yield</code>, exhaustive, phạm vi của <code>instanceof</code></td><td><a href="0013-switch-expressions-and-instanceof-patterns.vi.html">Bài 0013: switch expression và instanceof pattern</a></td></tr>
+<tr><td>record sinh ra gì, bất biến nông, compact constructor</td><td><a href="0003-records-and-immutability.vi.html">Bài 0003: Record và bất biến nông</a></td></tr>
+<tr><td><code>permits</code>, final / sealed / non-sealed</td><td><a href="0014-sealed-classes.vi.html">Bài 0014: Sealed class và interface</a></td></tr>
+<tr><td>đọc thông báo NPE, <code>&lt;local1&gt;</code> và <code>-g</code></td><td><a href="0027-helpful-nullpointerexceptions.vi.html">Bài 0027: Helpful NullPointerException</a></td></tr>
+<tr><td><code>case null</code>, guard, dominance, record pattern, không cần default</td><td><a href="0015-pattern-matching-switch-and-record-patterns.vi.html">Bài 0015: Pattern matching cho switch</a></td></tr>
+<tr><td><code>getFirst</code>, view <code>reversed()</code>, kiểu nào là sequenced</td><td><a href="0016-sequenced-collections.vi.html">Bài 0016: Sequenced collection</a></td></tr>
+<tr><td>carrier, pool, Semaphore, pinning</td><td><a href="0006-virtual-threads.vi.html">Bài 0006: Virtual thread</a></td></tr>
+<tr><td>generation, flag ZGC trên 21, đọc GC log</td><td><a href="0017-generational-zgc.vi.html">Bài 0017: Generational ZGC</a></td></tr>
+</table>
+
+<h2>Bây giờ làm bài tập</h2>
+<p>Nếu bạn đã bỏ qua bài nào, hãy làm ngay; nếu đã làm hết, hãy làm lại theo trí nhớ bài bạn có điểm thấp nhất:</p>
+<ul>
+<li><a href="../exercises/0012-var-and-text-block-review.vi.md">Bài tập 0012: review code với var và text block</a></li>
+<li><a href="../exercises/0013-modernize-a-visitor.vi.md">Bài tập 0013: hiện đại hóa chuỗi ép kiểu</a></li>
+<li><a href="../exercises/0003-record-as-key.vi.md">Bài tập 0003: record làm key của map</a></li>
+<li><a href="../exercises/0014-model-payment-types.vi.md">Bài tập 0014: mô hình hóa các loại thanh toán</a></li>
+<li><a href="../exercises/0027-read-the-npe.vi.md">Bài tập 0027: đọc NPE</a></li>
+<li><a href="../exercises/0015-expression-evaluator.vi.md">Bài tập 0015: bộ tính giá trị biểu thức</a></li>
+<li><a href="../exercises/0016-last-element-refactor.vi.md">Bài tập 0016: refactor cách lấy phần tử cuối</a></li>
+<li><a href="../exercises/0006-pool-vs-virtual.vi.md">Bài tập 0006: pool và virtual</a></li>
+<li><a href="../exercises/0017-compare-g1-and-zgc.vi.md">Bài tập 0017: so sánh G1 và ZGC</a></li>
+</ul>
+<p>Ví dụ chạy được: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a> · <a href="../examples/RecordDemo.java"><code>RecordDemo.java</code></a> · <a href="../examples/NpeDemo.java"><code>NpeDemo.java</code></a> · <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a> · <a href="../examples/VirtualThreadsDemo.java"><code>VirtualThreadsDemo.java</code></a> · <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Bạn đã đi hết lộ trình của khoá học. Giờ người phỏng vấn senior sẽ trộn mọi thứ: <em>"Thiết kế một order service trên JDK 21: dùng collection nào, mô hình concurrency nào, GC nào?"</em> Hãy luyện với bộ câu hỏi đầy đủ ở <a href="../interview.vi.html">Hỏi đáp phỏng vấn Java</a>, và nói to từng câu trả lời trước khi mở đáp án.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/projects/jdk/21/">OpenJDK: JDK 21</a>, danh sách chính thức mọi JEP trong bản phát hành, có link tới từng JEP.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào vẫn nên dùng class thường thay vì record?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và ba điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0017-generational-zgc.vi.html">← Generational ZGC: pause siêu ngắn, giờ có thêm young và old (JDK 21)</a> &nbsp;|&nbsp; <a href="../interview.vi.html">Hỏi đáp phỏng vấn Java →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với các JEP và tài liệu Java 21, tháng 10/2026 (mọi thông tin đều lấy từ các bài 0012, 0013, 0003, 0014, 0027, 0015, 0016, 0006 và 0017).</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/286">JEP 286</a> · <a href="https://openjdk.org/jeps/378">JEP 378</a> · <a href="https://openjdk.org/jeps/361">JEP 361</a> · <a href="https://openjdk.org/jeps/394">JEP 394</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="https://openjdk.org/jeps/409">JEP 409</a> · <a href="https://openjdk.org/jeps/358">JEP 358</a> · <a href="https://openjdk.org/jeps/441">JEP 441</a> · <a href="https://openjdk.org/jeps/440">JEP 440</a> · <a href="https://openjdk.org/jeps/431">JEP 431</a> · <a href="https://openjdk.org/jeps/444">JEP 444</a> · <a href="https://openjdk.org/jeps/439">JEP 439</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

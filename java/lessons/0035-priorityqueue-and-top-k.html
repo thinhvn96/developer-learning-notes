@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 35: PriorityQueue, heaps and the top-K problem</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>PriorityQueue, heaps and the top-K problem</h1>
+<p class="subtitle">A queue that always hands you the smallest item first, without ever sorting everything.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0035 · step 17 of 46 · Advanced · ~22 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0035-priorityqueue-and-top-k.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Job schedulers, "the 10 slowest requests", "the 5 nearest drivers", merging sorted files: all of them need "give me the most important item next". <em>"Find the top K of N numbers"</em> is also one of the most common coding-interview questions, and the expected answer is a heap.</div>
+
+<div class="win"><b>Today's win:</b> use PriorityQueue correctly (it is not sorted!), solve top-K in O(n log k) with a min-heap, and pick ArrayDeque for stacks and FIFO queues.</div>
+
+<dl class="words">
+  <dt>queue</dt><dd>A line of items waiting their turn. You add at one end and take from the other.</dd>
+  <dt>priority queue</dt><dd>A queue where the next item out is the most important one (in Java: the smallest), not the one that came first.</dd>
+  <dt>heap</dt><dd>A tree where every parent is smaller than or equal to its children. The smallest item is always at the top.</dd>
+  <dt>head</dt><dd>The item you would get next: <code>peek()</code> looks at it, <code>poll()</code> removes it.</dd>
+  <dt>top-K</dt><dd>The K biggest (or smallest) items out of many, for example the 3 highest scores out of a million.</dd>
+  <dt>deque</dt><dd>Say "deck": a double-ended queue. You can add and remove at both the front and the back.</dd>
+  <dt>O(n log k)</dt><dd>n steps, each costing about log k. With k = 3, log k is tiny, so it is close to one pass over the data.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Predict: <code>new PriorityQueue&lt;&gt;(List.of(7, 3, 9, 1, 5, 8))</code>, then <code>System.out.println(pq)</code>. What is printed? Say it out loud before you read section 1. Most people say <code>[1, 3, 5, 7, 8, 9]</code>.</p>
+
+<h2>1. The picture: a hospital emergency room</h2>
+<p>In a bank, people are served in the order they arrive. In an emergency room, the nurse always calls the most urgent patient next, whoever arrived first. The nurse does not keep a fully sorted list of everybody; she only needs to know <strong>who is the most urgent right now</strong>.</p>
+<p>That is a <code>PriorityQueue</code>: "an unbounded priority queue based on a priority heap". "The head of this queue is the least element" according to its natural order or your comparator.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a> Smallest number = most urgent.</p>
+<p>A heap is a "half-sorted" tree: every parent is ≤ its children, but brothers and cousins are in no particular order. In OpenJDK the tree is stored in a plain array: "the two children of queue[n] are queue[2*n+1] and queue[2*(n+1)]", and the smallest element is in <code>queue[0]</code>.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/PriorityQueue.java">OpenJDK source</a></p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="The heap 1, 3, 8, 7, 5, 9 drawn as a tree and as an array. 1 is the root at index 0; 3 and 8 are its children at indexes 1 and 2; 7 and 5 are the children of 3; 9 is the child of 8.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <path d="M322 52L222 96"/><path d="M358 52L458 96"/>
+      <path d="M190 124L140 168"/><path d="M210 124L260 168"/>
+      <path d="M470 124L470 168"/>
+    </g>
+    <circle cx="340" cy="40" r="20" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <circle cx="200" cy="110" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="470" cy="110" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="130" cy="180" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="270" cy="180" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="470" cy="180" r="20" fill="none" stroke="currentColor"/>
+    <g text-anchor="middle">
+      <text x="340" y="45" fill="var(--accent)">1</text>
+      <text x="200" y="115">3</text><text x="470" y="115">8</text>
+      <text x="130" y="185">7</text><text x="270" y="185">5</text><text x="470" y="185">9</text>
+    </g>
+    <g font-size="10" opacity=".7">
+      <text x="366" y="36">[0]</text><text x="226" y="106">[1]</text><text x="496" y="106">[2]</text>
+      <text x="156" y="176">[3]</text><text x="296" y="176">[4]</text><text x="496" y="176">[5]</text>
+    </g>
+    <text x="560" y="40" font-size="11" fill="var(--accent)">head = peek()</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="130" y="230" width="70" height="36"/><rect x="200" y="230" width="70" height="36"/>
+      <rect x="270" y="230" width="70" height="36"/><rect x="340" y="230" width="70" height="36"/>
+      <rect x="410" y="230" width="70" height="36"/><rect x="480" y="230" width="70" height="36"/>
+    </g>
+    <rect x="130" y="230" width="70" height="36" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="165" y="253" fill="var(--accent)">1</text><text x="235" y="253">3</text><text x="305" y="253">8</text>
+      <text x="375" y="253">7</text><text x="445" y="253">5</text><text x="515" y="253">9</text>
+    </g>
+    <g font-size="10" opacity=".7" text-anchor="middle">
+      <text x="165" y="282">0</text><text x="235" y="282">1</text><text x="305" y="282">2</text>
+      <text x="375" y="282">3</text><text x="445" y="282">4</text><text x="515" y="282">5</text>
+    </g>
+    <text x="30" y="253" font-size="11">array:</text>
+  </g>
+</svg>
+<figcaption>The same heap as a tree and as the array Java prints. Every parent ≤ its children, so 1 is on top, but 8 comes before 7 and 5 in the array.</figcaption>
+</figure>
+
+<p>Now the "Before you start" answer. Printing a PriorityQueue prints the array, and the array is in heap order, not sorted order:</p>
+<pre><code>$ java java/examples/collections/PriorityQueueTopK.java
+toString (heap array order): [1, 3, 8, 7, 5, 9]     <span class="c">&lt;- NOT sorted</span>
+peek (smallest)            : 1
+poll until empty           : [1, 3, 5, 7, 8, 9]     <span class="c">&lt;- sorted only via poll</span>
+top 3 of 1,000,000         : [9999989, 9999982, 9999981]
+max-heap by length poll    : kubernetes
+stack pop: c   queue poll: a</code></pre>
+<p>The Javadoc says it plainly: the iterator is "not guaranteed to traverse the elements of the priority queue in any particular order. If you need ordered traversal, consider using <code>Arrays.sort(pq.toArray())</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a> A for-each loop, a stream and <code>toString()</code> all use that iterator.</p>
+
+<h2>2. Follow one poll and one offer, step by step</h2>
+<p>Why is the heap cheap? Because each change only walks <strong>one path</strong> from top to bottom (or bottom to top), and a balanced tree of n items is only about log n levels tall.</p>
+<pre><code>pq.poll();             <span class="c">// heap array [1, 3, 8, 7, 5, 9]</span>
+<span class="c">Step 1  Take the root, 1. It is the answer.</span>
+<span class="c">Step 2  Move the last item, 9, to the root:       [9, 3, 8, 7, 5]</span>
+<span class="c">Step 3  9 &gt; its smaller child 3 → swap:            [3, 9, 8, 7, 5]</span>
+<span class="c">Step 4  9 &gt; its smaller child 5 → swap:            </span><span class="hl">[3, 5, 8, 7, 9]</span>
+
+pq.offer(2);
+<span class="c">Step 1  Put 2 at the end, index 5 (parent: index 2, value 8)</span>
+<span class="c">Step 2  2 &lt; 8 → swap; now at index 2 (parent: index 0, value 3)</span>
+<span class="c">Step 3  2 &lt; 3 → swap; now at the root:             </span><span class="hl">[2, 5, 3, 7, 9, 8]</span></code></pre>
+<p class="muted">The swaps follow the OpenJDK implementation; the Javadoc only promises the costs below, not the exact array layout.</p>
+<p>That gives the costs from the Javadoc: "O(log(n)) time for the enqueuing and dequeuing methods (offer, poll, remove() and add); linear time for the remove(Object) and contains(Object) methods; and constant time for the retrieval methods (peek, element, and size)".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a> <code>contains</code> is linear because a half-sorted tree cannot tell you which branch to search.</p>
+<p>Three more rules: it does not permit <code>null</code> elements; if several elements tie for least, "ties are broken arbitrarily"; and it is not synchronized, so for threads "use the thread-safe PriorityBlockingQueue class".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a></p>
+
+<h2>3. Top-K: the interview classic</h2>
+<p>Picture a VIP room with exactly 3 chairs and a bouncer at the door. The bouncer only remembers <strong>the weakest person inside</strong>. A newcomer gets in only if they beat that weakest person, who is then thrown out. At the end of the night, the 3 people inside are the top 3.</p>
+<p>The "remember the weakest one" part is a <strong>min</strong>-heap of size K: its head is the smallest of the current top K, so a new item only enters if it beats the head.</p>
+<pre><code>PriorityQueue&lt;Integer&gt; heap = new PriorityQueue&lt;&gt;(k);   <span class="c">// min-heap</span>
+for (int x : stream) {
+    if (heap.size() &lt; k) heap.offer(x);                    <span class="c">// room not full yet</span>
+    else if (x &gt; heap.peek()) { heap.poll(); heap.offer(x); } <span class="c">// beats the weakest</span>
+}</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Top 3 of the stream 4, 9, 1, 7, 12, 3 with a min-heap of size 3. After each item the heap holds: 4; 4 9; 1 4 9; then 7 replaces 1; 12 replaces 4; 3 is rejected. Final heap 7 9 12.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="28" font-size="11" opacity=".75">input</text>
+    <text x="120" y="28" font-size="11" opacity=".75">heap after (head first)</text>
+    <text x="400" y="28" font-size="11" opacity=".75">what happened</text>
+    <g>
+      <text x="30" y="56">4</text><text x="130" y="56"><tspan fill="var(--accent)">4</tspan></text><text x="400" y="56" font-size="11">room not full → offer</text>
+      <text x="30" y="84">9</text><text x="130" y="84"><tspan fill="var(--accent)">4</tspan>  9</text><text x="400" y="84" font-size="11">room not full → offer</text>
+      <text x="30" y="112">1</text><text x="130" y="112"><tspan fill="var(--accent)">1</tspan>  4  9</text><text x="400" y="112" font-size="11">room not full → offer</text>
+      <text x="30" y="140">7</text><text x="130" y="140"><tspan fill="var(--accent)">4</tspan>  7  9</text><text x="400" y="140" font-size="11">7 &gt; head 1 → poll 1, offer 7</text>
+      <text x="30" y="168">12</text><text x="130" y="168"><tspan fill="var(--accent)">7</tspan>  9  12</text><text x="400" y="168" font-size="11">12 &gt; head 4 → poll 4, offer 12</text>
+      <text x="30" y="196">3</text><text x="130" y="196"><tspan fill="var(--accent)">7</tspan>  9  12</text><text x="400" y="196" font-size="11">3 &lt; head 7 → rejected</text>
+    </g>
+    <rect x="120" y="208" width="140" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="190" y="228" text-anchor="middle" fill="var(--accent)">top 3: 12 9 7</text>
+    <path d="M20 40H660" stroke="currentColor" opacity=".3" fill="none"/>
+  </g>
+</svg>
+<figcaption>The head (highlighted) is the weakest member of the current top 3. Each item costs at most one poll and one offer on a heap of size 3.</figcaption>
+</figure>
+
+<p>Cost: O(n log k) time and O(k) memory, versus O(n log n) and O(n) for sorting everything. It also works on a stream you cannot hold in memory. The example runs it on a million random numbers and keeps only three of them: <code>top 3 of 1,000,000 : [9999989, 9999982, 9999981]</code>.</p>
+<p>For a <strong>max</strong>-heap (largest first), pass a comparator: <code>new PriorityQueue&lt;&gt;(Comparator.reverseOrder())</code>. The example builds one ordered by string length, and <code>poll()</code> returns <code>kubernetes</code>, the longest word.</p>
+
+<h3>Common mistake: the wrong heap</h3>
+<p>For the K <em>largest</em>, many people reach for a max-heap of everything and poll K times. That works, but it holds all n items: O(n) memory. The trick is the opposite heap: a <strong>min</strong>-heap of size K for the K largest, a <strong>max</strong>-heap of size K for the K smallest.</p>
+
+<h2>4. ArrayDeque for everything else</h2>
+<p>Often you do not need priority, only "last in, first out" (a stack of plates) or "first in, first out" (a bank queue). <code>Deque</code> supports "insertion and removal at both ends".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util summary</a> Use <code>ArrayDeque</code>:</p>
+<pre><code>Deque&lt;String&gt; stack = new ArrayDeque&lt;&gt;();
+stack.push("a"); stack.push("b"); stack.push("c");
+stack.pop();                            <span class="hl">// "c": last in, first out</span>
+
+Deque&lt;String&gt; queue = new ArrayDeque&lt;&gt;();
+queue.offer("a"); queue.offer("b"); queue.offer("c");
+queue.poll();                           <span class="hl">// "a": first in, first out</span></code></pre>
+<p>That is the last line of the run: <code>stack pop: c   queue poll: a</code>. The ArrayDeque Javadoc says it "is likely to be faster than Stack when used as a stack, and faster than LinkedList when used as a queue"; it prohibits <code>null</code> elements and is not thread-safe.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque javadoc</a> So avoid the legacy <code>Stack</code> class (see <a href="0002-choosing-a-list.html">lesson 0002</a>).</p>
+<p>Typical uses: breadth-first search (queue), depth-first search and undo history (stack), sliding window maximum (deque). All of this works the same on JDK 8, 17 and 21.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">What does <code>System.out.println(new PriorityQueue&lt;&gt;(List.of(7, 3, 9, 1, 5, 8)))</code> print?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>[1, 3, 8, 7, 5, 9]</code></button>
+    <button class="opt"><code>[1, 3, 5, 7, 8, 9]</code></button>
+    <button class="opt"><code>[7, 3, 9, 1, 5, 8]</code></button>
+    <button class="opt"><code>[9, 8, 7, 5, 3, 1]</code></button>
+  </div>
+  <div class="why">toString uses the iterator, which walks the heap array. Only the head is guaranteed to be the smallest; the rest is not sorted.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">How much does <code>PriorityQueue.contains(x)</code> cost?</p>
+  <div class="options">
+    <button class="opt" data-correct>Linear time</button>
+    <button class="opt">Log time</button>
+    <button class="opt">Constant time</button>
+    <button class="opt">Quadratic time</button>
+  </div>
+  <div class="why">remove(Object) and contains(Object) are linear: a heap is only half-sorted, so Java must scan the array.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You want the 10 largest numbers from a huge stream. Which heap do you keep?</p>
+  <div class="options">
+    <button class="opt" data-correct>A min-heap of size 10</button>
+    <button class="opt">A max-heap of size 10</button>
+    <button class="opt">A max-heap of all items</button>
+    <button class="opt">Two heaps of size 5 each</button>
+  </div>
+  <div class="why">The min-heap's head is the weakest of the current top 10, so it is the one to compare against and replace. Memory stays O(k).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which operations of PriorityQueue run in O(log n)?</p>
+  <div class="options">
+    <button class="opt" data-correct>offer, poll, add and remove()</button>
+    <button class="opt">peek, element and size</button>
+    <button class="opt">contains and remove(Object)</button>
+    <button class="opt">iterator and toString</button>
+  </div>
+  <div class="why">Enqueue and dequeue walk one path of the tree: O(log n). peek, element and size are constant; contains and remove(Object) are linear.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">How do you make a PriorityQueue return the <em>largest</em> element first?</p>
+  <div class="options">
+    <button class="opt" data-correct>Pass Comparator.reverseOrder() to the constructor</button>
+    <button class="opt">Call pq.reverse() once after you add the items</button>
+    <button class="opt">Use pollLast() instead of poll() on the queue</button>
+    <button class="opt">Iterate the queue backwards with a for loop</button>
+  </div>
+  <div class="why">The head is the least element according to the comparator. Reverse the comparator and the largest becomes "least".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which class should you use for a plain stack in modern Java?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayDeque</button>
+    <button class="opt">Stack</button>
+    <button class="opt">PriorityQueue</button>
+    <button class="opt">Vector</button>
+  </div>
+  <div class="why">ArrayDeque is likely to be faster than Stack when used as a stack. Use push and pop.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How would you find the top 10 of a billion numbers? Which Java class, and what does it cost?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Use a <code>PriorityQueue</code>, which is a binary heap; the head is the smallest element.</label></li>
+      <li><label><input type="checkbox"> Keep a <strong>min</strong>-heap of size K; replace the head when a new item is bigger.</label></li>
+      <li><label><input type="checkbox"> Cost O(n log k) time and O(k) memory, versus O(n log n) to sort.</label></li>
+      <li><label><input type="checkbox"> Works on a stream that does not fit in memory.</label></li>
+      <li><label><input type="checkbox"> offer/poll are O(log n), peek O(1), contains O(n).</label></li>
+      <li><label><input type="checkbox"> Iterating or printing the queue is not sorted; poll repeatedly or sort the result.</label></li>
+      <li><label><input type="checkbox"> Not thread-safe: <code>PriorityBlockingQueue</code> for threads.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"I'd stream through the numbers once and keep a PriorityQueue of size 10 as a min-heap. PriorityQueue is a binary heap, so its head is always the smallest element. For each number, if the heap has fewer than 10 items I offer it; otherwise, if the number is bigger than the head, I poll the head and offer the new number. The head is always the weakest of the current top 10, so that's the one to beat. Each step is O(log 10), so the whole thing is O(n log k) time and only O(k) memory, which matters for a billion numbers that don't fit in memory. At the end I sort those 10, because iterating a PriorityQueue doesn't give sorted order. And if several threads fed it, I'd use PriorityBlockingQueue."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0035-top-k-and-scheduling.md">Exercise 0035: top-K and scheduling</a>. Draw the heap on paper after each step before you run anything.</p>
+<p>Runnable example: <a href="../examples/collections/PriorityQueueTopK.java"><code>PriorityQueueTopK.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Your keys are enums. Your map should compare objects by identity. Your cache entries should vanish when nobody uses the key. Which map now?"</em> <a href="0036-enummap-identity-and-weak-maps.html">Lesson 0036</a> covers the special-purpose maps.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue Javadoc (JDK 21)</a>. A short class description: read all of it, especially the complexity paragraph.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why is the heap stored in an array?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0034-treemap-and-navigable-maps.html">← TreeMap and NavigableMap: range and nearest-key queries</a> &nbsp;|&nbsp; <a href="0036-enummap-identity-and-weak-maps.html">EnumMap, EnumSet, IdentityHashMap and WeakHashMap →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation and the OpenJDK 21 source, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/PriorityQueue.java">OpenJDK 21 PriorityQueue.java</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 15: Proxy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Proxy</h1>
+<p class="meta">Design Patterns · Bài 0015 · bước 15/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0015-proxy.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tạo một object đứng thế có cùng interface (lazy, logging, bảo vệ) và viết được một JDK dynamic proxy.</div>
+
+<h2>Mục đích</h2>
+<p>Proxy là "một structural design pattern cho phép bạn cung cấp một vật thay thế hoặc giữ chỗ cho một object khác." Các loại: khởi tạo lazy (virtual proxy), kiểm soát truy cập (protection proxy), remote proxy, logging proxy, caching proxy, smart reference.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/ProxyDemo.java
+--- virtual (lazy) proxy
+proxy created, nothing loaded yet
+  loading big.png from disk (expensive)
+  showing image
+  showing image
+--- JDK dynamic proxy adding logging to ANY interface
+  -&gt; calling compute[20, 22]
+  &lt;- returned 42
+proxy class name starts with: $Proxy</code></pre><p>Proxy <code>LazyImage</code> chỉ nạp ảnh thật ở lần gọi <code>show()</code> đầu tiên. JDK có thể tạo proxy lúc runtime: theo tài liệu, "proxy class là class được tạo ra lúc runtime, implement một danh sách interface được chỉ định"; mỗi lời gọi được chuyển tới method <code>invoke</code> của một <code>InvocationHandler</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[2]</a> Ở đây một handler duy nhất thêm logging cho <em>bất kỳ</em> interface nào. Mã nguồn: <a href="../examples/ProxyDemo.java"><code>ProxyDemo.java</code></a>.</p>
+<p><strong>Bạn đã gặp nó rồi:</strong> <code>@Transactional</code> của Spring hoạt động thông qua một proxy, đó là lý do gọi một method transactional qua <code>this</code> sẽ đi vòng qua transaction (đã kiểm chứng trong <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.vi.html">bài Spring</a>: 2 account được lưu thay vì bị rollback).</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Kiểm soát service object mà client không hề biết</li><li>Quản lý vòng đời của service</li><li>Vẫn hoạt động ngay cả khi service chưa sẵn sàng</li><li>Open/Closed: thêm proxy mới mà không sửa service hay client</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Thêm class và độ phức tạp</li><li>Có thể làm response chậm hơn</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a> Adapter đưa ra interface khác; Facade bọc cả subsystem; việc ghép Decorator do client điều khiển, còn proxy thường tự quản lý toàn bộ vòng đời của service object.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một proxy có...?</p>
+  <button>Chỉ static method</button>
+  <button>Một interface khác</button>
+  <button data-correct>Cùng interface với service</button>
+  <button>Không có interface</button>
+  <p class="explain">Nó là vật thay thế cho một object khác.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lazy proxy trì hoãn...?</p>
+  <button>Garbage collection</button>
+  <button>Việc biên dịch</button>
+  <button data-correct>Việc tạo object thật</button>
+  <button>Việc nạp JVM</button>
+  <p class="explain">Khởi tạo lazy tạo service object khi cần đến.<a class="cite" href="https://refactoring.guru/design-patterns/proxy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Class JDK để tạo proxy lúc runtime?</p>
+  <button>Thread</button>
+  <button>java.util.Proxy</button>
+  <button data-correct>java.lang.reflect.Proxy</button>
+  <button>Chỉ java.net.Proxy</button>
+  <p class="explain">Proxy.newProxyInstance tạo ra chúng.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao self-invocation bỏ qua @Transactional?</p>
+  <button data-correct>Nó đi vòng qua proxy</button>
+  <button>Thiếu bean</button>
+  <button>Lỗi của JDK</button>
+  <button>Sai isolation</button>
+  <p class="explain">Lời gọi không đi qua proxy object.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0015-caching-proxy.vi.md">Bài tập 15: một caching proxy</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ProxyDemo.java"><code>ProxyDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/proxy">Proxy (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0014-flyweight.vi.html">← Flyweight</a> &nbsp;|&nbsp; <a href="0016-chain-of-responsibility.vi.html">Chain of Responsibility →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/proxy">Proxy (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">Proxy Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

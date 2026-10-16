@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 35: PriorityQueue, heap và bài toán top-K</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>PriorityQueue, heap và bài toán top-K</h1>
+<p class="subtitle">Một queue luôn đưa bạn phần tử nhỏ nhất trước, mà không bao giờ phải sắp xếp tất cả.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0035 · bước 17/46 · Advanced · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0035-priorityqueue-and-top-k.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Bộ lập lịch job, "10 request chậm nhất", "5 tài xế gần nhất", gộp các file đã sắp xếp: tất cả đều cần "đưa tôi phần tử quan trọng nhất tiếp theo". <em>"Tìm top K trong N số"</em> cũng là một trong những câu coding interview phổ biến nhất, và đáp án được mong đợi là heap.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng PriorityQueue đúng cách (nó không được sắp xếp!), giải top-K trong O(n log k) bằng min-heap, và chọn ArrayDeque cho stack và queue FIFO.</div>
+
+<dl class="words">
+  <dt>queue</dt><dd>Một hàng phần tử chờ tới lượt. Bạn thêm ở một đầu và lấy ra ở đầu kia.</dd>
+  <dt>priority queue</dt><dd>Một queue mà phần tử ra tiếp theo là phần tử quan trọng nhất (trong Java: nhỏ nhất), không phải phần tử đến trước.</dd>
+  <dt>heap</dt><dd>Một cây mà mọi node cha đều nhỏ hơn hoặc bằng các node con. Phần tử nhỏ nhất luôn ở trên đỉnh.</dd>
+  <dt>head</dt><dd>Phần tử bạn sẽ nhận tiếp theo: <code>peek()</code> nhìn nó, <code>poll()</code> lấy nó ra.</dd>
+  <dt>top-K</dt><dd>K phần tử lớn nhất (hoặc nhỏ nhất) trong rất nhiều phần tử, ví dụ 3 điểm cao nhất trong một triệu.</dd>
+  <dt>deque</dt><dd>Đọc là "đéc": queue hai đầu. Bạn thêm và lấy ra được ở cả đầu lẫn cuối.</dd>
+  <dt>O(n log k)</dt><dd>n bước, mỗi bước tốn khoảng log k. Với k = 3, log k rất nhỏ, nên gần như chỉ một lượt duyệt dữ liệu.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Đoán xem: <code>new PriorityQueue&lt;&gt;(List.of(7, 3, 9, 1, 5, 8))</code>, rồi <code>System.out.println(pq)</code>. In ra gì? Nói to trước khi đọc phần 1. Đa số mọi người nói <code>[1, 3, 5, 7, 8, 9]</code>.</p>
+
+<h2>1. Hình ảnh: phòng cấp cứu</h2>
+<p>Ở ngân hàng, người ta được phục vụ theo thứ tự đến. Ở phòng cấp cứu, y tá luôn gọi bệnh nhân nguy kịch nhất tiếp theo, bất kể ai đến trước. Y tá không giữ một danh sách sắp xếp đầy đủ mọi người; cô chỉ cần biết <strong>ai đang nguy kịch nhất lúc này</strong>.</p>
+<p>Đó chính là <code>PriorityQueue</code>: "một priority queue không giới hạn dựa trên priority heap". "Head của queue này là phần tử nhỏ nhất" theo thứ tự tự nhiên hoặc theo comparator của bạn.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a> Số nhỏ nhất = nguy kịch nhất.</p>
+<p>Heap là một cây "sắp xếp một nửa": mọi cha ≤ các con, nhưng anh em và họ hàng thì không theo thứ tự nào. Trong OpenJDK, cây được lưu trong một mảng thường: "hai con của queue[n] là queue[2*n+1] và queue[2*(n+1)]", và phần tử nhỏ nhất nằm ở <code>queue[0]</code>.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/PriorityQueue.java">OpenJDK source</a></p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="Heap 1, 3, 8, 7, 5, 9 vẽ dưới dạng cây và dạng mảng. 1 là gốc ở chỉ số 0; 3 và 8 là con của nó ở chỉ số 1 và 2; 7 và 5 là con của 3; 9 là con của 8.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <path d="M322 52L222 96"/><path d="M358 52L458 96"/>
+      <path d="M190 124L140 168"/><path d="M210 124L260 168"/>
+      <path d="M470 124L470 168"/>
+    </g>
+    <circle cx="340" cy="40" r="20" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <circle cx="200" cy="110" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="470" cy="110" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="130" cy="180" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="270" cy="180" r="20" fill="none" stroke="currentColor"/>
+    <circle cx="470" cy="180" r="20" fill="none" stroke="currentColor"/>
+    <g text-anchor="middle">
+      <text x="340" y="45" fill="var(--accent)">1</text>
+      <text x="200" y="115">3</text><text x="470" y="115">8</text>
+      <text x="130" y="185">7</text><text x="270" y="185">5</text><text x="470" y="185">9</text>
+    </g>
+    <g font-size="10" opacity=".7">
+      <text x="366" y="36">[0]</text><text x="226" y="106">[1]</text><text x="496" y="106">[2]</text>
+      <text x="156" y="176">[3]</text><text x="296" y="176">[4]</text><text x="496" y="176">[5]</text>
+    </g>
+    <text x="560" y="40" font-size="11" fill="var(--accent)">head = peek()</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="130" y="230" width="70" height="36"/><rect x="200" y="230" width="70" height="36"/>
+      <rect x="270" y="230" width="70" height="36"/><rect x="340" y="230" width="70" height="36"/>
+      <rect x="410" y="230" width="70" height="36"/><rect x="480" y="230" width="70" height="36"/>
+    </g>
+    <rect x="130" y="230" width="70" height="36" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="165" y="253" fill="var(--accent)">1</text><text x="235" y="253">3</text><text x="305" y="253">8</text>
+      <text x="375" y="253">7</text><text x="445" y="253">5</text><text x="515" y="253">9</text>
+    </g>
+    <g font-size="10" opacity=".7" text-anchor="middle">
+      <text x="165" y="282">0</text><text x="235" y="282">1</text><text x="305" y="282">2</text>
+      <text x="375" y="282">3</text><text x="445" y="282">4</text><text x="515" y="282">5</text>
+    </g>
+    <text x="30" y="253" font-size="11">mảng:</text>
+  </g>
+</svg>
+<figcaption>Cùng một heap dưới dạng cây và dạng mảng mà Java in ra. Mọi cha ≤ các con, nên 1 ở đỉnh, nhưng 8 đứng trước 7 và 5 trong mảng.</figcaption>
+</figure>
+
+<p>Giờ là đáp án của phần "Trước khi bắt đầu". In một PriorityQueue là in mảng, và mảng theo thứ tự heap, không phải thứ tự đã sắp xếp:</p>
+<pre><code>$ java java/examples/collections/PriorityQueueTopK.java
+toString (heap array order): [1, 3, 8, 7, 5, 9]     <span class="c">&lt;- NOT sorted</span>
+peek (smallest)            : 1
+poll until empty           : [1, 3, 5, 7, 8, 9]     <span class="c">&lt;- sorted only via poll</span>
+top 3 of 1,000,000         : [9999989, 9999982, 9999981]
+max-heap by length poll    : kubernetes
+stack pop: c   queue poll: a</code></pre>
+<p>Javadoc nói rõ: iterator "không được đảm bảo duyệt các phần tử của priority queue theo bất kỳ thứ tự cụ thể nào. Nếu bạn cần duyệt có thứ tự, hãy cân nhắc dùng <code>Arrays.sort(pq.toArray())</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a> Vòng for-each, stream và <code>toString()</code> đều dùng iterator đó.</p>
+
+<h2>2. Lần theo một lần poll và một lần offer</h2>
+<p>Vì sao heap rẻ? Vì mỗi thay đổi chỉ đi <strong>một đường</strong> từ trên xuống dưới (hoặc dưới lên trên), và một cây cân bằng n phần tử chỉ cao khoảng log n tầng.</p>
+<pre><code>pq.poll();             <span class="c">// heap array [1, 3, 8, 7, 5, 9]</span>
+<span class="c">Step 1  Take the root, 1. It is the answer.</span>
+<span class="c">Step 2  Move the last item, 9, to the root:       [9, 3, 8, 7, 5]</span>
+<span class="c">Step 3  9 &gt; its smaller child 3 → swap:            [3, 9, 8, 7, 5]</span>
+<span class="c">Step 4  9 &gt; its smaller child 5 → swap:            </span><span class="hl">[3, 5, 8, 7, 9]</span>
+
+pq.offer(2);
+<span class="c">Step 1  Put 2 at the end, index 5 (parent: index 2, value 8)</span>
+<span class="c">Step 2  2 &lt; 8 → swap; now at index 2 (parent: index 0, value 3)</span>
+<span class="c">Step 3  2 &lt; 3 → swap; now at the root:             </span><span class="hl">[2, 5, 3, 7, 9, 8]</span></code></pre>
+<p class="muted">Các lần hoán đổi theo cài đặt của OpenJDK; Javadoc chỉ hứa chi phí bên dưới, không hứa cách sắp xếp mảng cụ thể.</p>
+<p>Từ đó có chi phí trong Javadoc: "thời gian O(log(n)) cho các method thêm và lấy ra (offer, poll, remove() và add); thời gian tuyến tính cho remove(Object) và contains(Object); và thời gian hằng số cho các method truy xuất (peek, element và size)".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a> <code>contains</code> là tuyến tính vì một cây chỉ sắp xếp một nửa không cho bạn biết nên tìm ở nhánh nào.</p>
+<p>Thêm ba quy tắc: nó không cho phép phần tử <code>null</code>; nếu nhiều phần tử cùng nhỏ nhất, "việc phân xử là tùy ý"; và nó không synchronized, nên với nhiều thread hãy "dùng class thread-safe PriorityBlockingQueue".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue javadoc</a></p>
+
+<h2>3. Top-K: câu kinh điển của interview</h2>
+<p>Hãy hình dung một phòng VIP có đúng 3 ghế và một bảo vệ ở cửa. Bảo vệ chỉ nhớ <strong>người yếu nhất bên trong</strong>. Người mới chỉ được vào nếu hơn người yếu nhất đó, và người yếu nhất bị mời ra. Cuối buổi, 3 người bên trong là top 3.</p>
+<p>Phần "nhớ người yếu nhất" là một <strong>min</strong>-heap kích thước K: head của nó là phần tử nhỏ nhất trong top K hiện tại, nên phần tử mới chỉ vào được nếu hơn head.</p>
+<pre><code>PriorityQueue&lt;Integer&gt; heap = new PriorityQueue&lt;&gt;(k);   <span class="c">// min-heap</span>
+for (int x : stream) {
+    if (heap.size() &lt; k) heap.offer(x);                    <span class="c">// room not full yet</span>
+    else if (x &gt; heap.peek()) { heap.poll(); heap.offer(x); } <span class="c">// beats the weakest</span>
+}</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Top 3 của dãy 4, 9, 1, 7, 12, 3 với min-heap kích thước 3. Sau mỗi phần tử heap chứa: 4; 4 9; 1 4 9; rồi 7 thay 1; 12 thay 4; 3 bị loại. Heap cuối cùng 7 9 12.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="28" font-size="11" opacity=".75">vào</text>
+    <text x="120" y="28" font-size="11" opacity=".75">heap sau đó (head trước)</text>
+    <text x="400" y="28" font-size="11" opacity=".75">chuyện gì xảy ra</text>
+    <g>
+      <text x="30" y="56">4</text><text x="130" y="56"><tspan fill="var(--accent)">4</tspan></text><text x="400" y="56" font-size="11">phòng chưa đầy → offer</text>
+      <text x="30" y="84">9</text><text x="130" y="84"><tspan fill="var(--accent)">4</tspan>  9</text><text x="400" y="84" font-size="11">phòng chưa đầy → offer</text>
+      <text x="30" y="112">1</text><text x="130" y="112"><tspan fill="var(--accent)">1</tspan>  4  9</text><text x="400" y="112" font-size="11">phòng chưa đầy → offer</text>
+      <text x="30" y="140">7</text><text x="130" y="140"><tspan fill="var(--accent)">4</tspan>  7  9</text><text x="400" y="140" font-size="11">7 &gt; head 1 → poll 1, offer 7</text>
+      <text x="30" y="168">12</text><text x="130" y="168"><tspan fill="var(--accent)">7</tspan>  9  12</text><text x="400" y="168" font-size="11">12 &gt; head 4 → poll 4, offer 12</text>
+      <text x="30" y="196">3</text><text x="130" y="196"><tspan fill="var(--accent)">7</tspan>  9  12</text><text x="400" y="196" font-size="11">3 &lt; head 7 → bị loại</text>
+    </g>
+    <rect x="120" y="208" width="140" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="190" y="228" text-anchor="middle" fill="var(--accent)">top 3: 12 9 7</text>
+    <path d="M20 40H660" stroke="currentColor" opacity=".3" fill="none"/>
+  </g>
+</svg>
+<figcaption>Head (được tô) là thành viên yếu nhất của top 3 hiện tại. Mỗi phần tử tốn nhiều nhất một poll và một offer trên heap kích thước 3.</figcaption>
+</figure>
+
+<p>Chi phí: O(n log k) thời gian và O(k) bộ nhớ, so với O(n log n) và O(n) nếu sắp xếp tất cả. Nó cũng chạy được trên một stream mà bạn không thể giữ hết trong bộ nhớ. Ví dụ chạy trên một triệu số ngẫu nhiên và chỉ giữ ba số: <code>top 3 of 1,000,000 : [9999989, 9999982, 9999981]</code>.</p>
+<p>Muốn <strong>max</strong>-heap (lớn nhất trước), truyền một comparator: <code>new PriorityQueue&lt;&gt;(Comparator.reverseOrder())</code>. Ví dụ tạo một heap sắp theo độ dài chuỗi, và <code>poll()</code> trả về <code>kubernetes</code>, từ dài nhất.</p>
+
+<h3>Lỗi thường gặp: chọn sai heap</h3>
+<p>Với K phần tử <em>lớn nhất</em>, nhiều người dùng max-heap chứa tất cả rồi poll K lần. Cách đó chạy được, nhưng giữ cả n phần tử: O(n) bộ nhớ. Mẹo là dùng heap ngược lại: <strong>min</strong>-heap kích thước K cho K lớn nhất, <strong>max</strong>-heap kích thước K cho K nhỏ nhất.</p>
+
+<h2>4. ArrayDeque cho mọi thứ còn lại</h2>
+<p>Thường bạn không cần độ ưu tiên, chỉ cần "vào sau, ra trước" (chồng đĩa) hoặc "vào trước, ra trước" (hàng ở ngân hàng). <code>Deque</code> hỗ trợ "thêm và lấy ra ở cả hai đầu".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util summary</a> Hãy dùng <code>ArrayDeque</code>:</p>
+<pre><code>Deque&lt;String&gt; stack = new ArrayDeque&lt;&gt;();
+stack.push("a"); stack.push("b"); stack.push("c");
+stack.pop();                            <span class="hl">// "c": last in, first out</span>
+
+Deque&lt;String&gt; queue = new ArrayDeque&lt;&gt;();
+queue.offer("a"); queue.offer("b"); queue.offer("c");
+queue.poll();                           <span class="hl">// "a": first in, first out</span></code></pre>
+<p>Đó là dòng cuối của lần chạy: <code>stack pop: c   queue poll: a</code>. Javadoc của ArrayDeque nói nó "có khả năng nhanh hơn Stack khi dùng làm stack, và nhanh hơn LinkedList khi dùng làm queue"; nó cấm phần tử <code>null</code> và không thread-safe.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque javadoc</a> Vì vậy hãy tránh class cũ <code>Stack</code> (xem <a href="0002-choosing-a-list.vi.html">bài 0002</a>).</p>
+<p>Ứng dụng điển hình: tìm kiếm theo chiều rộng BFS (queue), tìm kiếm theo chiều sâu DFS và lịch sử undo (stack), giá trị lớn nhất trong cửa sổ trượt (deque). Tất cả chạy giống nhau trên JDK 8, 17 và 21.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>System.out.println(new PriorityQueue&lt;&gt;(List.of(7, 3, 9, 1, 5, 8)))</code> in ra gì?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>[1, 3, 8, 7, 5, 9]</code></button>
+    <button class="opt"><code>[1, 3, 5, 7, 8, 9]</code></button>
+    <button class="opt"><code>[7, 3, 9, 1, 5, 8]</code></button>
+    <button class="opt"><code>[9, 8, 7, 5, 3, 1]</code></button>
+  </div>
+  <div class="why">toString dùng iterator, mà iterator duyệt mảng heap. Chỉ head được đảm bảo là nhỏ nhất; phần còn lại không được sắp xếp.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>PriorityQueue.contains(x)</code> tốn bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Thời gian tuyến tính</button>
+    <button class="opt">Thời gian log</button>
+    <button class="opt">Thời gian hằng số</button>
+    <button class="opt">Thời gian bình phương</button>
+  </div>
+  <div class="why">remove(Object) và contains(Object) là tuyến tính: heap chỉ sắp xếp một nửa, nên Java phải quét cả mảng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn muốn 10 số lớn nhất từ một stream khổng lồ. Bạn giữ heap nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một min-heap kích thước 10</button>
+    <button class="opt">Một max-heap kích thước 10</button>
+    <button class="opt">Một max-heap chứa mọi phần tử</button>
+    <button class="opt">Hai heap, mỗi heap kích thước 5</button>
+  </div>
+  <div class="why">Head của min-heap là phần tử yếu nhất trong top 10 hiện tại, nên đó là phần tử để so sánh và thay thế. Bộ nhớ giữ ở O(k).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Thao tác nào của PriorityQueue chạy trong O(log n)?</p>
+  <div class="options">
+    <button class="opt" data-correct>offer, poll, add và remove()</button>
+    <button class="opt">peek, element và size</button>
+    <button class="opt">contains và remove(Object)</button>
+    <button class="opt">iterator và toString</button>
+  </div>
+  <div class="why">Thêm và lấy ra đi một đường trên cây: O(log n). peek, element và size là hằng số; contains và remove(Object) là tuyến tính.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Làm sao để PriorityQueue trả về phần tử <em>lớn nhất</em> trước?</p>
+  <div class="options">
+    <button class="opt" data-correct>Truyền Comparator.reverseOrder() vào constructor</button>
+    <button class="opt">Gọi pq.reverse() một lần sau khi thêm phần tử</button>
+    <button class="opt">Dùng pollLast() thay cho poll() trên queue đó</button>
+    <button class="opt">Duyệt queue ngược lại bằng một vòng lặp for</button>
+  </div>
+  <div class="why">Head là phần tử nhỏ nhất theo comparator. Đảo comparator thì phần tử lớn nhất trở thành "nhỏ nhất".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong Java hiện đại, nên dùng class nào cho một stack đơn giản?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayDeque</button>
+    <button class="opt">Stack</button>
+    <button class="opt">PriorityQueue</button>
+    <button class="opt">Vector</button>
+  </div>
+  <div class="why">ArrayDeque có khả năng nhanh hơn Stack khi dùng làm stack. Dùng push và pop.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Bạn tìm top 10 trong một tỷ số thế nào? Dùng class Java nào, và tốn bao nhiêu?"</strong> Bấm giờ. Trả lời thành tiếng, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Dùng <code>PriorityQueue</code>, là một binary heap; head là phần tử nhỏ nhất.</label></li>
+      <li><label><input type="checkbox"> Giữ một <strong>min</strong>-heap kích thước K; thay head khi phần tử mới lớn hơn.</label></li>
+      <li><label><input type="checkbox"> Chi phí O(n log k) thời gian và O(k) bộ nhớ, so với O(n log n) nếu sort.</label></li>
+      <li><label><input type="checkbox"> Chạy được trên stream không vừa bộ nhớ.</label></li>
+      <li><label><input type="checkbox"> offer/poll là O(log n), peek O(1), contains O(n).</label></li>
+      <li><label><input type="checkbox"> Duyệt hoặc in queue không ra thứ tự đã sắp xếp; phải poll liên tục hoặc sort kết quả.</label></li>
+      <li><label><input type="checkbox"> Không thread-safe: dùng <code>PriorityBlockingQueue</code> cho nhiều thread.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Em sẽ duyệt qua các số một lần và giữ một PriorityQueue kích thước 10 làm min-heap. PriorityQueue là binary heap, nên head luôn là phần tử nhỏ nhất. Với mỗi số, nếu heap chưa đủ 10 phần tử thì em offer; còn không, nếu số đó lớn hơn head thì em poll head ra và offer số mới. Head luôn là phần tử yếu nhất trong top 10 hiện tại, nên đó là cái cần vượt qua. Mỗi bước là O(log 10), nên tổng cộng là O(n log k) thời gian và chỉ O(k) bộ nhớ, điều này quan trọng với một tỷ số không vừa bộ nhớ. Cuối cùng em sort 10 số đó, vì duyệt PriorityQueue không cho thứ tự đã sắp xếp. Và nếu nhiều thread cùng đưa dữ liệu vào, em dùng PriorityBlockingQueue."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0035-top-k-and-scheduling.vi.md">Bài tập 0035: top-K và lập lịch</a>. Vẽ heap ra giấy sau mỗi bước trước khi chạy bất cứ thứ gì.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/PriorityQueueTopK.java"><code>PriorityQueueTopK.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi: <em>"Key của bạn là enum. Map của bạn cần so sánh object theo identity. Entry trong cache cần tự biến mất khi không ai dùng key nữa. Giờ dùng map nào?"</em> <a href="0036-enummap-identity-and-weak-maps.vi.html">Bài 0036</a> nói về các map chuyên dụng.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue Javadoc (JDK 21)</a>. Phần mô tả class ngắn: đọc hết, đặc biệt đoạn về độ phức tạp.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao heap được lưu trong mảng?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0034-treemap-and-navigable-maps.vi.html">← TreeMap và NavigableMap: truy vấn khoảng và key gần nhất</a> &nbsp;|&nbsp; <a href="0036-enummap-identity-and-weak-maps.vi.html">EnumMap, EnumSet, IdentityHashMap và WeakHashMap →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/PriorityQueue.java">OpenJDK 21 PriorityQueue.java</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

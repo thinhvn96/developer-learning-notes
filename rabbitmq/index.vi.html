@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình RabbitMQ</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>RabbitMQ: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình RabbitMQ · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="rabbitmq" data-total="9">9 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Exchange, ack, publisher confirm, DLX, TTL, quorum queue, stream, clustering. 9 bài theo thứ tự nên đọc, học xong bài nào thì tick bài đó (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Foundation</h2>
+<ol class="steps" data-stack="rabbitmq">
+<li data-id="0001-amqp-model-exchanges-queues-bindings"><a href="lessons/0001-amqp-model-exchanges-queues-bindings.vi.html">Mô hình AMQP: exchange, queue và binding</a></li>
+<li data-id="0002-exchange-types"><a href="lessons/0002-exchange-types.vi.html">Exchange kiểu direct, fanout và topic</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="rabbitmq">
+<li data-id="0003-acks-prefetch-redelivery"><a href="lessons/0003-acks-prefetch-redelivery.vi.html">Consumer acknowledgement, prefetch và redelivery</a></li>
+<li data-id="0004-publisher-confirms-and-durability"><a href="lessons/0004-publisher-confirms-and-durability.vi.html">Publisher confirm và độ bền dữ liệu</a></li>
+<li data-id="0007-message-ttl"><a href="lessons/0007-message-ttl.vi.html">Message TTL: hết hạn theo queue và theo từng message</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="rabbitmq">
+<li data-id="0005-dead-letter-exchanges"><a href="lessons/0005-dead-letter-exchanges.vi.html">Dead letter exchange</a></li>
+<li data-id="0006-quorum-queues-and-poison-messages"><a href="lessons/0006-quorum-queues-and-poison-messages.vi.html">Quorum queue và poison message</a></li>
+<li data-id="0008-streams"><a href="lessons/0008-streams.vi.html">Stream: một append-only log ngay trong RabbitMQ</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="rabbitmq">
+<li data-id="0009-clustering-and-replicated-queues"><a href="lessons/0009-clustering-and-replicated-queues.vi.html">Clustering: node, số lẻ và replicated queue</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Client Spring AMQP <span class="meta">(dự kiến)</span></li>
+<li>Monitoring và alarm <span class="meta">(dự kiến)</span></li>
+<li>Federation và shovel <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> nếu muốn thêm, đổi thứ tự hoặc bỏ qua bài nào, hoặc nhờ chạy một buổi phỏng vấn thử dựa trên <a href="interview.vi.html">trang hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

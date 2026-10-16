@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 7: Prototype</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Prototype</h1>
+<p class="meta">Design Patterns · Bài 0007 · bước 7/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-prototype.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> sao chép một object đã được cấu hình sẵn, và biết chọn giữa shallow copy với deep copy.</div>
+
+<h2>Mục đích</h2>
+<p>Prototype là "một creational design pattern cho phép bạn sao chép các object có sẵn mà code không phải phụ thuộc vào class của chúng." Hãy dùng nó khi code không nên phụ thuộc vào các class cụ thể mà nó sao chép, hoặc để tránh tạo ra những subclass chỉ khác nhau ở phần khởi tạo, bằng cách clone các object đã cấu hình sẵn.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/PrototypeDemo.java
+template : orc(hp=100, items=[club, shield])
+shallow  : orc-2(hp=100, items=[club, shield])   &lt;- shares the SAME list object
+deep     : orc-3(hp=100, items=[club])   &lt;- has its own list</code></pre><p>Bản <em>shallow</em> copy dùng chung list với template, nên thay đổi sau này trên template sẽ hiện ra cả ở bản sao; bản <em>deep</em> copy có list riêng của nó. Cơ chế có sẵn của Java là <code>Cloneable</code>/<code>Object.clone</code>; copy constructor hoặc copy method (như ở đây) thường rõ ràng hơn (đây là khuyến nghị của tôi; trang mô tả pattern không gắn với ngôn ngữ nào). Mã nguồn: <a href="../examples/PrototypeDemo.java"><code>PrototypeDemo.java</code></a>. Liên quan: <a href="../../oop/lessons/0014-immutability.vi.html">immutability và defensive copy</a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Clone object mà không phụ thuộc class cụ thể của nó</li><li>Tránh khởi tạo lặp lại bằng cách clone từ template</li><li>Thay thế cho kế thừa khi cần các bộ cấu hình dựng sẵn</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Sao chép object phức tạp có tham chiếu vòng rất khó</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a> Nó có thể thay Memento cho các snapshot trạng thái đơn giản, giúp Command lưu lịch sử, và tăng tốc các thiết kế dùng nhiều Composite/Decorator bằng cách clone cả cấu trúc.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Prototype tạo object bằng cách...?</p>
+  <button>Gọi một factory</button>
+  <button data-correct>Sao chép object có sẵn</button>
+  <button>Dùng thread</button>
+  <button>Parse văn bản</button>
+  <p class="explain">Nó sao chép object có sẵn mà không phụ thuộc vào class của chúng.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Shallow copy của một field kiểu list thì dùng chung...?</p>
+  <button>Class</button>
+  <button>Không gì cả</button>
+  <button data-correct>Cùng một list</button>
+  <button>Một list mới</button>
+  <p class="explain">Bản shallow copy trong demo thấy được phần tử mà template thêm vào sau đó.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Trường hợp khó với prototype?</p>
+  <button>String</button>
+  <button data-correct>Tham chiếu vòng</button>
+  <button>Enum</button>
+  <button>Int</button>
+  <p class="explain">Nhân bản object phức tạp có tham chiếu vòng là việc khó.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lợi ích?</p>
+  <button>GC nhanh hơn</button>
+  <button>Không cần class</button>
+  <button>Ít field hơn</button>
+  <button data-correct>Tránh khởi tạo lặp lại</button>
+  <p class="explain">Clone từ template dựng sẵn giúp bỏ được việc khởi tạo lặp đi lặp lại.<a class="cite" href="https://refactoring.guru/design-patterns/prototype">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-copy-a-document.vi.md">Bài tập 7: sao chép một document</a></p>
+<p>Ví dụ chạy được: <a href="../examples/PrototypeDemo.java"><code>PrototypeDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/prototype">Prototype (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0006-builder.vi.html">← Builder</a> &nbsp;|&nbsp; <a href="0008-singleton.vi.html">Singleton →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/prototype">Prototype (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

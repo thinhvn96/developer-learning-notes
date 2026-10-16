@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 40: Ôn tập 1: string, exception và generic</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ôn tập 1: string, exception và generic</h1>
+<p class="subtitle">Câu hỏi trộn lẫn từ bài 0018 tới 0021, để các ý gắn kết với nhau và bật ra nhanh trong buổi interview.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0040 · bước 5/46 · Review · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0040-review-fundamentals.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Đọc một bài một lần thì có cảm giác đã học, nhưng interview kiểm tra thứ bạn <em>lôi ra được từ trí nhớ</em>, trộn lẫn và không theo thứ tự. Bài ôn này không có thông tin mới. Nó bắt bạn nhớ lại bốn bài vừa học, trộn ngẫu nhiên, và chính điều đó giúp kiến thức ở lại lâu.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> đạt ít nhất 10/12 câu quiz trộn, trả lời ba câu trong 60 giây, và tìm ra các bug trong một đoạn code nhỏ.</div>
+
+<dl class="words">
+  <dt>immutable</dt><dd>Bất biến: không đổi được sau khi tạo; "đổi" nghĩa là tạo object mới (<a href="0018-strings-immutability-and-stringbuilder.vi.html">0018</a>).</dd>
+  <dt>string pool</dt><dd>Tập string dùng chung do <code>String</code> giữ; các literal giống nhau trỏ về một object (<a href="0018-strings-immutability-and-stringbuilder.vi.html">0018</a>).</dd>
+  <dt>checked</dt><dd>Exception bạn phải catch hoặc khai báo bằng <code>throws</code> (<a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">0019</a>).</dd>
+  <dt>suppressed</dt><dd>Exception từ <code>close()</code> được gắn vào exception của phần thân thay vì thay thế nó (<a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">0019</a>).</dd>
+  <dt>invariant</dt><dd><code>List&lt;Integer&gt;</code> và <code>List&lt;Number&gt;</code> là hai kiểu không liên quan (<a href="0020-generics-basics-and-invariance.vi.html">0020</a>).</dd>
+  <dt>PECS</dt><dd>Producer <code>extends</code>, consumer <code>super</code>: quy tắc chọn wildcard (<a href="0021-wildcards-and-type-erasure.vi.html">0021</a>).</dd>
+  <dt>erasure</dt><dd>Type argument được compiler kiểm tra, rồi bị xóa (<a href="0021-wildcards-and-type-erasure.vi.html">0021</a>).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Không nhìn lại, hãy nói thành tiếng <strong>mỗi bài một bug compile được bình thường nhưng hỏng hoặc chạy sai lúc runtime</strong>. Nếu bạn chỉ tìm được hai, điều đó đã cho bạn biết cần xem lại chỗ nào trong bảng ở cuối bài.</p>
+
+<h2>1. Bức tranh lớn: ai bắt được bug?</h2>
+<p>Hãy nghĩ tới hai tấm lưới an toàn. Tấm thứ nhất là compiler: nó chặn bug trước khi chương trình kịp chạy. Tấm thứ hai là chương trình đang chạy: bug lộ ra muộn, thường là trên production, dưới dạng kết quả sai hoặc exception. Nhiều bài trong phần này xoay quanh cùng một ý: <strong>ưu tiên code để tấm lưới thứ nhất bắt được bug</strong>.</p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="Cột trái, các bug javac chặn: checked exception không được xử lý, List của Number bằng ints, List của int, add vào wildcard extends, instanceof List của String. Cột phải, các bug lọt tới lúc chạy: so string bằng ==, += trong vòng lặp, lưu vào mảng, cast sai từ raw list, close trong finally che lỗi.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <text x="175" y="30" text-anchor="middle" font-size="12">javac chặn được (compile time)</text>
+    <text x="505" y="30" text-anchor="middle" font-size="12" fill="var(--accent)">lọt tới lúc chạy (run time)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="44" width="310" height="34" rx="5"/>
+      <rect x="20" y="88" width="310" height="34" rx="5"/>
+      <rect x="20" y="132" width="310" height="34" rx="5"/>
+      <rect x="20" y="176" width="310" height="34" rx="5"/>
+      <rect x="20" y="220" width="310" height="34" rx="5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="350" y="44" width="310" height="34" rx="5"/>
+      <rect x="350" y="88" width="310" height="34" rx="5"/>
+      <rect x="350" y="132" width="310" height="34" rx="5"/>
+      <rect x="350" y="176" width="310" height="34" rx="5"/>
+      <rect x="350" y="220" width="310" height="34" rx="5"/>
+    </g>
+    <text x="32" y="65">uncaught checked IOException (0019)</text>
+    <text x="32" y="109">List&lt;Number&gt; nums = ints;   (0020)</text>
+    <text x="32" y="153">List&lt;int&gt; scores;           (0020)</text>
+    <text x="32" y="197">add(1) to List&lt;? extends N&gt; (0021)</text>
+    <text x="32" y="241">obj instanceof List&lt;String&gt; (0021)</text>
+    <g fill="var(--accent)">
+      <text x="362" y="65">role == "ADMIN" on input   (0018)</text>
+      <text x="362" y="109">s += x trong vòng lặp      (0018)</text>
+      <text x="362" y="153">arr[0] = 3.14 in Integer[] (0020)</text>
+      <text x="362" y="197">cast sai từ raw List       (0020)</text>
+      <text x="362" y="241">close() trong finally che lỗi (0019)</text>
+    </g>
+    <text x="340" y="284" text-anchor="middle" font-size="12">generic và checked exception đẩy bug sang cột trái</text>
+  </g>
+</svg>
+<figcaption>Mười bug trong phần này, xếp theo tấm lưới an toàn nào bắt được chúng. Cột phải là nơi sinh ra câu hỏi interview (và sự cố).</figcaption>
+</figure>
+
+<p>Dành mười giây cho mỗi ô và nói vì sao nó nằm ở cột đó. Nếu ô nào chưa rõ, số bài nằm ngay đó.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>String a = "hi"; String b = new String("hi");</code> Vậy <code>a == b</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>false, new luôn tạo ra một object khác</button>
+    <button class="opt">true, cả hai có cùng các ký tự bên trong</button>
+    <button class="opt">true, new String dùng lại bản trong pool</button>
+    <button class="opt">Không compile được với object String</button>
+  </div>
+  <div class="why"><code>==</code> so reference, và <code>new</code> tạo object riêng. Xem <a href="0018-strings-immutability-and-stringbuilder.vi.html">bài 0018</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Compiler bắt bạn catch hoặc khai báo những exception nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lớp con của Exception mà không phải RuntimeException</button>
+    <button class="opt">RuntimeException và tất cả các lớp con của nó</button>
+    <button class="opt">Error và tất cả các lớp con của nó nữa</button>
+    <button class="opt">Mọi Throwable, không có ngoại lệ nào cả</button>
+  </div>
+  <div class="why">Unchecked = <code>RuntimeException</code>, <code>Error</code> và lớp con; còn lại là checked. Xem <a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">bài 0019</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một method phải nhận được <code>List&lt;Integer&gt;</code> và <code>List&lt;Double&gt;</code>, và chỉ đọc chúng. Dùng kiểu tham số nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? extends Number&gt;</button>
+    <button class="opt">List&lt;? super Number&gt;</button>
+    <button class="opt">List&lt;Number&gt;</button>
+    <button class="opt">List&lt;Object&gt;</button>
+  </div>
+  <div class="why">Producer ("in") dùng <code>extends</code>; <code>List&lt;Number&gt;</code> sẽ từ chối cả hai (invariance). Xem <a href="0021-wildcards-and-type-erasure.vi.html">bài 0021</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">try-with-resources mở A, rồi B. Phần thân ném X, và <code>close()</code> của B ném Y. Catch thấy gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>X, có Y trong getSuppressed(); B đóng trước A</button>
+    <button class="opt">Y, có X trong getSuppressed(); A đóng trước B</button>
+    <button class="opt">Chỉ Y, vì exception cuối cùng luôn thắng</button>
+    <button class="opt">Chỉ X; Y bị mất và A không bao giờ được đóng</button>
+  </div>
+  <div class="why">Đóng theo thứ tự ngược, exception của phần thân thắng, exception của close bị nén lại. Xem <a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">bài 0019</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>List&lt;Integer&gt;</code> không phải <code>List&lt;Number&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Qua góc nhìn Number bạn có thể add một Double vào</button>
+    <button class="opt">Integer là final nên không có quan hệ gì với Number</button>
+    <button class="opt">Generic bị xóa kiểu nên không thể có kiểu con</button>
+    <button class="opt">List số phải được chuyển bằng stream trước đã</button>
+  </div>
+  <div class="why">Cho phép thì phá vỡ type safety. Xem <a href="0020-generics-basics-and-invariance.vi.html">bài 0020</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Đoạn này in ra gì? <code>String s = "a"; s.toUpperCase(); System.out.println(s);</code></p>
+  <div class="options">
+    <button class="opt" data-correct>a</button>
+    <button class="opt">A</button>
+    <button class="opt">null</button>
+    <button class="opt">aA</button>
+  </div>
+  <div class="why">String là bất biến; string mới từ <code>toUpperCase()</code> đã bị bỏ đi. Xem <a href="0018-strings-immutability-and-stringbuilder.vi.html">bài 0018</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Lúc chạy, điều gì đúng về <code>List&lt;String&gt;</code> và <code>List&lt;Integer&gt;</code> cùng được tạo bằng <code>ArrayList</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chúng dùng chung một class: getClass() bằng nhau</button>
+    <button class="opt">Mỗi cái có một file class được sinh ra riêng</button>
+    <button class="opt">JVM kiểm tra kiểu ở mỗi lần gọi add()</button>
+    <button class="opt">instanceof phân biệt được hai cái một cách chắc chắn</button>
+  </div>
+  <div class="why">Type erasure không tạo class mới cho parameterized type. Xem <a href="0021-wildcards-and-type-erasure.vi.html">bài 0021</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Method của bạn đọc file config, và bên gọi có thể dùng giá trị mặc định nếu thiếu file. Checked hay unchecked?</p>
+  <div class="options">
+    <button class="opt" data-correct>Checked, vì bên gọi có thể phục hồi hợp lý</button>
+    <button class="opt">Unchecked, vì file nằm ngoài chương trình</button>
+    <button class="opt">Một Error, vì thiếu file là chuyện nghiêm trọng</button>
+    <button class="opt">Không loại nào; trả về null và log cảnh báo</button>
+  </div>
+  <div class="why">Hướng dẫn của tutorial: phục hồi được → checked; không phục hồi được → unchecked. Xem <a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">bài 0019</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Number[] arr = new Integer[2]; arr[0] = 1.5;</code> Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compile được, rồi ném ArrayStoreException</button>
+    <button class="opt">Không compile được, giống bản dùng List</button>
+    <button class="opt">Lưu được 1.5, vì mảng chứa mọi Number</button>
+    <button class="opt">Ném ClassCastException ngay ở dòng đầu</button>
+  </div>
+  <div class="why">Mảng là covariant và được kiểm tra lúc chạy; generic là invariant và được kiểm tra lúc compile. Xem <a href="0020-generics-basics-and-invariance.vi.html">bài 0020</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Dòng nào là cách an toàn nhất để kiểm tra input của người dùng?</p>
+  <div class="options">
+    <button class="opt" data-correct>if ("yes".equals(answer))</button>
+    <button class="opt">if (answer == "yes")</button>
+    <button class="opt">if (answer.equals("yes"))</button>
+    <button class="opt">if (answer.compareTo("yes") &gt; 0)</button>
+  </div>
+  <div class="why">So nội dung bằng <code>equals</code>, literal đứng trước để <code>null</code> chỉ cho ra false. Xem <a href="0018-strings-immutability-and-stringbuilder.vi.html">bài 0018</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một method chỉ <em>add</em> Integer vào list do bên gọi đưa vào. Kiểu nào cho phép bên gọi truyền <code>List&lt;Object&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? super Integer&gt;</button>
+    <button class="opt">List&lt;? extends Integer&gt;</button>
+    <button class="opt">List&lt;Integer&gt;</button>
+    <button class="opt">List&lt;? extends Object&gt;</button>
+  </div>
+  <div class="why">Consumer ("out") dùng <code>super</code>. Xem <a href="0021-wildcards-and-type-erasure.vi.html">bài 0021</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Lý do tốt nhất để ghép một string dài bằng <code>StringBuilder</code> trong vòng lặp là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mỗi += sẽ tạo một String mới và chép lại chữ cũ</button>
+    <button class="opt">StringBuilder thread-safe nên vòng lặp chạy nhanh hơn</button>
+    <button class="opt">Toán tử + hoàn toàn không dùng được trong vòng lặp</button>
+    <button class="opt">StringBuilder bỏ từng mảnh vào string pool giúp bạn</button>
+  </div>
+  <div class="why">String là bất biến; <code>StringBuilder</code> ghi vào một buffer (và nó <em>không</em> thread-safe). Xem <a href="0018-strings-immutability-and-stringbuilder.vi.html">bài 0018</a>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<p>Lần này có ba câu hỏi. Làm từng câu một, có bấm giờ, nói thành tiếng.</p>
+
+<div class="recall">
+  <p class="prompt">Câu 1: <strong>"Vì sao String là immutable, và dùng <code>==</code> thì hỏng ở đâu?"</strong></p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> String không đổi được; các method trả về string mới.</label></li>
+      <li><label><input type="checkbox"> Nhờ vậy dùng chung an toàn: giữa các thread, làm key của map, trong string pool.</label></li>
+      <li><label><input type="checkbox"> <code>==</code> so reference; literal dùng chung một object trong pool, string tạo lúc chạy thì không.</label></li>
+      <li><label><input type="checkbox"> Dùng <code>equals</code>, literal đứng trước; dùng <code>StringBuilder</code> trong vòng lặp.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"String là immutable, nên mọi thay đổi đều cho em một string mới. Nhờ vậy nó dùng chung an toàn, và Java giữ được một pool mà các literal giống nhau là cùng một object. Đó là cái bẫy của <code>==</code>: nó so reference, nên đúng với hai literal nhưng sai với string lấy từ request. Em luôn so bằng <code>"x".equals(value)</code>, còn trong vòng lặp thì ghép chữ bằng <code>StringBuilder</code>."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 2: <strong>"Checked và unchecked exception khác nhau thế nào, và try-with-resources xử lý ra sao khi có lỗi?"</strong></p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Unchecked = <code>RuntimeException</code>, <code>Error</code> và lớp con; còn lại là checked.</label></li>
+      <li><label><input type="checkbox"> Checked phải catch hoặc khai báo; dùng khi bên gọi phục hồi được.</label></li>
+      <li><label><input type="checkbox"> try-with-resources đóng các <code>AutoCloseable</code> theo thứ tự ngược, trước catch/finally.</label></li>
+      <li><label><input type="checkbox"> Exception của phần thân thắng; exception của close nằm trong <code>getSuppressed()</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Runtime exception và error là unchecked; mọi exception khác là checked, nên em phải catch hoặc khai báo bằng <code>throws</code>. Em làm exception thành checked khi bên gọi có thể phục hồi hợp lý. Với resource thì em dùng try-with-resources: nó đóng theo thứ tự ngược trước khi catch chạy, và nếu cả phần thân lẫn <code>close</code> đều hỏng, em nhận exception của phần thân, còn cái của close được gắn vào dạng suppressed."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 3: <strong>"<code>List&lt;Integer&gt;</code> có phải <code>List&lt;Number&gt;</code> không? Giải thích wildcard và erasure."</strong></p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Không: generic là invariant, nếu không bạn có thể add Double qua góc nhìn Number.</label></li>
+      <li><label><input type="checkbox"> Mảng là covariant và hỏng muộn với <code>ArrayStoreException</code>.</label></li>
+      <li><label><input type="checkbox"> PECS: đọc → <code>? extends</code>, ghi → <code>? super</code> (<code>Collections.copy</code>).</label></li>
+      <li><label><input type="checkbox"> Erasure: type argument bị xóa sau compile; một class lúc chạy, không <code>instanceof List&lt;String&gt;</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Không. Generic là invariant: nếu <code>List&lt;Integer&gt;</code> là <code>List&lt;Number&gt;</code> thì em add được Double vào nó. Mảng cho phép chuyện đó và hỏng lúc chạy với <code>ArrayStoreException</code>. Để nhận nhiều kiểu list, em dùng wildcard: <code>? extends</code> cho list em đọc ra, <code>? super</code> cho list em ghi vào, như trong <code>Collections.copy</code>. Và generic bị xóa sau khi compile, nên lúc chạy mọi ArrayList là một class và em không kiểm tra được <code>instanceof List&lt;String&gt;</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bài tập trộn: tìm bug</h2>
+<p>Class nhỏ này compile được (giả sử <code>Order</code> là record có <code>id()</code>). Nó giấu <strong>bốn</strong> vấn đề từ ba bài khác nhau. Tìm ít nhất ba, nói mỗi cái thuộc bài nào và cách sửa. Rồi mới mở đáp án.</p>
+<pre><code>class ReportService {
+    String build(List&lt;Order&gt; orders) {
+        String report = "";
+        for (Order o : orders) report += o.id() + "\n";
+        return report;
+    }
+
+    boolean isAdmin(String role) {           <span class="c">// role comes from a request</span>
+        return role == "ADMIN";
+    }
+
+    void save(String text) {
+        try {
+            FileWriter w = new FileWriter("report.txt");
+            w.write(text);
+            w.close();
+        } catch (IOException e) { }
+    }
+
+    double total(List&lt;Number&gt; amounts) {     <span class="c">// callers have List&lt;Integer&gt;</span>
+        double t = 0;
+        for (Number n : amounts) t += n.doubleValue();
+        return t;
+    }
+}</code></pre>
+<details>
+<summary>Hiện đáp án</summary>
+<ol class="steps">
+  <li><strong><code>report +=</code> trong vòng lặp</strong> (<a href="0018-strings-immutability-and-stringbuilder.vi.html">0018</a>): mỗi order một String mới. Dùng một <code>StringBuilder</code>.</li>
+  <li><strong><code>role == "ADMIN"</code></strong> (<a href="0018-strings-immutability-and-stringbuilder.vi.html">0018</a>): so reference; string tạo lúc chạy là object mới. Dùng <code>"ADMIN".equals(role)</code>.</li>
+  <li><strong>Writer không được đóng nếu <code>write</code> hỏng, và lỗi bị nuốt mất</strong> (<a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">0019</a>): dùng <code>try (FileWriter w = new FileWriter(...))</code> và log hoặc ném lại trong catch.</li>
+  <li><strong>Tham số <code>List&lt;Number&gt;</code></strong> (<a href="0020-generics-basics-and-invariance.vi.html">0020</a>, <a href="0021-wildcards-and-type-erasure.vi.html">0021</a>): bên gọi có <code>List&lt;Integer&gt;</code> sẽ bị lỗi compile. Dùng <code>List&lt;? extends Number&gt;</code>.</li>
+</ol>
+</details>
+
+<h2>Nên quay lại bài nào</h2>
+<table>
+<tr><th>Nếu bạn sai các câu về…</th><th>Đọc lại</th></tr>
+<tr><td><code>==</code> và <code>equals</code>, string pool, <code>intern()</code>, <code>StringBuilder</code></td><td><a href="0018-strings-immutability-and-stringbuilder.vi.html">Bài 0018</a></td></tr>
+<tr><td>checked và unchecked, catch or specify, thứ tự đóng, suppressed exception</td><td><a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">Bài 0019</a></td></tr>
+<tr><td>lợi ích của generic, invariance, mảng so với generic, primitive trong <code>&lt;&gt;</code></td><td><a href="0020-generics-basics-and-invariance.vi.html">Bài 0020</a></td></tr>
+<tr><td><code>? extends</code> / <code>? super</code>, PECS, erasure và các giới hạn của nó</td><td><a href="0021-wildcards-and-type-erasure.vi.html">Bài 0021</a></td></tr>
+</table>
+
+<h2>Bây giờ làm bài tập</h2>
+<p>Nếu bài tập nào trong bốn bài còn lấn cấn, hãy làm lại từ đầu mà không xem đáp án cũ: <a href="../exercises/0018-string-traps.vi.md">0018 các bẫy với string</a> · <a href="../exercises/0019-design-an-exception-hierarchy.vi.md">0019 thiết kế exception</a> · <a href="../exercises/0020-generic-utility.vi.md">0020 một tiện ích generic</a> · <a href="../exercises/0021-copy-with-wildcards.vi.md">0021 copy với wildcard</a>.</p>
+<p>Ví dụ chạy được: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a> · <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a> · <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Phần tiếp theo là Collections Framework. Ở đó generic có mặt khắp nơi (<code>List&lt;E&gt;</code>, <code>Map&lt;K, V&gt;</code>), và wildcard cũng vậy (<code>Collections.copy</code>, <code>addAll(Collection&lt;? extends E&gt;)</code>). Bắt đầu với <a href="0028-collections-framework-map.vi.html">bài 0028: bản đồ Collections Framework</a>.</p>
+<p><strong>Đọc thêm:</strong> các link "Đọc thêm" ở cuối bài 0018 tới 0021. Đó là nguồn chính cho mọi thứ trong bài ôn này.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Cho mình thêm năm câu hỏi trộn nữa"</em> hoặc <em>"Chấm giúp ba câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz, điểm checklist và số bug bạn tìm được: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0021-wildcards-and-type-erasure.vi.html">← Khi nào viết ? extends, khi nào viết ? super</a> &nbsp;|&nbsp; <a href="0028-collections-framework-map.vi.html">Bản đồ các collection trong Java →</a></p>
+
+<footer>
+  <p>Bài ôn tập: không có thông tin mới. Mọi thứ ở đây lấy từ bài 0018 tới 0021, vốn đã được kiểm tra với tài liệu Java 21, Java Tutorials và Java Language Specification, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="0018-strings-immutability-and-stringbuilder.vi.html">Bài 0018</a> · <a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">Bài 0019</a> · <a href="0020-generics-basics-and-invariance.vi.html">Bài 0020</a> · <a href="0021-wildcards-and-type-erasure.vi.html">Bài 0021</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

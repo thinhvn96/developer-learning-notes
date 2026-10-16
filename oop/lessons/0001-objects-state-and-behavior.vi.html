@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 1: Object: state, behavior và encapsulation</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Object: state, behavior và encapsulation</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0001 · bước 1/22 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-objects-state-and-behavior.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> định nghĩa được object, state (trạng thái), behavior (hành vi) và encapsulation (đóng gói), và chỉ ra được encapsulation bảo vệ một invariant (bất biến) như thế nào.</div>
+
+<h2>State và behavior</h2>
+<p>Theo tutorial, "các object ngoài đời thực đều có chung hai đặc điểm: chúng đều có <em>state</em> và <em>behavior</em>." Một object trong phần mềm lưu state trong các <em>field</em> và phơi bày behavior của nó qua các <em>method</em>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+<h2>Encapsulation</h2>
+<p>"Việc che giấu state bên trong và bắt buộc mọi tương tác phải đi qua các method của object được gọi là <em>data encapsulation</em>": một nguyên lý nền tảng của OOP.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a> Tutorial liệt kê những lợi ích của việc gói code vào object: tính module, che giấu thông tin, tái sử dụng code, dễ thay thế (pluggability) và dễ debug.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+<h2>Xem nó bảo vệ một invariant</h2>
+<p><code>BankAccount</code> giữ <code>balance</code> ở dạng private, nên quy tắc "số dư không bao giờ âm" được kiểm soát ở đúng hai method, và không có gì bên ngoài có thể phá vỡ nó.</p>
+<pre><code>java oop/examples/BankAccountDemo.java
+ann has 120
+rejected: insufficient funds
+rejected: deposit must be positive</code></pre>
+<p>Mã nguồn: <a href="../examples/BankAccountDemo.java"><code>BankAccountDemo.java</code></a>. Dòng bị comment <code>a.balance = -1_000_000</code> sẽ không compile được. Hãy so sánh với <a href="../../java/lessons/0003-records-and-immutability.vi.html">bài về record</a>: record giúp trường hợp "đối tượng chỉ mang dữ liệu một cách trong suốt" trở nên rẻ.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Object nào cũng có hai thứ gì?</p>
+  <button>Field và file</button>
+  <button data-correct>State và behavior</button>
+  <button>Heap và stack</button>
+  <button>Tên và kiểu</button>
+  <p class="explain">Object có state (field) và behavior (method).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Data encapsulation là gì?</p>
+  <button>Sao chép object</button>
+  <button data-correct>Giấu state sau các method</button>
+  <button>Nén dữ liệu</button>
+  <button>Mã hoá các field</button>
+  <p class="explain">Che giấu state bên trong và bắt buộc tương tác phải đi qua method.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Trong demo, quy tắc về số dư được kiểm soát ở đâu?</p>
+  <button>Ở mọi nơi gọi</button>
+  <button>Trong một comment</button>
+  <button data-correct>Trong các method của account</button>
+  <button>Chỉ trong main</button>
+  <p class="explain">Field private chỉ có thể thay đổi qua deposit và withdraw.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một lợi ích của việc gói code vào object?</p>
+  <button>Không có exception</button>
+  <button>Phần cứng nhanh hơn</button>
+  <button>Ít class hơn</button>
+  <button data-correct>Che giấu thông tin</button>
+  <p class="explain">Tính module, che giấu thông tin, tái sử dụng và dễ thay thế.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-model-a-thermostat.vi.md">Bài tập 1: mô hình hoá một thermostat</a></p>
+<p>Ví dụ chạy được: <a href="../examples/BankAccountDemo.java"><code>BankAccountDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">Java Tutorials: What Is an Object?</a>. Đọc hết trang (khoảng năm phút).</p>
+<p> &nbsp;|&nbsp; <a href="0002-classes-and-instances.vi.html">Class, instance và constructor →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/object.html">Java Tutorials: What Is an Object?</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

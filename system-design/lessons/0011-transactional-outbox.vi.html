@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 11: Transactional outbox</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Transactional outbox</h1>
+<p class="meta">System Design · Bài 0011 · bước 10/11 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-transactional-outbox.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được vấn đề dual-write (ghi kép) và cách transactional outbox giải quyết nó, kể cả lý do consumer vẫn cần idempotent.</div>
+
+<h2>Vấn đề</h2>
+<p>Một service lưu order, rồi publish event <code>OrderCreated</code>. Nếu việc publish thất bại giữa hai bước (lỗi mạng, broker sập, host hỏng), các service khác sẽ không bao giờ được báo, và "event bị mất có thể gây ra sự không nhất quán dữ liệu trên toàn ứng dụng".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+<h2>Giải pháp</h2>
+<p>Transactional Outbox "lưu event vào một data store, thường là một outbox table trong database của bạn, trước khi đẩy chúng tới message broker". Business object và event được lưu trong cùng một transaction, transaction đó "hoặc commit tất cả, hoặc rollback tất cả". Một worker riêng query các bản ghi chưa xử lý, publish chúng và đánh dấu là đã xử lý.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a> <em>Thứ tự</em> event phải được giữ nguyên; và hướng dẫn gắn pattern này với việc xử lý message idempotent.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh ../../system-design/examples/05-outbox.sql
+success : orders=1, outbox=1 (committed together)
+failure : CHECK violation on the order -&gt; ROLLBACK -&gt; no outbox row for the failed order
+relay   : SELECT unpublished -&gt; publish -&gt; UPDATE published = true</code></pre>
+<p>Nếu relay crash sau khi publish nhưng trước khi update, nó sẽ publish lại: đó là at-least-once, nên consumer phải idempotent (xem <a href="../../kafka/lessons/0004-delivery-semantics.vi.html">delivery semantics của Kafka</a>). Mã nguồn: <a href="../examples/05-outbox.sql"><code>05-outbox.sql</code></a>. Bản hiện thực trong hướng dẫn của Azure dùng change feed của Cosmos DB và Service Bus; bản relational ở trên là dạng tổng quát của pattern. Các lựa chọn thay thế được nêu trong hướng dẫn: những library như NServiceBus hoặc MassTransit có sẵn outbox.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a> Liên quan: <a href="0009-saga.vi.html">saga</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Vấn đề dual-write là gì?</p>
+  <button>Hai database lệch nhau</button>
+  <button data-correct>Lưu rồi publish có thể lỗi nửa chừng</button>
+  <button>Hai queue gộp lại</button>
+  <button>Hai cache cùng hết hạn</button>
+  <p class="explain">Một lỗi xảy ra giữa lúc lưu và lúc publish sẽ làm mất event.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Event được ghi vào đâu trước tiên?</p>
+  <button>Thẳng tới broker</button>
+  <button data-correct>Một outbox table trong cùng database</button>
+  <button>Vào một cache</button>
+  <button>Vào một file log</button>
+  <p class="explain">Event được lưu cùng business object trong một transaction.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Ai publish các event?</p>
+  <button>Chỉ trigger của database</button>
+  <button>Không ai cả</button>
+  <button data-correct>Một worker riêng</button>
+  <button>Client</button>
+  <p class="explain">Một worker query outbox và publish.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Relay crash sau khi publish, trước khi đánh dấu. Kết quả?</p>
+  <button>Order bị xóa</button>
+  <button>Event bị mất</button>
+  <button data-correct>Event được publish lại</button>
+  <button>Không có gì</button>
+  <p class="explain">Giao at-least-once: consumer phải idempotent.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-outbox-with-kafka.vi.md">Bài tập 0011: outbox với Kafka</a></p>
+<p>Ví dụ chạy được: <a href="../examples/05-outbox.sql"><code>05-outbox.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">Azure: Transactional Outbox guide</a>. Các phần Overview và Solution.</p>
+<p><a href="0009-saga.vi.html">← Pattern saga: xử lý phân tán không cần distributed transaction</a> &nbsp;|&nbsp; <a href="0010-sharding.vi.html">Sharding, shard key và consistent hashing →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/databases/guide/transactional-outbox-cosmos">Azure: Transactional Outbox (Cosmos DB guide)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 1: HashMap tìm value của bạn như thế nào</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>HashMap tìm value của bạn như thế nào</h1>
+<p class="subtitle">Và vì sao <code>equals()</code> và <code>hashCode()</code> phải đi cùng nhau.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0001 · bước 9/46 · Foundation · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-hashmap-equals-hashcode.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Người phỏng vấn rất hay mở đầu bằng câu <em>"HashMap hoạt động thế nào?"</em> Bạn dùng <code>HashMap</code> mỗi ngày. Bài này giúp bạn <em>giải thích</em> được nó bằng lời đơn giản, và tránh được bug phổ biến nhất.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích HashMap thành lời trong khoảng 60 giây, kể cả vì sao override <code>equals()</code> mà quên <code>hashCode()</code> sẽ làm nó hỏng một cách âm thầm.</div>
+
+<dl class="words">
+  <dt>key, value</dt><dd>Map lưu các cặp. Bạn tra <em>value</em> bằng <em>key</em> của nó, giống như tra một từ để ra nghĩa trong từ điển.</dd>
+  <dt>entry</dt><dd>Một key và value của nó, được lưu cùng nhau. Ví dụ <code>"cat" → 1</code>.</dd>
+  <dt>bucket</dt><dd>Một "ô" bên trong HashMap. HashMap có nhiều bucket, mỗi bucket chứa một phần các entry.</dd>
+  <dt>hash code</dt><dd>Một số nguyên (<code>int</code>) được tính từ một object. Bạn lấy nó bằng cách gọi <code>hashCode()</code>. HashMap dùng nó để chọn bucket.</dd>
+  <dt>collision</dt><dd>Hai key khác nhau rơi vào cùng một bucket (va chạm). Chuyện này bình thường.</dd>
+  <dt>override</dt><dd>Viết phiên bản riêng của một method mà class bạn được thừa kế, ở đây là <code>equals()</code> và <code>hashCode()</code> từ <code>Object</code>.</dd>
+  <dt>O(1)</dt><dd>Đọc là "O một": thời gian gần như không đổi, kể cả khi map lớn lên.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Thử trước đã. Hãy nói thành lời: <em>"<code>map.get(key)</code> tìm ra value bằng cách nào?"</em> Đừng tra cứu gì cả. Không biết cũng không sao. Thử trước giúp bạn nhớ bài lâu hơn; cuối bài bạn sẽ so sánh lại.</p>
+
+<h2>1. Hình dung: một bức tường hộp thư</h2>
+<p>Hãy tưởng tượng một bức tường có 16 hộp thư, đánh số từ 0 đến 15. Mỗi hộp thư là một <span class="term">bucket</span>. Một <code>HashMap</code> mới bắt đầu với 16 hộp như vậy.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">mã nguồn</a></p>
+<p>Khi bạn <code>put</code>, Java không đi tìm chỗ trống. Nó <strong>tính</strong> ra hộp thư đúng từ key. Khi bạn <code>get</code>, Java làm đúng phép tính đó và đi thẳng tới cùng hộp thư.</p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Key cat cho hash code 98262, số này chọn hộp thư 7 trong 16 hộp thư">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <rect x="30" y="20" width="120" height="44" rx="6"/>
+      <rect x="250" y="20" width="120" height="44" rx="6"/>
+      <path d="M150 42h94M244 37l6 5-6 5"/>
+      <path d="M370 42h255v90" stroke="var(--accent)"/>
+      <path d="M619 124l6 8 6-8" stroke="var(--accent)"/>
+    </g>
+    <text x="90" y="47" text-anchor="middle">"cat"</text>
+    <text x="197" y="34" text-anchor="middle" font-size="11" opacity=".75">hashCode()</text>
+    <text x="310" y="47" text-anchor="middle">98262</text>
+    <text x="495" y="34" text-anchor="middle" font-size="11" fill="var(--accent)">chọn hộp thư (0 đến 15)</text>
+    <g fill="none" stroke="currentColor" stroke-width="1" opacity=".6">
+      <rect x="30" y="140" width="70" height="54" rx="3"/><rect x="110" y="140" width="70" height="54" rx="3"/>
+      <rect x="190" y="140" width="70" height="54" rx="3"/><rect x="270" y="140" width="70" height="54" rx="3"/>
+      <rect x="350" y="140" width="70" height="54" rx="3"/><rect x="430" y="140" width="70" height="54" rx="3"/>
+      <rect x="510" y="140" width="70" height="54" rx="3"/>
+      <rect x="30" y="204" width="70" height="54" rx="3"/><rect x="110" y="204" width="70" height="54" rx="3"/>
+      <rect x="190" y="204" width="70" height="54" rx="3"/><rect x="270" y="204" width="70" height="54" rx="3"/>
+      <rect x="350" y="204" width="70" height="54" rx="3"/><rect x="430" y="204" width="70" height="54" rx="3"/>
+      <rect x="510" y="204" width="70" height="54" rx="3"/><rect x="590" y="204" width="70" height="54" rx="3"/>
+    </g>
+    <rect x="590" y="140" width="70" height="54" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g font-size="10" opacity=".6">
+      <text x="36" y="154">0</text><text x="116" y="154">1</text><text x="196" y="154">2</text><text x="276" y="154">3</text>
+      <text x="356" y="154">4</text><text x="436" y="154">5</text><text x="516" y="154">6</text>
+      <text x="36" y="218">8</text><text x="116" y="218">9</text><text x="196" y="218">10</text><text x="276" y="218">11</text>
+      <text x="356" y="218">12</text><text x="436" y="218">13</text><text x="516" y="218">14</text><text x="596" y="218">15</text>
+    </g>
+    <text x="596" y="154" font-size="10" fill="var(--accent)">7</text>
+    <text x="625" y="178" text-anchor="middle" font-size="12" fill="var(--accent)">cat→1</text>
+  </g>
+</svg>
+<figcaption>Key "cat" luôn cho ra số 98262. Số đó luôn dẫn tới hộp thư 7.</figcaption>
+</figure>
+
+<p>Đây là lý do <code>get()</code> nhanh. Java không nhìn vào cả 16 hộp thư; nó chỉ nhìn vào <strong>một</strong>. Tài liệu gọi đó là "hiệu năng thời gian hằng số cho các thao tác cơ bản (get và put), với giả định hàm hash phân tán các phần tử đều giữa các bucket".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Đó là điều người phỏng vấn muốn nói khi bảo <span class="term">O(1)</span> trung bình.</p>
+
+<h2>2. Theo dõi một key, từng bước một</h2>
+<pre><code>map.put("cat", 1);
+<span class="c">Step 1  Java calls "cat".hashCode()          → 98262</span>
+<span class="c">Step 2  Java turns 98262 into a box number   → 7</span>
+<span class="c">Step 3  Java stores the entry "cat" → 1 in box 7</span>
+
+map.get("cat");
+<span class="c">        Same steps → box 7 → found → returns 1</span></code></pre>
+<p class="muted">Java biến 98262 thành 7 bằng cách nào? Bằng một mẹo bit rất nhanh mà bạn sẽ học ở <a href="0030-hashmap-internals.vi.html">bài 0030</a>. Giờ chỉ cần nhớ: <strong>cùng key → cùng số → cùng hộp.</strong></p>
+
+<h2>3. Hai key trong cùng một hộp</h2>
+<p>Chỉ có 16 hộp mà có hàng triệu key có thể có, nên đôi khi hai key khác nhau rơi vào cùng một hộp. Đó là <span class="term">collision</span>, và nó bình thường.</p>
+<p>Một ví dụ thật: hai chuỗi <code>"Aa"</code> và <code>"BB"</code> có <strong>cùng hash code</strong> là 2112. Vì vậy chúng vào cùng một hộp.</p>
+<pre><code>map.put("Aa", 1);
+map.put("BB", 2);   <span class="c">// same box as "Aa"</span>
+map.get("BB");      <span class="hl">// returns 2</span></code></pre>
+<p>Vậy Java tìm đúng entry bằng cách nào? Bên trong hộp, các entry tạo thành một chuỗi nhỏ. Java đi dọc chuỗi và hỏi hai câu với mỗi entry:</p>
+<figure>
+<svg viewBox="0 0 680 190" role="img" aria-label="Bucket 0 chứa chuỗi hai entry Aa và BB. get BB bỏ qua Aa vì equals là false và dừng ở BB.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <rect x="20" y="70" width="90" height="54" rx="3" fill="none" stroke="currentColor"/>
+    <text x="65" y="102" text-anchor="middle">hộp 0</text>
+    <g fill="none" stroke="currentColor"><path d="M110 97h46M150 92l6 5-6 5"/></g>
+    <rect x="160" y="62" width="180" height="70" rx="6" fill="none" stroke="currentColor"/>
+    <text x="250" y="88" text-anchor="middle">"Aa" → 1</text>
+    <text x="250" y="112" text-anchor="middle" font-size="11" opacity=".7">hash 2112</text>
+    <g fill="none" stroke="currentColor"><path d="M340 97h46M380 92l6 5-6 5"/></g>
+    <rect x="390" y="62" width="180" height="70" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="480" y="88" text-anchor="middle" fill="var(--accent)">"BB" → 2</text>
+    <text x="480" y="112" text-anchor="middle" font-size="11" opacity=".7">hash 2112</text>
+    <text x="250" y="30" text-anchor="middle" font-size="11">cùng hash? có</text>
+    <text x="250" y="48" text-anchor="middle" font-size="11">"BB".equals("Aa")? không → tiếp</text>
+    <text x="480" y="30" text-anchor="middle" font-size="11" fill="var(--accent)">cùng hash? có</text>
+    <text x="480" y="48" text-anchor="middle" font-size="11" fill="var(--accent)">equals? có → trả về 2</text>
+    <text x="340" y="170" text-anchor="middle" font-size="12" opacity=".8">map.get("BB"): hashCode tìm hộp, equals tìm entry</text>
+  </g>
+</svg>
+<figcaption>Bên trong một bucket: so sánh hash code trước (rẻ), rồi mới gọi <code>equals()</code>.</figcaption>
+</figure>
+<ol class="steps">
+  <li><strong>Hash code có giống không?</strong> Nếu không, bỏ qua. So sánh hai con số rất nhanh.</li>
+  <li><strong>Key có bằng nhau không?</strong> Java gọi <code>equals()</code>. Nếu trả về <code>true</code>, đây là entry đúng.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">mã nguồn</a></li>
+</ol>
+<p>Tóm lại, <code>hashCode()</code> tìm ra hộp, còn <code>equals()</code> tìm ra entry đúng bên trong hộp.</p>
+
+<h2>4. Quy tắc: object bằng nhau thì cùng hash code</h2>
+<p>Chính vì vậy, Java có một quy tắc trong tài liệu của <code>Object.hashCode</code>:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html#hashCode()">Object javadoc</a></p>
+<div class="win">Nếu hai object <strong>bằng nhau</strong> (<code>equals()</code> trả về <code>true</code>), chúng <strong>bắt buộc</strong> phải có <strong>cùng hash code</strong>.</div>
+<p>Chiều ngược lại thì <em>không</em> bắt buộc. Hai object khác nhau <em>có thể</em> có chung hash code, như <code>"Aa"</code> và <code>"BB"</code>. Điều đó được phép; nó chỉ làm map chậm đi một chút.</p>
+<p class="muted">Người phỏng vấn gọi đây là <strong>equals/hashCode contract</strong>. "Contract" (hợp đồng) đơn giản là "một quy tắc bạn phải tuân theo".</p>
+
+<h3>Chuyện gì xảy ra nếu bạn phá quy tắc?</h3>
+<p>Ở đây class override <code>equals()</code> nhưng <strong>quên</strong> <code>hashCode()</code>:</p>
+<pre><code>class Point {
+  final int x, y;
+  Point(int x, int y) { this.x = x; this.y = y; }
+
+  @Override public boolean equals(Object o) {
+    return o instanceof Point p &amp;&amp; p.x == x &amp;&amp; p.y == y;
+  }
+  <span class="c">// hashCode() is missing!</span>
+}
+
+map.put(new Point(1, 2), "A");
+map.get(new Point(1, 2));   <span class="hl">// almost always null!</span></code></pre>
+<p>Vì sao? Khi bạn không tự viết <code>hashCode()</code>, Java dùng bản mặc định từ <code>Object</code>, bản này cho mỗi object mới một con số <strong>riêng</strong>. Hai object <code>Point</code> bằng nhau nhưng có số khác nhau, nên Java tìm sai hộp và không thấy gì. Không có thông báo lỗi nào: chỉ là <code>null</code>. Bạn tự chạy thử:</p>
+<pre><code>$ java java/examples/LostKey.java
+BadKey  lookup: null
+GoodKey lookup: value</code></pre>
+<p><strong>Cách sửa:</strong> luôn override cả hai method cùng lúc. Hoặc dễ hơn, dùng <code>record</code> (JDK 16+, nên dùng được trên 17 và 21): nó tự viết <code>equals()</code> và <code>hashCode()</code> cho bạn từ các field.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a></p>
+<pre><code>@Override public int hashCode() { return Objects.hash(x, y); }   <span class="c">// JDK 8 style</span>
+
+record Point(int x, int y) {}                                     <span class="c">// JDK 17 / 21 style</span></code></pre>
+
+<h2>5. Đừng sửa key sau khi đã put vào</h2>
+<p>Quay lại các hộp thư. Bạn ghi địa chỉ lên lá thư và bỏ nó vào hộp thư 7. Sau đó bạn lén sửa địa chỉ trên lá thư. Lát sau bạn hỏi "thư của tôi đâu?". Java đọc địa chỉ <strong>mới</strong>, đi tới một hộp thư <strong>khác</strong>, và không thấy gì. Lá thư vẫn nằm ở hộp 7, nhưng sẽ không ai tìm ra nó.</p>
+<p>Đó chính là điều xảy ra khi bạn sửa field của key sau <code>put()</code>: hash code của nó đổi, nên Java tìm sai hộp. Tài liệu của <code>Map</code> cảnh báo: "Phải hết sức cẩn thận nếu dùng object có thể thay đổi (mutable) làm key của map."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></p>
+<p><strong>Cách sửa:</strong> dùng key <span class="term">immutable</span> (bất biến), tức là key không thể thay đổi: <code>String</code>, <code>Integer</code>, <code>List.of(...)</code>, record có các field immutable. Bài tập 0001 cho bạn tận mắt thấy bug này xảy ra.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>map.get(key)</code> nhanh?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó đi thẳng tới một bucket nhờ hash code</button>
+    <button class="opt">Nó giữ mọi key đã sắp xếp trong một danh sách dài</button>
+    <button class="opt">Nó kiểm tra mọi bucket nhưng dùng nhiều thread</button>
+    <button class="opt">Nó lưu câu trả lời gần nhất trong một cache nhỏ</button>
+  </div>
+  <div class="why">Hash code cho Java biết dùng bucket nào. Java chỉ nhìn vào một bucket, không phải tất cả.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>"Aa"</code> và <code>"BB"</code> có cùng hash code. Sau <code>map.put("Aa", 1)</code> và <code>map.put("BB", 2)</code>, <code>map.get("BB")</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó trả về 2</button>
+    <button class="opt">Nó trả về 1</button>
+    <button class="opt">Nó trả về null</button>
+    <button class="opt">Nó ném exception</button>
+  </div>
+  <div class="why">Cả hai key ở cùng bucket (collision). Bên trong bucket, <code>equals()</code> tìm ra đúng key <code>"BB"</code>, nên bạn nhận được 2.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Câu nào là <em>quy tắc</em> của Java?</p>
+  <div class="options">
+    <button class="opt" data-correct>Object bằng nhau phải có cùng hash code</button>
+    <button class="opt">Cùng hash code nghĩa là các object bằng nhau</button>
+    <button class="opt">Object khác nhau phải có hash code khác nhau</button>
+    <button class="opt">Hash code không bao giờ được thay đổi</button>
+  </div>
+  <div class="why">Quy tắc chỉ đi một chiều: bằng nhau → cùng hash code. Object khác nhau <em>có thể</em> chung hash code ("Aa" và "BB").</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Point</code> override <code>equals()</code> nhưng <strong>không</strong> override <code>hashCode()</code>. Sau <code>map.put(new Point(1, 2), "A")</code>, <code>map.get(new Point(1, 2))</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Gần như luôn là null</button>
+    <button class="opt">Luôn trả về "A"</button>
+    <button class="opt">Ném ra exception</button>
+    <button class="opt">Không compile được</button>
+  </div>
+  <div class="why"><code>hashCode()</code> mặc định cho mỗi object mới một số riêng, nên Java tìm sai bucket. Không lỗi gì cả, chỉ là <code>null</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Giờ <code>Point</code> là <code>record Point(int x, int y) {}</code>. Cùng <code>put</code>, cùng <code>get</code>. Kết quả?</p>
+  <div class="options">
+    <button class="opt" data-correct>Luôn trả về "A"</button>
+    <button class="opt">Gần như luôn là null</button>
+    <button class="opt">Ném ra exception</button>
+    <button class="opt">Không compile được</button>
+  </div>
+  <div class="why">Record tạo cả <code>equals()</code> <em>và</em> <code>hashCode()</code> từ các field. Hai point có cùng x và y thì bằng nhau và có chung hash code.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn put một key vào HashMap, rồi sửa field của key. Giờ <code>get()</code> không tìm thấy nó. Cách tốt nhất để tránh chuyện này?</p>
+  <div class="options">
+    <button class="opt" data-correct>Dùng key không thể thay đổi</button>
+    <button class="opt">Gọi map.clear() sau khi sửa key</button>
+    <button class="opt">Dùng TreeMap thay cho HashMap</button>
+    <button class="opt">Bọc map lại cho thread safe</button>
+  </div>
+  <div class="why">Sửa key làm đổi hash code, nên Java tìm sai bucket. Hãy dùng key immutable: <code>String</code>, record, <code>List.of(...)</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"HashMap hoạt động thế nào?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> HashMap có nhiều bucket (một mảng các bucket).</label></li>
+      <li><label><input type="checkbox"> Nó dùng <code>hashCode()</code> của key để chọn bucket.</label></li>
+      <li><label><input type="checkbox"> Vì vậy <code>get()</code> và <code>put()</code> nhanh: O(1) trung bình.</label></li>
+      <li><label><input type="checkbox"> Hai key có thể chung một bucket (collision); <code>equals()</code> tìm ra key đúng.</label></li>
+      <li><label><input type="checkbox"> Quy tắc: object bằng nhau phải có cùng hash code. Override cả hai method, hoặc dùng record.</label></li>
+      <li><label><input type="checkbox"> Key nên immutable. Nếu key thay đổi, map không tìm ra nó nữa.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"HashMap lưu các entry trong một mảng bucket. Khi em gọi <code>put</code>, Java gọi <code>hashCode()</code> trên key và dùng con số đó để chọn bucket. Khi em gọi <code>get</code>, nó làm lại đúng phép tính đó nên đi thẳng tới bucket đúng. Vì vậy <code>get</code> và <code>put</code> là O(1) trung bình. Đôi khi hai key rơi vào cùng một bucket, gọi là collision; lúc đó Java dùng <code>equals()</code> để tìm đúng key trong bucket. Đó là lý do object bằng nhau phải có cùng hash code: nếu không, Java sẽ tìm sai bucket. Và key nên immutable, vì nếu key bị sửa sau khi put vào thì map không tìm lại được nữa."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-mutable-key.vi.md">Bài tập 0001: cái key đã bị thay đổi</a>. Viết dự đoán của bạn gửi cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/LostKey.java"><code>LostKey.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Câu trả lời này đủ tốt cho interview mid-level. Người phỏng vấn senior sẽ hỏi sâu hơn: <em>"Java biến hash code thành số hộp như thế nào? Chuyện gì xảy ra khi map đầy? Nếu một bucket trở nên rất dài thì sao?"</em> <a href="0030-hashmap-internals.vi.html">Bài 0030</a> trả lời cả ba, từng bước một.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://dev.java/learn/api/collections-framework/choosing-keys/">dev.java: Choosing Immutable Types for Your Key</a>, tutorial chính thức của Oracle, minh họa vấn đề key bị sửa bằng code thật.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Override chính xác là gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0029-iterators-and-fail-fast.vi.html">← Vì sao xóa phần tử trong vòng lặp lại bị crash</a> &nbsp;|&nbsp; <a href="0041-review-collections-basics.vi.html">Ôn tập 2: collection cơ bản và HashMap →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html">Object Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">OpenJDK HashMap.java</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

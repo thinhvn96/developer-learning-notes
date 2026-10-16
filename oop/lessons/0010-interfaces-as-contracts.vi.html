@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 10: Interface như một hợp đồng</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Interface như một hợp đồng</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0010 · bước 10/22 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-interfaces-as-contracts.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích interface như một hợp đồng (contract) do compiler kiểm soát, và thay đổi qua lại các cách hiện thực đứng sau nó.</div>
+
+<h2>Hợp đồng</h2>
+<p>Interface là một nhóm method có liên quan "định nghĩa một hợp đồng giữa class và thế giới bên ngoài". "Việc implement một interface giúp class thể hiện một cách chính thức hơn về behavior mà nó cam kết cung cấp", và "hợp đồng này được compiler kiểm soát ngay lúc build": nếu một class tuyên bố implement interface, thì tất cả method của interface phải có mặt thì class mới compile được.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+<pre><code>java oop/examples/InterfaceContracts.java
+card ****4242 charged 100
+wallet declined 100
+gift card paid 30
+PaymentMethod: pay(int) -&gt; receipt</code></pre>
+<p><code>checkout(PaymentMethod, int)</code> chỉ biết đến hợp đồng; ba cách hiện thực khác nhau (hai class và một lambda) đều chạy được mà không cần sửa gì. Từ JDK 8, interface còn có thể chứa method <code>default</code> và <code>static</code> (<a href="../../java/lessons/0009-default-methods-and-conflicts.vi.html">bài học</a>). Mã nguồn: <a href="../examples/InterfaceContracts.java"><code>InterfaceContracts.java</code></a>.</p>
+<div class="aside">Quy tắc thiết kế sẽ được dùng lại ở khắp nơi về sau: "lập trình theo interface, không theo cách hiện thực". Đây là hạt giống của Strategy, Factory, Adapter và <a href="0021-dependency-inversion-principle.vi.html">Dependency Inversion Principle</a>.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Interface là một...?</p>
+  <button>Package</button>
+  <button>Thread</button>
+  <button data-correct>Hợp đồng</button>
+  <button>Object lúc runtime</button>
+  <p class="explain">Nó định nghĩa một hợp đồng giữa class và thế giới bên ngoài.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Ai kiểm soát hợp đồng?</p>
+  <button data-correct>Compiler</button>
+  <button>Không ai cả</button>
+  <button>Chỉ IDE</button>
+  <button>JVM, ngẫu nhiên</button>
+  <p class="explain">Nó được compiler kiểm soát lúc build.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Class thiếu một method của interface?</p>
+  <button>Cảnh báo lúc runtime</button>
+  <button data-correct>Lỗi compile</button>
+  <button>Âm thầm dùng mặc định</button>
+  <button>Method null</button>
+  <p class="explain">Tất cả method phải có mặt thì class mới compile được.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một lambda có thể implement...?</p>
+  <button>Một record</button>
+  <button data-correct>Interface có một method</button>
+  <button>Bất kỳ class nào</button>
+  <button>Một enum</button>
+  <p class="explain">Demo truyền một lambda làm PaymentMethod.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-swap-the-implementation.vi.md">Bài tập 10: thay cách hiện thực</a></p>
+<p>Ví dụ chạy được: <a href="../examples/InterfaceContracts.java"><code>InterfaceContracts.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">Java Tutorials: What Is an Interface?</a>. Trang ngắn.</p>
+<p><a href="0009-abstract-classes-vs-interfaces.vi.html">← Abstract class và interface</a> &nbsp;|&nbsp; <a href="0011-composition-over-inheritance.vi.html">Ưu tiên composition hơn kế thừa →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/interface.html">Java Tutorials: What Is an Interface?</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

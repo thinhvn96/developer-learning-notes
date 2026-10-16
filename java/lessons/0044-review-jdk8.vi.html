@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 44: Ôn tập 5, tính năng JDK 8</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ôn tập 5: lambda, stream, java.time và CompletableFuture</h1>
+<p class="subtitle">Sáu bài học, trộn lẫn vào nhau, đúng kiểu interviewer sẽ trộn.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0044 · bước 29/46 · Review · ~30 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0044-review-jdk8.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Trong interview thật không ai nói "giờ là câu hỏi về bài 0022". Một đoạn code trộn lambda, collector và timestamp, và bạn phải nhận ra chỗ sai. Bài ôn tập này không thêm kiến thức mới: nó bắt bạn kéo sáu bài JDK 8 ra từ trí nhớ, theo thứ tự lẫn lộn, và chính điều đó làm kiến thức bám chắc.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> đạt ít nhất 10/12 câu quiz trộn, tìm ra ba bug trong bài tập trộn, và nói thành tiếng cả ba câu trả lời 60 giây.</div>
+
+<dl class="words">
+  <dt>retrieval practice</dt><dd>Kéo câu trả lời ra từ trí nhớ thay vì đọc lại. Nó khó hơn, và chính vì vậy mà hiệu quả.</dd>
+  <dt>interleaving</dt><dd>Trộn câu hỏi của nhiều chủ đề, để bạn phải nhận ra trước <em>ý nào</em> đang được hỏi.</dd>
+  <dt>lambda</dt><dd>Một hàm ngắn không tên được truyền như một giá trị (<a href="0008-lambdas-and-functional-interfaces.vi.html">bài 0008</a>).</dd>
+  <dt>pipeline</dt><dd>Source, các intermediate operation, một terminal operation (<a href="0004-streams-and-optional.vi.html">bài 0004</a>).</dd>
+  <dt>stage</dt><dd>Một bước trong chuỗi <code>CompletableFuture</code> (<a href="0010-completablefuture.vi.html">bài 0010</a>).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Không tra cứu gì, hãy nói thành tiếng một câu cho mỗi bài: 0008 lambda, 0009 default method, 0004 stream và Optional, 0022 collector, 0011 java.time, 0010 CompletableFuture. Ghi lại bài nào bạn thấy trống rỗng: đó là những bài cần đọc lại sau phần quiz.</p>
+
+<h2>1. Sáu bài nối với nhau thế nào</h2>
+<p>Sáu bài này không phải sáu công cụ rời rạc. Lambda là chất keo: stream, collector và <code>CompletableFuture</code> đều nhận lambda làm các bước của mình. Default method là cách JDK thêm được <code>stream()</code> vào các interface collection có sẵn. <code>java.time</code> đứng hơi tách riêng: nó nói về việc chọn đúng kiểu <em>giá trị</em>, không phải truyền hành vi.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Sơ đồ khái niệm. Lambda (0008) đi vào stream (0004) và CompletableFuture (0010). Default method (0009) giúp Collection có stream(). Stream kết thúc bằng collect, dẫn tới Collectors (0022). java.time (0011) đứng riêng: kiểu giá trị immutable.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="24" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="45" text-anchor="middle">0009 default method</text>
+    <text x="120" y="63" text-anchor="middle" font-size="11" opacity=".75">interface tiến hóa được</text>
+    <rect x="240" y="24" width="200" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="45" text-anchor="middle" fill="var(--accent)">0008 lambda</text>
+    <text x="340" y="63" text-anchor="middle" font-size="11">hành vi như giá trị</text>
+    <rect x="460" y="24" width="200" height="50" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="560" y="45" text-anchor="middle">0011 java.time</text>
+    <text x="560" y="63" text-anchor="middle" font-size="11" opacity=".75">kiểu giá trị immutable</text>
+    <rect x="20" y="160" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="181" text-anchor="middle">0004 stream, Optional</text>
+    <text x="120" y="199" text-anchor="middle" font-size="11" opacity=".75">lazy, dùng một lần</text>
+    <rect x="250" y="160" width="180" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="181" text-anchor="middle">0022 collector</text>
+    <text x="340" y="199" text-anchor="middle" font-size="11" opacity=".75">group, partition, toMap</text>
+    <rect x="460" y="160" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="560" y="181" text-anchor="middle">0010 CompletableFuture</text>
+    <text x="560" y="199" text-anchor="middle" font-size="11" opacity=".75">chuỗi stage async</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M120 74v80M115 148l5 6 5-6"/>
+      <path d="M220 185h24M238 180l6 5-6 5"/>
+    </g>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M300 74L150 156M156 150l-6 6 9 0"/>
+      <path d="M380 74L530 156M524 150l6 6-9 0"/>
+    </g>
+    <text x="72" y="120" text-anchor="middle" font-size="10">Collection</text>
+    <text x="72" y="133" text-anchor="middle" font-size="10">.stream()</text>
+    <text x="232" y="110" text-anchor="middle" font-size="10" fill="var(--accent)">filter, map</text>
+    <text x="452" y="110" text-anchor="middle" font-size="10" fill="var(--accent)">thenApply, ...</text>
+    <text x="235" y="230" text-anchor="middle" font-size="10">collect(...)</text>
+  </g>
+</svg>
+<figcaption>Lambda là nền cho ba bài khác. Nếu lambda còn lung lay, hãy bắt đầu đọc lại từ bài 0008.</figcaption>
+</figure>
+
+<h2>2. Quiz trộn</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>List.of(1, 2, 3).stream().peek(System.out::println).map(x -&gt; x * 2);</code> In ra gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không in gì cả</button>
+    <button class="opt">In 1, 2 và 3</button>
+    <button class="opt">In 2, 4 và 6</button>
+    <button class="opt">Chỉ in số 1</button>
+  </div>
+  <div class="why">Không có terminal operation, nên pipeline lazy không bao giờ chạy. Xem <a href="0004-streams-and-optional.vi.html">bài 0004</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Collectors.toMap(Emp::salary, Emp::name)</code> gặp hai nhân viên cùng lương 4800. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>IllegalStateException</button>
+    <button class="opt">Giữ tên đầu tiên</button>
+    <button class="opt">Giữ tên cuối cùng</button>
+    <button class="opt">Nối cả hai tên</button>
+  </div>
+  <div class="why">Key trùng sẽ ném lỗi trừ khi bạn truyền merge function làm tham số thứ ba. Xem <a href="0022-collectors-groupingby-tomap.vi.html">bài 0022</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Thread nào chạy <code>CompletableFuture.supplyAsync(task)</code> khi không truyền executor?</p>
+  <div class="options">
+    <button class="opt" data-correct>ForkJoinPool.commonPool()</button>
+    <button class="opt">Chính thread đã gọi nó</button>
+    <button class="opt">Mỗi lần một thread mới</button>
+    <button class="opt">Mỗi task một virtual thread</button>
+  </div>
+  <div class="why">Method async không có Executor dùng common pool (trừ khi parallelism dưới hai). Xem <a href="0010-completablefuture.vi.html">bài 0010</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một lambda đọc biến local <code>total</code>; sau đó trong cùng method có <code>total = 0;</code>. Kết quả?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không compile được</button>
+    <button class="opt">Ném lỗi lúc chạy</button>
+    <button class="opt">Lambda thấy giá trị 0</button>
+    <button class="opt">Lambda thấy giá trị cũ</button>
+  </div>
+  <div class="why">Biến local bị capture phải final hoặc effectively final. Xem <a href="0008-lambdas-and-functional-interfaces.vi.html">bài 0008</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Kiểu nào nên giữ "thời điểm nhận được khoản thanh toán này", được lưu và gửi giữa các service?</p>
+  <div class="options">
+    <button class="opt" data-correct>Instant</button>
+    <button class="opt">LocalDateTime</button>
+    <button class="opt">LocalDate</button>
+    <button class="opt">Duration</button>
+  </div>
+  <div class="why">Timestamp sự kiện là một điểm trên trục thời gian: <code>Instant</code>, theo UTC. <code>LocalDateTime</code> không có zone. Xem <a href="0011-java-time.vi.html">bài 0011</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Robot extends Base implements Walker</code>; <code>Base.move()</code> trả về "base", <code>Walker</code> có default <code>move()</code> trả về "walk". Output?</p>
+  <div class="options">
+    <button class="opt" data-correct>base</button>
+    <button class="opt">walk</button>
+    <button class="opt">walk and base</button>
+    <button class="opt">Lỗi compile</button>
+  </div>
+  <div class="why">Class thắng: method từ class hoặc superclass thắng default của interface. Xem <a href="0009-default-methods-and-conflicts.vi.html">bài 0009</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Giá trị dự phòng cho một <code>Optional</code> rỗng cần một lời gọi remote chậm. Dòng nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>opt.orElseGet(() -&gt; remote.load())</button>
+    <button class="opt">opt.orElse(remote.load())</button>
+    <button class="opt">opt.get() sau remote.load()</button>
+    <button class="opt">opt.orElse(null) rồi remote.load()</button>
+  </div>
+  <div class="why"><code>orElse</code> tính đối số kể cả khi có giá trị; <code>orElseGet</code> chỉ gọi supplier khi rỗng. Xem <a href="0004-streams-and-optional.vi.html">bài 0004</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một future thất bại với <code>IllegalStateException</code>. <code>get()</code> ném gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>ExecutionException checked bọc lỗi đó</button>
+    <button class="opt">CompletionException unchecked bọc lỗi đó</button>
+    <button class="opt">Chính IllegalStateException, không bọc</button>
+    <button class="opt">Không ném gì: get() trả về null khi lỗi</button>
+  </div>
+  <div class="why"><code>get()</code> ném <code>ExecutionException</code> checked; <code>join()</code> ném <code>CompletionException</code> unchecked. Xem <a href="0010-completablefuture.vi.html">bài 0010</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn chia user theo <code>u -&gt; u.isActive()</code> và luôn cần có cả entry true lẫn false. Collector nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>partitioningBy</button>
+    <button class="opt">groupingBy</button>
+    <button class="opt">toMap</button>
+    <button class="opt">joining</button>
+  </div>
+  <div class="why">Map của <code>partitioningBy</code> luôn chứa cả hai key <code>false</code> và <code>true</code>. Xem <a href="0022-collectors-groupingby-tomap.vi.html">bài 0022</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Lúc 18:00 tối hôm trước một khoảng trống DST một giờ, bạn cộng <code>Period.ofDays(1)</code> vào một <code>ZonedDateTime</code>. Giờ địa phương?</p>
+  <div class="options">
+    <button class="opt" data-correct>18:00 ngày hôm sau</button>
+    <button class="opt">19:00 ngày hôm sau</button>
+    <button class="opt">17:00 ngày hôm sau</button>
+    <button class="opt">Nó ném exception</button>
+  </div>
+  <div class="why">Period cộng một ngày theo khái niệm và giữ giờ đồng hồ; Duration một ngày sẽ cho 19:00. Xem <a href="0011-java-time.vi.html">bài 0011</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>class Duck implements Walker, Swimmer {}</code>, cả hai đều có default <code>move()</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lỗi compile cho tới khi Duck override move()</button>
+    <button class="opt">Walker thắng vì được liệt kê trước tiên</button>
+    <button class="opt">Swimmer thắng vì được liệt kê sau cùng</button>
+    <button class="opt">Cả hai chạy, và kết quả được nối lại</button>
+  </div>
+  <div class="why">Hai default thừa hưởng cùng signature phải được giải quyết bằng override, ví dụ với <code>Walker.super.move()</code>. Xem <a href="0009-default-methods-and-conflicts.vi.html">bài 0009</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Method nào biến một <code>CompletableFuture</code> thất bại thành giá trị dự phòng?</p>
+  <div class="options">
+    <button class="opt" data-correct>exceptionally</button>
+    <button class="opt">thenApply</button>
+    <button class="opt">thenCombine</button>
+    <button class="opt">allOf</button>
+  </div>
+  <div class="why"><code>exceptionally(fn)</code> chỉ chạy khi hoàn thành với lỗi và kết quả của nó thay cho lỗi; <code>thenApply</code> bị bỏ qua. Xem <a href="0010-completablefuture.vi.html">bài 0010</a>.</div>
+</div>
+
+<h2>3. Bài tập trộn: tìm ba bug</h2>
+<p>Method này dựng báo cáo hằng ngày. Nó compile được trong đầu tác giả, nhưng ngoài đời thì không, và còn hai vấn đề nữa. Hãy tìm <strong>ba</strong> bug, mỗi bug từ một bài khác nhau. Gửi câu trả lời cho giáo viên trước khi mở lời giải.</p>
+<pre><code>Report buildReport(List&lt;Order&gt; orders) {
+  int paid = 0;
+  orders.stream().filter(Order::isPaid).forEach(o -&gt; paid++);           <span class="c">// (A)</span>
+
+  Map&lt;String, Order&gt; lastByCustomer = orders.stream()
+      .collect(Collectors.toMap(Order::customerId, o -&gt; o));              <span class="c">// (B)</span>
+
+  LocalDateTime generatedAt = LocalDateTime.now();                       <span class="c">// (C)</span>
+  return new Report(paid, lastByCustomer, generatedAt);
+}</code></pre>
+<details>
+<summary>Xem lời giải</summary>
+<ol class="steps">
+  <li><strong>(A) Bài 0008.</strong> <code>paid++</code> bên trong lambda thay đổi một biến local bị capture, nên <code>paid</code> không effectively final: lỗi compile. Đây cũng là side effect (bài 0004). Cách sửa: <code>long paid = orders.stream().filter(Order::isPaid).count();</code></li>
+  <li><strong>(B) Bài 0022.</strong> Một khách hàng thường có nhiều đơn, nên <code>toMap</code> gặp key trùng và ném <code>IllegalStateException</code>. Cách sửa: thêm merge function, ví dụ <code>(a, b) -&gt; b</code> để giữ đơn sau (hoặc <code>groupingBy</code> để giữ tất cả).</li>
+  <li><strong>(C) Bài 0011.</strong> Timestamp của báo cáo là một thời điểm, nhưng <code>LocalDateTime</code> không có zone nên không biểu diễn được một instant. Cách sửa: <code>Instant generatedAt = Instant.now();</code> và chỉ đổi sang zone khi hiển thị.</li>
+</ol>
+</details>
+
+<h2>4. Bài kiểm tra cuối: nói trong 60 giây (ba lần)</h2>
+<div class="recall">
+  <p class="prompt">Lần 1. Interviewer đưa ra <code>orders.stream().filter(o -&gt; o.total() &gt; 100).collect(groupingBy(Order::customerId, counting()))</code> và hỏi: <strong>"Hãy giải thích từng bước chuyện gì xảy ra khi đoạn này chạy."</strong> Bấm giờ, trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Lambda <code>o -&gt; o.total() &gt; 100</code> trở thành một <code>Predicate&lt;Order&gt;</code>, một functional interface.</label></li>
+      <li><label><input type="checkbox"> <code>Order::customerId</code> là method reference, một lambda ngắn hơn.</label></li>
+      <li><label><input type="checkbox"> <code>filter</code> là lazy; không gì chạy cho tới terminal <code>collect</code>.</label></li>
+      <li><label><input type="checkbox"> Phần tử chảy qua filter vào collector từng cái một.</label></li>
+      <li><label><input type="checkbox"> <code>groupingBy</code> tạo mỗi khách hàng một thùng; <code>counting()</code> là downstream collector.</label></li>
+      <li><label><input type="checkbox"> Kiểu map không được đảm bảo; stream không dùng lại được sau đó.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Lambda trong <code>filter</code> trở thành một <code>Predicate&lt;Order&gt;</code>, vì <code>filter</code> nhận functional interface đó, còn <code>Order::customerId</code> là method reference được dùng như một <code>Function</code>. Dựng pipeline thì chưa có gì chạy: <code>filter</code> là intermediate operation lazy. Khi <code>collect</code>, tức terminal operation, chạy, nó kéo từng order đi qua. Order nào trên 100 thì tới được collector. <code>groupingBy</code> bỏ mỗi order vào thùng theo customer ID, và downstream <code>counting()</code> biến mỗi thùng thành một con số, nên em có map từ khách hàng sang số đơn lớn. Tài liệu không hứa trả về loại map nào, nên nếu cần thứ tự thì em truyền map factory. Và sau <code>collect</code> stream đã bị tiêu thụ; em không dùng lại được."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Lần 2. <strong>"Bạn lưu và tính toán ngày giờ trong backend thế nào?"</strong> Bấm giờ, trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>java.time</code>, JDK 8+; các kiểu immutable và thread-safe.</label></li>
+      <li><label><input type="checkbox"> <code>Instant</code> (UTC) cho timestamp sự kiện; lưu và truyền đúng giá trị đó.</label></li>
+      <li><label><input type="checkbox"> <code>LocalDate</code> cho ngày không có zone như ngày sinh.</label></li>
+      <li><label><input type="checkbox"> <code>ZonedDateTime</code> khi zone quan trọng; chỉ đổi zone khi hiển thị.</label></li>
+      <li><label><input type="checkbox"> <code>Duration</code> = giây chính xác, <code>Period</code> = đơn vị lịch; khác nhau khi qua DST.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Em dùng <code>java.time</code>. Kiểu nào cũng immutable, nên <code>plusDays</code> trả về object mới và em phải giữ lại kết quả. Với thứ xảy ra tại một thời điểm, như một khoản thanh toán, em dùng <code>Instant</code>, là một điểm trên trục UTC, và đó là cái em lưu và gửi đi. Với ngày không có zone, như ngày sinh, em dùng <code>LocalDate</code>. Nếu giờ đó thuộc về một nơi, như cuộc họp 9 giờ ở Tokyo, em giữ <code>ZonedDateTime</code> kèm zone ID, và chỉ đổi instant sang zone của user khi hiển thị. Với khoảng thời gian em tách <code>Duration</code> và <code>Period</code>: Duration một ngày luôn là 24 giờ, còn Period một ngày giữ nguyên giờ đồng hồ, điều này quan trọng vào ngày đổi giờ DST."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Lần 3. <strong>"Bạn phải gọi user service và order service rồi ghép kết quả. Làm thế nào, và có thể hỏng ở đâu?"</strong> Bấm giờ, trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Khởi động cả hai bằng <code>supplyAsync</code> trước khi chờ cái nào.</label></li>
+      <li><label><input type="checkbox"> Ghép bằng <code>thenCombine</code> (hoặc <code>allOf</code> khi có nhiều).</label></li>
+      <li><label><input type="checkbox"> Truyền executor riêng cho blocking I/O, không dùng common pool.</label></li>
+      <li><label><input type="checkbox"> Xử lý lỗi bằng <code>exceptionally</code> / <code>handle</code>; thêm <code>orTimeout</code> (JDK 9+).</label></li>
+      <li><label><input type="checkbox"> <code>join</code> ném <code>CompletionException</code>, <code>get</code> ném <code>ExecutionException</code>; <code>cancel</code> không dừng việc đang chạy.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Em sẽ khởi động cả hai lời gọi bằng <code>supplyAsync</code> trước, để chúng chạy cùng lúc; nếu <code>join</code> ngay sau mỗi cái thì chúng sẽ chạy lần lượt. Sau đó em ghép bằng <code>thenCombine</code>, nó chạy lambda của em khi cả hai đã xong. Đây là các lời gọi HTTP blocking, nên em truyền executor riêng thay vì dùng common pool dùng chung, hoặc trên Java 21 thì dùng virtual thread. Những chỗ có thể hỏng: một lời gọi lỗi, nên em thêm <code>exceptionally</code> hoặc <code>handle</code> để có fallback; một lời gọi bị treo, nên em thêm <code>orTimeout</code>. Khi cuối cùng phải chờ, <code>join</code> bọc lỗi trong <code>CompletionException</code> unchecked còn <code>get</code> bọc trong <code>ExecutionException</code> checked. Và hủy future không dừng lời gọi đang chạy, nên timeout trên chính HTTP client vẫn quan trọng."</em></p>
+  </div>
+</div>
+
+<h2>5. Quay lại bài nào</h2>
+<table>
+<tr><th>Nếu bạn sai các câu về…</th><th>Đọc lại</th></tr>
+<tr><td>lambda, functional interface, method reference, effectively final</td><td><a href="0008-lambdas-and-functional-interfaces.vi.html">bài 0008</a></td></tr>
+<tr><td>default method, "class thắng", <code>X.super.m()</code></td><td><a href="0009-default-methods-and-conflicts.vi.html">bài 0009</a></td></tr>
+<tr><td>laziness, dùng một lần, side effect, <code>orElse</code> so với <code>orElseGet</code></td><td><a href="0004-streams-and-optional.vi.html">bài 0004</a></td></tr>
+<tr><td><code>groupingBy</code>, <code>partitioningBy</code>, key trùng trong <code>toMap</code></td><td><a href="0022-collectors-groupingby-tomap.vi.html">bài 0022</a></td></tr>
+<tr><td><code>Instant</code> so với <code>LocalDateTime</code>, <code>Duration</code> so với <code>Period</code></td><td><a href="0011-java-time.vi.html">bài 0011</a></td></tr>
+<tr><td>common pool, <code>join</code> so với <code>get</code>, <code>exceptionally</code>, timeout</td><td><a href="0010-completablefuture.vi.html">bài 0010</a></td></tr>
+</table>
+
+<h2>Tiếp theo là gì</h2>
+<p>Lần 3 kết thúc bằng một câu hỏi mà interviewer cấp Senior sẽ hỏi tiếp: <em>"Vì sao thread main chắc chắn thấy giá trị mà worker đã ghi?"</em> Đó là Java memory model: <a href="0005-visibility-and-happens-before.vi.html">bài 0005, visibility và happens-before</a>.</p>
+<p><strong>Đọc thêm:</strong> các nguồn chính của phần này: <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda Expressions tutorial</a>, <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> và <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Cho mình thêm năm câu hỏi trộn"</em> hoặc <em>"Kiểm tra giúp mình ba câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz, những bug bạn tìm được và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0010-completablefuture.vi.html">← CompletableFuture: một chuỗi bước chạy trên thread khác</a> &nbsp;|&nbsp; <a href="0005-visibility-and-happens-before.vi.html">Vì sao một thread có thể không thấy giá trị mà thread khác đã ghi →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với các bài gốc 0008, 0009, 0004, 0022, 0011 và 0010 (Oracle Java Tutorials, Java Language Specification và tài liệu Java 21), tháng 10/2026. Bài ôn tập này không thêm kiến thức mới.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a> · <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a> · <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Date-Time tutorial</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

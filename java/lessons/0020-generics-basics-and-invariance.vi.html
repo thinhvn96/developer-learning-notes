@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 20: Generic: vì sao List của Integer không phải List của Number</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Vì sao List&lt;Integer&gt; không phải là List&lt;Number&gt;</h1>
+<p class="subtitle">Generic mang lại gì, cách đọc <code>&lt;T&gt;</code>, và một quy tắc khiến ai cũng bất ngờ.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0020 · bước 3/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0020-generics-basics-and-invariance.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Ngày nào bạn cũng viết <code>List&lt;Order&gt;</code> và <code>Map&lt;String, User&gt;</code>. Interviewer hỏi <em>"Generic dùng để làm gì?"</em> rồi tung câu hỏi mẹo <em>"Integer là Number, vậy List&lt;Integer&gt; có phải List&lt;Number&gt; không?"</em>. Phần lớn mọi người trả lời có. Bài này cho bạn thấy vì sao câu trả lời là không.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> nêu được ba lợi ích của generic và giải thích, bằng một câu chuyện ngắn, vì sao <code>List&lt;Integer&gt;</code> không phải là <code>List&lt;Number&gt;</code>.</div>
+
+<dl class="words">
+  <dt>class</dt><dd>Bản thiết kế cho các object. <code>ArrayList</code> là một class; mỗi lần <code>new ArrayList&lt;&gt;()</code> là một object.</dd>
+  <dt>generic type</dt><dd>Một class hoặc interface có một "chỗ trống" cho kiểu, viết trong ngoặc nhọn: <code>List&lt;E&gt;</code>, <code>Box&lt;T&gt;</code>.</dd>
+  <dt>type parameter</dt><dd>Tên của chỗ trống, như <code>T</code> hay <code>E</code>. Bạn điền vào khi dùng class.</dd>
+  <dt>type argument</dt><dd>Kiểu thật mà bạn điền vào chỗ trống: trong <code>List&lt;String&gt;</code> đó là <code>String</code>.</dd>
+  <dt>subtype</dt><dd>Kiểu con: một kiểu cụ thể hơn, dùng được ở nơi cần kiểu tổng quát. <code>Integer</code> là subtype của <code>Number</code>.</dd>
+  <dt>cast</dt><dd>Ép kiểu: bảo compiler "tin tôi đi, object này thật ra là String": <code>(String) obj</code>. Ép sai sẽ hỏng lúc chạy.</dd>
+  <dt>compile time / run time</dt><dd>Compile time là lúc <code>javac</code> kiểm tra code. Run time là lúc chương trình thật sự chạy.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Integer kế thừa Number. Mình có truyền được <code>List&lt;Integer&gt;</code> vào một method nhận <code>List&lt;Number&gt;</code> không? Vì sao?"</em> Chọn hẳn có hoặc không trước khi đọc tiếp.</p>
+
+<h2>1. Hình dung: những chiếc hộp có dán nhãn</h2>
+<p>Hãy tưởng tượng một nhà kho đầy hộp không dán nhãn. Bạn bỏ giày vào một hộp. Sau đó một đồng nghiệp mở ra, tưởng là sách, giật mình làm rơi xuống đất. Giờ hãy tưởng tượng mỗi hộp đều có nhãn: "Chỉ đựng giày". Người đứng ở cửa kiểm tra nhãn và không cho bỏ sách vào. Về sau không ai bị bất ngờ nữa.</p>
+<p>Generic chính là những cái nhãn đó, còn compiler là người đứng ở cửa. Xem code cũ không dùng generic:</p>
+<pre><code>List list = new ArrayList();      <span class="c">// no label: holds any Object</span>
+list.add("hello");
+list.add(42);                     <span class="c">// allowed, nobody checks</span>
+String s = (String) list.get(1);  <span class="hl">// ClassCastException at run time</span></code></pre>
+<p>Và khi có nhãn:</p>
+<pre><code>List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add("hello");
+list.add(42);                     <span class="hl">// compile error: 42 is not a String</span>
+String s = list.get(0);           <span class="c">// no cast needed</span></code></pre>
+<p>Tutorial liệt kê đúng ba lợi ích: kiểm tra kiểu chặt hơn lúc compile, bỏ được việc ép kiểu, và viết được các thuật toán generic chạy trên collection của nhiều kiểu khác nhau.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">Tutorial: why use generics</a> Ý chính: một bug trước đây chỉ lộ ra trên production (<code>ClassCastException</code>) giờ hiện ngay trong editor của bạn.</p>
+
+<h2>2. Đọc và viết <code>&lt;T&gt;</code></h2>
+<p>Đây là một generic class nhỏ theo phong cách của tutorial. <code>T</code> là chỗ trống; ai tạo <code>Box</code> sẽ quyết định cái gì được bỏ vào.</p>
+<pre><code>class Box&lt;T&gt; {
+    private T item;
+    void set(T item) { this.item = item; }
+    T get()          { return item; }
+}
+
+Box&lt;Integer&gt; b = new Box&lt;&gt;();
+b.set(7);
+int n = b.get();
+<span class="c">Bước 1  Box&lt;Integer&gt;: compiler đọc mọi chữ T thành Integer</span>
+<span class="c">Bước 2  b.set(7) được kiểm tra: 7 là Integer → OK</span>
+<span class="c">Bước 3  b.get() được biết là trả về Integer → không cần cast</span>
+<span class="c">Bước 4  b.set("seven") sẽ là lỗi compile</span></code></pre>
+<p><strong>Cách đặt tên.</strong> "Theo quy ước, tên type parameter là một chữ cái in hoa duy nhất": <code>E</code> cho Element (dùng khắp các collection), <code>K</code> cho Key, <code>V</code> cho Value, <code>T</code> cho Type, <code>N</code> cho Number.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/types.html">Tutorial: generic types</a> Vậy <code>Map&lt;K, V&gt;</code> đọc là "một map từ key tới value".</p>
+<p><strong>Diamond <code>&lt;&gt;</code>.</strong> "Từ Java SE 7 trở đi", bạn có thể để trống ngoặc nhọn ở vế phải khi compiler suy ra được kiểu: <code>new Box&lt;&gt;()</code>.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/types.html">Tutorial: generic types</a> Nên cú pháp này chạy như nhau trên JDK 8, 17 và 21.</p>
+<h3>Bẫy: kiểu primitive không điền vào chỗ trống được</h3>
+<pre><code>List&lt;int&gt; nums;        <span class="hl">// compile error</span>
+List&lt;Integer&gt; nums;    <span class="c">// fix: use the wrapper class</span></code></pre>
+<p>Danh sách các giới hạn trong tutorial mở đầu bằng "Cannot Instantiate Generic Types with Primitive Types" (không thể dùng kiểu primitive cho generic type).<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Tutorial: restrictions on generics</a> Java tự chuyển qua lại giữa <code>int</code> và <code>Integer</code> khi bạn add và get.</p>
+
+<h2>3. Quy tắc bất ngờ: không có quan hệ họ hàng</h2>
+<p>Quay lại nhà kho. Bạn có một hộp dán nhãn "Chỉ đựng táo". Một đồng nghiệp xin "một hộp trái cây". Táo là trái cây, nên bạn đưa hộp táo. Đồng nghiệp, đang cầm "hộp trái cây", bỏ một quả chuối vào. Với hộp trái cây thì việc đó hợp lệ! Giờ hộp táo của bạn có chuối, và người tiếp theo lấy ra "một quả táo" sẽ nhận được chuối.</p>
+<p>Java chặn câu chuyện này ngay từ cửa. Tutorial viết: "Mặc dù Integer là subtype của Number, List&lt;Integer&gt; không phải là subtype của List&lt;Number&gt; và thực ra hai kiểu này không hề liên quan."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Tutorial: generics and subtyping</a> Nếu được phép, bạn có thể add một <code>Double</code> qua reference <code>List&lt;Number&gt;</code> vào thứ mà thật ra là <code>List&lt;Integer&gt;</code>, phá vỡ type safety.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Tutorial: generics and subtyping</a></p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="ints, một List của Integer, trỏ tới một ArrayList chứa 1, 2, 3. Nếu nums, một List của Number, trỏ được vào cùng list đó, nums.add(3.14) sẽ bỏ một Double vào, và ints.get(3) sẽ không phải Integer.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="40" width="200" height="36" rx="6"/>
+      <rect x="340" y="85" width="70" height="44"/><rect x="410" y="85" width="70" height="44"/>
+      <rect x="480" y="85" width="70" height="44"/>
+      <path d="M220 58H300V100H334M328 95l6 5-6 5"/>
+    </g>
+    <rect x="20" y="150" width="200" height="36" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/>
+    <rect x="550" y="85" width="70" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <path d="M220 168H300V118H334" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/>
+    <path d="M328 113l6 5-6 5" fill="none" stroke="var(--accent)"/>
+    <text x="120" y="63" text-anchor="middle">ints: List&lt;Integer&gt;</text>
+    <text x="120" y="173" text-anchor="middle" fill="var(--accent)">nums: List&lt;Number&gt;</text>
+    <text x="20" y="141" font-size="11" opacity=".75">giả sử điều này được phép:</text>
+    <text x="120" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">nums.add(3.14)</text>
+    <text x="480" y="75" text-anchor="middle" font-size="11" opacity=".75">một object ArrayList</text>
+    <g text-anchor="middle">
+      <text x="375" y="112">1</text><text x="445" y="112">2</text><text x="515" y="112">3</text>
+      <text x="585" y="112" fill="var(--accent)">3.14</text>
+    </g>
+    <text x="480" y="152" text-anchor="middle" font-size="11" fill="var(--accent)">ints.get(3) không phải Integer → crash</text>
+    <text x="340" y="230" text-anchor="middle" font-size="12">nên javac từ chối:  List&lt;Number&gt; nums = ints;</text>
+  </g>
+</svg>
+<figcaption>Nếu một reference <code>List&lt;Number&gt;</code> trỏ được vào list số nguyên, ai cũng có thể add <code>Double</code> qua nó. Thay vào đó, Java chặn luôn phép gán.</figcaption>
+</figure>
+
+<p>Thử xem. Trong ví dụ, dòng này bị comment lại vì nó không compile được:</p>
+<pre><code>List&lt;Integer&gt; ints = new ArrayList&lt;&gt;(List.of(1, 2, 3));
+// List&lt;Number&gt; nums = ints;   // compile error</code></pre>
+<p>Nếu bạn bỏ <code>//</code>, <code>javac</code> của JDK 21 báo:</p>
+<pre><code>error: incompatible types: List&lt;Integer&gt; cannot be converted to List&lt;Number&gt;</code></pre>
+<p>Interviewer gọi quy tắc này là <strong>invariance</strong> (tính bất biến về kiểu): một generic type không đi theo cây gia phả của type argument. <code>Integer → Number</code> là một quan hệ; <code>List&lt;Integer&gt; → List&lt;Number&gt;</code> thì không.</p>
+<p class="muted">Nhưng chỉ đọc thì không sao: một method chỉ <em>đọc</em> số thì nên nhận được list số nguyên. Đó là việc của wildcard (<code>? extends Number</code>), ở <a href="0021-wildcards-and-type-erasure.vi.html">bài 0021</a>.</p>
+
+<h2>4. Mảng thì chọn cách ngược lại</h2>
+<p>Mảng có trước generic, và mảng <em>có</em> đi theo cây gia phả: một <code>Integer[]</code> dùng được như <code>Number[]</code>. JLS nói một biến như vậy "có thể giữ reference tới một instance của bất kỳ kiểu mảng B[] nào, miễn B gán được cho A", và cảnh báo: "Điều này có thể gây ra một exception lúc chạy ở một phép gán <em>sau đó</em>".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-10.html#jls-10.2">JLS §10.2</a> Exception đó là <code>ArrayStoreException</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-10.html#jls-10.5">JLS §10.5</a></p>
+<pre><code>Number[] arr = new Integer[3];   <span class="c">// compiles</span>
+arr[0] = 3.14;                   <span class="hl">// ArrayStoreException at run time</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Mảng: Number[] bằng new Integer[] compile được, và việc lưu 3.14 hỏng lúc chạy với ArrayStoreException. Generic: List của Number bằng new ArrayList của Integer là lỗi compile, nên bug không bao giờ chạy.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <g text-anchor="middle" opacity=".75">
+      <text x="165" y="30">code của bạn</text>
+      <text x="385" y="30">compile time</text>
+      <text x="565" y="30">run time</text>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="45" width="290" height="58" rx="6"/>
+      <rect x="330" y="54" width="110" height="40" rx="6"/>
+      <rect x="20" y="130" width="290" height="58" rx="6"/>
+      <rect x="470" y="139" width="190" height="40" rx="6" opacity=".5"/>
+      <path d="M310 74h14M320 70l4 4-4 4M440 74h24M460 70l4 4-4 4"/>
+      <path d="M310 159h14M320 155l4 4-4 4M440 159h24M460 155l4 4-4 4" opacity=".5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="470" y="54" width="190" height="40" rx="6"/>
+      <rect x="330" y="139" width="110" height="40" rx="6"/>
+    </g>
+    <text x="32" y="62" opacity=".75">mảng (covariant)</text>
+    <text x="32" y="80" font-size="12">Number[] arr = new Integer[3];</text>
+    <text x="32" y="96" font-size="12">arr[0] = 3.14;</text>
+    <text x="32" y="147" opacity=".75">generic (invariant)</text>
+    <text x="32" y="165" font-size="12">List&lt;Number&gt; n =</text>
+    <text x="32" y="181" font-size="12">    new ArrayList&lt;Integer&gt;();</text>
+    <text x="385" y="78" text-anchor="middle">compile được</text>
+    <text x="565" y="71" text-anchor="middle" fill="var(--accent)">ArrayStoreException</text>
+    <text x="565" y="86" text-anchor="middle" fill="var(--accent)">(crash trên production)</text>
+    <text x="385" y="163" text-anchor="middle" fill="var(--accent)">lỗi compile</text>
+    <text x="565" y="156" text-anchor="middle" opacity=".6">không bao giờ chạy:</text>
+    <text x="565" y="171" text-anchor="middle" opacity=".6">bug bị bắt sớm</text>
+  </g>
+</svg>
+<figcaption>Cùng một lỗi, hai kết cục: mảng hỏng lúc chạy; generic từ chối compile.</figcaption>
+</figure>
+<p>Một cách nói hay trong interview: invariance giúp generic bắt bug "chuối trong hộp táo" ngay lúc compile, khi sửa còn rẻ, thay vì lúc chạy, khi nó đã thành sự cố production.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>List&lt;Integer&gt;</code> có phải subtype của <code>List&lt;Number&gt;</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, hai kiểu này không liên quan gì nhau</button>
+    <button class="opt">Có, vì Integer kế thừa từ class Number</button>
+    <button class="opt">Có, nhưng chỉ với các object ArrayList</button>
+    <button class="opt">Chỉ khi list được khai báo là final</button>
+  </div>
+  <div class="why">Generic type là invariant: "List&lt;Integer&gt; không phải là subtype của List&lt;Number&gt;" (Java Tutorials).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao Java từ chối <code>List&lt;Number&gt; nums = ints;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Qua nums bạn có thể add Double vào list Integer</button>
+    <button class="opt">Chuyển list sẽ phải chép từng phần tử, rất chậm</button>
+    <button class="opt">Number là abstract class nên không tạo list được</button>
+    <button class="opt">Hai list sẽ có kích thước khác nhau sau khi ép</button>
+  </div>
+  <div class="why">Cho phép thì sẽ phá vỡ type safety: chính là chuyện "chuối trong hộp táo".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Đâu là một trong ba lợi ích của generic theo tutorial?</p>
+  <div class="options">
+    <button class="opt" data-correct>Kiểm tra kiểu chặt hơn lúc compile</button>
+    <button class="opt">Code nhanh hơn vì JIT bỏ qua kiểm tra</button>
+    <button class="opt">File class nhỏ hơn vì ít bytecode hơn</button>
+    <button class="opt">Không thể có exception nào lúc chạy</button>
+  </div>
+  <div class="why">Ba lợi ích: kiểm tra lúc compile chặt hơn, không cần cast, và thuật toán generic.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Đoạn này in ra gì hoặc làm gì? <code>Number[] a = new Integer[1]; a[0] = 1.5;</code></p>
+  <div class="options">
+    <button class="opt" data-correct>Compile được, rồi ném ArrayStoreException</button>
+    <button class="opt">Không compile: mảng cũng là invariant</button>
+    <button class="opt">Chạy bình thường và lưu 1.5 vào mảng</button>
+    <button class="opt">Chạy bình thường và âm thầm lưu số 1</button>
+  </div>
+  <div class="why">Mảng là covariant nên phép gán compile được; việc lưu được kiểm tra lúc chạy và hỏng (JLS §10.5).</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List&lt;int&gt; scores = new ArrayList&lt;&gt;();</code> sai ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Primitive không làm type argument được; dùng Integer</button>
+    <button class="opt">Diamond phải ghi rõ kiểu bên trong: &lt;int&gt;</button>
+    <button class="opt">Không sai gì, từ JDK 17 trở đi compile được</button>
+    <button class="opt">ArrayList cần capacity ban đầu mới compile</button>
+  </div>
+  <div class="why">"Cannot Instantiate Generic Types with Primitive Types" là giới hạn đầu tiên trong tutorial.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Với <code>List&lt;String&gt; list</code>, vì sao bạn viết được <code>String s = list.get(0);</code> mà không cần cast?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compiler biết mọi phần tử đều là String</button>
+    <button class="opt">get() luôn trả về String trong mọi List</button>
+    <button class="opt">Java tự đổi mọi Object thành String</button>
+    <button class="opt">Diamond chèn ngầm một lời gọi toString()</button>
+  </div>
+  <div class="why">Type argument cho compiler biết <code>get</code> trả về gì, nên không cần cast nữa.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Generic dùng để làm gì, và <code>List&lt;Integer&gt;</code> có phải là <code>List&lt;Number&gt;</code> không?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Generic thêm một type parameter, như <code>List&lt;E&gt;</code>, mà bạn điền bằng một type argument.</label></li>
+      <li><label><input type="checkbox"> Lợi ích: kiểm tra kiểu lúc compile, không cần cast, thuật toán generic.</label></li>
+      <li><label><input type="checkbox"> Không: <code>List&lt;Integer&gt;</code> và <code>List&lt;Number&gt;</code> không liên quan (generic là invariant).</label></li>
+      <li><label><input type="checkbox"> Lý do: qua <code>List&lt;Number&gt;</code> bạn có thể add <code>Double</code> vào list số nguyên.</label></li>
+      <li><label><input type="checkbox"> Mảng là covariant và hỏng muộn với <code>ArrayStoreException</code>; generic hỏng ngay lúc compile.</label></li>
+      <li><label><input type="checkbox"> Muốn nhận "list của bất kỳ loại số nào" để đọc, dùng wildcard: <code>List&lt;? extends Number&gt;</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Generic cho phép một class như <code>List</code> nhận type parameter, nên em viết <code>List&lt;String&gt;</code> và compiler biết bên trong chứa gì. Có ba lợi ích: lỗi kiểu bị bắt lúc compile, không cần cast, và viết được thuật toán dùng cho nhiều kiểu. Còn <code>List&lt;Integer&gt;</code> có phải <code>List&lt;Number&gt;</code> không? Không, dù Integer là Number. Hai kiểu list này không liên quan gì nhau; generic là invariant. Nếu Java cho phép, em có thể lấy list số nguyên, nhìn nó như list Number, rồi add một <code>Double</code> vào. Lúc đó code nào đọc Integer ra sẽ crash. Mảng thì thật ra cho phép chuyện này, và hỏng lúc chạy với <code>ArrayStoreException</code>; generic thì chọn báo lỗi ngay lúc compile. Nếu em chỉ cần đọc số từ list kiểu đó, em dùng wildcard: <code>List&lt;? extends Number&gt;</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0020-generic-utility.vi.md">Bài tập 0020: một tiện ích generic</a>. Viết signature của method trước và gửi cho giáo viên trước khi implement.</p>
+<p>Ví dụ chạy được: <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior sẽ hỏi tiếp: <em>"Vậy làm sao viết một method nhận được cả <code>List&lt;Integer&gt;</code> lẫn <code>List&lt;Double&gt;</code>? PECS là gì? Generic có tồn tại lúc chạy không?"</em> Cả ba có trong <a href="0021-wildcards-and-type-erasure.vi.html">bài 0021: wildcard và type erasure</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/index.html">Java Tutorials: Generics trail</a>. Đọc "Why Use Generics?" và "Generics, Inheritance, and Subtypes".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Integer với int khác nhau thế nào?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">← Chuyện gì xảy ra khi code Java gặp lỗi</a> &nbsp;|&nbsp; <a href="0021-wildcards-and-type-erasure.vi.html">Khi nào viết ? extends, khi nào viết ? super →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Java Tutorials (Generics trail) và Java Language Specification (Java SE 21), tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">Java Tutorials: Why use generics</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Java Tutorials: Generics and subtyping</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/types.html">Java Tutorials: Generic types</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Java Tutorials: Restrictions on generics</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-10.html">JLS §10 Arrays</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

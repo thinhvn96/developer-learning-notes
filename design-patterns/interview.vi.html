@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn Design Patterns</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Design Patterns: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Design Patterns · 18 câu hỏi · <a href="index.vi.html">Lộ trình Design Patterns</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi phỏng vấn về design pattern kèm câu trả lời chi tiết, mỗi câu đều có một ví dụ Java chạy được trong lộ trình và một dòng intent từ Refactoring.Guru làm chỗ dựa.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn làm chỗ dựa cho nhận định.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Design pattern là gì, và khi nào bạn KHÔNG nên dùng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một bản thiết kế giải pháp điển hình, tái sử dụng được, cho một vấn đề thiết kế hay gặp; không phải code để dán vào và cũng không phải lúc nào cũng cần.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a> Các lời chỉ trích: pattern có thể chỉ là cách chữa cháy cho một ngôn ngữ thiếu khả năng trừu tượng, có thể bị cài đặt "đúng từng chữ" mà không điều chỉnh theo bối cảnh, và bị người mới áp vào mọi thứ ("Khi trong tay chỉ có cái búa, nhìn đâu cũng thấy đinh").<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[2]</a> Đừng dùng khi một thiết kế đơn giản hơn (một lambda, một enum, một method bình thường) đã giải quyết được vấn đề.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Kể tên một pattern mà Java hiện đại khiến nó gần như tầm thường. (Strategy qua lambda.)</div>
+<p class="see">Học bài: <a href="lessons/0003-criticism-and-anti-patterns.vi.html">Những lời chỉ trích</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Phân loại các pattern GoF.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> creational (5), structural (7), behavioral (10).</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/catalog">[3]</a> Creational: Factory Method, Abstract Factory, Builder, Prototype, Singleton. Structural: Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy. Behavioral: Chain of Responsibility, Command, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Nhóm nào giải quyết câu hỏi "các object này phối hợp với nhau ra sao"? (Behavioral.)</div>
+<p class="see">Học bài: <a href="lessons/0002-classification-and-catalog.vi.html">Danh mục</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Factory Method so với Abstract Factory so với Builder?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Factory Method: một method trong superclass mà subclass override để chọn một product; Abstract Factory: một họ product liên quan tạo ra từ một factory; Builder: dựng từng bước một object phức tạp.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[4]</a><a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[5]</a><a class="cite" href="https://refactoring.guru/design-patterns/builder">[6]</a> Abstract Factory trả product về ngay; Builder cho phép thêm bước. Abstract Factory thường được xây từ các Factory Method. Trong các demo của tôi: một dialog chọn button, một GUI factory tạo ra button và checkbox khớp nhau, một pizza builder thay cho constructor 6 tham số.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Với 12 tham số tùy chọn thì dùng gì? (Builder, hoặc record nếu dữ liệu đơn giản.)</div>
+<p class="see">Học bài: <a href="lessons/0006-builder.vi.html">Builder</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Cài đặt một Singleton thread-safe trong Java. Nhược điểm là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> enum một phần tử hoặc lazy holder class; nhược điểm là trạng thái toàn cục bị che giấu và khó test.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/singleton">[7]</a> Demo của tôi xác nhận chỉ có một instance trên 8 thread với cách viết holder, và cho thấy trạng thái có thể thay đổi bị rò rỉ giữa các "test". Pattern này vi phạm SRP (giải quyết hai vấn đề cùng lúc) và cần cẩn thận trong code đa luồng.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[7]</a> <code>Runtime</code> của JDK được tài liệu ghi rõ là một instance duy nhất.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[8]</a> Singleton scope của Spring tính theo container, không theo class loader.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[9]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Phương án thay thế? (Dependency injection với scope do container quản lý.)</div>
+<p class="see">Học bài: <a href="lessons/0008-singleton.vi.html">Singleton</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Prototype pattern là gì? Shallow copy so với deep copy?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> sao chép một object đã cấu hình sẵn mà không phụ thuộc vào class của nó; shallow copy dùng chung các object lồng bên trong, deep copy nhân bản chúng.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/prototype">[10]</a> Demo của tôi: sau khi list của template thay đổi, bản shallow copy thấy thay đổi đó còn bản deep copy thì không.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Các cạm bẫy của Cloneable? (Nên ưu tiên copy constructor; đây là lời khuyên chung trong Java.)</div>
+<p class="see">Học bài: <a href="lessons/0007-prototype.vi.html">Prototype</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Adapter so với Decorator so với Proxy so với Facade?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Adapter thay đổi interface, Decorator giữ nguyên hoặc mở rộng nó để thêm hành vi, Proxy giữ nguyên nó để kiểm soát truy cập, Facade đưa ra một interface mới đơn giản hơn cho một subsystem.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/adapter">[12]</a><a class="cite" href="https://refactoring.guru/design-patterns/decorator">[13]</a><a class="cite" href="https://refactoring.guru/design-patterns/proxy">[14]</a><a class="cite" href="https://refactoring.guru/design-patterns/facade">[15]</a> Adapter thường bọc một object, Facade bọc cả một subsystem; việc ghép Decorator do client điều khiển, còn Proxy thường tự quản lý vòng đời của service object. Trong JDK: <code>Arrays.asList</code> (adapter), <code>BufferedReader</code> (decorator), <code>java.lang.reflect.Proxy</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[16]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> @Transactional là cái nào? (Proxy.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[11]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0026-choosing-between-similar-patterns.vi.html">Chọn giữa các pattern giống nhau</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Giải thích Decorator bằng một ví dụ, và nêu nhược điểm của nó.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> bọc một object bên trong một object khác có cùng interface để thêm hành vi; chồng nhiều wrapper lên nhau để kết hợp.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/decorator">[13]</a> Nhược điểm: khó gỡ riêng một wrapper, phụ thuộc thứ tự, code cấu hình lộn xộn. Ví dụ cà phê của tôi tính giá khi chồng sữa và đường; ví dụ trong JDK: <code>BufferedReader(new StringReader(..))</code> và <code>Collections.unmodifiableList</code> (một view đọc xuyên qua).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Decorator so với kế thừa? (Kết hợp lúc runtime so với bùng nổ subclass lúc compile.)</div>
+<p class="see">Học bài: <a href="lessons/0012-decorator.vi.html">Decorator</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Proxy pattern mang lại gì cho bạn, và Spring dùng nó ở đâu?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một object đứng thế có cùng interface: lazy loading, kiểm soát truy cập, logging, caching, truy cập từ xa.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/proxy">[14]</a> JDK dynamic proxy chuyển các lời gọi tới một <code>InvocationHandler</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">[16]</a> <code>@Transactional</code> của Spring dùng proxy: chỉ những lời gọi từ bên ngoài đi qua proxy mới bị chặn lại, nên test self-invocation của tôi lưu 2 account thay vì rollback.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[11]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Sửa lỗi self-invocation thế nào? (Gọi qua một bean khác, hoặc dùng AspectJ mode.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[11]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0015-proxy.vi.html">Proxy</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Composite pattern là gì và nó phù hợp ở đâu?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một cây gồm phần và tổng thể, được xử lý qua cùng một interface.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/composite">[17]</a> Ví dụ folder/file của tôi tính kích thước đệ quy qua <code>Node</code>. Liên quan: Iterator và Visitor duyệt nó; Builder dựng nó.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Composite so với Decorator? (Composite tổng hợp các con; Decorator bọc một object.)</div>
+<p class="see">Học bài: <a href="lessons/0011-composite.vi.html">Composite</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Giải thích Strategy, và khi nào một lambda thay thế được nó.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một họ thuật toán có thể hoán đổi đặt sau một interface, được chọn lúc runtime.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a> <code>Comparator</code> là strategy của JDK.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[20]</a> Với interface chỉ có một method thì một lambda là đủ (trang mô tả có ghi rằng ngôn ngữ hàm có thể khiến pattern này trở nên thừa).<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Strategy so với State? (Các state biết về nhau và tự kích hoạt việc chuyển trạng thái.<a class="cite" href="https://refactoring.guru/design-patterns/state">[18]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0023-strategy.vi.html">Strategy</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>State so với Strategy?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> cùng hình dạng, khác mục đích: State thay đổi hành vi khi trạng thái bên trong thay đổi và các state tự kích hoạt việc chuyển trạng thái; Strategy được chọn từ bên ngoài và các strategy không biết về nhau.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/state">[18]</a><a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a> Ví dụ document của tôi chuyển từ Draft sang Moderation rồi sang Published qua các lần gọi <code>publish()</code> liên tiếp.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Máy trạng thái chỉ có vài trạng thái thì sao? (Một enum có thể là đủ.)</div>
+<p class="see">Học bài: <a href="lessons/0022-state.vi.html">State</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Observer: hoạt động thế nào, vì sao java.util.Observable bị deprecate, và cái gì thay thế nó?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một subject thông báo cho các subscriber đăng ký động; Observable bị deprecate vì mô hình sự kiện hạn chế và thứ tự thông báo không được đặc tả.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/observer">[22]</a> Javadoc chỉ sang <code>java.beans</code>, các cấu trúc concurrent, và <code>Flow</code> API cho reactive stream.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">[23]</a> <code>Flow</code>: Publisher, Subscriber, Subscription với back-pressure qua <code>request(n)</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">[24]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Observer so với Mediator? (Subscription một chiều so với điều phối hai chiều tập trung.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[21]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0021-observer.vi.html">Observer</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Command pattern: vì sao lại biến một request thành object?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> để có thể đưa request vào queue, ghi log, lên lịch và undo, đồng thời tách bên gọi khỏi bên nhận.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/command">[25]</a> Editor của tôi giữ một stack các command và undo chúng theo thứ tự ngược lại; <code>Runnable</code> là một command chỉ có một method. Kết hợp với Memento để làm undo.<a class="cite" href="https://refactoring.guru/design-patterns/memento">[26]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Command so với Strategy? (Một thao tác dưới dạng object so với việc chọn thuật toán.)</div>
+<p class="see">Học bài: <a href="lessons/0017-command.vi.html">Command</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Template Method so với Strategy?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Template Method cố định bộ khung thuật toán trong base class và cho subclass override từng bước (kế thừa, tĩnh); Strategy hoán đổi cả thuật toán qua composition lúc runtime.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/template-method">[27]</a><a class="cite" href="https://refactoring.guru/design-patterns/strategy">[19]</a> Rủi ro: subclass triệt tiêu các bước mặc định có thể vi phạm Liskov. Trong JDK: <code>AbstractList</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao để template method là final? (Để bảo vệ thứ tự các bước.)</div>
+<p class="see">Học bài: <a href="lessons/0024-template-method.vi.html">Template Method</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>Chain of Responsibility: cho một ví dụ thực tế và một nhược điểm.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> các handler xử lý request nối tiếp nhau, mỗi handler hoặc xử lý hoặc chuyển tiếp (xác thực, rate limit, business logic).</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[28]</a> Nhược điểm: một số request có thể kết thúc mà không ai xử lý (dòng cuối trong demo của tôi). Các pipeline filter/middleware trên web là một hiện thực hóa phổ biến (nhận xét chung).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Chain so với Decorator? (Một handler có thể dừng chuỗi; một decorator thì luôn ủy quyền tiếp.)</div>
+<p class="see">Học bài: <a href="lessons/0016-chain-of-responsibility.vi.html">Chain of Responsibility</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">16.</span>Visitor pattern: double dispatch là gì, và Java hiện đại thay đổi nó thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>accept</code> của phần tử gọi overload của visitor ứng với kiểu cụ thể của nó; giờ đây sealed type cùng pattern switch cho ta kiểm tra exhaustive mà không cần visitor.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/visitor">[29]</a> Nhược điểm: mọi visitor đều phải sửa khi các kiểu phần tử thay đổi. Trong JDK: <code>FileVisitor</code> với <code>Files.walkFileTree</code>. Demo của tôi tính diện tích theo cả hai cách.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào nên giữ Visitor? (Khi có nhiều thao tác trên một hệ phân cấp ổn định, hoặc khi bạn không dùng được sealed type.)</div>
+<p class="see">Học bài: <a href="lessons/0025-visitor.vi.html">Visitor</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">17.</span>Flyweight pattern là gì? JDK dùng nó thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> chia sẻ trạng thái intrinsic giữa nhiều object giống nhau để tiết kiệm bộ nhớ, còn trạng thái extrinsic thì truyền từ ngoài vào.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[30]</a> <code>Integer.valueOf</code> luôn cache từ -128 đến 127, nên <code>==</code> đúng trong khoảng đó và sai khi ra ngoài (lần chạy của tôi: true rồi false).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[31]</a> Luôn so sánh giá trị boxed bằng <code>equals</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cái giá? (Tốn CPU và phức tạp hơn để đổi lấy ít RAM hơn.)</div>
+<p class="see">Học bài: <a href="lessons/0014-flyweight.vi.html">Flyweight</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">18.</span>Bạn sẽ nói về pattern trong buổi phỏng vấn như thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> vấn đề trước, rồi đến pattern và mục đích, rồi hình dạng, sau cùng là trade-off và phương án đơn giản hơn.</p>
+<p><a class="cite" href="https://refactoring.guru/design-patterns/criticism">[2]</a> Tránh khoe tên pattern và cài đặt đúng từng chữ; hãy nêu các nhược điểm mà trang mô tả của mỗi pattern đã liệt kê.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cho một ví dụ từ chính dự án của bạn. (Chuẩn bị sẵn mỗi nhóm một ví dụ.)</div>
+<p class="see">Học bài: <a href="lessons/0030-talking-about-patterns-in-interviews.vi.html">Kỹ thuật phỏng vấn</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi tôi lần lượt từng câu Design Patterns này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern?</a> · [2] <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns</a> · [3] <a href="https://refactoring.guru/design-patterns/catalog">Catalog</a> · [4] <a href="https://refactoring.guru/design-patterns/factory-method">Factory Method</a> · [5] <a href="https://refactoring.guru/design-patterns/abstract-factory">Abstract Factory</a> · [6] <a href="https://refactoring.guru/design-patterns/builder">Builder</a> · [7] <a href="https://refactoring.guru/design-patterns/singleton">Singleton</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">Runtime Javadoc</a> · [9] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring: Bean Scopes</a> · [10] <a href="https://refactoring.guru/design-patterns/prototype">Prototype</a> · [11] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring: @Transactional</a> · [12] <a href="https://refactoring.guru/design-patterns/adapter">Adapter</a> · [13] <a href="https://refactoring.guru/design-patterns/decorator">Decorator</a> · [14] <a href="https://refactoring.guru/design-patterns/proxy">Proxy</a> · [15] <a href="https://refactoring.guru/design-patterns/facade">Facade</a> · [16] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/reflect/Proxy.html">Proxy Javadoc</a> · [17] <a href="https://refactoring.guru/design-patterns/composite">Composite</a> · [18] <a href="https://refactoring.guru/design-patterns/state">State</a> · [19] <a href="https://refactoring.guru/design-patterns/strategy">Strategy</a> · [20] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc</a> · [21] <a href="https://refactoring.guru/design-patterns/mediator">Mediator</a> · [22] <a href="https://refactoring.guru/design-patterns/observer">Observer</a> · [23] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Observable.html">Observable Javadoc (deprecated)</a> · [24] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Flow.html">Flow Javadoc</a> · [25] <a href="https://refactoring.guru/design-patterns/command">Command</a> · [26] <a href="https://refactoring.guru/design-patterns/memento">Memento</a> · [27] <a href="https://refactoring.guru/design-patterns/template-method">Template Method</a> · [28] <a href="https://refactoring.guru/design-patterns/chain-of-responsibility">Chain of Responsibility</a> · [29] <a href="https://refactoring.guru/design-patterns/visitor">Visitor</a> · [30] <a href="https://refactoring.guru/design-patterns/flyweight">Flyweight</a> · [31] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">Integer Javadoc</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

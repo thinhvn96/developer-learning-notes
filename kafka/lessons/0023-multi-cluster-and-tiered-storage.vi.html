@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 23: Replication đa cluster và tiered storage</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Replication đa cluster và tiered storage</h1>
+<p class="meta">Kafka · Bài 0023 · bước 23/23 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0023-multi-cluster-and-tiered-storage.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> thiết kế disaster recovery (khôi phục sau thảm hoạ) giữa các data centre bằng MirrorMaker 2, và cắt giảm chi phí lưu trữ cho retention dài bằng tiered storage.</div>
+
+<h2>Vì sao cần nhiều hơn một cluster</h2>
+<p>Replication bên trong một cluster chịu được sự cố broker và rack, nhưng không chịu được việc mất cả một region. Mirroring giữa các cluster phục vụ disaster recovery, đặt dữ liệu gần người dùng theo địa lý, gom các cluster ở edge về một cluster trung tâm, migrate lên cloud và yêu cầu pháp lý về nơi lưu dữ liệu.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></p>
+<h2>MirrorMaker 2</h2>
+<ul>
+<li>"MirrorMaker được xây dựng trên nền framework Kafka Connect"; các luồng được viết dạng <code>source-&gt;target</code>.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+<li><strong>Active/passive:</strong> một luồng, <code>primary-&gt;secondary</code>, cluster dự phòng tiếp quản khi có sự cố. <strong>Active/active:</strong> <code>A-&gt;B, B-&gt;A</code>, cả hai cùng phục vụ traffic.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+<li>Topic được replicate sẽ bị đổi tên: topic <code>foo</code> từ cluster <code>us-west</code> trở thành <code>us-west.foo</code> (<code>DefaultReplicationPolicy</code>). Chính tiền tố này ngăn vòng lặp vô hạn trong mô hình active/active.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+<li>Offset của consumer group được replicate qua các checkpoint, để ứng dụng có thể failover và tiếp tục gần chỗ đã dừng.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a> Offset giữa các cluster là khác nhau, và đó chính là lý do cần phải dịch offset.</li>
+<li>Exactly-once được hỗ trợ cho các cluster MirrorMaker chuyên trách từ bản 3.5.0.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></li>
+</ul>
+<div class="aside">Replication giữa các cluster là bất đồng bộ: khi failover, vài giây dữ liệu cuối cùng có thể chưa có ở cluster dự phòng (RPO khác 0). Hãy nói rõ điều này trong buổi phỏng vấn thiết kế.</div>
+<h2>Tiered storage</h2>
+<p>Giữ retention dài trên đĩa broker thì tốn kém và làm việc thay broker chậm đi (broker mới phải copy toàn bộ). Tiered storage chia log ra hai tầng: "Tầng local giống như Kafka hiện tại, dùng đĩa local", còn "tầng remote dùng các hệ thống lưu trữ bên ngoài như HDFS hoặc S3" cho các segment đã hoàn tất.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></p>
+<ul>
+<li>Broker: <code>remote.log.storage.system.enable=true</code>; topic: <code>remote.storage.enable=true</code>.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+<li><code>local.retention.ms</code> / <code>local.retention.bytes</code> quyết định giữ bao nhiêu ở local trước khi chuyển sang remote; <code>retention.ms</code> vẫn quyết định tổng thời gian retention.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+<li>Kafka cung cấp interface <code>RemoteStorageManager</code> nhưng không kèm plugin nào dùng được cho production; bạn cần một plugin cho S3, GCS hoặc HDFS.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+<li>Hạn chế: "Không hỗ trợ topic compacted".<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></li>
+</ul>
+<div class="aside">Câu trả lời khi phỏng vấn: "Trong một region: RF 3 trải trên các rack. Giữa các region: MirrorMaker 2 active/passive với offset được checkpoint, chấp nhận một RPO nhỏ. Với retention hàng tháng: tiered storage lên S3 với retention local ngắn, ngoại trừ các topic compacted."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. MirrorMaker 2 được xây trên nền gì?</p>
+  <button data-correct>Kafka Connect</button>
+  <button>Share group</button>
+  <button>Kafka Streams</button>
+  <button>ZooKeeper</button>
+  <p class="explain">MirrorMaker được xây dựng trên nền framework Kafka Connect.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Topic foo được mirror từ us-west sẽ có tên gì?</p>
+  <button>foo.us-west</button>
+  <button>foo</button>
+  <button data-correct>us-west.foo</button>
+  <button>foo-mirror</button>
+  <p class="explain">Định dạng mặc định là {source}.{source_topic_name}.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Loại topic nào không dùng được tiered storage?</p>
+  <button>Topic có key</button>
+  <button>Topic nội bộ</button>
+  <button data-correct>Topic compacted</button>
+  <button>Topic dung lượng lớn</button>
+  <p class="explain">Tiered storage không hỗ trợ topic compacted.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái gì được chuyển sang tầng remote?</p>
+  <button>Segment đang active</button>
+  <button>Offset của consumer</button>
+  <button>Buffer của producer</button>
+  <button data-correct>Các log segment đã hoàn tất</button>
+  <p class="explain">Tầng remote lưu các log segment đã hoàn tất.<a class="cite" href="https://kafka.apache.org/43/operations/tiered-storage/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0023-design-dr.vi.md">Bài tập 0023: thiết kế disaster recovery</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">Kafka Operations: Geo-Replication (MirrorMaker)</a>. Đọc mục 'Overview', 'Configuring Geo-Replication' và các ví dụ topology; sau đó đọc Tiered Storage.</p>
+<p><a href="0022-security-and-quotas.vi.html">← Bảo mật và quota</a> &nbsp;|&nbsp; <a href="../interview.vi.html">Hỏi đáp phỏng vấn Kafka →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">Kafka Operations: Geo-Replication (MirrorMaker)</a> · [2] <a href="https://kafka.apache.org/43/operations/tiered-storage/">Kafka Operations: Tiered Storage</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

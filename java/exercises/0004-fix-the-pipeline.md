@@ -1,5 +1,7 @@
 # Exercise 0004: fix the pipeline
 
+[Tiếng Việt](0004-fix-the-pipeline.vi.md)
+
 Companion to [lesson 4](../lessons/0004-streams-and-optional.html). This code has three problems. Find them before running anything.
 
 ```java

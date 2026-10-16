@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 3: Auto-configuration và cách nhìn thấy nó</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Auto-configuration và cách nhìn thấy nó</h1>
+<p class="meta">Spring Boot · Bài 0003 · bước 4/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-auto-configuration.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích auto-configuration của Spring Boot làm gì, cách override nó, và cách hỏi Boot vì sao nó lại cấu hình một thứ gì đó.</div>
+
+<h2>Nó làm gì</h2>
+<p>"Auto-configuration của Spring Boot cố gắng tự động cấu hình ứng dụng Spring của bạn dựa trên các jar dependency bạn đã thêm vào." Ví dụ, nếu có HSQLDB trên classpath và bạn không tự khai báo bean kết nối database nào, Boot sẽ cấu hình một database in-memory.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a> Bạn bật nó bằng <code>@EnableAutoConfiguration</code> hoặc <code>@SpringBootApplication</code>, chỉ thêm một lần, trên configuration class chính.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+<h2>Không xâm lấn</h2>
+<p>"Auto-configuration không xâm lấn. Bất cứ lúc nào, bạn cũng có thể bắt đầu tự định nghĩa cấu hình để thay thế những phần cụ thể của auto-configuration." Tự định nghĩa bean <code>DataSource</code> là database nhúng sẽ tự rút lui.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+<h2>Nhìn thấy nó, loại bỏ nó</h2>
+<ul>
+<li>Khởi động với <code>--debug</code> để log ra conditions report cho biết cái gì đã được áp dụng và vì sao.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></li>
+<li>Loại một class: <code>@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })</code>, hoặc đặt <code>spring.autoconfigure.exclude</code>.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></li>
+</ul>
+<div class="aside">Câu chốt khi phỏng vấn: "Phép màu của Boot là các bean có điều kiện, được quyết định bởi classpath và các bean đã tồn tại. Khi hành vi làm tôi bất ngờ, tôi đọc conditions report từ <code>--debug</code>."</div><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Điều gì quyết định auto-configuration?</p>
+  <button>Tag của Docker image</button>
+  <button data-correct>Các jar trên classpath</button>
+  <button>Tên nhánh Git</button>
+  <button>Tên user của OS</button>
+  <p class="explain">Nó cấu hình app dựa trên các jar dependency bạn đã thêm.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Bạn tự định nghĩa bean DataSource. Kết quả?</p>
+  <button>Cả hai đều được tạo</button>
+  <button data-correct>Mặc định tự rút lui</button>
+  <button>JVM khởi động lại</button>
+  <button>Luôn khởi động thất bại</button>
+  <p class="explain">Auto-configuration không xâm lấn và rút lui khỏi những phần bạn tự định nghĩa.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Làm sao xem cái gì đã được áp dụng và vì sao?</p>
+  <button>Chạy kubectl logs</button>
+  <button>Bật debugger</button>
+  <button>Xoá classpath</button>
+  <button data-correct>Khởi động với --debug</button>
+  <p class="explain">--debug log ra conditions report.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Làm sao tắt một auto-configuration?</p>
+  <button>Đổi tên package</button>
+  <button>Đổi port</button>
+  <button>Xoá main()</button>
+  <button data-correct>Dùng exclude trên annotation</button>
+  <p class="explain">Dùng thuộc tính exclude của @SpringBootApplication hoặc property tương ứng.<a class="cite" href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-read-the-conditions-report.vi.md">Bài tập 0003: đọc conditions report</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot Reference: Auto-configuration</a>. Trang ngắn; sau đó đọc 'Creating Your Own Auto-configuration' để hiểu sâu hơn.</p>
+<p><a href="0007-bean-scopes.vi.html">← Bean scope: singleton và prototype</a> &nbsp;|&nbsp; <a href="0008-externalized-configuration-and-profiles.vi.html">Externalized configuration, thứ tự ưu tiên và profile →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-boot/reference/using/auto-configuration.html">Spring Boot Reference: Auto-configuration</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

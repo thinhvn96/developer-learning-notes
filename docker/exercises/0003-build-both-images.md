@@ -1,5 +1,7 @@
 # Exercise 0003: build both images
 
+[Tiếng Việt](0003-build-both-images.vi.md)
+
 Companion to [lesson 3](../lessons/0003-multi-stage-java-image.html).
 
 1. In `docker/examples/hello-java` build `Dockerfile.naive` as `hello-naive` and `Dockerfile` as `hello-multi`.

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 29: Removing items while you loop</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Why removing items in a loop crashes</h1>
+<p class="subtitle">Iterators, fail-fast checks and <code>ConcurrentModificationException</code>, with no threads involved.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0029 · step 8 of 46 · Foundation · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0029-iterators-and-fail-fast.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> "Remove the inactive users from this list" is an everyday task, and the first version most people write crashes. Interviewers love the follow-up: <em>"Can you get a ConcurrentModificationException with only one thread?"</em> After this lesson you can say yes, explain why, and show three correct ways.</div>
+
+<div class="win"><b>Today's win:</b> explain why a single thread can get <code>ConcurrentModificationException</code>, and remove elements while looping the three correct ways.</div>
+
+<dl class="words">
+  <dt>collection</dt><dd>An object that holds a group of other objects, like a <code>List</code>, a <code>Set</code> or the keys of a <code>Map</code>.</dd>
+  <dt>iterator</dt><dd>A small helper object that walks through a collection one element at a time. It has <code>hasNext()</code> ("is there another one?") and <code>next()</code> ("give me the next one").</dd>
+  <dt>for-each loop</dt><dd>The short loop <code>for (String n : names)</code>. Behind the scenes Java creates an iterator and calls <code>hasNext()</code> and <code>next()</code> for you.</dd>
+  <dt>structural change</dt><dd>A change to the <em>shape</em> of a collection: adding or removing elements. Replacing one value with another is not structural.</dd>
+  <dt>modCount</dt><dd>A counter inside <code>ArrayList</code> and <code>HashMap</code> that goes up by one on every structural change. Think of it as a version number.</dd>
+  <dt>fail-fast</dt><dd>An iterator that stops with an exception as soon as it notices the collection changed under it, instead of continuing with wrong data.</dd>
+  <dt>exception</dt><dd>An error object that Java "throws" to stop normal work. If nobody catches it, the program stops and prints it.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Predict, out loud: this list is <code>[ann, bob, cid, dan]</code>. What happens when you run <code>for (String n : names) if (n.startsWith("b")) names.remove(n);</code>? Does it print, crash, or skip something? Commit to an answer; you will check it in section 2.</p>
+
+<h2>1. The picture: a teacher reading the attendance list</h2>
+<p>A teacher reads names from an attendance sheet, moving a finger down one line at a time. At the top of the sheet there is a small <strong>version number</strong>. Every time the office adds or crosses out a name, they increase it.</p>
+<p>The careful teacher notes the version number before starting. Before reading each next name, she checks it again. If the number changed, someone edited the sheet while she was reading, and her finger may now point at the wrong line. So she stops and says "the list changed!" instead of reading wrong names.</p>
+<p>That is exactly a <span class="term">fail-fast</span> iterator:</p>
+<ul>
+  <li>The sheet is the <code>ArrayList</code>.</li>
+  <li>The version number is its <code>modCount</code> field. In <code>ArrayList</code> (via <code>AbstractList</code>), every structural change increments it.</li>
+  <li>The finger is the iterator. It remembers the number as <code>expectedModCount</code> and checks it on each <code>next()</code>: <code>if (modCount != expectedModCount) throw new ConcurrentModificationException();</code><a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">ArrayList.java</a></li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Before: list ann bob cid dan with modCount 0 and the iterator expecting 0. After list.remove bob: modCount is 1 but the iterator still expects 0, so next throws ConcurrentModificationException.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="30" font-size="12" opacity=".75">start of the loop</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="42" width="70" height="40" rx="3"/><rect x="90" y="42" width="70" height="40" rx="3"/>
+      <rect x="160" y="42" width="70" height="40" rx="3"/><rect x="230" y="42" width="70" height="40" rx="3"/>
+    </g>
+    <text x="55" y="67" text-anchor="middle">ann</text><text x="125" y="67" text-anchor="middle">bob</text>
+    <text x="195" y="67" text-anchor="middle">cid</text><text x="265" y="67" text-anchor="middle">dan</text>
+    <rect x="360" y="42" width="140" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="430" y="67" text-anchor="middle">modCount = 0</text>
+    <rect x="520" y="42" width="140" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="590" y="62" text-anchor="middle" font-size="11">iterator expects</text>
+    <text x="590" y="76" text-anchor="middle" font-size="11">0  ✓ same</text>
+
+    <g fill="none" stroke="currentColor"><path d="M160 100v32M155 126l5 6 5-6"/></g>
+    <text x="175" y="122" font-size="11" opacity=".8">names.remove("bob")  (structural change)</text>
+
+    <text x="20" y="160" font-size="12" opacity=".75">after the remove</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="172" width="70" height="40" rx="3"/><rect x="90" y="172" width="70" height="40" rx="3"/>
+      <rect x="160" y="172" width="70" height="40" rx="3"/>
+    </g>
+    <text x="55" y="197" text-anchor="middle">ann</text><text x="125" y="197" text-anchor="middle">cid</text>
+    <text x="195" y="197" text-anchor="middle">dan</text>
+    <rect x="360" y="172" width="140" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="430" y="197" text-anchor="middle" fill="var(--accent)">modCount = 1</text>
+    <rect x="520" y="172" width="140" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="590" y="192" text-anchor="middle" font-size="11">iterator expects</text>
+    <text x="590" y="206" text-anchor="middle" font-size="11">0  (stale)</text>
+    <text x="340" y="242" text-anchor="middle" font-size="12" fill="var(--accent)">next(): 1 ≠ 0 → throw ConcurrentModificationException</text>
+  </g>
+</svg>
+<figcaption>The list changed behind the iterator's back. On the next <code>next()</code>, the two numbers differ, so the iterator stops.</figcaption>
+</figure>
+
+<h3>The name misleads: it is not about threads</h3>
+<p>"Concurrent" sounds like "two threads". But the Javadoc says: "this exception does not always indicate that an object has been concurrently modified by a <em>different</em> thread ... if a thread modifies a collection directly while it is iterating over the collection with a fail-fast iterator, the iterator will throw this exception."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">CME javadoc</a> One thread is enough.</p>
+
+<h2>2. Trace the crash, step by step</h2>
+<p>A for-each loop is just an iterator. The Java Language Specification defines <code>for (T x : collection)</code> as a loop that calls <code>iterator()</code>, then <code>hasNext()</code> and <code>next()</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.14.2">JLS 14.14.2</a> So <code>list.remove(x)</code> inside it bumps <code>modCount</code> behind the iterator's back.</p>
+<pre><code>List&lt;String&gt; names = new ArrayList&lt;&gt;(List.of("ann", "bob", "cid", "dan"));
+for (String n : names) if (n.startsWith("b")) names.remove(n);
+
+<span class="c">Step 1  iterator created            expectedModCount = 0, cursor = 0</span>
+<span class="c">Step 2  next() → "ann"              check 0 == 0 ✓, cursor = 1</span>
+<span class="c">Step 3  next() → "bob"              check 0 == 0 ✓, cursor = 2</span>
+<span class="c">Step 4  names.remove("bob")         modCount = 1, size = 3</span>
+<span class="c">Step 5  hasNext(): cursor 2 != size 3 → true</span>
+<span class="c">Step 6  next(): check 1 == 0 ✗</span>          <span class="hl">→ ConcurrentModificationException</span></code></pre>
+<p>In the OpenJDK source, <code>hasNext()</code> is simply <code>return cursor != size;</code> and <code>next()</code> runs the check first.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">ArrayList.java</a> Keep that in mind: it explains the trap in the next section.</p>
+<p>Here is the real output of the runnable example. Line 1 is the crash you just traced:</p>
+<pre><code>$ java java/examples/collections/IteratorsAndFailFast.java
+1. for-each + list.remove        -&gt; ConcurrentModificationException
+2. remove 2nd-to-last in for-each -&gt; no exception, list=[ann, cid]  (loop silently skipped 'cid')
+3. Iterator.remove()              -&gt; [ann, cid, dan]
+4. removeIf (JDK 8)               -&gt; [ann, cid, dan]
+5. ListIterator set + add         -&gt; [ANN, ann!, BOB, bob!]
+6. entry.setValue while iterating -&gt; {a=10, b=20}
+7. map.put new key while iterating -&gt; ConcurrentModificationException</code></pre>
+
+<h2>3. The trap: sometimes it does not crash</h2>
+<p>Look at line 2. Same mistake, but the list is <code>[ann, bob, cid]</code> and you remove <code>bob</code>, the <strong>second-to-last</strong> element. No exception. But <code>cid</code> was never visited.</p>
+<pre><code>List&lt;String&gt; tricky = new ArrayList&lt;&gt;(List.of("ann", "bob", "cid"));
+for (String n : tricky) if (n.equals("bob")) tricky.remove(n);
+
+<span class="c">Step 1  next() → "ann"                cursor = 1</span>
+<span class="c">Step 2  next() → "bob"                cursor = 2</span>
+<span class="c">Step 3  tricky.remove("bob")          size = 2, modCount = 1</span>
+<span class="c">Step 4  hasNext(): cursor 2 != size 2 → false</span>
+        <span class="hl">→ loop ends, no check ever runs</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Before removal the cursor is at index 2 of a list of size 3. After removing bob, cid moves to index 1, size becomes 2, cursor equals size, so hasNext is false and cid is skipped.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="30" font-size="12" opacity=".75">just after next() returned "bob"</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="42" width="80" height="40" rx="3"/><rect x="100" y="42" width="80" height="40" rx="3"/>
+      <rect x="180" y="42" width="80" height="40" rx="3"/>
+    </g>
+    <text x="60" y="67" text-anchor="middle">ann</text><text x="140" y="67" text-anchor="middle">bob</text>
+    <text x="220" y="67" text-anchor="middle">cid</text>
+    <g font-size="10" opacity=".6"><text x="24" y="96">0</text><text x="104" y="96">1</text><text x="184" y="96">2</text></g>
+    <g fill="none" stroke="currentColor"><path d="M220 120v-18M215 108l5-6 5 6"/></g>
+    <text x="220" y="134" text-anchor="middle" font-size="11">cursor = 2</text>
+    <text x="320" y="67" font-size="12">size = 3 → hasNext() true</text>
+
+    <text x="20" y="166" font-size="12" opacity=".75">after tricky.remove("bob")</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="176" width="80" height="34" rx="3"/><rect x="100" y="176" width="80" height="34" rx="3"/>
+    </g>
+    <text x="60" y="198" text-anchor="middle">ann</text>
+    <text x="140" y="198" text-anchor="middle" fill="var(--accent)">cid</text>
+    <rect x="180" y="176" width="80" height="34" rx="3" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <text x="220" y="198" text-anchor="middle" font-size="11" fill="var(--accent)">cursor 2</text>
+    <text x="320" y="190" font-size="12" fill="var(--accent)">size = 2 → cursor == size</text>
+    <text x="320" y="206" font-size="12" fill="var(--accent)">hasNext() false: cid skipped</text>
+  </g>
+</svg>
+<figcaption>Removing <code>bob</code> shifts <code>cid</code> left into the slot the cursor already passed. Cursor and size are now equal, so the loop ends quietly.</figcaption>
+</figure>
+
+<p>This is the interview trap: removing the second-to-last element shrinks the size so <code>hasNext()</code> returns false before the check runs. No exception, and the last element was never visited. <strong>A bug that does not crash.</strong></p>
+<p>That is why the Javadoc calls fail-fast "best-effort": "it would be wrong to write a program that depended on this exception for its correctness".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">CME javadoc</a> The exception is a bug detector, not a guarantee.</p>
+
+<h2>4. The correct ways</h2>
+<p>Back to the teacher: if <em>she</em> crosses out a name herself, she knows about it and updates her note. Only edits made <em>by someone else</em> confuse her. In Java, "she" is the iterator.</p>
+
+<h3>Way 1: <code>Iterator.remove()</code></h3>
+<pre><code>for (Iterator&lt;String&gt; it = a.iterator(); it.hasNext(); )
+  if (it.next().startsWith("b")) it.remove();   <span class="hl">// [ann, cid, dan]</span></code></pre>
+<p>This is the only removal the iterator knows about. In the source, <code>Itr.remove()</code> removes the element, moves the cursor back and sets <code>expectedModCount = modCount</code>, so the next check passes.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">ArrayList.java</a> HashMap's views are fail-fast "in any way except through the iterator's own <code>remove</code> method".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+
+<h3>Way 2: <code>removeIf</code> (JDK 8+)</h3>
+<pre><code>b.removeIf(n -&gt; n.startsWith("b"));             <span class="hl">// [ann, cid, dan]</span></code></pre>
+<p>One call, no iterator in your code. <code>n -&gt; n.startsWith("b")</code> is a <em>lambda</em>: a tiny function that answers "remove this one?". On <code>ArrayList</code> it compacts in one pass instead of shifting the array after every removal. This is the version to write in an interview.</p>
+
+<h3>Way 3: <code>ListIterator</code> to change while walking</h3>
+<pre><code>for (ListIterator&lt;String&gt; it = c.listIterator(); it.hasNext(); ) {
+  String n = it.next();
+  it.set(n.toUpperCase());   <span class="c">// replace the current element</span>
+  it.add(n + "!");           <span class="c">// insert after it</span>
+}                            <span class="hl">// [ANN, ann!, BOB, bob!]</span></code></pre>
+<p>A <code>ListIterator</code> can also <code>set</code> and <code>add</code> while walking a list.</p>
+
+<h3>Maps: values yes, keys no</h3>
+<ul>
+  <li>Changing a <em>value</em> (<code>entry.setValue</code>) is not structural, so it is allowed (line 6 of the output).</li>
+  <li>Adding or removing keys is structural, so <code>map.put(newKey, ...)</code> inside a key loop throws (line 7).</li>
+</ul>
+<p>Two more options: collect the items into a new list and change the original after the loop, or use a concurrent collection if <em>other threads</em> modify it (<a href="0039-concurrent-collections.html">lesson 0039</a>).</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<p>The fail-fast rules are the same in all three. The difference is style: <code>removeIf</code> exists since JDK 8, so on any modern codebase it is the default answer.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Can a program with only one thread get a <code>ConcurrentModificationException</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Yes, if it changes a list while looping over it</button>
+    <button class="opt">No, it always needs two threads at the same time</button>
+    <button class="opt">Only when the collection is a HashMap, not a list</button>
+    <button class="opt">Only when the loop uses Java streams instead</button>
+  </div>
+  <div class="why">Modifying a collection directly while iterating it with a fail-fast iterator throws it, even in one thread.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does the fail-fast iterator compare on every <code>next()</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The list's modCount with its own expectedModCount</button>
+    <button class="opt">The list's size with the size when the loop began</button>
+    <button class="opt">The current element with the one before it</button>
+    <button class="opt">The thread id with the id of the list's owner</button>
+  </div>
+  <div class="why">Every structural change bumps <code>modCount</code>. The iterator remembered the old value; if they differ, it throws.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The list is <code>[ann, bob, cid]</code>. A for-each loop calls <code>list.remove("bob")</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>No exception, and cid is never visited</button>
+    <button class="opt">ConcurrentModificationException on cid</button>
+    <button class="opt">bob is removed and cid is visited normally</button>
+    <button class="opt">The loop runs forever on the same element</button>
+  </div>
+  <div class="why">After the remove, size is 2 and the cursor is 2, so <code>hasNext()</code> is false and the check never runs. A silent bug.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Is fail-fast detection guaranteed?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, it is best-effort, only for finding bugs</button>
+    <button class="opt">Yes, the exception is always thrown in time</button>
+    <button class="opt">Yes, but only for ArrayList and not for maps</button>
+    <button class="opt">Only when you start Java with the -ea flag</button>
+  </div>
+  <div class="why">The Javadoc says it would be wrong to write a program that depends on this exception for its correctness.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which removal is safe inside an explicit iterator loop?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>it.remove()</code></button>
+    <button class="opt"><code>list.remove(x)</code></button>
+    <button class="opt"><code>list.clear()</code></button>
+    <button class="opt"><code>list.add(x)</code></button>
+  </div>
+  <div class="why">The iterator's own <code>remove</code> updates <code>expectedModCount</code>, so the next check still passes.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You loop over <code>map.entrySet()</code> and call <code>entry.setValue(v * 10)</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It works, because changing a value is not structural</button>
+    <button class="opt">It throws, because every change counts as structural</button>
+    <button class="opt">It works, but the map is rehashed on every call</button>
+    <button class="opt">It removes the entry and inserts a brand new one</button>
+  </div>
+  <div class="why">Only adding or removing keys changes the structure. Line 6 of the run prints <code>{a=10, b=20}</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is a ConcurrentModificationException, and how do you remove items from a list while looping?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> It can happen with one thread: changing a collection while iterating it.</label></li>
+      <li><label><input type="checkbox"> A for-each loop uses an iterator under the hood.</label></li>
+      <li><label><input type="checkbox"> The collection counts structural changes in <code>modCount</code>; the iterator compares it with <code>expectedModCount</code> on <code>next()</code>.</label></li>
+      <li><label><input type="checkbox"> It is best-effort: removing the second-to-last element skips the last one with no exception.</label></li>
+      <li><label><input type="checkbox"> Fixes: <code>Iterator.remove()</code>, <code>removeIf</code>, or <code>ListIterator</code>.</label></li>
+      <li><label><input type="checkbox"> <code>setValue</code> on a map entry is fine; adding or removing keys is not.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Despite the name, it's usually not about threads. If I call <code>list.remove</code> inside a for-each loop, I get it in a single thread, because for-each uses an iterator. The list keeps a <code>modCount</code> that goes up on every add or remove, and the iterator remembers the value it started with. On each <code>next()</code> it compares them and throws if they differ. It's best-effort only: if I remove the second-to-last element, the size shrinks, <code>hasNext()</code> returns false, and the last element is silently skipped. So the right way is <code>removeIf</code>, or <code>Iterator.remove()</code>, or a <code>ListIterator</code> if I also need to replace or insert. Changing a map value with <code>setValue</code> is fine, because it's not a structural change."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0029-fix-the-loops.md">Exercise 0029: fix the loops</a>. Predict each loop's result first, then run it.</p>
+<p>Runnable example: <a href="../examples/collections/IteratorsAndFailFast.java"><code>IteratorsAndFailFast.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"What if another thread changes the list? Is there an iterator that never throws?"</em> Concurrent collections such as <code>CopyOnWriteArrayList</code> and <code>ConcurrentHashMap</code> use different, non-throwing iterators: see <a href="0039-concurrent-collections.html">lesson 0039</a>. Next, <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a> opens up <code>HashMap</code> itself.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">ConcurrentModificationException Javadoc (JDK 21)</a>. Read the class description; then the fail-fast paragraph in the ArrayList Javadoc.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why does removing the last element not crash either?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0002-choosing-a-list.html">← ArrayList, LinkedList or ArrayDeque?</a> &nbsp;|&nbsp; <a href="0001-hashmap-equals-hashcode.html">How HashMap finds your value →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, the Java Language Specification (SE 21) and the OpenJDK 21 source, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">ConcurrentModificationException Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">OpenJDK 21 source: ArrayList.java</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.14.2">JLS 14.14.2: the enhanced for statement</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

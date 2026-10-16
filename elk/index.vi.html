@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình ELK Stack</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ELK Stack: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình ELK Stack · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="elk" data-total="14">14 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Filebeat, Logstash, Elasticsearch, Kibana: từ mapping tới data stream và ILM. 14 bài theo thứ tự nên đọc, học xong bài nào thì tick bài đó (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Foundation</h2>
+<ol class="steps" data-stack="elk">
+<li data-id="0001-elk-overview-and-pipeline"><a href="lessons/0001-elk-overview-and-pipeline.vi.html">Pipeline ELK: thu thập, phân tích, lưu trữ, khám phá</a></li>
+<li data-id="0008-kql-and-discover"><a href="lessons/0008-kql-and-discover.vi.html">Tìm kiếm trong Kibana: Discover và KQL</a></li>
+<li data-id="0002-documents-indices-and-mappings"><a href="lessons/0002-documents-indices-and-mappings.vi.html">Document, index và mapping</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="elk">
+<li data-id="0009-text-analysis"><a href="lessons/0009-text-analysis.vi.html">Text analysis: analyzer và token</a></li>
+<li data-id="0003-shards-and-replicas"><a href="lessons/0003-shards-and-replicas.vi.html">Shard và replica</a></li>
+<li data-id="0004-near-real-time-search-and-refresh"><a href="lessons/0004-near-real-time-search-and-refresh.vi.html">Tìm kiếm gần thời gian thực và refresh</a></li>
+<li data-id="0005-query-dsl-term-match-bool"><a href="lessons/0005-query-dsl-term-match-bool.vi.html">Query DSL: term, match và bool</a></li>
+<li data-id="0010-bulk-api"><a href="lessons/0010-bulk-api.vi.html">Bulk API và lỗi theo từng item</a></li>
+<li data-id="0011-aggregations"><a href="lessons/0011-aggregations.vi.html">Aggregation: bucket và metric</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="elk">
+<li data-id="0006-logstash-grok-and-persistent-queues"><a href="lessons/0006-logstash-grok-and-persistent-queues.vi.html">Logstash: pipeline, grok và persistent queue</a></li>
+<li data-id="0007-filebeat-delivery-and-backpressure"><a href="lessons/0007-filebeat-delivery-and-backpressure.vi.html">Filebeat: harvester, registry và đảm bảo giao nhận</a></li>
+<li data-id="0012-ingest-pipelines"><a href="lessons/0012-ingest-pipelines.vi.html">Ingest pipeline: parse ngay bên trong Elasticsearch</a></li>
+<li data-id="0013-data-streams"><a href="lessons/0013-data-streams.vi.html">Data stream và rollover</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="elk">
+<li data-id="0014-index-lifecycle-management"><a href="lessons/0014-index-lifecycle-management.vi.html">Index lifecycle management (ILM)</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Từ Beats tới data stream, end to end <span class="meta">(dự kiến)</span></li>
+<li>Dashboard Kibana và Lens <span class="meta">(dự kiến)</span></li>
+<li>Tính toán quy mô kiến trúc hot/warm <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> nếu muốn thêm, đổi thứ tự hoặc bỏ qua bài nào, hoặc nhờ chạy một buổi phỏng vấn thử dựa trên <a href="interview.vi.html">trang hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # Exercise 0001: The key that changed
 
+[Tiếng Việt](0001-mutable-key.vi.md)
+
 Companion to [lesson 0001](../lessons/0001-hashmap-equals-hashcode.html). Write a `MutableKey` class with a non-final `id` field, and correct `equals` and `hashCode` based on `id`.
 
 1. Put one `MutableKey("a")` into a `HashMap`, keeping a reference to the key.

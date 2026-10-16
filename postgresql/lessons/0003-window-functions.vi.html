@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 3: Window function</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Window function</h1>
+<p class="meta">PostgreSQL · Bài 0003 · bước 5/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-window-functions.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết một window function hiển thị số liệu thống kê của nhóm ngay cạnh từng dòng, và dùng <code>row_number()</code> để lấy dòng đứng đầu mỗi nhóm.</div>
+
+<h2>Hàm tổng hợp vs window function</h2>
+<p>Window function "thực hiện một phép tính trên một tập các dòng của table có liên quan theo cách nào đó tới dòng hiện tại." Khác với hàm tổng hợp (aggregate) thông thường, window function "không gom các dòng lại thành một dòng kết quả duy nhất"; mỗi dòng vẫn giữ nguyên danh tính riêng của nó.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></p>
+<h2>Cú pháp cần nhớ</h2>
+<ul>
+<li><code>OVER</code> luôn đi ngay sau tên hàm và đánh dấu đây là window function.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></li>
+<li><code>PARTITION BY</code> chia các dòng thành những nhóm có cùng giá trị; hàm được tính trong partition chứa dòng hiện tại.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></li>
+<li><code>ORDER BY</code> bên trong <code>OVER</code> quyết định thứ tự xử lý trong partition (không nhất thiết trùng với thứ tự kết quả trả về).<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></li>
+</ul>
+<pre><code>SELECT depname, empno, salary,
+       row_number() OVER (PARTITION BY depname ORDER BY salary DESC)
+FROM empsalary;</code></pre>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 03-window.sql
+-- aggregate: 2 rows, window: 6 rows with the average beside each
+-- top earner per department: wrap the window query, then WHERE rn = 1</code></pre>
+<p class="aside">Câu hỏi phỏng vấn "ruột": "top N mỗi nhóm". Window function không được dùng trực tiếp trong <code>WHERE</code>, nên hãy tính <code>row_number()</code> trong một subquery rồi lọc trên kết quả đó, như query cuối cùng của ví dụ.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Window function xử lý các dòng thế nào?</p>
+  <button>Sắp xếp lại table</button>
+  <button>Gộp thành một dòng</button>
+  <button data-correct>Giữ lại mọi dòng</button>
+  <button>Xóa dòng trùng lặp</button>
+  <p class="explain">Các dòng vẫn giữ nguyên danh tính riêng.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Cái gì chia các dòng thành nhóm bên trong <code>OVER</code>?</p>
+  <button data-correct>Mệnh đề PARTITION BY</button>
+  <button>Mệnh đề LIMIT</button>
+  <button>Mệnh đề HAVING</button>
+  <button>Mệnh đề GROUP BY</button>
+  <p class="explain">PARTITION BY chia các dòng thành các partition.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Đầu vào sáu dòng, hai phòng ban. Dùng window để tính trung bình thì ra bao nhiêu dòng?</p>
+  <button>Ra một dòng</button>
+  <button data-correct>Ra sáu dòng</button>
+  <button>Ra hai dòng</button>
+  <button>Ra ba dòng</button>
+  <p class="explain">Window không gộp dòng, nên trả về đủ sáu dòng.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cách nào tìm người lương cao nhất mỗi phòng ban?</p>
+  <button>count rồi lọc</button>
+  <button>avg rồi lọc</button>
+  <button data-correct>row_number rồi lọc</button>
+  <button>sum rồi lọc</button>
+  <p class="explain">Đánh số các dòng trong mỗi partition theo lương giảm dần, rồi giữ lại rn = 1.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-second-highest-salary.vi.md">Bài tập 0003: lương cao thứ hai trong mỗi phòng ban</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-window.sql"><code>03-window.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-window.html">PostgreSQL Tutorial: Window Functions</a>. Mục 3.5, sau đó là trang tham chiếu về window function.</p>
+<p><a href="0008-transactions-commit-rollback-savepoints.vi.html">← Transaction: COMMIT, ROLLBACK và savepoint</a> &nbsp;|&nbsp; <a href="0009-ctes-with-and-recursive.vi.html">CTE: WITH và WITH RECURSIVE →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/tutorial-window.html">PostgreSQL Tutorial: Window Functions</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

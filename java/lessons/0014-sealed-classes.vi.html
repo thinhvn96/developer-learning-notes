@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 14: Sealed class và interface</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Sealed class: danh sách khách mời cho subclass</h1>
+<p class="subtitle">JDK 17 cho bạn nói "Shape là Circle, Square hoặc Rect, và không gì khác" như thế nào, và vì sao compiler quan tâm.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0014 · bước 40/46 · Advanced · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0014-sealed-classes.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Domain thực tế có những tập đóng: một payment là thẻ, chuyển khoản hoặc voucher; một kết quả API là thành công hoặc lỗi. Interviewer hỏi <em>"Sealed class dùng để làm gì? Nó khác enum hay final class thế nào?"</em> Bài này cho bạn câu trả lời đó và chuẩn bị cho <code>switch</code> của JDK 21 ở các bài sau.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> khai báo một sealed hierarchy, giải thích ba modifier <code>final</code>, <code>sealed</code> và <code>non-sealed</code>, và nói được vì sao sealing giúp compiler kiểm tra bạn đã xử lý mọi trường hợp.</div>
+
+<dl class="words">
+  <dt>extend / implement</dt><dd>Tạo kiểu mới dựa trên kiểu có sẵn: class <code>extends</code> một class, class <code>implements</code> một interface.</dd>
+  <dt>subclass</dt><dd>Kiểu mới, ví dụ <code>Circle</code> dưới <code>Shape</code>. Kiểu gốc là superclass (hoặc superinterface).</dd>
+  <dt>interface</dt><dd>Kiểu chỉ liệt kê các method (một bản hợp đồng). Class và record có thể implement nó.</dd>
+  <dt>hierarchy (cây kế thừa)</dt><dd>Cây gia phả của một kiểu và mọi kiểu con của nó.</dd>
+  <dt>sealed (niêm phong)</dt><dd>Kiểu ghi rõ chính xác những kiểu con nào được phép. Không ai khác được kế thừa nó.</dd>
+  <dt>permits</dt><dd>Keyword liệt kê các kiểu con được phép: danh sách khách mời.</dd>
+  <dt>exhaustive (đầy đủ)</dt><dd>Bao hết mọi trường hợp. Với sealed type, compiler kiểm tra được điều này.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói to: <em>"Ở JDK 8, làm sao để chỉ ba class của mình được kế thừa <code>Shape</code>?"</em> Nghĩ ra ít nhất một cách, và nó có vấn đề gì. Bạn sẽ so sánh ở mục 1.</p>
+
+<h2>1. Vấn đề của JDK 8: mở toang hoặc khoá chặt, không có ở giữa</h2>
+<p>Hãy nghĩ tới một bữa tiệc. Ở JDK 8 cánh cửa chỉ có hai chế độ. Mở: ai cũng vào được. Khoá (<code>final</code>): không ai vào được, kể cả bạn bè của bạn. Không có danh sách khách mời.</p>
+<pre><code><span class="c">// JDK 8: Shape is open to the whole world</span>
+public abstract class Shape {}
+public final class Circle extends Shape { ... }
+public final class Square extends Shape { ... }
+
+<span class="c">// somebody else, in another package, months later:</span>
+public class Triangle extends Shape { ... }    <span class="c">// compiles fine</span>
+
+static double area(Shape s) {
+    if (s instanceof Circle) { ... }
+    if (s instanceof Square) { ... }
+    throw new IllegalStateException();          <span class="hl">// Triangle lands here, at runtime</span>
+}</code></pre>
+<p>Các mẹo của JDK 8 (constructor package-private, comment ghi "đừng kế thừa") chỉ hiệu quả một nửa, và compiler vẫn không thể biết danh sách đầy đủ. Vì vậy chuỗi <code>if</code> nào cũng cần một <code>throw</code> ở cuối "cho chắc".</p>
+<p>JDK 17 thêm danh sách khách mời. JEP 409 liệt kê các mục tiêu: cho tác giả "kiểm soát code nào chịu trách nhiệm implement" một class hay interface, cung cấp "một cách khai báo rõ ràng hơn access modifier để giới hạn việc dùng một superclass", và đặt "nền móng cho việc phân tích pattern một cách đầy đủ".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a> Nó là preview ở JDK 15 và 16 và chính thức ở JDK 17.<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+
+<h2>2. Viết danh sách khách mời: <code>sealed</code> và <code>permits</code></h2>
+<pre><code>public sealed interface Shape permits Circle, Square, Rect {}
+record Circle(double r) implements Shape {}     <span class="c">// records are implicitly final</span>
+record Square(double side) implements Shape {}
+record Rect(double w, double h) implements Shape {}</code></pre>
+<ol class="steps">
+  <li><strong><code>sealed</code></strong> nghĩa là "kiểu này có danh sách khách mời".</li>
+  <li><strong><code>permits Circle, Square, Rect</code></strong> là danh sách. Chỉ ba kiểu này được implement <code>Shape</code>.</li>
+  <li>Mỗi record ngầm định là <code>final</code>, nên cây dừng ở đó.<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Sealed interface Shape ở trên cùng, permits Circle, Square và Rect. Ba khung record bên dưới nối với nó và được đánh dấu final. Khung Triangle nét đứt bên phải bị gạch: không được phép, và javac từ chối.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="200" y="20" width="280" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="43" text-anchor="middle">sealed interface Shape</text>
+    <text x="340" y="64" text-anchor="middle" fill="var(--accent)">permits Circle, Square, Rect</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M300 76L105 130M340 76v54M380 76L445 130"/>
+    </g>
+    <path d="M440 76L595 130" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <rect x="30" y="130" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="105" y="152" text-anchor="middle">record Circle</text>
+    <text x="105" y="170" text-anchor="middle" font-size="11" opacity=".75">final</text>
+    <rect x="200" y="130" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="275" y="152" text-anchor="middle">record Square</text>
+    <text x="275" y="170" text-anchor="middle" font-size="11" opacity=".75">final</text>
+    <rect x="370" y="130" width="150" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="445" y="152" text-anchor="middle">record Rect</text>
+    <text x="445" y="170" text-anchor="middle" font-size="11" opacity=".75">final</text>
+    <rect x="540" y="130" width="120" height="50" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <text x="600" y="152" text-anchor="middle" opacity=".75">Triangle</text>
+    <text x="600" y="170" text-anchor="middle" font-size="11" fill="var(--accent)">✗ không có tên</text>
+    <text x="340" y="214" text-anchor="middle" font-size="11" fill="var(--accent)">javac: class is not allowed to extend sealed class: Shape</text>
+    <text x="340" y="236" text-anchor="middle" font-size="11" opacity=".8">nên compiler biết danh sách đầy đủ: Circle, Square, Rect</text>
+  </g>
+</svg>
+<figcaption>Một sealed type và danh sách khách mời của nó. Thứ gì không có trong danh sách bị từ chối lúc compile, không phải đợi tới lúc chạy mới phát hiện.</figcaption>
+</figure>
+
+<h3>Compiler làm gì, từng bước</h3>
+<p>Giờ có người thêm <code>Triangle</code> mà không sửa danh sách. Mình đã compile bằng <code>javac</code> 21:</p>
+<pre><code>final class Triangle implements Shape {}
+<span class="c">Step 1  javac sees "implements Shape"</span>
+<span class="c">Step 2  Shape is sealed, so javac reads its permits list</span>
+<span class="c">Step 3  Triangle is not on the list → error</span>
+<span class="hl">error: class is not allowed to extend sealed class: Shape (as it is not listed in its 'permits' clause)</span></code></pre>
+<p>Danh sách này cũng thấy được lúc chạy. JEP 409 thêm hai method vào <code>java.lang.Class</code>: <code>isSealed()</code> và <code>getPermittedSubclasses()</code>.<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a> Với hierarchy ở trên, chúng in ra:</p>
+<pre><code>Shape.class.isSealed()                 <span class="hl">true</span>
+Shape.class.getPermittedSubclasses()   <span class="hl">Circle, Square, Rect</span></code></pre>
+<p class="muted">Nếu mọi subclass nằm trong cùng một file source, bạn có thể bỏ <code>permits</code>: theo JEP, "compiler Java sẽ suy ra các subclass được phép từ những khai báo trong file source".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+
+<h2>3. Mỗi khách mời phải nói rõ chuyện tiếp theo</h2>
+<p>Khách có tên trong danh sách có thể dẫn thêm khách của mình, hoặc không. Java bắt mỗi subclass được phép phải quyết định, và nói ra rõ ràng. Theo JEP, "mỗi subclass được phép phải dùng đúng một trong các modifier <code>final</code>, <code>sealed</code> và <code>non-sealed</code>".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+<ul>
+  <li><strong><code>final</code></strong>: không kế thừa tiếp. Nhánh dừng ở đây.</li>
+  <li><strong><code>sealed</code></strong>: được kế thừa tiếp, nhưng lại chỉ qua danh sách <code>permits</code> của riêng nó.</li>
+  <li><strong><code>non-sealed</code></strong>: mở lại; class nào cũng kế thừa nhánh này được.</li>
+</ul>
+<pre><code>sealed interface Vehicle permits Car, Truck, Bike {}
+final class Car implements Vehicle {}
+sealed class Truck implements Vehicle permits DumpTruck {}
+final class DumpTruck extends Truck {}
+non-sealed class Bike implements Vehicle {}
+class EBike extends Bike {}                    <span class="c">// allowed: Bike is open again</span></code></pre>
+<p>Đoạn này compile được trên JDK 21. Bỏ modifier của <code>Bike</code> đi thì <code>javac</code> báo <code>error: sealed, non-sealed or final modifiers expected</code>.</p>
+
+<figure>
+<svg viewBox="0 0 680 280" role="img" aria-label="Sealed interface Vehicle với ba subclass được phép. Car là final và nhánh dừng lại. Truck là sealed và chỉ permits DumpTruck. Bike là non-sealed, nên class bất kỳ như EBike có thể kế thừa nó.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="210" y="20" width="260" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="45" text-anchor="middle">sealed interface Vehicle</text>
+    <g fill="none" stroke="currentColor"><path d="M280 60L120 100M340 60v40M400 60L560 100"/></g>
+    <rect x="30" y="100" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="123" text-anchor="middle"><tspan fill="var(--accent)">final</tspan> class Car</text>
+    <text x="120" y="143" text-anchor="middle" font-size="11" opacity=".75">nhánh đã đóng</text>
+    <rect x="250" y="100" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="123" text-anchor="middle"><tspan fill="var(--accent)">sealed</tspan> class Truck</text>
+    <text x="340" y="143" text-anchor="middle" font-size="11" opacity=".75">permits DumpTruck</text>
+    <rect x="470" y="100" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="560" y="123" text-anchor="middle"><tspan fill="var(--accent)">non-sealed</tspan> Bike</text>
+    <text x="560" y="143" text-anchor="middle" font-size="11" opacity=".75">mở lại</text>
+    <g fill="none" stroke="currentColor"><path d="M340 156v40M560 156v40"/></g>
+    <rect x="265" y="196" width="150" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="221" text-anchor="middle">final DumpTruck</text>
+    <rect x="470" y="196" width="180" height="40" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="560" y="221" text-anchor="middle">EBike, class bất kỳ...</text>
+    <text x="120" y="221" text-anchor="middle" font-size="11" opacity=".6">(không có gì bên dưới)</text>
+    <text x="340" y="266" text-anchor="middle" font-size="11" opacity=".8">mỗi subclass được phép phải chọn đúng một trong ba modifier</text>
+  </g>
+</svg>
+<figcaption>Ba lựa chọn cho một subclass được phép. Chỉ <code>non-sealed</code> mở một nhánh ra cho cả thế giới lần nữa.</figcaption>
+</figure>
+
+<h3>Thêm hai quy tắc (và cái bẫy)</h3>
+<p>Theo JEP, "sealed class và các subclass được phép của nó phải thuộc cùng một module", hoặc nếu không dùng module thì "cùng một package". Và "mỗi subclass được phép phải kế thừa trực tiếp sealed class".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a></p>
+<p><strong>Bẫy:</strong> bạn liệt kê một class trong <code>permits</code> nhưng đặt nó ở package khác trong một ứng dụng bình thường (không dùng module). Code không compile. <strong>Cách sửa:</strong> giữ cả sealed hierarchy trong một package; dù sao nó cũng là một khái niệm đóng.</p>
+
+<h2>4. Vì sao quan trọng: record + sealed = kiểu dữ liệu đóng</h2>
+<p>Record rất hợp: record là vật chứa giá trị trong suốt, bất biến ở mức nông.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> JEP 409 viết "sealed class kết hợp tốt với record class", và "record class ngầm định là <code>final</code>".<a class="src" href="https://openjdk.org/jeps/409">JEP 409</a> Sealed interface cộng record cho bạn một algebraic data type: một tập biến thể đóng, mỗi biến thể có field riêng.</p>
+<p>Ví dụ của khoá học định nghĩa đúng hierarchy này. Trên JDK 17 nó vẫn dùng chuỗi <code>instanceof</code> có <code>throw</code> ở cuối:</p>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+...
+<span class="hl">3.14 4.00 6.00</span>        <span class="c">← area of Circle(1), Square(2), Rect(2, 3)</span></code></pre>
+<p>Trên JDK 21, một <code>switch</code> trên interface không cần <code>default</code>, vì compiler biết toàn bộ tập kiểu (<a href="0015-pattern-matching-switch-and-record-patterns.vi.html">bài 15</a>). Lợi ích thấy rõ khi có người thêm hình mới. Mình thêm <code>Triangle</code> vào danh sách <code>permits</code> nhưng quên nó trong switch:</p>
+<pre><code>static double area(Shape s) {
+    return switch (s) {                         <span class="c">// JDK 21</span>
+        case Circle c -&gt; Math.PI * c.r() * c.r();
+        case Square q -&gt; q.side() * q.side();
+    };                                          <span class="c">// Triangle missing</span>
+}
+<span class="hl">error: the switch expression does not cover all possible input values</span></code></pre>
+<p>Ở JDK 8 bug này là một exception trên production. Với sealed type, nó là lỗi compile ngay trên laptop của bạn.</p>
+<div class="aside"><strong>Góc phỏng vấn: sealed vs enum vs final.</strong> Enum: một tập đóng các <em>instance</em> của cùng một kiểu, cùng các field. Sealed: một tập đóng các <em>kiểu</em>, mỗi kiểu có hình dạng dữ liệu riêng. Final: hoàn toàn không có subclass.</div>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Keyword nào liệt kê các kiểu con được phép kế thừa một sealed type?</p>
+  <div class="options">
+    <button class="opt" data-correct>permits</button>
+    <button class="opt">allows</button>
+    <button class="opt">implements</button>
+    <button class="opt">extends</button>
+  </div>
+  <div class="why">Sealed class hay interface dùng mệnh đề <code>permits</code> để ghi tên các kiểu con được phép.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Subclass được phép phải dùng modifier nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đúng một trong final, sealed, non-sealed</button>
+    <button class="opt">Luôn là final, không gì khác được phép</button>
+    <button class="opt">Luôn là abstract, để còn kế thừa tiếp</button>
+    <button class="opt">Modifier nào cũng được, hoặc không cần</button>
+  </div>
+  <div class="why">Mỗi subclass được phép phải nói cây tiếp tục thế nào: dừng (final), giới hạn lần nữa (sealed) hoặc mở lại (non-sealed).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Modifier nào mở lại một nhánh của sealed hierarchy cho mọi class?</p>
+  <div class="options">
+    <button class="opt" data-correct>non-sealed</button>
+    <button class="opt">sealed</button>
+    <button class="opt">abstract</button>
+    <button class="opt">final</button>
+  </div>
+  <div class="why"><code>non-sealed</code> đưa nhánh đó về trạng thái mở, như một class bình thường.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Shape</code> permits Circle và Square. Có người viết <code>final class Triangle implements Shape</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lỗi compile: Triangle không được phép</button>
+    <button class="opt">Compile được, nhưng ném lỗi lúc chạy</button>
+    <button class="opt">Compile được, kèm warning deprecation</button>
+    <button class="opt">Compile được, Shape bị kế thừa âm thầm</button>
+  </div>
+  <div class="why">javac kiểm tra danh sách <code>permits</code>: "class is not allowed to extend sealed class". Lỗi xảy ra lúc compile.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao một <code>switch</code> JDK 21 trên sealed interface có thể bỏ <code>default</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compiler biết mọi kiểu con được phép</button>
+    <button class="opt">Sealed type không bao giờ null lúc chạy</button>
+    <button class="opt">JVM tự thêm case còn thiếu khi chạy</button>
+    <button class="opt">Record luôn khớp với case đầu tiên</button>
+  </div>
+  <div class="why">Sealing làm tập kiểu con đóng và đã biết, nên compiler kiểm tra được tính đầy đủ và báo case còn thiếu.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn cần "một payment là Card có số thẻ, hoặc Voucher có mã". Cách nào hợp nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một sealed interface với hai record</button>
+    <button class="opt">Một enum với hai hằng số</button>
+    <button class="opt">Một final class có field kiểu loại</button>
+    <button class="opt">Một abstract class mở cho tất cả</button>
+  </div>
+  <div class="why">Các biến thể mang dữ liệu khác nhau, nên bạn cần một tập đóng các <em>kiểu</em>. Enum là tập đóng các instance của cùng một kiểu.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Sealed class trở thành tính năng chính thức (không còn preview) ở bản nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>JDK 17</button>
+    <button class="opt">JDK 8</button>
+    <button class="opt">JDK 11</button>
+    <button class="opt">JDK 21</button>
+  </div>
+  <div class="why">Sealed class là preview ở JDK 15 và 16, rồi chính thức ở JDK 17 mà không thay đổi gì.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Sealed class là gì, và khi nào bạn dùng nó thay vì enum?"</strong> Bấm giờ. Trả lời to, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Sealed class hoặc interface (chính thức ở JDK 17) giới hạn kiểu nào được kế thừa nó, liệt kê bằng <code>permits</code>.</label></li>
+      <li><label><input type="checkbox"> Mỗi subclass được phép phải là <code>final</code>, <code>sealed</code> hoặc <code>non-sealed</code>.</label></li>
+      <li><label><input type="checkbox"> Class không có trong danh sách là lỗi compile, không phải bất ngờ lúc chạy.</label></li>
+      <li><label><input type="checkbox"> Record rất hợp: chúng là vật chứa dữ liệu ngầm định final.</label></li>
+      <li><label><input type="checkbox"> Compiler biết toàn bộ tập kiểu, nên <code>switch</code> ở JDK 21 được kiểm tra đầy đủ mà không cần <code>default</code>.</label></li>
+      <li><label><input type="checkbox"> Enum = các instance cố định của một kiểu; sealed = tập kiểu cố định với dữ liệu khác nhau.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Sealed class, chính thức từ JDK 17, cho em kiểm soát ai được kế thừa một kiểu. Em viết <code>sealed interface Shape permits Circle, Square, Rect</code>, và class nào khác cố implement <code>Shape</code> là lỗi compile. Mỗi subclass được phép phải ghi <code>final</code>, hoặc <code>sealed</code> kèm danh sách riêng, hoặc <code>non-sealed</code> để mở lại nhánh đó; record ngầm định là final nên rất hợp. Lợi ích lớn nhất là compiler biết toàn bộ tập kiểu con. Nên ở JDK 21 em switch trên <code>Shape</code> mà không cần <code>default</code>, và nếu ai đó thêm hình mới thì mọi switch quên nó sẽ không compile nữa. So với enum: enum là tập instance cố định của một kiểu, cùng field; sealed hierarchy là tập kiểu cố định, mỗi kiểu có dữ liệu riêng, kiểu như <code>Card(number)</code> với <code>Voucher(code)</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0014-model-payment-types.vi.md">Bài tập 0014: mô hình hoá các loại payment</a>. Gửi thiết kế của bạn cho giáo viên trước khi compile.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer senior sẽ hỏi tiếp: <em>"Cho tôi xem cái switch. Bạn lấy field ra khỏi từng record thế nào?"</em> Đó là pattern matching cho <code>switch</code> và record pattern, ở <a href="0015-pattern-matching-switch-and-record-patterns.vi.html">bài 0015</a>. Trước đó là một tính năng nhỏ của JDK 14+ giúp debug nhanh hơn nhiều: <a href="0027-helpful-nullpointerexceptions.vi.html">helpful NullPointerException</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a>. Đọc Summary, Goals và Description.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào mới cần dùng non-sealed?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ báo luôn điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0003-records-and-immutability.vi.html">← Record: một dòng thay cho bốn mươi dòng</a> &nbsp;|&nbsp; <a href="0027-helpful-nullpointerexceptions.vi.html">Phần nào bị null? Helpful NullPointerException →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với các JEP của OpenJDK và tài liệu Java 21, và compile thử bằng JDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

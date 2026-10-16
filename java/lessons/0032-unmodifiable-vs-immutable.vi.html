@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 32: List không ai sửa được</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>List không ai sửa được (thật không?)</h1>
+<p class="subtitle"><code>Arrays.asList</code>, <code>unmodifiableList</code>, <code>List.of</code> và <code>List.copyOf</code> trông giống nhau. Nhưng không phải vậy.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0032 · bước 13/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0032-unmodifiable-vs-immutable.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Một class trả về list nội bộ của nó, nơi gọi thêm phần tử vào, và giờ state của object bị sai. Người phỏng vấn kiểm tra điều này bằng câu <em>"Làm sao trả về một list mà không ai sửa được?"</em> rồi đến <em>"Unmodifiable và immutable khác nhau thế nào?"</em> Sau bài này bạn trả lời được cả hai, và đoán được lời gọi nào sẽ ném exception.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> phân biệt được <code>Arrays.asList</code>, <code>Collections.unmodifiableList</code>, <code>List.of</code> và <code>List.copyOf</code>, và đoán được lời gọi nào ném exception.</div>
+
+<dl class="words">
+  <dt>reference</dt><dd>Biến chứa một object không chứa chính object đó, mà chỉ chứa địa chỉ của nó. Hai list có thể cùng giữ địa chỉ của một object.</dd>
+  <dt>view</dt><dd>Một collection không có dữ liệu riêng; nó đọc xuyên qua tới một collection khác, nên nó thấy các thay đổi của collection đó.</dd>
+  <dt>unmodifiable</dt><dd>Collection từ chối <code>add</code>, <code>remove</code> và <code>set</code> (không sửa được). Nó không nói gì về các phần tử bên trong.</dd>
+  <dt>immutable</dt><dd>Bất biến: không gì có thể thay đổi, không phải collection, không phải phần tử, không qua bất kỳ reference nào khác.</dd>
+  <dt>UnsupportedOperationException</dt><dd>Exception mà collection ném ra khi bạn gọi method nó chọn không hỗ trợ, như <code>add</code> trên list có kích thước cố định. Thường viết tắt là UOE.</dd>
+  <dt>defensive copy</dt><dd>Sao chép dữ liệu trước khi đưa ra ngoài (hoặc sau khi nhận vào), để code bên ngoài không sửa được state của object (bản sao phòng thủ).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Dự đoán: <code>List&lt;String&gt; view = Collections.unmodifiableList(backing);</code> rồi ai đó gọi <code>backing.add("c")</code>. Giờ <code>view</code> có chứa <code>"c"</code> không? Có hay không, và vì sao? Câu trả lời nằm ở phần 2.</p>
+
+<h2>1. Bốn thứ trông giống nhau</h2>
+<p>Hãy hình dung một cửa hàng có một kệ hàng. Có bốn cách để khách hàng "xem" nó:</p>
+<ul>
+  <li><strong>Một khung bao quanh kệ</strong> (<code>Arrays.asList</code>): kệ có số ô cố định. Khách không thêm ô được, nhưng có thể đổi món trong một ô, và việc đó thay đổi kệ thật.</li>
+  <li><strong>Tấm kính trước kệ</strong> (<code>Collections.unmodifiableList</code>): khách không chạm được vào gì. Nhưng chủ cửa hàng sau tấm kính vẫn sắp xếp lại được, và khách thấy điều đó.</li>
+  <li><strong>Một tấm ảnh chụp kệ</strong> (<code>List.of</code>, <code>List.copyOf</code>): đông cứng. Không ai sửa được tấm ảnh, và thay đổi sau này trên kệ không hiện trong ảnh.</li>
+</ul>
+<p>Ví dụ chạy được thử từng cách:</p>
+<pre><code>$ java java/examples/collections/UnmodifiableVsImmutable.java
+Arrays.asList   set: ok  add: UnsupportedOperationException  -&gt; array now [X, b, c]
+unmodifiableList add: UnsupportedOperationException
+after backing.add("c"): view=[a, b, c]  copyOf=[a, b]
+List.of(null): NullPointerException
+List.of contains(null): NullPointerException
+Arrays.asList with null: ok
+Map.of duplicate key: IllegalArgumentException
+List.copyOf(List.of(..)) same instance? true
+List.of with mutable element: [hi there]
+Stream.toList add: UnsupportedOperationException</code></pre>
+<p>Đọc nó như một bảng:</p>
+<table>
+<tr><th></th><th>Thêm/xóa</th><th>set</th><th>Thấy thay đổi sau này của nguồn</th><th>null</th></tr>
+<tr><td><code>Arrays.asList(arr)</code></td><td>không</td><td>có, ghi vào mảng</td><td>có (nó <em>chính là</em> mảng)</td><td>có</td></tr>
+<tr><td><code>Collections.unmodifiableList(l)</code></td><td>không</td><td>không</td><td>có, nó là view</td><td>như nguồn</td></tr>
+<tr><td><code>List.of(...)</code>, <code>List.copyOf(c)</code></td><td>không</td><td>không</td><td>không, bản sao riêng</td><td>không (NPE)</td></tr>
+</table>
+<p class="muted">Vì sao một <code>List</code> lại được phép từ chối <code>add</code>? Vì <code>add</code> là "optional operation" (thao tác tùy chọn) trong interface <code>List</code>: implementation có thể ném <code>UnsupportedOperationException</code> thay vì hỗ trợ (bài 0028).</p>
+
+<h2>2. Lần theo: ai thấy thay đổi nào?</h2>
+<pre><code>String[] arr = {"a", "b", "c"};
+List&lt;String&gt; asList = Arrays.asList(arr);
+asList.set(0, "X");     <span class="c">// ok: writes into arr → arr is [X, b, c]</span>
+asList.add("d");        <span class="hl">// UnsupportedOperationException: fixed size</span>
+
+List&lt;String&gt; backing = new ArrayList&lt;&gt;(List.of("a", "b"));
+List&lt;String&gt; view = Collections.unmodifiableList(backing);
+List&lt;String&gt; copy = List.copyOf(backing);
+view.add("x");          <span class="hl">// UnsupportedOperationException</span>
+
+<span class="c">Step 1  backing = [a, b]   view reads backing   copy holds its own [a, b]</span>
+<span class="c">Step 2  backing.add("c")   backing = [a, b, c]</span>
+<span class="c">Step 3  print view         reads through        → [a, b, c]</span>
+<span class="c">Step 4  print copy         own data             → [a, b]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Sau backing.add c: view unmodifiable trỏ tới list backing và hiện a, b, c. List.copyOf giữ bản sao riêng a, b. Arrays.asList trỏ thẳng vào mảng mà nó bọc.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11" opacity=".75">sau backing.add("c")</text>
+    <rect x="240" y="40" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="60" text-anchor="middle">backing (ArrayList)</text>
+    <text x="340" y="78" text-anchor="middle">[a, b, <tspan fill="var(--accent)">c</tspan>]</text>
+    <rect x="20" y="150" width="190" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="115" y="172" text-anchor="middle" fill="var(--accent)">view</text>
+    <text x="115" y="192" text-anchor="middle" font-size="11">unmodifiableList</text>
+    <g fill="none" stroke="var(--accent)"><path d="M115 150V115h175V96M285 102l5-6 5 6"/></g>
+    <text x="130" y="132" font-size="11" fill="var(--accent)">đọc xuyên qua → [a, b, c]</text>
+    <rect x="470" y="150" width="190" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="565" y="172" text-anchor="middle">copy</text>
+    <text x="565" y="192" text-anchor="middle" font-size="11">List.copyOf → [a, b]</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".6"><path d="M440 65h125v79M560 138l5 6 5-6"/></g>
+    <text x="470" y="58" font-size="11" opacity=".75">chép một lần, lúc tạo</text>
+    <rect x="250" y="150" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="172" text-anchor="middle">Arrays.asList(arr)</text>
+    <text x="340" y="192" text-anchor="middle" font-size="11">[X, b, c] = chính arr</text>
+    <text x="340" y="236" text-anchor="middle" font-size="11" opacity=".8">View dùng chung dữ liệu, copy sở hữu dữ liệu, asList là mảng khoác áo List</text>
+  </g>
+</svg>
+<figcaption>View đi theo nguồn của nó mãi mãi. Copy được chụp một lần và không bao giờ đổi. <code>Arrays.asList</code> cũng không phải bản sao: nó bọc chính cái mảng.</figcaption>
+</figure>
+
+<p>Javadoc nói đúng điều đó bằng lời:</p>
+<ul>
+  <li><code>Arrays.asList</code> trả về "một list có kích thước cố định, dựa trên mảng được truyền vào".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays javadoc</a></li>
+  <li><code>unmodifiableList</code> trả về một "unmodifiable view"; các truy vấn "'đọc xuyên qua' tới list được chỉ định".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a> Ai giữ list gốc vẫn có thể thay đổi thứ bạn thấy.</li>
+  <li><code>List.of</code> (JDK 9) và <code>List.copyOf</code> (JDK 10): "Không thể thêm, xóa hay thay thế phần tử", "Chúng không cho phép phần tử null", và chúng là value-based, nên đừng dựa vào identity hay dùng chúng để lock.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> <code>copyOf</code> trên một list vốn đã unmodifiable có thể trả về chính instance đó, như lần chạy cho thấy (<code>same instance? true</code>).</li>
+  <li><code>Map.of</code> từ chối key trùng bằng <code>IllegalArgumentException</code>, từ chối null, và "thứ tự duyệt các mapping là không xác định và có thể thay đổi".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></li>
+</ul>
+<p><strong>Cái bẫy:</strong> <code>List.of</code> khắt khe với null kể cả khi bạn chỉ <em>hỏi</em>: <code>List.of("a").contains(null)</code> đã ném <code>NullPointerException</code> trong lần chạy. <code>Arrays.asList("a", null)</code> thì không sao.</p>
+
+<h2>3. Unmodifiable không phải là immutable</h2>
+<p>Hãy nghĩ tới một cuốn sổ địa chỉ đã in. Không ai thêm hay gạch được dòng nào: cuốn sổ là unmodifiable. Nhưng những ngôi nhà ở các địa chỉ đó vẫn có thể sơn lại. Cuốn sổ giữ <em>địa chỉ</em> (reference), không giữ ngôi nhà.</p>
+<p>Tất cả các list này đều <em>nông</em> (shallow): theo tài liệu, "nếu bản thân các phần tử bên trong là mutable, điều này có thể khiến nội dung List trông như bị thay đổi".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a></p>
+<pre><code>List&lt;StringBuilder&gt; sbs = List.of(new StringBuilder("hi"));
+sbs.add(new StringBuilder());   <span class="c">// throws UOE: list is locked</span>
+sbs.get(0).append(" there");    <span class="c">// allowed: element is mutable</span>
+System.out.println(sbs);        <span class="hl">// [hi there]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Một hộp List.of giữ một mũi tên reference tới object StringBuilder nằm ngoài list. add bị list từ chối, nhưng append thay đổi object mà mũi tên trỏ tới.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="30" y="50" width="220" height="90" rx="6" fill="none" stroke="currentColor"/>
+    <text x="140" y="72" text-anchor="middle">List.of(...)  đã khóa</text>
+    <rect x="60" y="88" width="160" height="36" rx="3" fill="none" stroke="currentColor" opacity=".7"/>
+    <text x="140" y="111" text-anchor="middle" font-size="11">[0] → reference</text>
+    <g fill="none" stroke="currentColor"><path d="M220 106h194M408 101l6 5-6 5"/></g>
+    <rect x="420" y="70" width="230" height="72" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="535" y="96" text-anchor="middle" fill="var(--accent)">StringBuilder</text>
+    <text x="535" y="122" text-anchor="middle" fill="var(--accent)">"hi there"</text>
+    <text x="140" y="34" text-anchor="middle" font-size="11">sbs.add(...) → UOE ✗</text>
+    <text x="535" y="56" text-anchor="middle" font-size="11" fill="var(--accent)">.append(" there") ✓</text>
+    <text x="340" y="180" text-anchor="middle" font-size="11" opacity=".8">Khóa nằm ở các ô của list, không ở các object mà chúng trỏ tới</text>
+  </g>
+</svg>
+<figcaption>Unmodifiable bảo vệ hình dạng của list. Immutable thật sự còn cần các phần tử immutable.</figcaption>
+</figure>
+
+<p>Immutable thật sự cần cả phần tử immutable (record có field immutable, <code>String</code>, <code>LocalDate</code>), như trong <a href="0003-records-and-immutability.vi.html">bài 0003</a>.</p>
+
+<h2>4. Trả về state nội bộ một cách an toàn</h2>
+<pre><code>class Cart {
+  private final List&lt;Item&gt; items = new ArrayList&lt;&gt;();
+
+  <span class="hl">// bad: the caller can add to your list</span>
+  List&lt;Item&gt; itemsBad()  { return items; }
+  <span class="c">// read-only, but live: sees later changes</span>
+  List&lt;Item&gt; itemsView() { return Collections.unmodifiableList(items); }
+  <span class="c">// frozen snapshot (JDK 10+)</span>
+  List&lt;Item&gt; items()     { return List.copyOf(items); }
+}</code></pre>
+<p>Cách thứ nhất làm rò rỉ state của bạn. Cách thứ hai chỉ đọc nhưng "sống": ổn nếu nơi gọi <em>cần</em> thấy cập nhật, sai nếu họ mong một ảnh chụp. Cách thứ ba là một ảnh chụp đông cứng.</p>
+
+<h3>JDK 8, 17 và 21</h3>
+<p>JDK 8 chỉ có <code>Arrays.asList</code>, <code>Collections.unmodifiable*</code>, <code>emptyList</code>/<code>singletonList</code>. <code>List/Set/Map.of</code> có từ bản 9, <code>copyOf</code> từ bản 10, <code>Stream.toList()</code> từ bản 16, nên tất cả đều dùng được trên 17 và 21.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> Dòng cuối của lần chạy cho thấy <code>Stream.toList()</code> cũng trả về list unmodifiable.</p>
+<p>Câu trả lời interview cho việc trả về state nội bộ: <code>return List.copyOf(items);</code> (17/21) hoặc <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code> (8).</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>Arrays.asList(arr).set(0, "X")</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ghi "X" vào chính cái mảng</button>
+    <button class="opt">Ném UnsupportedOperationException</button>
+    <button class="opt">Chỉ đổi một bản sao riêng của list</button>
+    <button class="opt">Thêm "X" làm phần tử đầu tiên mới</button>
+  </div>
+  <div class="why">List dựa trên mảng, nên <code>set</code> ghi xuyên qua: lần chạy in ra <code>array now [X, b, c]</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Còn <code>Arrays.asList(arr).add("d")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ném UnsupportedOperationException</button>
+    <button class="opt">Nới mảng ra thành bốn phần tử</button>
+    <button class="opt">Lặng lẽ bỏ qua phần tử mới</button>
+    <button class="opt">Ném ArrayIndexOutOfBoundsException</button>
+  </div>
+  <div class="why">Đây là list có kích thước cố định: bạn được thay phần tử nhưng không được thêm hay xóa.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn trả về <code>Collections.unmodifiableList(backing)</code>. Sau đó class gọi <code>backing.add("c")</code>. Nơi gọi thấy gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Phần tử mới: nó là một view sống</button>
+    <button class="opt">Nội dung cũ: nó đã được chép từ trước</button>
+    <button class="opt">Một exception ở lần đọc tiếp theo</button>
+    <button class="opt">Một list rỗng, vì nguồn đã thay đổi</button>
+  </div>
+  <div class="why">Các truy vấn "đọc xuyên qua" tới list nguồn. Hãy dùng <code>List.copyOf</code> nếu cần ảnh chụp.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List.of("a", null)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ném NullPointerException</button>
+    <button class="opt">Tạo một list có hai phần tử</button>
+    <button class="opt">Tạo một list chỉ có "a"</button>
+    <button class="opt">Ném IllegalArgumentException</button>
+  </div>
+  <div class="why"><code>List.of</code> không cho phép phần tử null. <code>Arrays.asList("a", null)</code> thì vẫn được.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Map.of("k", 1, "k", 2)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ném IllegalArgumentException</button>
+    <button class="opt">Giữ value sau cùng, nên k là 2</button>
+    <button class="opt">Giữ value đầu tiên, nên k là 1</button>
+    <button class="opt">Ném NullPointerException</button>
+  </div>
+  <div class="why">Key trùng bị từ chối ngay lúc tạo map.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List.of(new StringBuilder("hi"))</code>, rồi <code>get(0).append(" there")</code>. In list ra thì thấy gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>[hi there], phần tử đã đổi</button>
+    <button class="opt">[hi], list hoàn toàn immutable</button>
+    <button class="opt">Một UnsupportedOperationException</button>
+    <button class="opt">[hi, there], thêm một phần tử mới</button>
+  </div>
+  <div class="why">Unmodifiable là nông. Các ô của list bị khóa, nhưng <code>StringBuilder</code> mà chúng trỏ tới vẫn mutable.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trên JDK 8, làm sao trả về một ảnh chụp của <code>items</code> mà nơi gọi không sửa được?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code></button>
+    <button class="opt"><code>Collections.unmodifiableList(items)</code></button>
+    <button class="opt"><code>List.copyOf(items)</code></button>
+    <button class="opt"><code>Arrays.asList(items.toArray())</code></button>
+  </div>
+  <div class="why">Chép trước, rồi bọc. Chỉ bọc thôi thì là view sống; <code>List.copyOf</code> cần JDK 10; <code>Arrays.asList</code> vẫn cho <code>set</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Làm sao trả về một list không ai sửa được? Và nó có immutable không?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>Arrays.asList</code> có kích thước cố định và dựa trên mảng: <code>set</code> ghi xuyên qua, <code>add</code> ném exception.</label></li>
+      <li><label><input type="checkbox"> <code>unmodifiableList</code> là một <em>view</em> chỉ đọc: nó vẫn thấy thay đổi của nguồn.</label></li>
+      <li><label><input type="checkbox"> <code>List.of</code> / <code>List.copyOf</code> sở hữu dữ liệu riêng; không nhận null.</label></li>
+      <li><label><input type="checkbox"> Sửa đổi sẽ ném <code>UnsupportedOperationException</code>.</label></li>
+      <li><label><input type="checkbox"> Unmodifiable là nông: phần tử mutable vẫn có thể thay đổi.</label></li>
+      <li><label><input type="checkbox"> Câu trả lời: <code>List.copyOf(items)</code> từ 10+; <code>unmodifiableList(new ArrayList&lt;&gt;(items))</code> trên 8.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Có vài lựa chọn trông giống nhau. <code>Arrays.asList</code> chỉ là cái mảng khoác áo list: không add được, nhưng <code>set</code> thì ghi thẳng vào mảng. <code>Collections.unmodifiableList</code> là một view chỉ đọc: nơi gọi không sửa được, nhưng nếu class của em sửa list gốc thì họ vẫn thấy, nên nó không phải ảnh chụp. <code>List.of</code> và <code>List.copyOf</code> giữ dữ liệu riêng và từ chối null; mọi thay đổi đều ném <code>UnsupportedOperationException</code>. Nên để trả về state nội bộ em viết <code>return List.copyOf(items)</code>, hoặc trên Java 8 là <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code>. Nhưng đó là unmodifiable chứ không phải immutable: nó nông thôi. Nếu phần tử là mutable, như <code>StringBuilder</code>, chúng vẫn đổi được. Muốn immutable thật thì phần tử cũng phải immutable, ví dụ record với các field immutable."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0032-defend-the-state.vi.md">Bài tập 0032: bảo vệ state</a>. Tìm mọi cách mà nơi gọi có thể thay đổi object, rồi sửa từng cách một.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/UnmodifiableVsImmutable.java"><code>UnmodifiableVsImmutable.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi: <em>"List unmodifiable của bạn được dùng chung giữa các thread. Nó có an toàn không?"</em> Một list không bao giờ thay đổi sau khi được publish an toàn thì dễ chia sẻ, nhưng một <em>view</em> của list mà thread khác vẫn đang sửa thì không: xem <a href="0039-concurrent-collections.vi.html">bài 0039</a>. Tiếp theo, <a href="0033-hashset-linkedhashmap-and-lru.vi.html">bài 0033</a> xem set và map nào nhớ được thứ tự.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc (JDK 21)</a>. Đọc phần 'Unmodifiable Lists'; sau đó phần 'Unmodifiable Maps' của Map.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Value-based nghĩa là gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0031-comparable-comparator-and-ordering.vi.html">← Java sắp xếp mọi thứ theo thứ tự như thế nào</a> &nbsp;|&nbsp; <a href="0033-hashset-linkedhashmap-and-lru.vi.html">Collection nào nhớ thứ tự, và một LRU cache trong mười dòng →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

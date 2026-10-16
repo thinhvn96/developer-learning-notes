@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 10: Các loại index: B-tree, hash, GIN, BRIN</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Các loại index: B-tree, hash, GIN, BRIN</h1>
+<p class="meta">PostgreSQL · Bài 0010 · bước 8/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-index-types.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> kể tên các loại index có sẵn và chọn được loại phù hợp cho so sánh bằng/khoảng, kiểm tra mảng có chứa phần tử, hoặc table cực lớn sắp theo thời gian.</div>
+
+<h2>Các loại</h2>
+<table><tr><th>Loại</th><th>Phù hợp với<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></th></tr>
+<tr><td>B-tree (mặc định)</td><td>so sánh bằng và theo khoảng trên dữ liệu sắp xếp được: <code>&lt; &lt;= = &gt;= &gt;</code>, <code>BETWEEN</code>, <code>IN</code>, <code>IS NULL</code>, <code>LIKE</code> có neo đầu chuỗi</td></tr>
+<tr><td>Hash</td><td>chỉ so sánh bằng (lưu một giá trị hash 32-bit)</td></tr>
+<tr><td>GIN</td><td>index "đảo ngược" cho các giá trị phức hợp như mảng và full-text; mỗi thành phần một entry</td></tr>
+<tr><td>GiST / SP-GiST</td><td>hạ tầng cho nhiều chiến lược khác nhau (hình học, tìm láng giềng gần nhất)</td></tr>
+<tr><td>BRIN</td><td>tóm tắt theo từng dải block; tốt nhất khi giá trị tương quan với thứ tự vật lý của các dòng</td></tr></table>
+<p><code>CREATE INDEX</code> tạo B-tree trừ khi bạn chỉ định loại khác bằng <code>USING</code>.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a> Trong lần tôi chạy, một index <code>GIN</code> trên cột <code>text[]</code> đã được dùng cho <code>tags @&gt; ARRAY['x7']</code> (Bitmap Index Scan trên <code>t_tags</code>).</p>
+<p>Source: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a>. Nền tảng: <a href="0004-indexes-what-they-buy.vi.html">index: được gì</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Loại index mặc định?</p>
+  <button data-correct>B-tree</button>
+  <button>GIN</button>
+  <button>Hash</button>
+  <button>BRIN</button>
+  <p class="explain">B-tree là mặc định của CREATE INDEX.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Index cho phép kiểm tra mảng có chứa phần tử?</p>
+  <button data-correct>GIN</button>
+  <button>BRIN</button>
+  <button>Hash</button>
+  <button>B-tree</button>
+  <p class="explain">GIN phù hợp với các giá trị phức hợp như mảng.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Loại nào chỉ xử lý so sánh bằng?</p>
+  <button data-correct>Hash</button>
+  <button>B-tree</button>
+  <button>GIN</button>
+  <button>BRIN</button>
+  <p class="explain">Hash index chỉ xử lý phép so sánh bằng.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. BRIN hiệu quả nhất khi giá trị...?</p>
+  <button>Liên tục thay đổi</button>
+  <button>Chỉ là text</button>
+  <button data-correct>Theo thứ tự vật lý của dòng</button>
+  <button>Đều là duy nhất</button>
+  <p class="explain">Nó hiệu quả khi giá trị tương quan với thứ tự vật lý của các dòng.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-pick-the-index.vi.md">Bài tập 0010: chọn index</a></p>
+<p>Ví dụ chạy được: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/indexes-types.html">PostgreSQL Docs: Index Types</a>. Mục 11.2.</p>
+<p><a href="0004-indexes-what-they-buy.vi.html">← Index: được gì và mất gì</a> &nbsp;|&nbsp; <a href="0011-multicolumn-and-partial-indexes.vi.html">Index nhiều cột và partial index →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/indexes-types.html">PostgreSQL Docs: Index Types</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 45: Ôn tập 6: concurrency và JVM</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ôn tập 6: concurrency và JVM</h1>
+<p class="subtitle">Sáu bài, một buổi luyện tập: visibility, atomic, ConcurrentHashMap, thread pool, deadlock và heap.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0045 · bước 36/46 · Review · ~30 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0045-review-concurrency-jvm.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Trong interview thật, câu hỏi không đến từng chủ đề một. "Bộ đếm này có an toàn không?" dẫn tới "còn cái map thì sao?", rồi "còn pool chạy nó?", rồi "service đứng hình, bạn kiểm tra gì?". Trộn các chủ đề ngay bây giờ, khi bạn vẫn còn nhớ một chút, giúp kiến thức bám chắc hơn nhiều so với đọc lại.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> trả lời các câu hỏi trộn từ cả sáu bài, tìm ba bug trong một đoạn code, và nói thành tiếng ba câu trả lời 60 giây.</div>
+
+<dl class="words">
+  <dt>happens-before</dt><dd>Quy tắc đảm bảo một thread thấy được giá trị thread khác đã ghi (<a href="0005-visibility-and-happens-before.vi.html">bài 0005</a>).</dd>
+  <dt>lost update</dt><dd>Hai thread đọc cùng một giá trị và lần ghi này đè lần ghi kia (<a href="0024-atomics-and-locks.vi.html">bài 0024</a>).</dd>
+  <dt>check-then-act</dt><dd>Hai lời gọi an toàn với một khoảng hở ở giữa, nơi thread khác có thể chen vào (<a href="0025-concurrenthashmap.vi.html">bài 0025</a>).</dd>
+  <dt>core / queue / max</dt><dd>Thứ tự một thread pool lớn lên: core thread, rồi queue, rồi thread tăng cường (<a href="0023-thread-pools-executors.vi.html">bài 0023</a>).</dd>
+  <dt>deadlock</dt><dd>Các thread bị chặn mãi mãi, chờ lock của nhau thành vòng tròn (<a href="0026-deadlock-and-lock-ordering.vi.html">bài 0026</a>).</dd>
+  <dt>generations</dt><dd>Phần young và old của heap, vì đa số object chết trẻ (<a href="0007-heap-and-garbage-collection.vi.html">bài 0007</a>).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Không tra cứu gì, hãy nói một câu cho mỗi thuật ngữ ở trên. Đếm xem bạn nói rõ được bao nhiêu cái. Giữ con số đó; cuối bài bạn sẽ so với điểm quiz.</p>
+
+<h2>1. Cả phần học trên một trang</h2>
+<p>Mỗi bài trong phần này trả lời một vấn đề bằng một công cụ chính. Nếu bạn dựng lại được bảng này từ trí nhớ, bạn đã có bộ khung cho mọi câu trả lời.</p>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Sáu vấn đề và cách sửa: lần ghi không được thấy thì sửa bằng happens-before; count++ mất update thì dùng atomic hoặc lock; get rồi put bị race thì dùng merge và compute; quá nhiều task thì dùng pool có giới hạn; lock chờ thành vòng thì dùng một thứ tự lock; bộ nhớ tăng thì đặt kích thước heap và đọc GC log.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="160" y="22" text-anchor="middle" font-size="13">vấn đề</text>
+    <text x="500" y="22" text-anchor="middle" font-size="13">cách sửa chính</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="36" width="280" height="40" rx="4"/>
+      <rect x="20" y="84" width="280" height="40" rx="4"/>
+      <rect x="20" y="132" width="280" height="40" rx="4"/>
+      <rect x="20" y="180" width="280" height="40" rx="4"/>
+      <rect x="20" y="228" width="280" height="40" rx="4"/>
+      <rect x="20" y="276" width="280" height="40" rx="4"/>
+      <path d="M300 56h54M348 51l6 5-6 5"/>
+      <path d="M300 104h54M348 99l6 5-6 5"/>
+      <path d="M300 152h54M348 147l6 5-6 5"/>
+      <path d="M300 200h54M348 195l6 5-6 5"/>
+      <path d="M300 248h54M348 243l6 5-6 5"/>
+      <path d="M300 296h54M348 291l6 5-6 5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="360" y="36" width="300" height="40" rx="4"/>
+      <rect x="360" y="84" width="300" height="40" rx="4"/>
+      <rect x="360" y="132" width="300" height="40" rx="4"/>
+      <rect x="360" y="180" width="300" height="40" rx="4"/>
+      <rect x="360" y="228" width="300" height="40" rx="4"/>
+      <rect x="360" y="276" width="300" height="40" rx="4"/>
+    </g>
+    <text x="34" y="61">0005  lần ghi không ai thấy</text>
+    <text x="34" y="109">0024  count++ mất update</text>
+    <text x="34" y="157">0025  get rồi put bị race</text>
+    <text x="34" y="205">0023  task chất đống / reject</text>
+    <text x="34" y="253">0026  lock chờ nhau thành vòng</text>
+    <text x="34" y="301">0007  bộ nhớ đầy dần</text>
+    <g fill="var(--accent)">
+      <text x="374" y="61">happens-before: volatile, lock</text>
+      <text x="374" y="109">AtomicInteger (CAS) hoặc lock</text>
+      <text x="374" y="157">merge / compute (nguyên tử)</text>
+      <text x="374" y="205">bounded queue + policy</text>
+      <text x="374" y="253">một thứ tự lock chung</text>
+      <text x="374" y="301">đặt cỡ heap + đọc GC log</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Sáu vấn đề, sáu cách sửa. Lấy tay che cột bên phải và nói thành tiếng từng cách sửa.</figcaption>
+</figure>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Bốn thread, mỗi thread chạy <code>count++</code> 200.000 lần trên một <code>volatile int</code>. Bạn kỳ vọng gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Tổng dưới 800.000 và thay đổi mỗi lần chạy</button>
+    <button class="opt">Đúng 800.000, vì field là volatile</button>
+    <button class="opt">Deadlock giữa bốn worker thread với nhau</button>
+    <button class="opt">Lỗi compile: không thể tăng biến volatile</button>
+  </div>
+  <div class="why"><code>count++</code> là đọc, cộng, ghi; <code>volatile</code> không làm nó nguyên tử, nên update bị mất. Xem <a href="0024-atomics-and-locks.vi.html">bài 0024</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Không có flag heap, máy có 16 GB RAM. Heap có thể lớn tới khoảng bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Khoảng 4 GB</button>
+    <button class="opt">Khoảng 2 GB</button>
+    <button class="opt">Khoảng 8 GB</button>
+    <button class="opt">Khoảng 16 GB</button>
+  </div>
+  <div class="why">Heap tối đa mặc định là 1/4 bộ nhớ vật lý. Xem <a href="0007-heap-and-garbage-collection.vi.html">bài 0007</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một pool có core 4, max 8 và một bounded queue còn chỗ. Cả 4 core thread đều bận. Một task tới. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó chờ trong queue</button>
+    <button class="opt">Thread thứ năm được tạo</button>
+    <button class="opt">Nó bị từ chối ngay</button>
+    <button class="opt">Thread gọi tự chạy nó</button>
+  </div>
+  <div class="why">Thứ tự là core → queue → max → từ chối. Thread tăng cường chỉ được tạo khi queue đầy. Xem <a href="0023-thread-pools-executors.vi.html">bài 0023</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cái nào dưới đây tạo cạnh happens-before giữa hai thread?</p>
+  <div class="options">
+    <button class="opt" data-correct>Gọi start() trên thread, rồi hành động đầu tiên của nó</button>
+    <button class="opt">Hai thread lần lượt ghi cùng một field thường</button>
+    <button class="opt">Hai thread lock hai object khác nhau</button>
+    <button class="opt">Một thread đọc field sau Thread.sleep(100)</button>
+  </div>
+  <div class="why"><code>start()</code> happens-before các hành động của thread được khởi động. Sleep hay lock object khác nhau không tạo thứ tự nào. Xem <a href="0005-visibility-and-happens-before.vi.html">bài 0005</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một thread dump ghi: T1 "waiting to lock … which is held by T2", và T2 "waiting to lock … which is held by T1". Đây là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Deadlock do thứ tự lấy lock ngược nhau</button>
+    <button class="opt">Lost update trên một field volatile dùng chung</button>
+    <button class="opt">Một lần full GC pause dừng cả hai thread</button>
+    <button class="opt">Một task bị từ chối trong pool quá tải</button>
+  </div>
+  <div class="why">Mỗi bên giữ thứ bên kia muốn: một vòng tròn. Sửa bằng một thứ tự lấy lock chung. Xem <a href="0026-deadlock-and-lock-ordering.vi.html">bài 0026</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>new ConcurrentHashMap&lt;String, Integer&gt;().put("a", null)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ném NullPointerException</button>
+    <button class="opt">Lưu key với giá trị null</button>
+    <button class="opt">Xóa key "a" khỏi map</button>
+    <button class="opt">Không làm gì cả</button>
+  </div>
+  <div class="why">ConcurrentHashMap không cho key null và không cho value null. Xem <a href="0025-concurrenthashmap.vi.html">bài 0025</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong <code>Pause Young … 38M-&gt;3M(64M) 2.0ms</code>, <code>3M</code> nghĩa là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Heap đang dùng sau lần thu gom</button>
+    <button class="opt">Bộ nhớ đã giải phóng trong lần đó</button>
+    <button class="opt">Chỉ riêng kích thước young generation</button>
+    <button class="opt">Số lượng object đã được di chuyển</button>
+  </div>
+  <div class="why">Trước → sau (tổng heap), rồi thời gian pause. 3M là phần sống sót. Xem <a href="0007-heap-and-garbage-collection.vi.html">bài 0007</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một <code>AtomicInteger</code> đang giữ 7. Một thread gọi <code>compareAndSet(6, 7)</code>. Kết quả?</p>
+  <div class="options">
+    <button class="opt" data-correct>Trả về false; giá trị vẫn là 7</button>
+    <button class="opt">Trả về true; giá trị vẫn là 7</button>
+    <button class="opt">Chặn lại tới khi giá trị lại là 6</button>
+    <button class="opt">Ném ra IllegalStateException</button>
+  </div>
+  <div class="why">CAS chỉ ghi nếu giá trị hiện tại bằng giá trị mong đợi (6). Nó đang là 7, nên không có gì thay đổi và bên gọi phải thử lại. Xem <a href="0024-atomics-and-locks.vi.html">bài 0024</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Main ghi <code>config = load()</code> (field thường), rồi <code>ready = true</code> (volatile). Một worker thấy <code>ready == true</code>. <code>config</code> có chắc chắn hiển thị với nó không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Có: program order và cạnh volatile nối thành chuỗi</button>
+    <button class="opt">Không: config cũng phải là volatile mới được</button>
+    <button class="opt">Chỉ khi worker gọi Thread.yield() trước đó</button>
+    <button class="opt">Chỉ trên JDK 21; trên JDK 8 thì không đảm bảo</button>
+  </div>
+  <div class="why">Happens-before có tính bắc cầu: ghi config → ghi ready → đọc ready → đọc config. Xem <a href="0005-visibility-and-happens-before.vi.html">bài 0005</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Core 4, max 50, <code>LinkedBlockingQueue</code> không giới hạn. Khi tải cực lớn, có bao nhiêu thread chạy?</p>
+  <div class="options">
+    <button class="opt" data-correct>4, và queue cứ lớn dần lên</button>
+    <button class="opt">50, rồi task bắt đầu bị từ chối</button>
+    <button class="opt">54: số core cộng với số max</button>
+    <button class="opt">Bằng đúng số task đang có</button>
+  </div>
+  <div class="why">Queue không giới hạn thì không bao giờ đầy, nên max không có tác dụng. Đây cũng là cái bẫy của <code>newFixedThreadPool</code>. Xem <a href="0023-thread-pools-executors.vi.html">bài 0023</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Hai thread cùng chạy <code>map.put(k, map.get(k) + 1)</code> trên một ConcurrentHashMap. Cách sửa nào đúng?</p>
+  <div class="options">
+    <button class="opt" data-correct>map.merge(k, 1, Integer::sum)</button>
+    <button class="opt">Đánh dấu field map là volatile</button>
+    <button class="opt">Bọc get() trong một khối synchronized</button>
+    <button class="opt">Kiểm tra map.size() trước khi gọi put</button>
+  </div>
+  <div class="why">Từng lời gọi đều an toàn, nhưng khoảng hở giữa get và put thì không. <code>merge</code> làm cả hai một cách nguyên tử. Xem <a href="0025-concurrenthashmap.vi.html">bài 0025</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>transfer(a, b)</code> lock <code>a</code> rồi <code>b</code>. Hai thread gọi <code>transfer(x, y)</code> và <code>transfer(y, x)</code>. Cách sửa tốt nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>Luôn lock tài khoản có ID nhỏ hơn trước</button>
+    <button class="opt">Đánh dấu cả hai field số dư là volatile</button>
+    <button class="opt">Chạy mọi transfer trên thread pool lớn hơn</button>
+    <button class="opt">Dùng một AtomicInteger cho mỗi số dư</button>
+  </div>
+  <div class="why">Thứ tự ngược nhau làm vòng tròn có thể xảy ra. Một thứ tự chung ổn định (theo ID) ngăn được nó. Xem <a href="0026-deadlock-and-lock-ordering.vi.html">bài 0026</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao một lần thu gom young generation thường ngắn?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đa số object ở đó đã chết, và nó chỉ chép object còn sống</button>
+    <button class="opt">Nó chạy cùng lúc với lần thu gom old generation</button>
+    <button class="opt">Nó chỉ quét những object lớn hơn một megabyte</button>
+    <button class="opt">Nó bị bỏ qua mỗi khi old generation còn chỗ trống</button>
+  </div>
+  <div class="why">Đa số object chết trẻ; minor GC trả giá cho object sống sót, không phải cho rác. Xem <a href="0007-heap-and-garbage-collection.vi.html">bài 0007</a>.</div>
+</div>
+
+<h2>2. Bài tập trộn: tìm bug</h2>
+<p>Đọc chậm class này. Nó có <strong>ít nhất ba bug</strong>, mỗi bug từ một bài khác nhau. Ghi chúng ra (dòng và bài) trước khi mở đáp án.</p>
+<pre><code>class TrafficStats {
+    private boolean running = true;                                   <span class="c">// line 2</span>
+    private final Map&lt;String, Integer&gt; hits = new ConcurrentHashMap&lt;&gt;();
+    private final ExecutorService pool = Executors.newFixedThreadPool(8); <span class="c">// line 4</span>
+
+    void record(String page) {
+        Integer old = hits.get(page);                                 <span class="c">// line 7</span>
+        hits.put(page, old == null ? 1 : old + 1);                    <span class="c">// line 8</span>
+    }
+
+    void reporterLoop() {               <span class="c">// runs in its own thread</span>
+        while (running) { report(); }                                 <span class="c">// line 12</span>
+    }
+    void stop() { running = false; }    <span class="c">// called from another thread</span>
+
+    void merge(Account a, Account b) {
+        synchronized (a) {                                            <span class="c">// line 17</span>
+            synchronized (b) { a.add(b.drain()); }
+        }
+    }
+}</code></pre>
+<details class="qa">
+  <summary>Hiện đáp án</summary>
+  <ol>
+    <li><strong>Dòng 2 và 12 (bài 0005):</strong> <code>running</code> là field thường, một thread ghi và một thread khác đọc trong vòng lặp. Không có cạnh happens-before, nên reporter có thể không bao giờ dừng. Sửa: <code>private volatile boolean running</code>.</li>
+    <li><strong>Dòng 7 và 8 (bài 0025):</strong> get rồi put trên ConcurrentHashMap là check-then-act; hai thread có thể làm mất một lượt hit. Sửa: <code>hits.merge(page, 1, Integer::sum)</code>.</li>
+    <li><strong>Dòng 17 (bài 0026):</strong> thứ tự lấy lock phụ thuộc thứ tự tham số. <code>merge(x, y)</code> và <code>merge(y, x)</code> chạy cùng lúc có thể deadlock. Sửa: lock tài khoản có ID nhỏ hơn trước.</li>
+    <li><strong>Thêm, dòng 4 (bài 0023):</strong> <code>newFixedThreadPool</code> dùng queue không giới hạn; khi tải cao task chất đống tới khi hết bộ nhớ. Sửa: một <code>ThreadPoolExecutor</code> với bounded queue và rejection policy rõ ràng. Nếu nó thật sự làm đầy heap, GC log của bài 0007 sẽ cho thấy giá trị "sau" tăng dần.</li>
+  </ol>
+</details>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<p>Ba câu hỏi. Làm từng câu một, mỗi câu bấm giờ riêng.</p>
+
+<div class="recall">
+  <p class="prompt">Câu 1: <strong>"<code>volatile int count; count++</code> có thread-safe không? volatile thật sự đảm bảo điều gì?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> volatile cho visibility và thứ tự: một lần ghi volatile happens-before mọi lần đọc sau đó.</label></li>
+      <li><label><input type="checkbox"> Không có cạnh thì là data race: không gì đảm bảo bên đọc sẽ thấy lần ghi.</label></li>
+      <li><label><input type="checkbox"> count++ là đọc, cộng, ghi: không nguyên tử, nên update bị mất.</label></li>
+      <li><label><input type="checkbox"> Sửa bằng AtomicInteger (CAS, thử lại, không lock) hoặc một lock với unlock trong finally.</label></li>
+      <li><label><input type="checkbox"> Nhiều field đổi cùng nhau cần một lock; bộ đếm nóng: LongAdder.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Không ạ. volatile cho visibility và thứ tự: một lần ghi vào field volatile happens-before mọi lần đọc nó sau đó, nên bên đọc thấy giá trị mới nhất và mọi thứ được ghi trước nó. Nhưng count++ là ba bước, đọc, cộng một, ghi, và volatile không gắn chúng lại, nên hai thread có thể đọc cùng một giá trị và mất một lần tăng. Em sẽ dùng AtomicInteger, nó làm compare-and-set và retry nếu thread khác đã ghi trước, hoặc dùng lock nếu nhiều field phải đổi cùng nhau, với unlock trong finally. Còn bộ đếm thống kê rất nóng thì LongAdder scale tốt hơn."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 2: <strong>"Khi tải cao, service của chúng tôi ngừng phản hồi. Hãy nói lần lượt bạn kiểm tra những gì."</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Lấy thread dump (jstack): tìm "Found one Java-level deadlock" hoặc nhiều thread bị chặn trên cùng một lock.</label></li>
+      <li><label><input type="checkbox"> Sửa deadlock: một thứ tự lock chung, hoặc tryLock có timeout.</label></li>
+      <li><label><input type="checkbox"> Kiểm tra thread pool: queue tăng dần, task bị từ chối, queue không giới hạn.</label></li>
+      <li><label><input type="checkbox"> Sửa pool: bounded queue cộng policy rõ ràng (ví dụ CallerRunsPolicy để có back-pressure).</label></li>
+      <li><label><input type="checkbox"> Kiểm tra GC log: pause dài hoặc full, giá trị "sau" tăng dần (rò rỉ), heap được đặt kích thước có chủ đích.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Đầu tiên em lấy thread dump bằng jstack, vài lần cách nhau vài giây. Nếu JVM in ra 'Found one Java-level deadlock', em xem mỗi thread giữ lock nào rồi sửa thứ tự để mọi đường code lấy lock theo cùng một thứ tự chung, hoặc dùng tryLock có timeout. Nếu không có deadlock, em xem các request thread đang làm gì: nếu tất cả đang chờ, em nhìn sang thread pool, queue có đang phình ra không, task có bị reject không; newFixedThreadPool có queue không giới hạn, nên em sẽ đổi sang bounded queue với rejection policy rõ ràng. Song song đó em đọc GC log: nếu pause dài hoặc full GC lặp lại và giá trị sau cứ tăng, tức là dữ liệu sống đang chất đống, dấu hiệu của leak hoặc cache không giới hạn, và em kiểm tra xem heap size có được đặt có chủ đích không."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 3: <strong>"HashMap và ConcurrentHashMap khác nhau thế nào, và một thread pool quyết định làm gì với task mới?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> HashMap không được synchronized; ConcurrentHashMap an toàn theo từng lời gọi và đọc không lock.</label></li>
+      <li><label><input type="checkbox"> Check-then-act vẫn race: dùng merge / compute / computeIfAbsent.</label></li>
+      <li><label><input type="checkbox"> CHM: không null, iterator weakly consistent (không ConcurrentModificationException).</label></li>
+      <li><label><input type="checkbox"> Pool: dưới core → thread mới; rồi queue; queue đầy → thêm thread tới max; rồi từ chối.</label></li>
+      <li><label><input type="checkbox"> AbortPolicy mặc định ném exception; queue không giới hạn làm max vô dụng.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"HashMap không được synchronized, nên ghi đồng thời thì phải lock từ bên ngoài. ConcurrentHashMap làm từng lời gọi riêng lẻ thread-safe, get không lock, không cho null, và iterator weakly consistent nên không bao giờ ném ConcurrentModificationException. Nhưng get rồi put vẫn có thể mất update, nên em dùng merge hoặc computeIfAbsent, chạy nguyên tử. Các map đó thường được cập nhật từ một thread pool. Khi em submit task, pool tạo thread mới nếu đang có ít hơn core thread; nếu không thì đưa task vào queue; chỉ khi queue đầy nó mới thêm thread tới max; sau đó task bị reject, và AbortPolicy mặc định ném exception. Với queue không giới hạn thì max không bao giờ có ý nghĩa, đó là lý do em thích bounded queue hơn."</em></p>
+  </div>
+</div>
+
+<h2>Nếu bạn sai câu nào, hãy đọc lại</h2>
+<table>
+  <tr><th>Nếu bạn sai câu về…</th><th>Đọc lại</th></tr>
+  <tr><td>thread, cache, volatile, happens-before</td><td><a href="0005-visibility-and-happens-before.vi.html">Bài 0005: visibility và happens-before</a></td></tr>
+  <tr><td>count++, compare-and-set, AtomicInteger, ReentrantLock</td><td><a href="0024-atomics-and-locks.vi.html">Bài 0024: atomic và lock</a></td></tr>
+  <tr><td>key null, merge, iterator, check-then-act</td><td><a href="0025-concurrenthashmap.vi.html">Bài 0025: ConcurrentHashMap</a></td></tr>
+  <tr><td>core, queue, max, rejection policy</td><td><a href="0023-thread-pools-executors.vi.html">Bài 0023: thread pool</a></td></tr>
+  <tr><td>vòng lock, jstack, thứ tự lấy lock</td><td><a href="0026-deadlock-and-lock-ordering.vi.html">Bài 0026: deadlock</a></td></tr>
+  <tr><td>mặc định của heap, generation, dòng GC log</td><td><a href="0007-heap-and-garbage-collection.vi.html">Bài 0007: heap và GC</a></td></tr>
+</table>
+
+<h2>Bây giờ làm bài tập</h2>
+<p>Chọn bài tập của bài mà bạn được điểm thấp nhất, và làm lại mà không xem ghi chú:</p>
+<ul>
+  <li><a href="../exercises/0005-remove-volatile.vi.md">Bài tập 0005: bỏ volatile và quan sát</a> · <a href="../examples/StopFlag.java"><code>StopFlag.java</code></a></li>
+  <li><a href="../exercises/0024-fix-the-counter.vi.md">Bài tập 0024: sửa bộ đếm</a> · <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a></li>
+  <li><a href="../exercises/0025-word-count-concurrently.vi.md">Bài tập 0025: đếm từ đồng thời</a> · <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a></li>
+  <li><a href="../exercises/0023-size-a-pool.vi.md">Bài tập 0023: chọn kích thước pool</a> · <a href="../examples/PoolDemo.java"><code>PoolDemo.java</code></a></li>
+  <li><a href="../exercises/0026-find-the-deadlock.vi.md">Bài tập 0026: tìm deadlock</a> · <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a></li>
+  <li><a href="../exercises/0007-gc-log-reading.vi.md">Bài tập 0007: hai collector, một chương trình</a> · <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></li>
+</ul>
+
+<h2>Tiếp theo là gì</h2>
+<p>Phần tiếp theo chuyển sang cú pháp Java hiện đại, bắt đầu với <a href="0012-var-and-text-blocks.vi.html">var và text block</a>. Để đào sâu phần này sau: <a href="0006-virtual-threads.vi.html">virtual thread</a> (JDK 21 thay đổi thread pool thế nào), <a href="0039-concurrent-collections.vi.html">concurrent collection</a>, và <a href="0017-generational-zgc.vi.html">Generational ZGC</a>.</p>
+<p><strong>Đọc thêm:</strong> nguồn chính của sáu bài, gom lại một chỗ: <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide</a>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Cho mình thêm năm câu hỏi trộn"</em> hoặc <em>"Chấm giúp câu trả lời câu 2 của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và ba điểm checklist: chúng cho mình biết nên học lại bài nào.</div>
+
+<p><a href="0007-heap-and-garbage-collection.vi.html">← Object của bạn sống ở đâu, và ai dọn dẹp chúng</a> &nbsp;|&nbsp; <a href="0012-var-and-text-blocks.vi.html">var và text block: gõ ít hơn, kiểu vẫn y nguyên →</a></p>
+
+<footer>
+  <p>Một bài ôn tập: không có thông tin mới. Mọi thông tin ở đây lấy từ các bài 0005, 0024, 0025, 0023, 0026 và 0007, vốn đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17: Threads and Locks</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">Javadoc của ThreadPoolExecutor</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">Javadoc của ConcurrentHashMap</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

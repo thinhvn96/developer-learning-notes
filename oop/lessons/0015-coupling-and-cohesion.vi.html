@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 15: Coupling và cohesion</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Coupling và cohesion</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0015 · bước 15/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0015-coupling-and-cohesion.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> định nghĩa được coupling (độ phụ thuộc) và cohesion (độ gắn kết), và giảm coupling bằng cách inject một abstraction.</div>
+
+<h2>Định nghĩa</h2>
+<p>"Coupling là mức độ phụ thuộc lẫn nhau giữa các module phần mềm, một thước đo cho thấy hai routine hay module gắn với nhau chặt đến đâu." Nó trải từ thấp (lỏng) đến cao (chặt). "Coupling thấp thường được xem là dấu hiệu của một hệ thống có cấu trúc tốt và thiết kế tốt, và khi đi kèm với cohesion cao, nó hỗ trợ các mục tiêu chung là dễ đọc và dễ bảo trì."<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[1]</a> <em>Cohesion</em> là mức độ các phần bên trong một module thực sự thuộc về nhau (đây là cách diễn đạt của tôi; trang được trích chỉ định nghĩa coupling).</p>
+<pre><code>java oop/examples/CouplingCohesion.java
+(pretend SQL INSERT book)
+tight: placed book
+loose: placed book
+fake repo received: book</code></pre>
+<p><code>TightOrderService</code> tự tạo <code>SqlOrderRepo</code> của riêng nó: không thể dùng hay test nó mà thiếu cái repo đó. <code>LooseOrderService</code> nhận vào một <code>OrderRepo</code>, nên có thể inject một bản fake rồi kiểm tra nó. Việc inject đó chính là ý tưởng đằng sau DI của Spring (<a href="../../spring-boot/lessons/0002-constructor-injection.vi.html">bài học</a>). Mã nguồn: <a href="../examples/CouplingCohesion.java"><code>CouplingCohesion.java</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Thiết kế tốt thường hướng tới...?</p>
+  <button>Coupling cao, cohesion thấp</button>
+  <button>Cả hai đều thấp</button>
+  <button data-correct>Coupling thấp, cohesion cao</button>
+  <button>Cả hai đều cao</button>
+  <p class="explain">Coupling thấp đi kèm cohesion cao giúp dễ bảo trì.<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Cách nào coupling chặt hơn?</p>
+  <button>Interface inject qua constructor</button>
+  <button data-correct>Gọi new bên trong class</button>
+  <button>Tham số kiểu interface</button>
+  <button>Callback bằng lambda</button>
+  <p class="explain">TightOrderService gắn cứng repository của nó.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao inject repository?</p>
+  <button data-correct>Để thay bằng bản fake</button>
+  <button>Để tiết kiệm bộ nhớ</button>
+  <button>Để dùng static</button>
+  <button>Để tránh interface</button>
+  <p class="explain">Demo truyền vào một FakeRepo rồi kiểm tra nó.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Coupling đo...?</p>
+  <button>Kích thước class</button>
+  <button>Số dòng code</button>
+  <button data-correct>Sự phụ thuộc giữa các module</button>
+  <button>Số lượng thread</button>
+  <p class="explain">Đó là mức độ phụ thuộc lẫn nhau giữa các module.<a class="cite" href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0015-decouple-a-service.vi.md">Bài tập 15: gỡ coupling cho một service</a></p>
+<p>Ví dụ chạy được: <a href="../examples/CouplingCohesion.java"><code>CouplingCohesion.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">Wikipedia: Coupling</a>. Tổng quan ngắn.</p>
+<p><a href="0014-immutability.vi.html">← Immutability và defensive copy</a> &nbsp;|&nbsp; <a href="0016-law-of-demeter.vi.html">Law of Demeter →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/Coupling_(computer_programming)">Wikipedia: Coupling</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

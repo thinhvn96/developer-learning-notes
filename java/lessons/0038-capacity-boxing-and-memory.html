@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 38: Capacity, boxing and the memory cost of collections</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Capacity, boxing and the memory cost of collections</h1>
+<p class="subtitle">Why a list of a million numbers can weigh 19 MB instead of 4, and two boxing bugs that compile without a warning.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0038 · step 20 of 46 · Senior · ~22 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0038-capacity-boxing-and-memory.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> A service that caches ten million IDs, a batch job that runs out of heap, a test that passes with 100 but fails with 1000: these are capacity and boxing problems. Senior interviews ask <em>"How does ArrayList grow?"</em> and <em>"Why is <code>Integer == Integer</code> dangerous?"</em> to see whether you think about what your code costs.</div>
+
+<div class="win"><b>Today's win:</b> estimate the memory and resize cost of common collections, explain ArrayList growth, and avoid the Integer <code>==</code> and <code>remove(int)</code> traps.</div>
+
+<dl class="words">
+  <dt>capacity</dt><dd>How many slots the array inside a collection has. The size is how many slots are actually used.</dd>
+  <dt>amortized O(1)</dt><dd>Most operations are cheap, a rare one is expensive, and on average each costs a constant amount.</dd>
+  <dt>primitive</dt><dd>A plain value like <code>int</code> or <code>long</code>: just the number, no object around it.</dd>
+  <dt>boxing</dt><dd>Wrapping a primitive in an object, <code>int</code> → <code>Integer</code>, because collections can only hold objects. Unboxing is the reverse.</dd>
+  <dt>reference</dt><dd>The address of an object. A <code>List&lt;Integer&gt;</code> stores references, and each one points to a separate <code>Integer</code> object.</dd>
+  <dt>overload</dt><dd>Two methods with the same name but different parameter types, like <code>remove(int)</code> and <code>remove(Object)</code>. The compiler chooses one.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Guess: how many megabytes does an <code>ArrayList&lt;Integer&gt;</code> with one million numbers need, compared with an <code>int[]</code> of one million? Write down both numbers. Section 3 has a real (rough) measurement.</p>
+
+<h2>1. How ArrayList grows</h2>
+<p>Picture a family buying a dining table. When a fifth guest comes, they cannot "extend" the table; they buy a bigger one and move every plate across. Buying a table only one seat larger each time would mean moving plates at every visit, so they buy one about half again as big.</p>
+<p>An <code>ArrayList</code> works the same way: inside it is a plain array that cannot grow. When it is full, Java creates a bigger array and copies everything. The Javadoc deliberately says little: "The details of the growth policy are not specified beyond the fact that adding an element has constant amortized time cost."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a> The OpenJDK 21 source is concrete: an empty <code>new ArrayList&lt;&gt;()</code> shares an empty array and allocates <code>DEFAULT_CAPACITY = 10</code> on the first add; after that the preferred growth is <code>oldCapacity &gt;&gt; 1</code>, i.e. about 1.5×.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">OpenJDK source</a></p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="An ArrayList with capacity 10 is full. Adding the 11th element creates a new array of 15 slots, copies the 10 elements, then adds the new one. 4 slots remain free.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="26">capacity 10, size 10 (full)</text>
+    <g fill="var(--accent-soft)" stroke="currentColor">
+      <rect x="20" y="36" width="36" height="30"/><rect x="56" y="36" width="36" height="30"/><rect x="92" y="36" width="36" height="30"/>
+      <rect x="128" y="36" width="36" height="30"/><rect x="164" y="36" width="36" height="30"/><rect x="200" y="36" width="36" height="30"/>
+      <rect x="236" y="36" width="36" height="30"/><rect x="272" y="36" width="36" height="30"/><rect x="308" y="36" width="36" height="30"/>
+      <rect x="344" y="36" width="36" height="30"/>
+    </g>
+    <text x="400" y="56" fill="var(--accent)">add(11th) → no room</text>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M200 70v40M195 104l5 6 5-6"/>
+    </g>
+    <text x="212" y="96" font-size="11" fill="var(--accent)">new array: 10 + (10 &gt;&gt; 1) = 15, copy 10 items</text>
+    <text x="20" y="132">capacity 15, size 11</text>
+    <g fill="var(--accent-soft)" stroke="currentColor">
+      <rect x="20" y="142" width="36" height="30"/><rect x="56" y="142" width="36" height="30"/><rect x="92" y="142" width="36" height="30"/>
+      <rect x="128" y="142" width="36" height="30"/><rect x="164" y="142" width="36" height="30"/><rect x="200" y="142" width="36" height="30"/>
+      <rect x="236" y="142" width="36" height="30"/><rect x="272" y="142" width="36" height="30"/><rect x="308" y="142" width="36" height="30"/>
+      <rect x="344" y="142" width="36" height="30"/><rect x="380" y="142" width="36" height="30"/>
+    </g>
+    <g fill="none" stroke="currentColor" opacity=".5">
+      <rect x="416" y="142" width="36" height="30"/><rect x="452" y="142" width="36" height="30"/>
+      <rect x="488" y="142" width="36" height="30"/><rect x="524" y="142" width="36" height="30"/>
+    </g>
+    <text x="398" y="162" text-anchor="middle" font-size="11">new</text>
+    <text x="488" y="192" text-anchor="middle" font-size="11" opacity=".75">4 free slots (slack)</text>
+  </g>
+</svg>
+<figcaption>One expensive copy, then several cheap adds. In OpenJDK each new array is about 1.5 times the old one; the Javadoc only promises "constant amortized time".</figcaption>
+</figure>
+
+<p>The example prints the capacities that this source rule produces (it computes them with the same formula, starting at 10):</p>
+<pre><code>$ java -Xmx1g java/examples/collections/CapacityAndBoxing.java
+ArrayList capacities: [10, 15, 22, 33, 49, 73, 109, 163, 244, 366, 549, 823] ...</code></pre>
+<p>Each step copies the array, which is why it is "amortized" O(1): growing by a factor means the total copying stays proportional to the number of elements. <strong>If you know the size:</strong> <code>new ArrayList&lt;&gt;(n)</code> or <code>ensureCapacity</code>, which "may reduce the amount of incremental reallocation"; <code>trimToSize</code> releases the slack.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+
+<h2>2. Presizing a HashMap</h2>
+<p>A HashMap doubles its bucket array when it passes 75% full and moves every entry (<a href="0030-hashmap-internals.html">lesson 0030</a>). Putting 2,000,000 entries into a default map triggers many of those resizes. <code>HashMap.newHashMap(n)</code> (JDK 19+, so on 21) sizes it once for <code>n</code> entries:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<pre><code>HashMap default      : 172 ms     <span class="c">(2,000,000 puts, one rough run)</span>
+HashMap.newHashMap(n):  94 ms</code></pre>
+<p>Treat these as a single rough run on one laptop, not a benchmark: your numbers will differ, and a proper measurement needs a tool like JMH. The <em>direction</em> is the lesson: no resizes, less work. On JDK 8 and 17 write <code>new HashMap&lt;&gt;((int) (n / 0.75f) + 1)</code>.</p>
+
+<h2>3. Boxing: the hidden cost</h2>
+<p>Think of eggs. An <code>int[]</code> is an egg carton: the eggs sit right in the slots. A <code>List&lt;Integer&gt;</code> is a carton of <em>addresses</em>, and each egg is in its own little box somewhere else in the warehouse. You pay for the carton, the boxes, and the walk.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="int[] stores the numbers directly in the array. ArrayList of Integer stores references in its array, each pointing to a separate Integer object. LinkedList of Integer adds a node object per element with next and prev pointers, plus the Integer object.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="30">int[]</text>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="180" y="14" width="50" height="26"/><rect x="230" y="14" width="50" height="26"/><rect x="280" y="14" width="50" height="26"/>
+    </g>
+    <g text-anchor="middle" fill="var(--accent)"><text x="205" y="32">7</text><text x="255" y="32">8</text><text x="305" y="32">9</text></g>
+    <text x="350" y="32" font-size="11" opacity=".8">values live in the array</text>
+
+    <text x="20" y="96">ArrayList&lt;Integer&gt;</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="180" y="80" width="50" height="26"/><rect x="230" y="80" width="50" height="26"/><rect x="280" y="80" width="50" height="26"/>
+    </g>
+    <g fill="currentColor"><circle cx="205" cy="93" r="3"/><circle cx="255" cy="93" r="3"/><circle cx="305" cy="93" r="3"/></g>
+    <g fill="none" stroke="currentColor">
+      <path d="M205 96v28"/><path d="M255 96v28"/><path d="M305 96v28"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="180" y="124" width="50" height="24" rx="4"/><rect x="230" y="124" width="50" height="24" rx="4"/><rect x="280" y="124" width="50" height="24" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11" fill="var(--accent)"><text x="205" y="141">Int 7</text><text x="255" y="141">Int 8</text><text x="305" y="141">Int 9</text></g>
+    <text x="350" y="98" font-size="11" opacity=".8">array of references</text>
+    <text x="350" y="141" font-size="11" opacity=".8">+ one Integer object each</text>
+
+    <text x="20" y="196">LinkedList&lt;Integer&gt;</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="180" y="180" width="70" height="26" rx="4"/><rect x="290" y="180" width="70" height="26" rx="4"/>
+      <path d="M250 190h34M278 185l6 5-6 5"/><path d="M290 200h-34M262 195l-6 5 6 5"/>
+      <path d="M215 206v14"/><path d="M325 206v14"/>
+    </g>
+    <g text-anchor="middle" font-size="11"><text x="215" y="197">node</text><text x="325" y="197">node</text></g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="190" y="220" width="50" height="22" rx="4"/><rect x="300" y="220" width="50" height="22" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11" fill="var(--accent)"><text x="215" y="236">Int 7</text><text x="325" y="236">Int 8</text></g>
+    <text x="380" y="197" font-size="11" opacity=".8">node with prev/next per element</text>
+    <text x="380" y="236" font-size="11" opacity=".8">+ one Integer object each</text>
+  </g>
+</svg>
+<figcaption>More objects per element means more memory and more pointer-chasing. The highlighted boxes are the actual numbers.</figcaption>
+</figure>
+
+<p>Rough heap growth for 1,000,000 ints, one run on JDK 21 (measured with <code>Runtime</code>, so treat it as an order of magnitude; your numbers will vary):</p>
+<pre><code>int[]               ~  4 MB
+ArrayList&lt;Integer&gt;  ~ 19 MB
+LinkedList&lt;Integer&gt; ~ 38 MB
+HashSet&lt;Integer&gt;    ~ 54 MB</code></pre>
+<p>That 4× to 13× is why hot paths and big in-memory datasets use primitive arrays, <code>IntStream</code>, or primitive-collection libraries, and why <code>LinkedList</code>'s node per element hurts (<a href="0002-choosing-a-list.html">lesson 0002</a>). A <code>HashSet</code> is the heaviest: each element is a HashMap entry node plus the boxed key, plus the bucket array.</p>
+
+<h2>4. Two boxing bugs interviewers love</h2>
+<pre><code>Integer a = 127, b = 127, c = 128, d = 128;
+System.out.println(a == b);       <span class="c">// compares references!</span>
+System.out.println(c == d);
+System.out.println(c.equals(d));
+
+List&lt;Integer&gt; nums = new ArrayList&lt;&gt;(List.of(10, 20, 30));
+nums.remove(1);                   <span class="c">// which remove?</span>
+nums.remove(Integer.valueOf(10));</code></pre>
+<pre><code>Integer 127 == 127: true   128 == 128: false   128 equals: true
+remove(1) then remove(Integer.valueOf(10)): [30]</code></pre>
+
+<h3>Bug 1: <code>==</code> on boxed numbers</h3>
+<p><code>==</code> on two objects asks "same object?", not "same number?". Small values happen to be shared: the JLS only guarantees identical boxes for constant values in -128..127; "For other values, the rule disallows any assumptions about the identity of the boxed values".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 5.1.7</a> <code>Integer.valueOf</code> says the same from the library side: it "will always cache values in the range -128 to 127, inclusive, and may cache other values outside of this range".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html#valueOf(int)">Integer javadoc</a></p>
+<p>This is why the bug hides in tests: IDs 1 to 100 compare fine, then production reaches 128. <strong>The fix:</strong> compare boxed values with <code>equals</code> (or <code>Objects.equals</code> when either may be null), never <code>==</code>.</p>
+
+<h3>Bug 2: <code>remove(1)</code> on a <code>List&lt;Integer&gt;</code></h3>
+<p><code>List</code> has two <code>remove</code> methods: <code>remove(int index)</code> and <code>remove(Object o)</code>. For <code>remove(1)</code> the compiler picks the one that needs no boxing, so it removes <strong>index</strong> 1 (the value 20), not the value 1.</p>
+<pre><code><span class="c">Step 1  [10, 20, 30].remove(1)                 → removes index 1 → [10, 30]</span>
+<span class="c">Step 2  [10, 30].remove(Integer.valueOf(10))   → removes value 10 → </span><span class="hl">[30]</span></code></pre>
+<p><strong>The fix:</strong> to remove a value, write <code>remove(Integer.valueOf(x))</code>.</p>
+<p><strong>JDK 8 vs 17 vs 21:</strong> the boxing rules are the same in all three. <code>HashMap.newHashMap</code> needs JDK 19+. Since JDK 9 the <code>new Integer(int)</code> constructor is deprecated, and it is marked for removal; use <code>Integer.valueOf</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html#valueOf(int)">Integer javadoc</a></p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">In OpenJDK, what capacity does <code>new ArrayList&lt;&gt;()</code> get on the first <code>add</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ten</button>
+    <button class="opt">Sixteen</button>
+    <button class="opt">One</button>
+    <button class="opt">Zero</button>
+  </div>
+  <div class="why">DEFAULT_CAPACITY = 10, allocated on the first add; before that the list shares an empty array.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">An OpenJDK ArrayList is full. By how much does it prefer to grow?</p>
+  <div class="options">
+    <button class="opt" data-correct>About 1.5 times</button>
+    <button class="opt">Exactly 2 times</button>
+    <button class="opt">Plus one slot</button>
+    <button class="opt">Plus ten slots</button>
+  </div>
+  <div class="why">grow() uses oldCapacity &gt;&gt; 1 as the preferred growth: 10 → 15 → 22. The Javadoc itself only promises amortized constant time.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Integer a = 128, b = 128;</code> What can you say about <code>a == b</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Not guaranteed either way</button>
+    <button class="opt">Always true</button>
+    <button class="opt">It does not compile</button>
+    <button class="opt">It throws an NPE</button>
+  </div>
+  <div class="why">Identity is guaranteed only for -128..127. Above that, == compares two references that may or may not be the same; use equals.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List&lt;Integer&gt; nums = [10, 20, 30]</code>. After <code>nums.remove(1)</code>, what is the list?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>[10, 30]</code></button>
+    <button class="opt"><code>[20, 30]</code></button>
+    <button class="opt"><code>[10, 20, 30]</code></button>
+    <button class="opt"><code>[10, 20]</code></button>
+  </div>
+  <div class="why">Overload resolution picks remove(int index), so index 1 (the value 20) is removed. Use remove(Integer.valueOf(x)) for a value.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does an <code>ArrayList&lt;Integer&gt;</code> use several times more memory than an <code>int[]</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Each element is a reference to a separate Integer object</button>
+    <button class="opt">ArrayList always keeps twice the capacity it actually needs</button>
+    <button class="opt">ArrayList stores a hash code next to every single element</button>
+    <button class="opt">Generic types are copied once more at runtime by erasure</button>
+  </div>
+  <div class="why">Collections hold objects, so every int is boxed into its own Integer, plus the reference to it. The run showed about 4 MB vs 19 MB.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You will put 2,000,000 entries into a HashMap on JDK 21. What is the simplest way to avoid resizes?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>HashMap.newHashMap(2_000_000)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;(2_000_000)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;().trimToSize()</code></button>
+    <button class="opt"><code>new TreeMap&lt;&gt;(2_000_000)</code></button>
+  </div>
+  <div class="why">newHashMap(n) sizes the table for n mappings, accounting for the 0.75 load factor. The constructor argument is a capacity, so 2,000,000 would still resize past 75%.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Your service keeps millions of numbers in collections and uses too much memory. What is going on, and what would you change?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Collections hold objects: every int is boxed into an Integer, plus a reference.</label></li>
+      <li><label><input type="checkbox"> Rough order: int[] ~4 MB vs ArrayList ~19 MB vs LinkedList ~38 MB vs HashSet ~54 MB per million.</label></li>
+      <li><label><input type="checkbox"> Fix: primitive arrays, IntStream or a primitive-collection library on hot paths.</label></li>
+      <li><label><input type="checkbox"> ArrayList grows by copying (OpenJDK: 10, then ~1.5×); presize or <code>trimToSize</code>.</label></li>
+      <li><label><input type="checkbox"> HashMap resizes at 75%; presize with <code>HashMap.newHashMap(n)</code>.</label></li>
+      <li><label><input type="checkbox"> Boxing traps: <code>==</code> only safe in -128..127; <code>remove(int)</code> vs <code>remove(Object)</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"The first suspect is boxing. Collections can only hold objects, so a List of Integer stores a reference per element plus a separate Integer object. In a rough measurement, a million ints are about 4 MB in an int array, about 19 in an ArrayList, 38 in a LinkedList and over 50 in a HashSet. So on hot paths I'd switch to primitive arrays, IntStream, or a primitive-collection library. Second, growth: ArrayList copies its array when full, in OpenJDK by about one and a half times, and HashMap doubles at 75% load, so I presize: new ArrayList with n, or HashMap.newHashMap on Java 19 and later. Boxing also brings bugs: double equals on Integers is only reliable between minus 128 and 127, so I use equals, and on a List of Integer, remove(1) removes index 1, not the value 1."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0038-size-the-cache.md">Exercise 0038: size the cache</a>. Estimate first, then measure.</p>
+<p>Runnable example: <a href="../examples/collections/CapacityAndBoxing.java"><code>CapacityAndBoxing.java</code></a> (run it with <code>-Xmx1g</code>).</p>
+
+<h2>What's next</h2>
+<p>The last question in this block is about threads: <em>"Four threads add to the same ArrayList. What happens? Which collection would you use instead?"</em> <a href="0039-concurrent-collections.html">Lesson 0039</a> answers it with a real run.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc (JDK 21)</a>. Read the capacity paragraph and ensureCapacity/trimToSize; then <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 5.1.7</a> on boxing.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why is growing by a factor amortized O(1)?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0037-map-default-methods.html">← Map power methods: merge, compute and their traps</a> &nbsp;|&nbsp; <a href="0039-concurrent-collections.html">Concurrent collections: synchronized, copy-on-write, blocking queues →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, the JLS 21 and the OpenJDK 21 source, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">OpenJDK 21 source: ArrayList.java</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 21 §5.1.7 Boxing Conversion</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html">Integer Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

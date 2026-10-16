@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 13: StatefulSet: định danh và storage ổn định</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>StatefulSet: định danh và storage ổn định</h1>
+<p class="meta">Kubernetes · Bài 0013 · bước 13/15 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-statefulsets.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích StatefulSet đảm bảo điều gì mà Deployment không có, và chứng minh định danh và storage ổn định trên một cluster.</div>
+
+<h2>Các đảm bảo</h2>
+<p>StatefulSet "quản lý việc deploy và scale một tập Pod, đồng thời đảm bảo về thứ tự và tính duy nhất của các Pod này": định danh mạng duy nhất và ổn định, storage bền vững và ổn định, deploy và scale có thứ tự và nhẹ nhàng (graceful), rolling update có thứ tự.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a> Với ứng dụng stateless thì dùng Deployment.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+<h2>Yêu cầu và giới hạn</h2>
+<ul><li>Bạn phải tự tạo một <strong>headless Service</strong> (<code>clusterIP: None</code>) để quản lý định danh mạng của các Pod.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></li>
+<li>"Xoá và/hoặc scale down một StatefulSet sẽ <em>không</em> xoá các volume" - ưu tiên an toàn dữ liệu hơn là tự động dọn dẹp.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></li>
+<li>Không đảm bảo thứ tự dừng Pod khi xoá; muốn tắt có thứ tự thì hãy scale về 0 trước.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></li></ul>
+<h2>Đã kiểm chứng trên cluster</h2>
+<pre><code>kubectl apply -f examples/statefulset.yaml      # 2 replicas + volumeClaimTemplates
+web-0  1/1 Running  19s          web-1  1/1 Running  4s         # created in order
+data-web-0  Bound ...            data-web-1  Bound ...         # one PVC per Pod
+kubectl exec web-0 -- sh -c 'echo "page from web-0" &gt; /usr/share/nginx/html/index.html'
+kubectl delete pod web-0     # recreated with the SAME name and a new uid
+kubectl exec web-0 -- cat /usr/share/nginx/html/index.html   -&gt; page from web-0
+web-0.web.default.svc.cluster.local resolves to the Pod IP
+kubectl scale statefulset web --replicas=1   -&gt; data-web-1 still exists</code></pre>
+<p>File: <a href="../examples/statefulset.yaml"><code>statefulset.yaml</code></a>. Câu chốt khi phỏng vấn: StatefulSet cho bạn định danh và storage, không cho bạn replication dữ liệu; database vẫn cần cơ chế replication riêng của nó (đây là suy luận của tôi, nhất quán với các đảm bảo ở trên).</p><p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Cần có gì cho định danh mạng của StatefulSet?</p>
+  <button>Một Ingress</button>
+  <button>Một LoadBalancer</button>
+  <button>Một CronJob</button>
+  <button data-correct>Một headless Service</button>
+  <p class="explain">StatefulSet cần một headless Service do bạn tự tạo.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Scale down một StatefulSet. Volume thì sao?</p>
+  <button>Bị mã hoá</button>
+  <button>Bị sao chép</button>
+  <button data-correct>Không bị xoá</button>
+  <button>Bị xoá</button>
+  <p class="explain">Scale down không xoá các volume.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Pod được tạo theo cách nào?</p>
+  <button>Chỉ ngược thứ tự</button>
+  <button>Tất cả cùng lúc</button>
+  <button>Ngẫu nhiên</button>
+  <button data-correct>Có thứ tự</button>
+  <p class="explain">Việc deploy và scale diễn ra có thứ tự.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Pod web-0 bị xoá. Cái gì quay lại?</p>
+  <button>Một tên ngẫu nhiên</button>
+  <button>Một volume mới</button>
+  <button data-correct>Cùng tên, cùng volume</button>
+  <button>Không có Pod nào</button>
+  <p class="explain">Lần chạy thử cho thấy web-0 được tạo lại với dữ liệu còn nguyên.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-run-a-replicated-store.vi.md">Bài tập 0013: chạy một store có trạng thái</a></p>
+<p>Ví dụ chạy được: <a href="../examples/statefulset.yaml"><code>statefulset.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes Docs: StatefulSets</a>. Đọc phần 'Using StatefulSets' và 'Limitations'.</p>
+<p><a href="0012-persistent-volumes-and-claims.vi.html">← PersistentVolume, claim và StorageClass</a> &nbsp;|&nbsp; <a href="0014-ingress.vi.html">Ingress: định tuyến HTTP vào cluster →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes Docs: StatefulSets</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

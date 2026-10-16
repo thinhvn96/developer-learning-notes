@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 13: VACUUM, dead tuple và autovacuum</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>VACUUM, dead tuple và autovacuum</h1>
+<p class="meta">PostgreSQL · Bài 0013 · bước 13/13 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-vacuum-and-dead-tuples.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vì sao UPDATE để lại dead tuple (bản ghi chết), VACUUM làm gì, và vì sao autovacuum được bật mặc định.</div>
+
+<h2>Vì sao cần vacuum</h2>
+<p>MVCC của PostgreSQL giữ lại các phiên bản cũ của dòng để bên đọc không chặn bên ghi.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[2]</a> Các phiên bản đó phải được dọn dẹp. Tài liệu đưa ra bốn lý do để vacuum: thu hồi hoặc tái sử dụng không gian của các dòng đã bị update hoặc xóa; cập nhật thống kê cho planner; cập nhật visibility map (giúp index-only scan nhanh hơn); bảo vệ khỏi transaction ID wraparound.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+<h2>Autovacuum</h2>
+<p>Một tính năng không bắt buộc nhưng "rất được khuyến nghị", tự động hóa <code>VACUUM</code> và <code>ANALYZE</code>; trong cấu hình mặc định, nó được bật với các tham số phù hợp.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+<h2>Xem dead tuple xuất hiện</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 12-vacuum.sql     # autovacuum disabled on the table for the demo
+after 100k inserts:            n_dead_tup = 0
+after UPDATE of every row:     n_live_tup = 100000, n_dead_tup = 100000   size 7872 kB
+after VACUUM:                  n_dead_tup = 0
+after DELETE + VACUUM FULL:    size 48 kB</code></pre>
+<p><code>VACUUM</code> thường đánh dấu vùng trống chết là dùng lại được; <code>VACUUM FULL</code> ghi lại toàn bộ table và thu nhỏ file (mức giảm kích thước là từ lần chạy; chi phí lock của nó nằm ngoài các trang tài liệu đã đọc ở đây, nên hãy xem tài liệu trước khi dùng trên production). Source: <a href="../examples/12-vacuum.sql"><code>12-vacuum.sql</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Vì sao update tạo ra dead tuple?</p>
+  <button data-correct>Phiên bản cũ được giữ lại</button>
+  <button>Lock bị rò rỉ</button>
+  <button>Index bị rebuild</button>
+  <button>Cache hết hạn</button>
+  <p class="explain">MVCC giữ các phiên bản cũ của dòng cho tới khi chúng có thể được dọn.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một lý do để VACUUM?</p>
+  <button>Đổi tên table</button>
+  <button data-correct>Dùng lại chỗ của dòng chết</button>
+  <button>Tạo user</button>
+  <button>Đổi kiểu dữ liệu</button>
+  <p class="explain">Để thu hồi hoặc tái sử dụng dung lượng đĩa của các dòng đã bị update hoặc xóa.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Trạng thái mặc định của autovacuum?</p>
+  <button>Chỉ chạy tay</button>
+  <button>Bị tắt</button>
+  <button data-correct>Được bật</button>
+  <button>Đã bị gỡ bỏ</button>
+  <p class="explain">Trong cấu hình mặc định, autovacuum được bật.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. VACUUM còn bảo vệ khỏi điều gì?</p>
+  <button>Mật khẩu yếu</button>
+  <button data-correct>ID wraparound</button>
+  <button>Join chậm</button>
+  <button>Deadlock</button>
+  <p class="explain">Nó bảo vệ khỏi transaction ID wraparound.<a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-watch-bloat.vi.md">Bài tập 0013: quan sát bloat</a></p>
+<p>Ví dụ chạy được: <a href="../examples/12-vacuum.sql"><code>12-vacuum.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html">PostgreSQL Docs: Routine Vacuuming</a>. Mục 24.1.</p>
+<p><a href="0012-row-locks-and-deadlocks.vi.html">← Row lock, SELECT FOR UPDATE và deadlock</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html">PostgreSQL Docs: Routine Vacuuming</a> · [2] <a href="https://www.postgresql.org/docs/current/mvcc-intro.html">PostgreSQL Docs: MVCC intro</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

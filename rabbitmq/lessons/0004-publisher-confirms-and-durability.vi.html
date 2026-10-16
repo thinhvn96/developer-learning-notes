@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 4: Publisher confirm và độ bền dữ liệu</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Publisher confirm và độ bền dữ liệu</h1>
+<p class="meta">RabbitMQ · Bài 0004 · bước 4/9 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-publisher-confirms-and-durability.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> liệt kê được những gì phải cấu hình để một message sống sót qua lần restart broker, và publisher confirm cho producer biết điều gì (cũng như không cho biết điều gì).</div>
+
+<h2>Độ bền dữ liệu cần hai thứ</h2>
+<p>Queue và message có thể là durable (ghi xuống đĩa) hoặc transient (chỉ nằm trong bộ nhớ). Để tránh mất dữ liệu thì "cả queue lẫn message đều phải được đánh dấu durable."<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a> Ví dụ khai báo các queue với <code>"durable":true</code>.</p>
+<h2>Publisher confirm</h2>
+<p>Consumer ack bảo vệ phía consumer. Còn phía producer thì có publisher confirm để broker xác nhận đã nhận: khi bật lên, "broker sẽ confirm các message khi nó xử lý xong bằng cách gửi <code>basic.ack</code> trên cùng channel." Broker cũng có thể gửi <code>basic.nack</code>, nghĩa là nó "không thể xử lý các message đó và từ chối chịu trách nhiệm về chúng." Confirm là bất đồng bộ, nên ứng dụng nên xử lý chúng như một luồng sự kiện thay vì đứng chờ đồng bộ từng cái một.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+<h2>Ghép lại với nhau</h2>
+<ol>
+<li>Queue durable + message persistent.</li>
+<li>Bật publisher confirm, và retry hoặc cảnh báo khi gặp <code>nack</code> hay message không route được.</li>
+<li>Consumer dùng manual ack, xử lý idempotent.</li>
+</ol>
+<p>Về replicated queue để một node sự cố không làm mất queue, xem <a href="0006-quorum-queues-and-poison-messages.vi.html">bài quorum queue</a>. So sánh với cách làm của Kafka trong <a href="../../kafka/lessons/0005-replication-isr-and-durability.vi.html">Kafka replication</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Để không mất dữ liệu khi restart, thứ gì phải durable?</p>
+  <button>Chỉ channel</button>
+  <button>Chỉ exchange</button>
+  <button data-correct>Queue và message</button>
+  <button>Chỉ consumer</button>
+  <p class="explain">Cả queue lẫn message đều phải được đánh dấu durable.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Publisher confirm được gửi về như thế nào?</p>
+  <button data-correct>Bất đồng bộ, dạng ack</button>
+  <button>Chỉ khi đóng kết nối</button>
+  <button>Qua email</button>
+  <button>Đồng bộ theo từng publish</button>
+  <p class="explain">Publisher acknowledgement được gửi bất đồng bộ trên cùng channel.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Broker gửi basic.nack cho publisher. Nghĩa là gì?</p>
+  <button>Queue là durable</button>
+  <button>Consumer đã ack</button>
+  <button data-correct>Từ chối chịu trách nhiệm</button>
+  <button>Message đã được giao</button>
+  <p class="explain">Nack cho biết broker không thể xử lý message và từ chối chịu trách nhiệm về nó.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Consumer ack có xác nhận việc publish không?</p>
+  <button>Chỉ khi có TTL</button>
+  <button>Có, luôn luôn</button>
+  <button>Chỉ khi dùng fanout</button>
+  <button data-correct>Không, cơ chế riêng</button>
+  <p class="explain">Publisher confirm là cơ chế phía producer; consumer ack liên quan tới việc giao message cho consumer.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-lose-a-message.vi.md">Bài tập 0004: tìm mọi cách làm mất một message</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a>. Đọc phần 'Publisher Confirms'.</p>
+<p><a href="0003-acks-prefetch-redelivery.vi.html">← Consumer acknowledgement, prefetch và redelivery</a> &nbsp;|&nbsp; <a href="0007-message-ttl.vi.html">Message TTL: hết hạn theo queue và theo từng message →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a> · [2] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

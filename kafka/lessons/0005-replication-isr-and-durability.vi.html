@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 5: Replication, ISR và độ bền dữ liệu</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Replication, ISR và độ bền dữ liệu</h1>
+<p class="meta">Kafka · Bài 0005 · bước 10/23 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-replication-isr-and-durability.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được leader, follower, ISR và <code>min.insync.replicas</code>, và chọn được cấu hình để một lần ghi đã được xác nhận vẫn sống sót khi một broker gặp sự cố.</div>
+
+<h2>Mô hình replication</h2>
+<ul>
+<li>Mỗi partition có một <strong>leader</strong> nhận mọi lần ghi; các <strong>follower</strong> kéo dữ liệu về và sao chép giống như một consumer.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li>Leader theo dõi tập <strong>in-sync replica (ISR)</strong>.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li>Một message được coi là <strong>committed</strong> khi mọi in-sync replica đã nhận được nó, và "chỉ những message đã committed mới được trao cho consumer".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><code>min.insync.replicas</code> khiến một lần ghi chỉ được xác nhận khi có "ít nhất chừng này in-sync replica", tức là đánh đổi tính sẵn sàng để lấy tính nhất quán.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><strong>Unclean leader election</strong>: mặc định Kafka chờ một thành viên ISR hồi phục; nếu ghi đè cấu hình này, Kafka chọn replica đầu tiên quay lại, ưu tiên tính sẵn sàng hơn tính nhất quán và chấp nhận rủi ro mất dữ liệu.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+</ul>
+<h2>Ghép lại với nhau</h2>
+<p>Một công thức phổ biến: replication factor 3 (trang giới thiệu gọi đây là thiết lập phổ biến trên production), producer dùng <code>acks=all</code> ("sẽ không bị mất chừng nào còn ít nhất một in-sync replica còn sống"<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a>), và topic đặt <code>min.insync.replicas=2</code> để mỗi lần ghi cần hai bản sao. Khi chỉ còn 1 replica in-sync, các lần ghi <code>acks=all</code> sẽ bị từ chối thay vì được chấp nhận với độ bền dữ liệu yếu. (Giá trị 2 cụ thể là lựa chọn theo thông lệ, không phải quy tắc có trong tài liệu; hãy kiểm tra trang design để nắm đúng ngữ nghĩa trước khi bạn bảo vệ nó.)</p>
+<p>Trong broker dùng xong bỏ của khoá học này (<code>--replication-factor 1</code>), <code>describe</code> hiển thị <code>Replicas: 1 Isr: 1</code> cho mỗi partition: chỉ một bản sao, không có khả năng chịu lỗi, ổn để học nhưng sai cho production.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Ai nhận mọi lần ghi của một partition?</p>
+  <button>Một broker ngẫu nhiên</button>
+  <button data-correct>Leader</button>
+  <button>Mọi follower</button>
+  <button>Consumer group</button>
+  <p class="explain">Mỗi partition có một leader nhận mọi lần ghi.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Khi nào một message được coi là committed?</p>
+  <button>Khi producer retry</button>
+  <button data-correct>Khi mọi in-sync replica đã có nó</button>
+  <button>Khi leader đã có nó</button>
+  <button>Khi một follower đã có nó</button>
+  <p class="explain">Message được committed khi mọi in-sync replica đã nhận được lần ghi.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Unclean leader election ưu tiên điều gì?</p>
+  <button>Chỉ latency thấp hơn</button>
+  <button data-correct>Sẵn sàng hơn nhất quán</button>
+  <button>Nhất quán hơn sẵn sàng</button>
+  <button>Message nhỏ hơn</button>
+  <p class="explain">Nó cho phép một replica không đồng bộ lên làm leader, ưu tiên tính sẵn sàng.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. min.insync.replicas áp đặt điều gì?</p>
+  <button data-correct>Số replica xác nhận tối thiểu</button>
+  <button>Kích thước topic tối đa</button>
+  <button>Giới hạn số consumer</button>
+  <button>Thời gian retention</button>
+  <p class="explain">Lần ghi được xác nhận bởi ít nhất chừng đó in-sync replica.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-survive-a-broker.vi.md">Bài tập 0005: sống sót khi một broker sập</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design, Replication</a>. Đọc trọn phần 'Replication'.</p>
+<p><a href="0008-log-compaction.vi.html">← Log compaction và tombstone</a> &nbsp;|&nbsp; <a href="0014-producer-throughput-batching-compression.vi.html">Throughput của producer: batching và nén →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: replication</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

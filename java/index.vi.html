@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình Java (JDK 8, 17, 21)</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Java (JDK 8, 17, 21): từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình Java · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="java" data-total="46">46 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Collection chuyên sâu, concurrency, JVM, và những gì JDK 8, 17 và 21 lần lượt bổ sung. 46 bài theo thứ tự đọc, đánh dấu từng bài khi bạn học xong (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Nền tảng có trong mọi JDK</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0018-strings-immutability-and-stringbuilder"><a href="lessons/0018-strings-immutability-and-stringbuilder.vi.html">String: tính bất biến, pool và StringBuilder</a></li>
+<li data-id="0019-exceptions-checked-unchecked-try-with-resources"><a href="lessons/0019-exceptions-checked-unchecked-try-with-resources.vi.html">Exception: checked vs unchecked và try-with-resources</a></li>
+<li data-id="0020-generics-basics-and-invariance"><a href="lessons/0020-generics-basics-and-invariance.vi.html">Generic: vì sao List của Integer không phải List của Number</a></li>
+<li data-id="0021-wildcards-and-type-erasure"><a href="lessons/0021-wildcards-and-type-erasure.vi.html">Wildcard (extends, super) và type erasure</a></li>
+<li data-id="0040-review-fundamentals"><a href="lessons/0040-review-fundamentals.vi.html">Ôn tập 1: string, exception và generic</a> <span class="meta">Ôn tập</span></li>
+</ol>
+<h2>Collection chuyên sâu (mọi JDK)</h2>
+<p class="aside">Từ bản đồ các interface đến bên trong HashMap, thứ tự sắp xếp, tính bất biến, các cấu trúc navigable và priority, chi phí bộ nhớ và concurrency. Mọi bài đều chạy một ví dụ trên JDK 21; điểm khác biệt của JDK 8/17 được nêu rõ. Tra cứu nhanh: <a href="../reference/java-collections.vi.html">tóm tắt nhanh collection</a>.</p>
+<ol class="steps" data-stack="java">
+<li data-id="0028-collections-framework-map"><a href="lessons/0028-collections-framework-map.vi.html">Bản đồ Collections Framework: interface và implementation</a> <span class="meta">Foundation</span></li>
+<li data-id="0002-choosing-a-list"><a href="lessons/0002-choosing-a-list.vi.html">Chọn giữa ArrayList, LinkedList và ArrayDeque</a> <span class="meta">Foundation</span></li>
+<li data-id="0029-iterators-and-fail-fast"><a href="lessons/0029-iterators-and-fail-fast.vi.html">Iterator, fail-fast và ConcurrentModificationException</a> <span class="meta">Foundation</span></li>
+<li data-id="0001-hashmap-equals-hashcode"><a href="lessons/0001-hashmap-equals-hashcode.vi.html">HashMap, equals và hashCode</a> <span class="meta">Foundation</span></li>
+<li data-id="0041-review-collections-basics"><a href="lessons/0041-review-collections-basics.vi.html">Ôn tập 2: collection cơ bản và HashMap</a> <span class="meta">Ôn tập</span></li>
+<li data-id="0030-hashmap-internals"><a href="lessons/0030-hashmap-internals.vi.html">Bên trong HashMap: bucket, resize và treeification</a> <span class="meta">Core</span></li>
+<li data-id="0031-comparable-comparator-and-ordering"><a href="lessons/0031-comparable-comparator-and-ordering.vi.html">Comparable, Comparator và tính nhất quán với equals</a> <span class="meta">Core</span></li>
+<li data-id="0032-unmodifiable-vs-immutable"><a href="lessons/0032-unmodifiable-vs-immutable.vi.html">Unmodifiable và immutable: Arrays.asList, List.of, view</a> <span class="meta">Core</span></li>
+<li data-id="0033-hashset-linkedhashmap-and-lru"><a href="lessons/0033-hashset-linkedhashmap-and-lru.vi.html">HashSet, LinkedHashMap và LRU cache</a> <span class="meta">Core</span></li>
+<li data-id="0042-review-collections-core"><a href="lessons/0042-review-collections-core.vi.html">Ôn tập 3: HashMap bên trong, thứ tự và tính bất biến</a> <span class="meta">Ôn tập</span></li>
+<li data-id="0034-treemap-and-navigable-maps"><a href="lessons/0034-treemap-and-navigable-maps.vi.html">TreeMap và NavigableMap: truy vấn theo khoảng và key gần nhất</a> <span class="meta">Advanced</span></li>
+<li data-id="0035-priorityqueue-and-top-k"><a href="lessons/0035-priorityqueue-and-top-k.vi.html">PriorityQueue, heap và bài toán top-K</a> <span class="meta">Advanced</span></li>
+<li data-id="0036-enummap-identity-and-weak-maps"><a href="lessons/0036-enummap-identity-and-weak-maps.vi.html">EnumMap, EnumSet, IdentityHashMap và WeakHashMap</a> <span class="meta">Advanced</span></li>
+<li data-id="0037-map-default-methods"><a href="lessons/0037-map-default-methods.vi.html">Các method mạnh của Map: merge, compute và những cái bẫy</a> <span class="meta">Advanced</span></li>
+<li data-id="0038-capacity-boxing-and-memory"><a href="lessons/0038-capacity-boxing-and-memory.vi.html">Capacity, boxing và chi phí bộ nhớ của collection</a> <span class="meta">Senior</span></li>
+<li data-id="0039-concurrent-collections"><a href="lessons/0039-concurrent-collections.vi.html">Concurrent collection: synchronized, copy-on-write, blocking queue</a> <span class="meta">Senior</span></li>
+<li data-id="0043-review-collections-advanced"><a href="lessons/0043-review-collections-advanced.vi.html">Ôn tập 4: navigable, priority, collection đặc biệt và concurrent collection</a> <span class="meta">Ôn tập</span></li>
+</ol>
+<h2>JDK 8: mốc nền</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0008-lambdas-and-functional-interfaces"><a href="lessons/0008-lambdas-and-functional-interfaces.vi.html">JDK 8: lambda, method reference và functional interface</a></li>
+<li data-id="0009-default-methods-and-conflicts"><a href="lessons/0009-default-methods-and-conflicts.vi.html">JDK 8: default method và cách giải quyết xung đột</a></li>
+<li data-id="0004-streams-and-optional"><a href="lessons/0004-streams-and-optional.vi.html">Stream và Optional, tránh các cái bẫy</a></li>
+<li data-id="0022-collectors-groupingby-tomap"><a href="lessons/0022-collectors-groupingby-tomap.vi.html">Collectors: groupingBy, partitioningBy và toMap</a></li>
+<li data-id="0011-java-time"><a href="lessons/0011-java-time.vi.html">JDK 8: java.time, API ngày giờ</a></li>
+<li data-id="0010-completablefuture"><a href="lessons/0010-completablefuture.vi.html">JDK 8: CompletableFuture và async pipeline</a></li>
+<li data-id="0044-review-jdk8"><a href="lessons/0044-review-jdk8.vi.html">Ôn tập 5: lambda, stream, java.time và CompletableFuture</a> <span class="meta">Ôn tập</span></li>
+</ol>
+<h2>Concurrency và JVM (mọi JDK)</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0005-visibility-and-happens-before"><a href="lessons/0005-visibility-and-happens-before.vi.html">Visibility và happens-before</a></li>
+<li data-id="0024-atomics-and-locks"><a href="lessons/0024-atomics-and-locks.vi.html">Atomic và ReentrantLock: sửa lỗi mất cập nhật</a></li>
+<li data-id="0025-concurrenthashmap"><a href="lessons/0025-concurrenthashmap.vi.html">ConcurrentHashMap: cập nhật nguyên tử và tính nhất quán yếu</a></li>
+<li data-id="0023-thread-pools-executors"><a href="lessons/0023-thread-pools-executors.vi.html">Thread pool: core, max, queue và rejection</a></li>
+<li data-id="0026-deadlock-and-lock-ordering"><a href="lessons/0026-deadlock-and-lock-ordering.vi.html">Deadlock và thứ tự lấy lock</a></li>
+<li data-id="0007-heap-and-garbage-collection"><a href="lessons/0007-heap-and-garbage-collection.vi.html">Kích thước heap và garbage collection</a></li>
+<li data-id="0045-review-concurrency-jvm"><a href="lessons/0045-review-concurrency-jvm.vi.html">Ôn tập 6: concurrency và JVM</a> <span class="meta">Ôn tập</span></li>
+</ol>
+<h2>JDK 17: những gì thay đổi từ 8 đến 17</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0012-var-and-text-blocks"><a href="lessons/0012-var-and-text-blocks.vi.html">JDK 10 và 15: var và text block (có trong JDK 17)</a></li>
+<li data-id="0013-switch-expressions-and-instanceof-patterns"><a href="lessons/0013-switch-expressions-and-instanceof-patterns.vi.html">JDK 14 và 16: switch expression và instanceof pattern (có trong JDK 17)</a></li>
+<li data-id="0003-records-and-immutability"><a href="lessons/0003-records-and-immutability.vi.html">Record và tính bất biến nông</a></li>
+<li data-id="0014-sealed-classes"><a href="lessons/0014-sealed-classes.vi.html">JDK 17: sealed class và interface</a></li>
+<li data-id="0027-helpful-nullpointerexceptions"><a href="lessons/0027-helpful-nullpointerexceptions.vi.html">Helpful NullPointerException (JDK 14+, có trong 17 và 21)</a></li>
+</ol>
+<h2>JDK 21: những gì thay đổi từ 17 đến 21</h2>
+<ol class="steps" data-stack="java">
+<li data-id="0015-pattern-matching-switch-and-record-patterns"><a href="lessons/0015-pattern-matching-switch-and-record-patterns.vi.html">JDK 21: pattern matching cho switch và record pattern</a></li>
+<li data-id="0016-sequenced-collections"><a href="lessons/0016-sequenced-collections.vi.html">JDK 21: sequenced collection</a></li>
+<li data-id="0006-virtual-threads"><a href="lessons/0006-virtual-threads.vi.html">Virtual thread: mở rộng, không phải tốc độ</a></li>
+<li data-id="0017-generational-zgc"><a href="lessons/0017-generational-zgc.vi.html">JDK 21: generational ZGC</a></li>
+<li data-id="0046-review-jdk17-21"><a href="lessons/0046-review-jdk17-21.vi.html">Ôn tập 7: JDK 17 và 21 đã thêm gì</a> <span class="meta">Ôn tập</span></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Các cạm bẫy khi nâng cấp Java 8 lên 17 (cần nguồn từ release note) <span class="meta">(dự kiến)</span></li>
+<li>Class loading và bên trong JVM (cần nguồn) <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> để thêm, sắp xếp lại hoặc bỏ qua bài học, hoặc để chạy một buổi phỏng vấn thử dựa trên <a href="interview.vi.html">trang hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

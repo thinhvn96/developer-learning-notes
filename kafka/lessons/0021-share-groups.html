@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 21: Share groups: queues for Kafka</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Share groups: queues for Kafka</h1>
+<p class="meta">Kafka · Lesson 0021 · step 21 of 23 · Senior · ~13 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0021-share-groups.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> explain share groups (Queues for Kafka, KIP-932), when to use one instead of a consumer group, and how acknowledgements, locks and delivery limits work.</div>
+
+<h2>The limit they remove</h2>
+<p>In a consumer group a partition belongs to exactly one consumer, so a topic with 4 partitions can never have more than 4 busy workers, and one slow record blocks its partition. Share groups let "a pool of share consumers ... cooperate on the work of consuming and processing records", "permitting multiple consumers to consume from the same partitions".<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a> They became production-ready in Kafka 4.2.<a class="cite" href="https://kafka.apache.org/blog/2026/02/17/apache-kafka-4.2.0-release-announcement/">[3]</a></p>
+<h2>How it works</h2>
+<ul>
+<li>Records are delivered with a time-limited <strong>acquisition lock</strong> (default 30 s, <code>share.record.lock.duration.ms</code>). "While a record is acquired, it is not available for another consumer"; if the lock expires it is released.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a><a class="cite" href="https://kafka.apache.org/43/configuration/group-configs/">[2]</a></li>
+<li>Per record the consumer answers <code>ACCEPT</code> (done), <code>RELEASE</code> (try again later, maybe elsewhere), <code>REJECT</code> ("unprocessable", not redelivered) or <code>RENEW</code> (still working, extend the lock).<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a></li>
+<li>Each record gets at most <code>share.delivery.count.limit</code> attempts (default 5), so a poison pill cannot loop forever.<a class="cite" href="https://kafka.apache.org/43/configuration/group-configs/">[2]</a></li>
+<li>The trade-off: "more flexible sharing of records than a consumer group, at the expense of record ordering."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a></li>
+<li>A new share group starts at the <em>latest</em> offset (<code>share.auto.offset.reset</code>).<a class="cite" href="https://kafka.apache.org/43/configuration/group-configs/">[2]</a></li>
+</ul>
+<pre><code>props.setProperty("share.acknowledgement.mode", "explicit");
+KafkaShareConsumer&lt;String, String&gt; consumer = new KafkaShareConsumer&lt;&gt;(props);
+consumer.subscribe(List.of("jobs"));
+while (true) {
+    for (var r : consumer.poll(Duration.ofMillis(1000))) {
+        try { handle(r); consumer.acknowledge(r, AcknowledgeType.ACCEPT); }
+        catch (Exception e) { consumer.acknowledge(r, AcknowledgeType.RELEASE); }
+    }
+    consumer.commitSync();
+}</code></pre>
+<h2>Run it: two workers, one partition</h2>
+<pre><code>$ ./08-share-group.sh
+consumer A: 8 records: job-8 job-9 job-10 job-11 job-16 job-17 job-18 job-19
+consumer B: 12 records: job-1 job-2 job-3 job-4 job-5 job-6 job-7 job-12 job-13 job-14 job-15 job-20</code></pre>
+<p>The topic has one partition, and both consumers did work. With a consumer group one of them would have been idle. Note how ordering across the two workers is gone.</p>
+<h2>When to choose which</h2>
+<ul>
+<li><strong>Consumer group:</strong> per-key order matters (account balance, order state machine), or you need replay by offset with exactly-once in Kafka.</li>
+<li><strong>Share group:</strong> independent jobs (send email, resize image), workers that scale beyond the partition count, per-record retry. This is the job you would otherwise reach for RabbitMQ for; the data still lives in a Kafka log with retention.</li>
+</ul>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Share group, one partition, three consumers. Busy?</p>
+  <button>Two at the most</button>
+  <button>None until rebalance</button>
+  <button data-correct>All three can work</button>
+  <button>Only one works</button>
+  <p class="explain">Share groups let multiple consumers consume from the same partitions.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which ack means 'never redeliver this record'?</p>
+  <button>RELEASE</button>
+  <button>RENEW</button>
+  <button data-correct>REJECT</button>
+  <button>ACCEPT</button>
+  <p class="explain">REJECT marks the record unprocessable and it is not redelivered.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Default delivery attempt limit per record?</p>
+  <button>Ten attempts</button>
+  <button data-correct>Five attempts</button>
+  <button>One attempt</button>
+  <button>No limit set</button>
+  <p class="explain">share.delivery.count.limit defaults to 5.<a class="cite" href="https://kafka.apache.org/43/configuration/group-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. What do share groups give up?</p>
+  <button>Durability</button>
+  <button data-correct>Record ordering</button>
+  <button>Replication</button>
+  <button>Retention</button>
+  <p class="explain">Flexible sharing comes at the expense of record ordering.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0021-queue-or-group.md">Exercise 0021: queue or group?</a></p>
+<p>Runnable example: <a href="../examples/08-share-group.sh"><code>08-share-group.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">KafkaShareConsumer Javadoc</a>. Read the class description: share groups, acknowledgement, the acquisition lock and the code examples.</p>
+<p><a href="0020-monitoring-and-operations.html">← Monitoring and operating a cluster</a> &nbsp;|&nbsp; <a href="0022-security-and-quotas.html">Security and quotas →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">KafkaShareConsumer Javadoc</a> · [2] <a href="https://kafka.apache.org/43/configuration/group-configs/">Kafka Group Configs</a> · [3] <a href="https://kafka.apache.org/blog/2026/02/17/apache-kafka-4.2.0-release-announcement/">Apache Kafka 4.2.0 Release Announcement</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

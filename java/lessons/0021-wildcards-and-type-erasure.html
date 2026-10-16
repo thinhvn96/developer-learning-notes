@@ -8,73 +8,286 @@
 </head>
 <body>
 <main>
-<h1>Wildcards (extends, super) and type erasure</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0021 · step 6 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>When to write <code>? extends</code> and when <code>? super</code></h1>
+<p class="subtitle">Wildcards make generic methods flexible; type erasure explains what is left of generics at run time.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0021 · step 4 of 46 · Advanced · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0021-wildcards-and-type-erasure.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> choose <code>? extends</code> or <code>? super</code> by asking whether a parameter is a producer or consumer, and explain type erasure.</div>
+<div class="mission"><strong>Why this lesson?</strong> In <a href="0020-generics-basics-and-invariance.html">lesson 0020</a> you learned that <code>List&lt;Integer&gt;</code> is not a <code>List&lt;Number&gt;</code>. So how do you write one method that sums any list of numbers? Senior interviews ask exactly this, then <em>"What is PECS?"</em> and <em>"Do generics exist at run time?"</em></div>
 
-<h2>In and out variables</h2>
-<ul><li>An <strong>"in"</strong> variable (provides data to your code): upper bounded wildcard, <code>? extends</code>.</li>
-<li>An <strong>"out"</strong> variable (receives data): lower bounded wildcard, <code>? super</code>.</li>
-<li>If the "in" variable is used only through <code>Object</code> methods: unbounded <code>?</code>.</li>
-<li>If it is both in and out: no wildcard.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">[1]</a></li></ul>
-<p>Also: avoid wildcards in return types. And <code>List&lt;? extends X&gt;</code> is not strictly read-only: you can add <code>null</code>, call <code>clear</code>, or remove through an iterator.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">[1]</a> (Interviewers call the rule "PECS": producer extends, consumer super; the tutorial states it as in/out.)</p>
-<pre><code>static double sum(List&lt;? extends Number&gt; in)     // reads Numbers
-static void fill(List&lt;? super Integer&gt; out)      // writes Integers</code></pre>
-<h2>Type erasure</h2>
-<p>The compiler replaces type parameters with their bounds (or <code>Object</code>), inserts casts where needed, and generates bridge methods to preserve polymorphism.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">[2]</a> Consequence: parameterized types are not reifiable at runtime, so no <code>instanceof List&lt;String&gt;</code> and no arrays of parameterized types.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">[2]</a></p>
-<pre><code>java java/examples/GenericsDemo.java
+<div class="win"><b>Today's win:</b> choose <code>? extends</code> or <code>? super</code> by asking whether a parameter is a producer ("in") or a consumer ("out"), and explain type erasure and its consequences.</div>
+
+<dl class="words">
+  <dt>wildcard</dt><dd>A question mark in a generic type, <code>List&lt;?&gt;</code>: "a list of some type I don't know exactly".</dd>
+  <dt>? extends T</dt><dd>Upper bounded wildcard: "some type that is T or a subtype of T". Example: <code>List&lt;? extends Number&gt;</code>.</dd>
+  <dt>? super T</dt><dd>Lower bounded wildcard: "some type that is T or a supertype of T". Example: <code>List&lt;? super Integer&gt;</code>.</dd>
+  <dt>producer / "in"</dt><dd>A parameter your method only <em>reads</em> from. It gives data to your code.</dd>
+  <dt>consumer / "out"</dt><dd>A parameter your method only <em>writes</em> into. It receives data from your code.</dd>
+  <dt>type erasure</dt><dd>The compiler removes the type arguments after checking them, so the running program does not see them.</dd>
+  <dt>reifiable</dt><dd>A type whose full information is still available at run time. <code>String</code> is; <code>List&lt;String&gt;</code> is not.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"I need a method <code>copy(src, dest)</code> that copies Integers from one list into another. Which wildcard goes on <code>src</code>, and which on <code>dest</code>?"</em> Guess before you read.</p>
+
+<h2>1. Reading: <code>? extends</code></h2>
+<p>A fruit taster tastes fruit from any box you hand over. An apple box is fine, a banana box is fine. The taster only takes fruit <em>out</em>, so any box of "some kind of fruit" works.</p>
+<p>A method that only reads numbers is the taster. With <code>List&lt;Number&gt;</code> it would refuse a <code>List&lt;Integer&gt;</code> (invariance). With <code>? extends Number</code> it accepts both:</p>
+<pre><code>static double sum(List&lt;? extends Number&gt; in) {   <span class="c">// reads Numbers</span>
+    double s = 0;
+    for (Number n : in) s += n.doubleValue();
+    return s;
+}
+<span class="c">Step 1  sum(ints), ints is a List&lt;Integer&gt;: Integer is a Number → OK</span>
+<span class="c">Step 2  each element is read as a Number → doubleValue() works</span>
+<span class="c">Step 3  1 + 2 + 3 → 6.0</span></code></pre>
+<pre><code>$ java java/examples/GenericsDemo.java
+sum of ints    : 6.0
+...</code></pre>
+<h3>Trap: you cannot add to it</h3>
+<p>Why not <code>in.add(1)</code>? The compiler only knows "a list of <em>some</em> subtype of Number". It could be a <code>List&lt;Double&gt;</code>, and then an Integer would be the banana in the apple box. So JDK 21's javac refuses: <code>error: incompatible types: int cannot be converted to CAP#1</code> (<code>CAP#1</code> is the compiler's name for "the unknown type").</p>
+<p>The tutorial adds a detail interviewers like: such a list "can be informally thought of as read-only, but that is not a strict guarantee". You can still add <code>null</code>, call <code>clear</code>, or remove through an iterator.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Tutorial: wildcard guidelines</a></p>
+
+<h2>2. Writing: <code>? super</code></h2>
+<p>Now an apple picker who only puts apples <em>in</em>. Which boxes can you give the picker? An "apples" box, a "fruit" box, or an "anything" box. All of them accept apples. A "bananas only" box would not.</p>
+<pre><code>static void fill(List&lt;? super Integer&gt; out) {    <span class="c">// writes Integers</span>
+    for (int i = 1; i &lt;= 3; i++) out.add(i);
+}
+<span class="c">Step 1  fill(nums), a List&lt;Number&gt;: Number is a supertype → OK</span>
+<span class="c">Step 2  fill(objs) with List&lt;Object&gt;: Object is a supertype too → OK</span>
+<span class="c">Step 3  each add(i) is safe: every such list can hold an Integer</span></code></pre>
+<pre><code>$ java java/examples/GenericsDemo.java
+...
 filled Number  : [1, 2, 3]
 filled Object  : [1, 2, 3]
-same runtime class: true      # List&lt;String&gt; and List&lt;Integer&gt; share one class</code></pre>
+...</code></pre>
+<p>The other side of the trade: when you <em>read</em> from a <code>List&lt;? super Integer&gt;</code>, the compiler only knows the element is "some supertype of Integer", so you get back an <code>Object</code>.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. A method only reads Numbers from a list. Which type?</p>
-  <button>List of Object</button>
-  <button>Raw List</button>
-  <button>List of ? super Number</button>
-  <button data-correct>List of ? extends Number</button>
-  <p class="explain">An in variable uses an upper bounded wildcard.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. A method only adds Integers to a list. Which type?</p>
-  <button data-correct>List of ? super Integer</button>
-  <button>Raw List</button>
-  <button>List of int</button>
-  <button>List of ? extends Integer</button>
-  <p class="explain">An out variable uses a lower bounded wildcard.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. What does the compiler do with type parameters?</p>
-  <button>Turns them into ints</button>
-  <button>Generates new classes</button>
-  <button>Keeps them at runtime</button>
-  <button data-correct>Erases them to bounds</button>
-  <p class="explain">It replaces type parameters with bounds or Object.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Why is instanceof List of String illegal?</p>
-  <button data-correct>Not reifiable at runtime</button>
-  <button>Too slow at runtime</button>
-  <button>Wrong package</button>
-  <button>Needs a cast</button>
-  <p class="explain">Type arguments are erased, so they cannot be checked at runtime.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">[2]</a></p>
-</div>
+<h2>3. The rule: "in" and "out" (PECS)</h2>
+<p>The Java tutorial states the rule with "in" and "out" variables:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Tutorial: wildcard guidelines</a></p>
+<ul>
+  <li>An <strong>"in"</strong> variable (it provides data to your code) uses an upper bounded wildcard: <code>? extends</code>.</li>
+  <li>An <strong>"out"</strong> variable (it receives data) uses a lower bounded wildcard: <code>? super</code>.</li>
+  <li>If the "in" variable is used only through <code>Object</code> methods: unbounded <code>?</code>.</li>
+  <li>If it is both "in" and "out": no wildcard.</li>
+</ul>
+<p>Interviewers call it <strong>PECS</strong>: <em>Producer Extends, Consumer Super</em>. Same rule, other words.</p>
+
+<figure>
+<svg viewBox="0 0 680 225" role="img" aria-label="Data flows from a producer list typed List of extends Number, through get, into your method, and through add into a consumer list typed List of super Integer. Producer extends, consumer super.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="60" width="200" height="80" rx="6"/>
+      <rect x="270" y="75" width="140" height="50" rx="6"/>
+      <rect x="35" y="98" width="80" height="26" rx="4" opacity=".7"/>
+      <rect x="125" y="98" width="80" height="26" rx="4" opacity=".7"/>
+      <path d="M220 100h44M258 95l6 5-6 5"/>
+    </g>
+    <rect x="460" y="60" width="200" height="80" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g fill="none" stroke="var(--accent)">
+      <rect x="475" y="98" width="50" height="26" rx="4"/><rect x="535" y="98" width="50" height="26" rx="4"/>
+      <rect x="595" y="98" width="50" height="26" rx="4"/>
+      <path d="M410 100h44M448 95l6 5-6 5"/>
+    </g>
+    <text x="120" y="82" text-anchor="middle">List&lt;? extends Number&gt;</text>
+    <text x="75" y="115" text-anchor="middle">Integer</text>
+    <text x="165" y="115" text-anchor="middle">Double</text>
+    <text x="340" y="104" text-anchor="middle" font-size="13">your method</text>
+    <text x="242" y="90" text-anchor="middle">get</text>
+    <text x="432" y="90" text-anchor="middle" fill="var(--accent)">add</text>
+    <text x="560" y="82" text-anchor="middle" fill="var(--accent)">List&lt;? super Integer&gt;</text>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="500" y="115">1</text><text x="560" y="115">2</text><text x="620" y="115">3</text>
+    </g>
+    <text x="120" y="48" text-anchor="middle" opacity=".7">add() refused (only null)</text>
+    <text x="560" y="48" text-anchor="middle" opacity=".7">get() gives only Object</text>
+    <text x="120" y="162" text-anchor="middle">producer: you READ from it</text>
+    <text x="120" y="180" text-anchor="middle" font-size="12">→ ? extends T</text>
+    <text x="560" y="162" text-anchor="middle" fill="var(--accent)">consumer: you WRITE into it</text>
+    <text x="560" y="180" text-anchor="middle" font-size="12" fill="var(--accent)">→ ? super T</text>
+    <text x="340" y="212" text-anchor="middle" font-size="12">PECS: Producer Extends, Consumer Super</text>
+  </g>
+</svg>
+<figcaption>Follow the data: it comes <em>out</em> of the producer (<code>extends</code>) and goes <em>into</em> the consumer (<code>super</code>).</figcaption>
+</figure>
+
+<p>The JDK itself uses this rule. Here is the real signature of <code>Collections.copy</code>:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a></p>
+<pre><code>public static &lt;T&gt; void copy(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src)</code></pre>
+<p><code>src</code> is read (producer, <code>extends</code>), <code>dest</code> is written (consumer, <code>super</code>). That is the answer to the "Before you start" question.</p>
+<h3>Two more guidelines</h3>
+<ul>
+  <li><strong>No wildcards in return types.</strong> The tutorial: "Using a wildcard as a return type should be avoided because it forces programmers using the code to deal with wildcards."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Tutorial: wildcard guidelines</a></li>
+  <li><strong><code>List&lt;?&gt;</code> is not <code>List&lt;Object&gt;</code>.</strong> "You can insert an Object, or any subtype of Object, into a List&lt;Object&gt;. But you can only insert null into a List&lt;?&gt;."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/unboundedWildcards.html">Tutorial: unbounded wildcards</a> Use <code>List&lt;?&gt;</code> for methods like "print any list" or "count elements".</li>
+</ul>
+
+<h2>4. Type erasure: the labels come off</h2>
+<p>Back to the storeroom of lesson 0020. The inspector at the door checks every label carefully. But once a box is inside, the labels are peeled off to save space. Inside the warehouse, every box looks the same.</p>
+<p>That is <span class="term">type erasure</span>. After checking your code, the compiler:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Tutorial: type erasure</a></p>
+<ol class="steps">
+  <li>replaces type parameters with their bounds, or with <code>Object</code> if they have none,</li>
+  <li>inserts casts where needed to keep type safety,</li>
+  <li>generates <em>bridge methods</em> to keep polymorphism working in subclasses of generic types.</li>
+</ol>
+<p>The tutorial sums it up: "no new classes are created for parameterized types; consequently, generics incur no runtime overhead."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Tutorial: type erasure</a></p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Left, your source with List of String. Right, after erasure: a plain List, and a String cast inserted on get. At run time List of String and List of Integer share one class.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="34" text-anchor="middle" font-size="11" opacity=".75">your source (checked by javac)</text>
+    <text x="510" y="34" text-anchor="middle" font-size="11" opacity=".75">after erasure (what runs)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="46" width="300" height="120" rx="6"/>
+      <rect x="360" y="46" width="300" height="120" rx="6"/>
+      <path d="M320 106h34M348 101l6 5-6 5"/>
+    </g>
+    <text x="32" y="78">List&lt;String&gt; names = ...;</text>
+    <text x="32" y="106">names.add("Ann");</text>
+    <text x="32" y="134">String s = names.get(0);</text>
+    <text x="372" y="78">List names = ...;</text>
+    <text x="372" y="106">names.add("Ann");</text>
+    <rect x="368" y="119" width="286" height="22" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="372" y="134" fill="var(--accent)">String s = (String) names.get(0);</text>
+    <text x="340" y="96" text-anchor="middle" font-size="11">javac</text>
+    <text x="510" y="158" text-anchor="middle" font-size="11" fill="var(--accent)">cast inserted for you</text>
+    <text x="340" y="198" text-anchor="middle" font-size="12">run time: new ArrayList&lt;String&gt;().getClass()</text>
+    <text x="340" y="218" text-anchor="middle" font-size="12" fill="var(--accent)">== new ArrayList&lt;Integer&gt;().getClass()  → true</text>
+  </g>
+</svg>
+<figcaption>The type argument is used for checks and casts at compile time, then removed. At run time all <code>ArrayList</code>s share one class.</figcaption>
+</figure>
+
+<p>The example proves it:</p>
+<pre><code>List&lt;String&gt; strings = new ArrayList&lt;&gt;();
+strings.getClass() == ints.getClass()
+
+$ java java/examples/GenericsDemo.java
+...
+same runtime class: true</code></pre>
+
+<h3>Consequences you must know</h3>
+<p>Because the type argument is gone at run time, parameterized types are not <span class="term">reifiable</span>.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Tutorial: type erasure</a> The tutorial's list of restrictions includes:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Tutorial: restrictions on generics</a></p>
+<ul>
+  <li><strong>"Cannot Use Casts or instanceof with Parameterized Types".</strong> <code>obj instanceof List&lt;String&gt;</code> does not compile; JDK 21's javac says <code>Object cannot be safely cast to List&lt;String&gt;</code>. Check <code>instanceof List&lt;?&gt;</code> instead.</li>
+  <li><strong>"Cannot Create Arrays of Parameterized Types".</strong> No <code>new List&lt;String&gt;[10]</code>.</li>
+  <li><strong>"Cannot Create Instances of Type Parameters".</strong> No <code>new T()</code> inside a generic class.</li>
+</ul>
+<p class="muted">JDK 8 vs 17 vs 21: the rules of this lesson are the same on all three. What changed is around them, for example <code>var</code> and records, which you will meet later.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">A method only <em>reads</em> Numbers from a list. Which parameter type?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? extends Number&gt;</button>
+    <button class="opt">List&lt;? super Number&gt;</button>
+    <button class="opt">List&lt;Number&gt;</button>
+    <button class="opt">List&lt;Object&gt;</button>
+  </div>
+  <div class="why">An "in" variable (producer) uses an upper bounded wildcard, so it also accepts <code>List&lt;Integer&gt;</code> and <code>List&lt;Double&gt;</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A method only <em>adds</em> Integers to a list. Which parameter type?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? super Integer&gt;</button>
+    <button class="opt">List&lt;? extends Integer&gt;</button>
+    <button class="opt">List&lt;Integer&gt; only</button>
+    <button class="opt">List&lt;?&gt; unbounded</button>
+  </div>
+  <div class="why">An "out" variable (consumer) uses a lower bounded wildcard, so <code>List&lt;Number&gt;</code> and <code>List&lt;Object&gt;</code> work too.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does <code>in.add(1)</code> fail when <code>in</code> is <code>List&lt;? extends Number&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The real list might be a List&lt;Double&gt;</button>
+    <button class="opt">Wildcard lists are always strictly read-only</button>
+    <button class="opt">Integers cannot be stored in generic lists</button>
+    <button class="opt">add() is removed from the list by erasure</button>
+  </div>
+  <div class="why">The compiler only knows "some subtype of Number", so it cannot prove an Integer fits. (You can still add <code>null</code> or call <code>clear</code>.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the real signature of <code>Collections.copy</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>copy(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src)</button>
+    <button class="opt">copy(List&lt;? extends T&gt; dest, List&lt;? super T&gt; src)</button>
+    <button class="opt">copy(List&lt;T&gt; dest, List&lt;T&gt; src) with no wildcards</button>
+    <button class="opt">copy(List&lt;?&gt; dest, List&lt;?&gt; src) with no bound at all</button>
+  </div>
+  <div class="why">The source is read (extends), the destination is written (super): PECS in the JDK itself.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>new ArrayList&lt;String&gt;().getClass() == new ArrayList&lt;Integer&gt;().getClass()</code> print?</p>
+  <div class="options">
+    <button class="opt" data-correct>true, erasure leaves one runtime class</button>
+    <button class="opt">false, each type argument has a class</button>
+    <button class="opt">It does not compile for different types</button>
+    <button class="opt">It throws a ClassCastException at run time</button>
+  </div>
+  <div class="why">Type erasure creates no new classes for parameterized types; the demo prints <code>same runtime class: true</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why is <code>obj instanceof List&lt;String&gt;</code> rejected when <code>obj</code> is an <code>Object</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The String part is erased, so it can't be checked</button>
+    <button class="opt">instanceof only works with final classes</button>
+    <button class="opt">List is an interface, and instanceof needs a class</button>
+    <button class="opt">It is allowed, but always returns false</button>
+  </div>
+  <div class="why"><code>List&lt;String&gt;</code> is not reifiable: at run time there is only <code>List</code>. Use <code>instanceof List&lt;?&gt;</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which method signature follows the tutorial's guidelines?</p>
+  <div class="options">
+    <button class="opt" data-correct>static &lt;T&gt; List&lt;T&gt; merge(List&lt;? extends T&gt; a, List&lt;? extends T&gt; b)</button>
+    <button class="opt">static &lt;T&gt; List&lt;? extends T&gt; merge(List&lt;T&gt; a, List&lt;T&gt; b)</button>
+    <button class="opt">static &lt;T&gt; List&lt;? super T&gt; merge(List&lt;? super T&gt; a, List&lt;T&gt; b)</button>
+    <button class="opt">static List&lt;?&gt; merge(List&lt;?&gt; a, List&lt;?&gt; b) for any types</button>
+  </div>
+  <div class="why">Inputs are read, so <code>? extends T</code>; the return type has no wildcard, so callers get a plain <code>List&lt;T&gt;</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Explain <code>? extends</code> versus <code>? super</code>, and what type erasure is."</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Generics are invariant, so wildcards are needed for flexible parameters.</label></li>
+      <li><label><input type="checkbox"> <code>? extends T</code> for a parameter you read from (producer, "in"); you cannot add to it except <code>null</code>.</label></li>
+      <li><label><input type="checkbox"> <code>? super T</code> for a parameter you write into (consumer, "out"); reading gives <code>Object</code>.</label></li>
+      <li><label><input type="checkbox"> PECS, with an example like <code>Collections.copy(dest super, src extends)</code>; no wildcards in return types.</label></li>
+      <li><label><input type="checkbox"> Erasure: the compiler checks types, then replaces them with bounds or <code>Object</code> and inserts casts.</label></li>
+      <li><label><input type="checkbox"> Consequences: one runtime class, no <code>instanceof List&lt;String&gt;</code>, no generic arrays, no <code>new T()</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Because generics are invariant, a <code>List&lt;Number&gt;</code> parameter won't accept a <code>List&lt;Integer&gt;</code>, so we use wildcards. I ask one question: does my method read from this parameter or write into it? If it reads, it's a producer, and I use <code>? extends T</code>: for example <code>sum(List&lt;? extends Number&gt;)</code> accepts integers and doubles, but I can't add to it. If it writes, it's a consumer, and I use <code>? super T</code>: <code>fill(List&lt;? super Integer&gt;)</code> accepts a list of Integer, Number or Object. That's PECS, producer extends, consumer super, and <code>Collections.copy</code> is the classic example. I don't put wildcards in return types. Type erasure means the compiler checks the type arguments, then erases them to their bounds or Object and inserts casts. So at run time a <code>List&lt;String&gt;</code> and a <code>List&lt;Integer&gt;</code> are the same class, and I can't do <code>instanceof List&lt;String&gt;</code>, create a generic array, or call <code>new T()</code>."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0021-copy-with-wildcards.md">Exercise 0021: copy with wildcards</a></p>
+<p><a href="../exercises/0021-copy-with-wildcards.md">Exercise 0021: copy with wildcards</a>. Write the signature first and say which parameter is the producer and which the consumer.</p>
 <p>Runnable example: <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type Erasure</a>. Then 'Guidelines for Wildcard Use'.</p>
-<p><a href="0020-generics-basics-and-invariance.html">← Generics: why List of Integer is not List of Number</a> &nbsp;|&nbsp; <a href="0008-lambdas-and-functional-interfaces.html">JDK 8: lambdas, method references and functional interfaces →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer might ask: <em>"What is a bridge method? Why does <code>Collections.max</code> declare <code>T extends Object &amp; Comparable&lt;? super T&gt;</code>? How do frameworks like Jackson read generic types if they are erased?"</em> Try the <code>Collections.max</code> signature with PECS: <code>Comparable&lt;? super T&gt;</code> is a consumer of T.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a> Next, close the section with <a href="0040-review-fundamentals.html">Review 1</a>, then the collections section starts with <a href="0028-collections-framework-map.html">lesson 0028</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type Erasure</a>. Then "Guidelines for Wildcard Use".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Can you show me a bridge method in bytecode?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0020-generics-basics-and-invariance.html">← Why a List is not a List</a> &nbsp;|&nbsp; <a href="0040-review-fundamentals.html">Review 1: strings, exceptions and generics →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Java Tutorials: Wildcard guidelines</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type erasure</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java Tutorials (Generics trail) and the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Java Tutorials: Wildcard guidelines</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type erasure</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/unboundedWildcards.html">Java Tutorials: Unbounded wildcards</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Java Tutorials: Restrictions on generics</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

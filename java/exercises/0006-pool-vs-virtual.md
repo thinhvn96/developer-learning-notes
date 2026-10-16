@@ -1,5 +1,7 @@
 # Exercise 0006: pool vs virtual
 
+[Tiếng Việt](0006-pool-vs-virtual.vi.md)
+
 Companion to [lesson 6](../lessons/0006-virtual-threads.html).
 
 1. Copy `VirtualThreadsDemo.java` and replace the executor with `Executors.newFixedThreadPool(200)`. Predict the elapsed time first (10,000 tasks x 1 s / 200 threads).

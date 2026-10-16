@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 5: Dead letter exchange</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Dead letter exchange</h1>
+<p class="meta">RabbitMQ · Bài 0005 · bước 6/9 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-dead-letter-exchanges.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nêu được bốn lý do khiến một message bị dead-letter và cấu hình được DLX, ưu tiên dùng policy thay vì queue argument.</div>
+
+<h2>DLX là gì</h2>
+<p>Message trong một queue có thể bị "dead-letter", tức là "được publish lại tới một exchange" khi xảy ra một số sự kiện nhất định. Dead letter exchange chỉ là một exchange bình thường, thuộc kiểu nào cũng được.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+<h2>Bốn lý do</h2>
+<ol>
+<li>Bị từ chối mà không requeue: <code>basic.reject</code> hoặc <code>basic.nack</code> với <code>requeue=false</code> (hoặc outcome <code>rejected</code> của AMQP 1.0).</li>
+<li>Message hết hạn do per-message TTL.</li>
+<li>Message bị bỏ vì queue của nó vượt quá giới hạn độ dài.</li>
+<li>Message bị trả lại cho quorum queue nhiều lần hơn delivery limit.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></li>
+</ol>
+<h2>Cấu hình</h2>
+<p>Qua <strong>policy</strong> (<code>dead-letter-exchange</code>, tuỳ chọn thêm <code>dead-letter-routing-key</code>) hoặc qua queue argument (<code>x-dead-letter-exchange</code>). Tài liệu khuyên dùng policy: policy có thể đổi mà không cần deploy lại ứng dụng, còn argument hardcode thì phải xoá queue rồi khai báo lại.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+<pre><code>=== 3. dead-lettering: reject without requeue
+q.main depth: 0   q.dead depth: 1</code></pre>
+<p>Trong <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a>, một message <code>poison</code> bị reject đã rời <code>q.main</code> và tới <code>q.dead</code> qua <code>ex.dlx</code>. (Ví dụ dùng queue argument cho gọn; trên production nên dùng policy.)</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Đâu là một lý do khiến message bị dead-letter?</p>
+  <button>Consumer kết nối vào</button>
+  <button>Queue được khai báo</button>
+  <button data-correct>Reject với requeue false</button>
+  <button>Exchange được bind</button>
+  <p class="explain">basic.reject hoặc basic.nack với requeue=false sẽ dead-letter message.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. DLX là loại exchange nào?</p>
+  <button>Chỉ topic</button>
+  <button data-correct>Exchange thường bất kỳ</button>
+  <button>Chỉ một kiểu đặc biệt</button>
+  <button>Chỉ fanout</button>
+  <p class="explain">Dead letter exchange là exchange bình thường và có thể thuộc kiểu bất kỳ.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cách được khuyên dùng để cấu hình DLX?</p>
+  <button data-correct>Một policy</button>
+  <button>Publish lại thủ công</button>
+  <button>Queue argument</button>
+  <button>Một cron job</button>
+  <p class="explain">Policy có thể cập nhật mà không cần deploy lại ứng dụng.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message hết TTL. Chuyện gì có thể xảy ra?</p>
+  <button>Nó được ack</button>
+  <button>Nó bị mã hoá</button>
+  <button>Nó bị nhân bản</button>
+  <button data-correct>Nó bị dead-letter</button>
+  <p class="explain">Hết hạn per-message TTL là một trong các lý do dead-letter.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-retry-queue-with-ttl.vi.md">Bài tập 0005: retry queue dùng TTL</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a>. Đọc phần 'Dead Lettering' và phần cấu hình bằng policy.</p>
+<p><a href="0007-message-ttl.vi.html">← Message TTL: hết hạn theo queue và theo từng message</a> &nbsp;|&nbsp; <a href="0006-quorum-queues-and-poison-messages.vi.html">Quorum queue và poison message →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

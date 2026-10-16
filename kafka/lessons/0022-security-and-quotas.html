@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 22: Security and quotas</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Security and quotas</h1>
+<p class="meta">Kafka · Lesson 0022 · step 22 of 23 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0022-security-and-quotas.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> secure a Kafka cluster with TLS, SASL authentication and ACLs, and protect it from noisy clients with quotas.</div>
+
+<h2>Off by default</h2>
+<p>"Security is optional - non-secured clusters are supported."<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a> A fresh broker accepts anyone on its <code>PLAINTEXT</code> listener. Production needs three layers:<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a></p>
+<ul>
+<li><strong>Encryption in transit:</strong> SSL/TLS between clients and brokers (and between brokers). It costs CPU and disables zero-copy transfer.</li>
+<li><strong>Authentication:</strong> TLS client certificates or SASL mechanisms: GSSAPI (Kerberos), PLAIN, SCRAM-SHA-256/512, OAUTHBEARER. Typical pairs: <code>SASL_SSL</code> with SCRAM or OAUTHBEARER.</li>
+<li><strong>Authorization:</strong> ACLs on read/write operations, pluggable for external systems.</li>
+</ul>
+<h2>ACLs</h2>
+<p>In KRaft set <code>authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer</code> on all nodes.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a> An ACL reads: "Principal P is [Allowed|Denied] Operation O From Host H on any Resource R matching ResourcePattern RP".<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a> With an authorizer and no matching ACL, "only super users are allowed to access it" (unless you set <code>allow.everyone.if.no.acl.found=true</code>, which you should not).<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a></p>
+<pre><code>kafka-acls.sh --bootstrap-server localhost:9092 --add --allow-principal User:Bob --producer --topic Test-topic
+kafka-acls.sh --bootstrap-server localhost:9092 --add --allow-principal User:Bob --consumer --topic Test-topic --group Group-1</code></pre>
+<p>The consumer shortcut needs a group because consuming also requires access to the consumer group resource.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a> Grant per service, least privilege, prefixed topic patterns per team.</p>
+<h2>Quotas</h2>
+<p>In a shared cluster one bad client can saturate brokers. "Having quotas protects against these issues and is all the more important in large multi-tenant clusters."<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a> Two kinds: network bandwidth (bytes/sec) and request rate (percentage of request-handler thread time), applied per user, per client-id or both; brokers throttle clients that exceed them.<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a> "By default, clients receive an unlimited quota."<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+<pre><code>kafka-configs.sh --bootstrap-server localhost:9092 --alter \
+  --add-config 'producer_byte_rate=1024,consumer_byte_rate=2048,request_percentage=200' \
+  --entity-type users --entity-name user1</code></pre>
+<div class="aside">Interview answer: "SASL_SSL listeners, SCRAM or OAuth per service principal, StandardAuthorizer with least-privilege ACLs and no allow-everyone fallback, quotas per user in multi-tenant clusters, and secured JMX."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Is Kafka security on by default?</p>
+  <button>Only SASL is on</button>
+  <button>Only ACLs are on</button>
+  <button data-correct>No, it is optional</button>
+  <button>Yes, TLS always</button>
+  <p class="explain">Security is optional; non-secured clusters are supported.<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Authorizer on, no matching ACL. Who gets access?</p>
+  <button>Only producers</button>
+  <button>Only localhost</button>
+  <button data-correct>Only super users</button>
+  <button>Everyone allowed</button>
+  <p class="explain">Without ACLs only super users can access the resource.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Default client quota?</p>
+  <button>Half a thread</button>
+  <button>Ten requests</button>
+  <button data-correct>Unlimited</button>
+  <button>One MB per sec</button>
+  <p class="explain">By default clients receive an unlimited quota.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which SASL mechanism uses Kerberos?</p>
+  <button>PLAIN</button>
+  <button>OAUTHBEARER</button>
+  <button data-correct>GSSAPI</button>
+  <button>SCRAM-SHA-512</button>
+  <p class="explain">GSSAPI is the Kerberos mechanism.<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0022-lock-down-a-cluster.md">Exercise 0022: lock down a cluster</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/security/authorization-and-acls/">Kafka Security: Authorization and ACLs</a>. Read the ACL concepts and the kafka-acls.sh examples; then the Security overview.</p>
+<p><a href="0021-share-groups.html">← Share groups: queues for Kafka</a> &nbsp;|&nbsp; <a href="0023-multi-cluster-and-tiered-storage.html">Multi-cluster replication and tiered storage →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/security/security-overview/">Kafka Security: Overview</a> · [2] <a href="https://kafka.apache.org/43/security/authorization-and-acls/">Kafka Security: Authorization and ACLs</a> · [3] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a> · [4] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

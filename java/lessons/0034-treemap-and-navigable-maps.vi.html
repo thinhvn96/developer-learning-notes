@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 34: TreeMap và NavigableMap: truy vấn khoảng và key gần nhất</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>TreeMap và NavigableMap: truy vấn khoảng và key gần nhất</h1>
+<p class="subtitle">Khi "tìm đúng key này" là chưa đủ: tìm key gần nhất, hoặc mọi key nằm giữa hai giá trị, trong O(log n).</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0034 · bước 16/46 · Advanced · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0034-treemap-and-navigable-maps.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Hệ thống thật hay hỏi những câu như <em>"đơn hàng 230.000 thì áp phí ship nào?"</em> hay <em>"những event nào xảy ra giữa phút 10 và phút 40?"</em>. HashMap không trả lời được. Người phỏng vấn dùng chính những câu này để xem bạn có biết <code>TreeMap</code> và các method <code>floor</code>/<code>ceiling</code>/<code>subMap</code> không.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải bài 'tìm bậc phí', 'event tiếp theo sau thời điểm T' và 'các event trong một khung' bằng <code>floorEntry</code>, <code>ceilingEntry</code> và <code>subMap</code> trong O(log n), và giải thích khi nào chọn TreeMap thay vì HashMap.</div>
+
+<dl class="words">
+  <dt>sorted map</dt><dd>Một map luôn giữ key theo thứ tự, nhỏ trước, như các từ trong từ điển.</dd>
+  <dt>interface</dt><dd>Một danh sách method mà class hứa sẽ có. <code>NavigableMap</code> là interface; <code>TreeMap</code> là class cung cấp nó.</dd>
+  <dt>cây nhị phân tìm kiếm</dt><dd>Các node nối nhau như cây gia phả: mọi thứ bên trái một node thì nhỏ hơn, bên phải thì lớn hơn.</dd>
+  <dt>cây đỏ-đen</dt><dd>Một cây nhị phân tìm kiếm tự cân bằng lại sau mỗi lần thêm hoặc xóa, nên không bao giờ thành một chuỗi dài và chậm.</dd>
+  <dt>O(log n)</dt><dd>Đọc là "O log n": map lớn gấp đôi thì chỉ thêm một bước. Một triệu key cần khoảng 20 bước.</dd>
+  <dt>view</dt><dd>Một collection không có bản sao riêng; nó hiển thị một phần của collection khác, theo thời gian thực (bạn đã gặp ở bài 0032).</dd>
+  <dt>floor / ceiling</dt><dd>Giống làm tròn: floor là key gần nhất bằng hoặc dưới một giá trị, ceiling là key gần nhất bằng hoặc trên nó.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói to bạn sẽ giải bài này thế nào với những công cụ đã biết: <em>"Phí: đơn từ 0 tốn 30.000, từ 200.000 tốn 15.000, từ 500.000 thì miễn phí. Đơn 499.999 tốn phí bao nhiêu?"</em> <code>HashMap</code> có giúp được không? Giữ câu trả lời lại; bạn sẽ gặp lời giải một dòng ở phần 2.</p>
+
+<h2>1. Hình ảnh: một kệ sách có thứ tự và một thủ thư giỏi</h2>
+<p><code>HashMap</code> giống một bức tường hộp thư: tìm đúng một cái tên ngay lập tức, nhưng không biết tên nào đứng "kế tiếp". <code>TreeMap</code> giống một kệ thư viện sắp theo số, với một thủ thư biết nhảy vào giữa, quyết định "trái hay phải?", và chia đôi phạm vi tìm mỗi lần.</p>
+<p>Javadoc mô tả nó là "một cài đặt NavigableMap dựa trên cây đỏ-đen" với "chi phí log(n) được đảm bảo cho các thao tác containsKey, get, put và remove".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a> Key được giữ theo thứ tự tự nhiên (<code>Comparable</code>) hoặc theo <code>Comparator</code> bạn truyền vào.</p>
+
+<figure>
+<svg viewBox="0 0 680 280" role="img" aria-label="Một cây tìm kiếm cân bằng với các key 5, 12, 20, 33, 47, 58. Để tìm ceiling của 21, việc tìm đi qua 20, sang phải tới 47, sang trái tới 33, là đáp án.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <path d="M318 62L190 122"/>
+      <path d="M170 152L110 212"/>
+      <path d="M210 152L250 212"/>
+      <path d="M548 152L590 212"/>
+    </g>
+    <g fill="none" stroke="var(--accent)" stroke-width="2">
+      <path d="M362 62L490 122"/>
+      <path d="M510 152L450 212"/>
+    </g>
+    <circle cx="340" cy="50" r="22" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <circle cx="190" cy="138" r="22" fill="none" stroke="currentColor"/>
+    <circle cx="530" cy="138" r="22" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <circle cx="110" cy="226" r="22" fill="none" stroke="currentColor"/>
+    <circle cx="450" cy="226" r="22" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+    <circle cx="590" cy="226" r="22" fill="none" stroke="currentColor"/>
+    <text x="340" y="55" text-anchor="middle">20</text>
+    <text x="190" y="143" text-anchor="middle">12</text>
+    <text x="530" y="143" text-anchor="middle">47</text>
+    <text x="110" y="231" text-anchor="middle">5</text>
+    <text x="450" y="231" text-anchor="middle" fill="var(--accent)">33</text>
+    <text x="590" y="231" text-anchor="middle">58</text>
+    <g font-size="11">
+      <text x="420" y="80" fill="var(--accent)">21 &gt; 20 → phải</text>
+      <text x="360" y="180" fill="var(--accent)">21 &lt; 47 → trái</text>
+      <text x="290" y="262" fill="var(--accent)">33 ≥ 21, không còn ứng viên nhỏ hơn → 33</text>
+      <text x="40" y="30" opacity=".75">key nhỏ hơn sang trái,</text>
+      <text x="40" y="46" opacity=".75">key lớn hơn sang phải</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Hình đơn giản hóa của một TreeMap có sáu key. <code>ceilingKey(21)</code> chỉ ghé ba node: 20, 47, 33. Các quy tắc đỏ-đen giữ cây luôn thấp như vậy dù bạn chèn theo thứ tự nào.</figcaption>
+</figure>
+
+<p>Vì cây luôn cân bằng, đường đi từ gốc tới bất kỳ key nào đều ngắn: khoảng log<sub>2</sub>(n) bước. Vì thế TreeMap hứa O(log n) cho <code>get</code> và <code>put</code>, còn HashMap hứa O(1) trung bình. TreeMap chậm hơn với tra cứu đúng key, nhưng làm được điều HashMap không làm được: <strong>trả lời câu hỏi về thứ tự</strong>.</p>
+<p>Sắp xếp đi kèm hai quy tắc. Comparator phải consistent with equals, vì map coi hai key so sánh ra 0 là cùng một key ("hai key được phương thức này coi là bằng nhau thì, từ góc nhìn của sorted map, là bằng nhau"<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a>; xem <a href="0031-comparable-comparator-and-ordering.vi.html">bài 0031</a>). Và key <code>null</code> ném <code>NullPointerException</code> khi dùng thứ tự tự nhiên, vì không thể so sánh <code>null</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a></p>
+
+<h2>2. Câu hỏi key gần nhất: floor, ceiling, lower, higher</h2>
+<p>Giá trị thật của TreeMap nằm ở interface <code>NavigableMap</code>: "các method điều hướng trả về kết quả khớp gần nhất với mục tiêu tìm kiếm".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util summary</a> Hãy nghĩ tới một trục số có đánh dấu các key. Bạn đứng ở một giá trị và hỏi "key gần nhất bên trái, hoặc bên phải tôi là gì?"</p>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Các key 5, 12, 20, 33, 47, 58 trên trục số. Đứng ở 20: floor là 20, lower là 12, ceiling là 20, higher là 33. Đứng ở 21: floor 20 và ceiling 33.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <path d="M30 90H650" stroke="currentColor" fill="none"/>
+    <g fill="currentColor">
+      <circle cx="70" cy="90" r="5"/><circle cx="160" cy="90" r="5"/><circle cx="260" cy="90" r="5"/>
+      <circle cx="420" cy="90" r="5"/><circle cx="530" cy="90" r="5"/><circle cx="620" cy="90" r="5"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="70" y="115">5</text><text x="160" y="115">12</text><text x="260" y="115">20</text>
+      <text x="420" y="115">33</text><text x="530" y="115">47</text><text x="620" y="115">58</text>
+    </g>
+    <path d="M300 40v40" stroke="var(--accent)" stroke-width="2" fill="none"/>
+    <text x="300" y="32" text-anchor="middle" fill="var(--accent)">truy vấn 21</text>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5">
+      <path d="M296 60H268M274 55l-6 5 6 5"/>
+      <path d="M304 60H410M404 55l6 5-6 5"/>
+    </g>
+    <text x="230" y="52" text-anchor="end" font-size="11" fill="var(--accent)">floor(21) = lower(21) = 20</text>
+    <text x="430" y="52" font-size="11" fill="var(--accent)">ceiling(21) = higher(21) = 33</text>
+    <rect x="30" y="140" width="620" height="54" rx="6" fill="none" stroke="currentColor" opacity=".6"/>
+    <text x="45" y="162" font-size="11">truy vấn 20 (một key có sẵn):</text>
+    <text x="45" y="182" font-size="11">floor = ceiling = 20   lower = 12 (nhỏ hơn hẳn)   higher = 33 (lớn hơn hẳn)</text>
+  </g>
+</svg>
+<figcaption>Floor và ceiling có thể trả về chính key đó; lower và higher thì không bao giờ. Cả bốn trả về <code>null</code> khi không có key như vậy.</figcaption>
+</figure>
+
+<table>
+<tr><th>Method</th><th>Trả về<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a></th></tr>
+<tr><td><code>floorKey(k)</code> / <code>floorEntry(k)</code></td><td>key lớn nhất ≤ k</td></tr>
+<tr><td><code>ceilingKey(k)</code> / <code>ceilingEntry(k)</code></td><td>key nhỏ nhất ≥ k</td></tr>
+<tr><td><code>lowerKey(k)</code> / <code>higherKey(k)</code></td><td>nhỏ hơn hẳn k / lớn hơn hẳn k</td></tr>
+<tr><td><code>headMap(to)</code>, <code>tailMap(from)</code>, <code>subMap(from, to)</code></td><td>view: &lt; to, ≥ from, [from, to)</td></tr>
+<tr><td><code>firstEntry()</code>, <code>pollFirstEntry()</code>, <code>descendingMap()</code></td><td>nhỏ nhất, lấy ra nhỏ nhất, view đảo ngược</td></tr>
+</table>
+
+<h3>Lần theo: bậc phí ship</h3>
+<p>Đây là bài ở phần "Trước khi bắt đầu" trong một dòng. Mỗi key là <em>điểm bắt đầu</em> của một bậc; bậc đúng là điểm bắt đầu lớn nhất ≤ tổng đơn hàng, chính là <code>floorEntry</code>.</p>
+<pre><code>NavigableMap&lt;Integer, Integer&gt; feeFrom =
+    new TreeMap&lt;&gt;(Map.of(0, 30_000, 200_000, 15_000, 500_000, 0));
+int fee = feeFrom.floorEntry(499_999).getValue();
+<span class="c">Step 1  The keys are kept sorted: 0, 200,000, 500,000</span>
+<span class="c">Step 2  floorEntry(499,999) looks for the greatest key ≤ 499,999</span>
+<span class="c">Step 3  500,000 is too big; 200,000 fits → entry 200,000 = 15,000</span>
+<span class="c">Step 4  getValue() → </span><span class="hl">15,000</span></code></pre>
+<p>Không có TreeMap, "tìm bậc cho số tiền này" thành một list đã sắp xếp cộng binary search, hoặc một vòng lặp qua mọi bậc. Thêm bậc mới chỉ là một lần <code>put</code>; thứ tự tự lo phần còn lại.</p>
+
+<h2>3. Khoảng là view sống</h2>
+<p>Hãy tưởng tượng một ô cửa khoét vào một kệ sách dài: qua đó bạn chỉ thấy sách từ 10 đến 39. Nếu ai đó nhét cuốn 15 mới lên kệ, nó hiện ngay trong ô cửa của bạn. <code>subMap</code>, <code>headMap</code> và <code>tailMap</code> chính là những ô cửa như thế: view, không phải bản sao.</p>
+<pre><code>TreeMap&lt;Integer, String&gt; events = ...;     <span class="c">// minutes 5, 12, 20, 33, 47, 58</span>
+SortedMap&lt;Integer, String&gt; window = events.subMap(10, 40);   <span class="c">// [10, 40)</span>
+events.put(15, "late");                    <span class="c">// added to the map, not the window</span>
+System.out.println(window);                <span class="hl">// shows 15 too</span></code></pre>
+<p>Lần chạy dưới đây cho thấy cả ba bài toán thật của bài này: bậc phí, event tiếp theo sau một thời điểm, và khung thời gian.</p>
+<pre><code>$ java java/examples/collections/NavigableMaps.java
+total    50,000 -&gt; fee 30,000                         <span class="c">// floorEntry: tier lookup</span>
+total   200,000 -&gt; fee 15,000
+total   499,999 -&gt; fee 15,000
+total 1,200,000 -&gt; fee      0
+first at/after 21: 33=e33                             <span class="c">// ceilingEntry: next event</span>
+last before 20   : 12=e12                             <span class="c">// lowerEntry</span>
+subMap [10,40)   : {12=e12, 20=e20, 33=e33}
+after put(15)    : {12=e12, 15=late, 20=e20, 33=e33}  <span class="c">// views are live</span>
+descending       : [58, 47, 33, 20, 15, 12, 5]
+pollFirstEntry   : 5=e5 -&gt; [12, 15, 20, 33, 47, 58]
+leaderboard      : [an=95, lan=90, minh=90]
+TreeMap null key : NullPointerException</code></pre>
+<p>Ba chi tiết người phỏng vấn thích:</p>
+<ul>
+<li><strong>Hai đầu:</strong> <code>subMap(from, to)</code> bao gồm <code>from</code> và loại trừ <code>to</code>. <code>headMap(toKey)</code> là "nhỏ hơn hẳn toKey" và <code>tailMap(fromKey)</code> là "lớn hơn hoặc bằng fromKey"; các overload có <code>boolean inclusive</code> cho bạn tự chọn.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a></li>
+<li><strong>Ghi ra ngoài ô cửa sẽ lỗi:</strong> "Map trả về sẽ ném IllegalArgumentException khi cố chèn một key nằm ngoài phạm vi của nó."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a></li>
+<li><strong>Entry là snapshot:</strong> entry từ <code>floorEntry</code>, <code>firstEntry</code>, <code>pollFirstEntry</code> và các method tương tự "là snapshot của các mapping tại thời điểm gọi" và không hỗ trợ <code>setValue</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a> Muốn đổi value thì dùng <code>put</code>.</li>
+</ul>
+
+<h2>4. Các cái bẫy</h2>
+<h3>Bẫy 1: comparator có trường hợp hòa</h3>
+<p>Bảng xếp hạng trong lần chạy sắp người chơi theo điểm, cao trước. Lan và Minh đều có 90. Nếu comparator dừng ở điểm số, họ sẽ so sánh ra 0 và sorted set chỉ giữ một người, một cách âm thầm. Ví dụ đã thêm tiêu chí phụ:</p>
+<pre><code>Comparator.comparingInt(Player::score).reversed()
+          .thenComparing(Player::name)      <span class="c">// without this line, minh disappears</span></code></pre>
+<h3>Bẫy 2: <code>floorEntry</code> có thể trả về null</h3>
+<p>Nếu không có key nào ≤ giá trị của bạn, bạn nhận <code>null</code>, và <code>floorEntry(x).getValue()</code> ném <code>NullPointerException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a> Bảng phí ở trên an toàn vì nó bắt đầu từ key 0; nhưng một tổng âm vẫn làm nó lỗi. Hãy kiểm tra <code>null</code>, hoặc đảm bảo key nhỏ nhất bao phủ mọi đầu vào.</p>
+<h3>Bẫy 3: dùng chung giữa các thread</h3>
+<p>"Lưu ý rằng cài đặt này không được synchronized", và iterator của nó là fail-fast.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a> Với sorted map mà nhiều thread dùng, xem phần 5.</p>
+
+<h2>5. HashMap, TreeMap hay ConcurrentSkipListMap?</h2>
+<ul>
+<li>Chỉ tra cứu đúng key: <code>HashMap</code>, O(1) kỳ vọng.</li>
+<li>Duyệt có thứ tự, khoảng, key gần nhất: <code>TreeMap</code>, O(log n) được đảm bảo.</li>
+<li>Như trên, nhưng nhiều thread dùng chung: <code>ConcurrentSkipListMap</code>, "trung bình kỳ vọng log(n)" và iterator weakly consistent.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentSkipListMap.html">ConcurrentSkipListMap javadoc</a> Bạn sẽ gặp lại nó ở <a href="0039-concurrent-collections.vi.html">bài 0039</a>.</li>
+</ul>
+<p><strong>JDK 8, 17 và 21.</strong> Mọi thứ ở trên chạy giống nhau trên 8, 17 và 21. Trên JDK 21, TreeMap còn implement <code>SequencedMap</code> (<a href="0016-sequenced-collections.vi.html">bài 0016</a>), nhưng <code>putFirst</code> và <code>putLast</code> của nó ném <code>UnsupportedOperationException</code>: "Thứ tự duyệt của các mapping do phương thức so sánh quyết định; vì vậy không hỗ trợ đặt vị trí một cách tường minh."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a></p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">TreeMap hứa gì cho <code>get</code> và <code>put</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Thời gian log(n) được đảm bảo</button>
+    <button class="opt">Thời gian hằng số khấu hao</button>
+    <button class="opt">Thời gian hằng số trung bình</button>
+    <button class="opt">Thời gian tuyến tính theo size</button>
+  </div>
+  <div class="why">TreeMap đảm bảo log(n) cho containsKey, get, put và remove, vì cây đỏ-đen của nó luôn cân bằng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Các key là 5, 12, 20, 33. <code>floorKey(21)</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>20</button>
+    <button class="opt">33</button>
+    <button class="opt">12</button>
+    <button class="opt">null</button>
+  </div>
+  <div class="why">floorKey trả về key lớn nhất ≤ key đưa vào. 20 ≤ 21, còn 33 thì quá lớn.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Các key là 5, 12, 20, 33. <code>lowerKey(20)</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>12</button>
+    <button class="opt">20</button>
+    <button class="opt">33</button>
+    <button class="opt">5</button>
+  </div>
+  <div class="why">lower nghĩa là nhỏ hơn hẳn, nên bản thân 20 không tính. floorKey(20) mới trả về 20.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>subMap(10, 40)</code> có bao gồm key 40 không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, đầu cuối bị loại trừ</button>
+    <button class="opt">Có, cả hai đầu đều bao gồm</button>
+    <button class="opt">Chỉ khi 40 là key cuối cùng</button>
+    <button class="opt">Ném lỗi vì 40 là đầu cuối</button>
+  </div>
+  <div class="why">subMap(from, to) đi từ bao gồm tới loại trừ. Overload có boolean cho phép bao gồm đầu cuối.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn lấy <code>w = map.subMap(10, 40)</code>, rồi gọi <code>map.put(15, "x")</code>. <code>w</code> hiển thị gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Có key 15, vì nó là một view sống</button>
+    <button class="opt">Không có 15, vì nó là một bản sao</button>
+    <button class="opt">Ném ConcurrentModificationException</button>
+    <button class="opt">Chỉ có 15 sau khi bạn gọi w.size()</button>
+  </div>
+  <div class="why">subMap, headMap và tailMap là view dựa trên map. Lần chạy cho thấy event muộn 15 xuất hiện trong khung.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một <code>TreeSet</code> bảng xếp hạng chỉ sắp theo điểm. Hai người chơi cùng 90 điểm. Bug là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một người bị bỏ mất, vì hai người so ra 0</button>
+    <button class="opt">Cả hai được giữ nhưng mỗi lần một thứ tự khác</button>
+    <button class="opt">Lần add thứ hai ném IllegalArgumentException</button>
+    <button class="opt">Không có bug; TreeSet gọi equals khi hòa điểm</button>
+  </div>
+  <div class="why">Collection có thứ tự xét trùng bằng comparator. Thêm <code>.thenComparing(Player::name)</code> làm tiêu chí phụ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn chọn map nào cho một sorted map được nhiều thread dùng chung?</p>
+  <div class="options">
+    <button class="opt" data-correct>ConcurrentSkipListMap</button>
+    <button class="opt">ConcurrentHashMap</button>
+    <button class="opt">Một TreeMap thường</button>
+    <button class="opt">LinkedHashMap</button>
+  </div>
+  <div class="why">ConcurrentSkipListMap là một NavigableMap concurrent với chi phí trung bình kỳ vọng log(n). ConcurrentHashMap không có thứ tự; TreeMap không synchronized.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Khi nào bạn dùng TreeMap thay vì HashMap? Cho một ví dụ."</strong> Bấm giờ. Trả lời thành tiếng, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> TreeMap là cây đỏ-đen; key luôn có thứ tự.</label></li>
+      <li><label><input type="checkbox"> O(log n) được đảm bảo, so với O(1) trung bình của HashMap.</label></li>
+      <li><label><input type="checkbox"> Dùng khi cần thứ tự: duyệt có thứ tự, key gần nhất, khoảng.</label></li>
+      <li><label><input type="checkbox"> Nêu tên method: <code>floorEntry</code>/<code>ceilingEntry</code> và <code>subMap</code>/<code>headMap</code>/<code>tailMap</code> (view sống).</label></li>
+      <li><label><input type="checkbox"> Một ví dụ cụ thể: bậc phí với <code>floorEntry</code>, hoặc event trong một khung thời gian.</label></li>
+      <li><label><input type="checkbox"> Comparator quyết định bằng nhau: thêm tiêu chí phụ; không có key null với thứ tự tự nhiên.</label></li>
+      <li><label><input type="checkbox"> Nhiều thread: <code>ConcurrentSkipListMap</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"HashMap là lựa chọn mặc định cho tra cứu đúng key: O(1) trung bình, nhưng không có thứ tự. TreeMap là cây đỏ-đen, nên key luôn được sắp xếp và mỗi lần get hay put là O(log n), được đảm bảo. Em chọn nó khi câu hỏi liên quan tới thứ tự. Ví dụ bậc phí ship: em đặt điểm bắt đầu mỗi bậc làm key, và floorEntry của tổng đơn hàng cho ra đúng bậc trong một lần gọi. Hoặc time series: ceilingEntry cho event tiếp theo sau một thời điểm, còn subMap cho mọi event trong một khung. Các method khoảng này trả về view sống, không phải bản sao. Hai lưu ý: comparator quyết định thế nào là cùng key, nên em luôn thêm tiêu chí phụ; và TreeMap không thread-safe, nên sorted map dùng chung thì em dùng ConcurrentSkipListMap."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0034-price-tiers-and-windows.vi.md">Bài tập 0034: bậc giá và khung thời gian</a>. Đoán trước từng đáp án rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/NavigableMaps.java"><code>NavigableMaps.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi tiếp: <em>"Bạn chỉ cần phần tử nhỏ nhất mỗi lần, không cần cả thứ tự. TreeMap còn là công cụ đúng không? Làm sao giữ top 10 trong một triệu số?"</em> Đó là việc của heap: <a href="0035-priorityqueue-and-top-k.vi.html">bài 0035</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap Javadoc (JDK 21)</a>. Đọc phần mô tả class, rồi bảng tóm tắt method của NavigableMap.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao cây cân bằng lại là O(log n)?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0042-review-collections-core.vi.html">← Ôn tập 3: HashMap bên trong, thứ tự và tính bất biến</a> &nbsp;|&nbsp; <a href="0035-priorityqueue-and-top-k.vi.html">PriorityQueue, heap và bài toán top-K →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentSkipListMap.html">ConcurrentSkipListMap Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

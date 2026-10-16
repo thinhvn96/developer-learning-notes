@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn Docker</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Docker: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Docker · 11 câu hỏi · <a href="index.vi.html">Lộ trình Docker</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi Docker cho buổi phỏng vấn Senior backend, có góc nhìn riêng cho Java (image, memory của JVM, hardening).</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Container khác máy ảo (virtual machine) ở điểm nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> container là các process được cô lập và dùng chung kernel của host; còn mỗi VM chạy nguyên một guest OS.</p>
+<p>Container là một process được cô lập, chạy một thành phần của ứng dụng trong môi trường riêng mà không ảnh hưởng tới host hay các container khác. Nó "nhẹ hơn máy ảo vì nhiều container dùng chung một kernel thay vì mỗi cái cần nguyên một hệ điều hành", và mang đi chạy được trên máy dev, data center lẫn cloud.<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">[1]</a> Điểm đánh đổi (trade-off) bạn nên chủ động nêu ra: dùng chung kernel nghĩa là mức cô lập yếu hơn ranh giới của hypervisor, và container cần một kernel tương thích (trade-off này ai cũng biết, nhưng không được viết rõ trong các trang tài liệu tôi đã đọc).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Có chạy được Linux container trên Windows không? (Trả lời từ kinh nghiệm của bạn; thông thường bên dưới có một Linux VM. Các nguồn đã đọc ở đây không đề cập.)</div>
+<p class="see">Học bài: <a href="lessons/0001-containers-images-layers.vi.html">Container, image và layer</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Image khác container thế nào? Layer là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> image là một gói bất biến; container là một instance đang chạy; layer là các thay đổi trên file system tạo nên image.</p>
+<p>"Container image là một gói chuẩn hóa chứa tất cả file, binary, library và cấu hình cần để chạy một container." Image là bất biến: đã tạo thì không sửa được, chỉ có thể mở rộng bằng cách tạo image mới hoặc thêm thay đổi lên trên. "Container image được tạo thành từ các layer. Mỗi layer là một tập thay đổi trên file system: thêm, xóa hoặc sửa file."<a class="cite" href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">[3]</a> Dữ liệu ghi trong một container đang chạy không làm thay đổi image; đó là lý do bạn dùng volume cho dữ liệu cần lưu lâu dài.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vậy dữ liệu của database nên nằm ở đâu? (Trong một volume; Compose mô hình hóa điều này một cách tường minh.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[2]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0001-containers-images-layers.vi.html">Container, image và layer</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Làm sao để Docker build nhanh?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> sắp xếp các lệnh trong Dockerfile để các layer ít thay đổi nằm trước, và dùng <code>.dockerignore</code>.</p>
+<p>Mỗi lệnh trở thành một layer, và "nếu một layer thay đổi, mọi layer đứng sau nó cũng bị ảnh hưởng."<a class="cite" href="https://docs.docker.com/build/cache/">[5]</a> Vì vậy hãy copy file mô tả dependency và cài dependency <em>trước</em> khi copy source; khi đó sửa source chỉ làm mất hiệu lực các layer từ <code>COPY src/</code> trở đi. <code>.dockerignore</code> giữ các file không liên quan nằm ngoài build context và các layer.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a> (Cách sắp xếp này là hệ quả trực tiếp của quy tắc invalidation cache.)</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao ép build sạch từ đầu? (Best practices của Docker nhắc tới việc kết hợp <code>--pull</code> và <code>--no-cache</code>.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0002-layer-cache-and-dockerfile-order.vi.html">Layer cache</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Multi-stage build là gì và dùng nó cho ứng dụng Java thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> compile trong một stage có JDK, rồi chỉ copy artifact sang một stage runtime nhỏ hơn.</p>
+<p>Multi-stage build "tách bạch rõ ràng hơn giữa quá trình build image và đầu ra cuối cùng." Đặt tên stage bằng <code>AS</code>, copy bằng <code>COPY --from=build</code>, dừng ở một stage bằng <code>docker build --target</code>.<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[6]</a><a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a> Trong ví dụ tôi đo, image single-stage dùng JDK nặng 475 MB, còn image multi-stage dựa trên JRE là 318 MB. Nói thêm: <code>USER</code> non-root, <code>CMD</code> dạng exec form, base image được pin phiên bản.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Debug một stage trung gian bị lỗi thế nào? (<code>--target</code>.)</div>
+<p class="see">Học bài: <a href="lessons/0003-multi-stage-java-image.vi.html">Image multi-stage cho Java</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Container Java của bạn bị OOM-kill. Bạn điều tra và xử lý thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> so sánh giới hạn memory của container với heap cộng non-heap; chủ động đặt kích thước heap.</p>
+<p>Flag <code>--memory</code> là "lượng memory tối đa container được dùng"; vượt quá nó, cơ chế xử lý out-of-memory của kernel bắt đầu kill process.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[7]</a> Trên Linux, JVM mặc định phát hiện giới hạn của container và tính kích thước heap dựa trên đó; <code>MaxRAMPercentage</code> mặc định là 25 phần trăm (và 50 phần trăm cho heap nhỏ thông qua <code>MinRAMPercentage</code>).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[8]</a> Khi tôi chạy thử, giới hạn 256 MB cho max heap 121 MB; với <code>MaxRAMPercentage=75</code> thì là 185 MB. Heap không phải toàn bộ footprint: metaspace, thread stack, direct buffer và code cache cũng cộng thêm vào, nên cho heap 100 phần trăm là tự rước OOM kill. Các bước: kiểm tra giới hạn, bật log <code>-Xlog:os+container=trace</code>, đặt <code>MaxRAMPercentage</code> khoảng 60 đến 75, đo mức dùng thực tế, và tăng giới hạn nếu cần.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Giới hạn <code>--cpus</code> ảnh hưởng gì tới JVM? (JVM thấy số CPU đã bị giới hạn; khi tôi chạy với --cpus=1 thì nó báo 1 processor.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[7]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0005-memory-cpu-limits-and-the-jvm.vi.html">Giới hạn memory và CPU</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Bạn áp dụng những cách hardening Dockerfile nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> pin theo digest, user non-root, CMD dạng exec form, base image tối giản và tin cậy, mỗi container một nhiệm vụ.</p>
+<p>Theo best practices của Docker: dùng base image tối giản và tin cậy; pin base image theo digest vì tag có thể thay đổi, không đảm bảo lần build nào cũng ra cùng một image; nếu service chạy được mà không cần đặc quyền thì dùng <code>USER</code>; tránh <code>sudo</code>; dùng exec form cho <code>CMD</code>/<code>ENTRYPOINT</code> để signal được xử lý đúng khi chạy với vai trò PID 1; tách rời các ứng dụng, mỗi container một nhiệm vụ; dùng <code>.dockerignore</code>.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao exec form quan trọng với việc tắt ứng dụng Java? (Với shell form, shell là PID 1; tài liệu khuyên dùng exec form để xử lý signal, nhờ đó JVM nhận được SIGTERM và chạy các shutdown hook. Hãy kiểm chứng bằng thực nghiệm như bài tập gợi ý.)</div>
+<p class="see">Học bài: <a href="lessons/0006-pinning-nonroot-and-signals.vi.html">Image được pin, non-root, xử lý signal đúng</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Giải thích Docker Compose. Làm sao để ứng dụng đợi database sẵn sàng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một file YAML khai báo service, network và volume; dùng health check kết hợp <code>depends_on: condition: service_healthy</code>.</p>
+<p>File Compose cấu hình các service của một ứng dụng, và chỉ một lệnh CLI là tạo và start tất cả. Một service là cùng một image và cấu hình được chạy một hoặc nhiều lần; các service nói chuyện với nhau qua network và lưu dữ liệu lâu dài trong volume.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[2]</a> Container đã start chưa chắc đã sẵn sàng, nên hãy định nghĩa <code>healthcheck</code> cho database và cho ứng dụng <code>depends_on</code> nó với <code>service_healthy</code>. Ví dụ của tôi làm đúng như vậy với <code>pg_isready</code>, và client chỉ được start khi database đã healthy.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Compose hay Kubernetes? (Compose cho dev local và các trường hợp đơn giản trên một host; Kubernetes khi cần lập lịch trên cluster, tự phục hồi và rollout.)</div>
+<p class="see">Học bài: <a href="lessons/0004-compose-app-and-database.vi.html">Compose</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>CMD khác ENTRYPOINT thế nào? <code>docker run image args</code> thay thế cái gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> ENTRYPOINT là chương trình thực thi, CMD là các tham số mặc định của nó; tham số truyền vào <code>docker run</code> chỉ thay thế CMD.</p>
+<p>Chỉ CMD cuối cùng có hiệu lực; CMD cung cấp giá trị mặc định cho ENTRYPOINT hoặc tự chạy một mình; khi ENTRYPOINT và CMD đều ở exec form thì CMD được nối vào làm tham số; ENTRYPOINT ở shell form sẽ bỏ qua CMD và chạy qua <code>/bin/sh -c</code>. Nên ưu tiên exec form (không có shell, xử lý signal đúng).<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[9]</a><a class="cite" href="https://docs.docker.com/build/building/best-practices/">[4]</a> Demo của tôi: <code>docker run lesson-entry</code> in ra "hello world", <code>docker run lesson-entry Docker</code> in ra "hello Docker", và <code>--entrypoint printenv</code> thay thế luôn chương trình thực thi.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> ENV khác ARG thế nào? (ARG chỉ tồn tại lúc build; ENV được giữ lại trong image và container; tôi đã xác nhận BUILD_ID không có giá trị lúc runtime.)</div>
+<p class="see">Học bài: <a href="lessons/0009-cmd-entrypoint-and-exec-form.vi.html">CMD và ENTRYPOINT</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Làm sao lưu giữ dữ liệu của container? Volume khác bind mount thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> volume cho dữ liệu lâu dài do Docker quản lý; bind mount để chia sẻ file của host, chủ yếu khi dev.</p>
+<p>Nội dung của volume "tồn tại bên ngoài vòng đời của một container cụ thể"; không có volume thì writable layer bị hủy cùng container. Volume do Docker quản lý; bind mount gắn một đường dẫn trên host và "gắn chặt với host"; thêm <code>readonly</code> để bảo vệ file của host.<a class="cite" href="https://docs.docker.com/engine/storage/volumes/">[10]</a><a class="cite" href="https://docs.docker.com/engine/storage/bind-mounts/">[11]</a> Kết quả tôi chạy: dữ liệu không nằm trong volume thì mất khi tạo container mới; named volume giữ được dữ liệu; bind mount read-only từ chối thao tác ghi.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> File của database nên nằm ở đâu? (Trong một named volume, như ví dụ Compose.)</div>
+<p class="see">Học bài: <a href="lessons/0010-volumes-and-bind-mounts.vi.html">Volume và bind mount</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Vì sao các container gọi nhau được bằng tên trên network này mà không được trên network khác? <code>-p</code> làm gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> user-defined bridge có sẵn DNS theo tên container; default bridge thì không; <code>-p</code> publish một port của container ra host.</p>
+<p>User-defined bridge cung cấp phân giải DNS tự động và cô lập tốt hơn; các container trên default bridge không gọi nhau bằng tên được. Không có <code>-p</code> thì các port không truy cập được từ bên ngoài host, và mặc định cũng không truy cập được từ container trên network khác.<a class="cite" href="https://docs.docker.com/engine/network/">[12]</a><a class="cite" href="https://docs.docker.com/engine/network/drivers/bridge/">[13]</a> Kết quả tôi chạy: <code>ping</code> theo tên thất bại trên default bridge và thành công trên user-defined bridge, và một container trên user-defined network không phân giải được tên của container nằm trên default bridge.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Ứng dụng trong Compose kết nối tới database bằng cách nào? (Bằng tên service trên network của Compose.)</div>
+<p class="see">Học bài: <a href="lessons/0011-networks-and-port-publishing.vi.html">Network</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Bạn sẽ dùng restart policy nào, và nó không làm được gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>unless-stopped</code> hoặc <code>on-failure</code> cho service; restart policy phản ứng khi process thoát, chứ không xử lý process bị treo nhưng vẫn đang chạy.</p>
+<p><code>no</code> (mặc định), <code>on-failure[:max]</code> (thoát với mã khác 0), <code>always</code>, <code>unless-stopped</code> (giữ nguyên trạng thái dừng nếu bạn đã chủ động stop, kể cả sau khi daemon khởi động lại).<a class="cite" href="https://docs.docker.com/engine/containers/start-containers-automatically/">[14]</a> Kết quả tôi chạy: <code>on-failure:3</code> trên một container liên tục crash ghi nhận 3 lần restart, sau đó nằm yên ở trạng thái exited; policy <code>no</code> ghi nhận 0 lần.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cái gì xử lý một container đang chạy nhưng không healthy? (Health check trong Docker; liveness probe trong Kubernetes.)</div>
+<p class="see">Học bài: <a href="lessons/0012-restart-policies.vi.html">Restart policy</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi tôi lần lượt từng câu Docker này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/">Docker: What is a container?</a> · [2] <a href="https://docs.docker.com/compose/intro/compose-application-model/">Docker: Compose application model</a> · [3] <a href="https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-an-image/">Docker: What is an image?</a> · [4] <a href="https://docs.docker.com/build/building/best-practices/">Docker: Building best practices</a> · [5] <a href="https://docs.docker.com/build/cache/">Docker: Build cache</a> · [6] <a href="https://docs.docker.com/build/building/multi-stage/">Docker: Multi-stage builds</a> · [7] <a href="https://docs.docker.com/engine/containers/resource_constraints/">Docker: Resource constraints</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · [9] <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a> · [10] <a href="https://docs.docker.com/engine/storage/volumes/">Docker volumes</a> · [11] <a href="https://docs.docker.com/engine/storage/bind-mounts/">Docker bind mounts</a> · [12] <a href="https://docs.docker.com/engine/network/">Docker networking</a> · [13] <a href="https://docs.docker.com/engine/network/drivers/bridge/">Docker bridge driver</a> · [14] <a href="https://docs.docker.com/engine/containers/start-containers-automatically/">Docker restart policies</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

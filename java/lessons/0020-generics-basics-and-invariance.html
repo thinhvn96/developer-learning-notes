@@ -8,67 +8,252 @@
 </head>
 <body>
 <main>
-<h1>Generics: why List of Integer is not List of Number</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0020 · step 5 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Why a List&lt;Integer&gt; is not a List&lt;Number&gt;</h1>
+<p class="subtitle">What generics give you, how to read <code>&lt;T&gt;</code>, and the one rule that surprises everybody.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0020 · step 3 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0020-generics-basics-and-invariance.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> explain the benefits of generics and why <code>List&lt;Integer&gt;</code> is not a <code>List&lt;Number&gt;</code>.</div>
+<div class="mission"><strong>Why this lesson?</strong> You write <code>List&lt;Order&gt;</code> and <code>Map&lt;String, User&gt;</code> every day. Interviewers ask <em>"What are generics for?"</em> and then the trick question <em>"Integer is a Number, so is List&lt;Integer&gt; a List&lt;Number&gt;?"</em>. Most people say yes. This lesson shows why the answer is no.</div>
 
-<h2>Benefits</h2>
-<p>Three: stronger type checks at compile time, elimination of casts, and the ability to write generic algorithms over different types.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">[1]</a></p>
+<div class="win"><b>Today's win:</b> name the three benefits of generics and explain, with a short story, why <code>List&lt;Integer&gt;</code> is not a <code>List&lt;Number&gt;</code>.</div>
+
+<dl class="words">
+  <dt>class</dt><dd>A blueprint for objects. <code>ArrayList</code> is a class; each <code>new ArrayList&lt;&gt;()</code> is one object.</dd>
+  <dt>generic type</dt><dd>A class or interface with a "blank" for a type, written in angle brackets: <code>List&lt;E&gt;</code>, <code>Box&lt;T&gt;</code>.</dd>
+  <dt>type parameter</dt><dd>The name of the blank, like <code>T</code> or <code>E</code>. You fill it when you use the class.</dd>
+  <dt>type argument</dt><dd>The real type you put in the blank: in <code>List&lt;String&gt;</code> it is <code>String</code>.</dd>
+  <dt>subtype</dt><dd>A more specific type that can be used where the general one is expected. <code>Integer</code> is a subtype of <code>Number</code>.</dd>
+  <dt>cast</dt><dd>Telling the compiler "trust me, this object is really a String": <code>(String) obj</code>. Wrong casts fail at run time.</dd>
+  <dt>compile time / run time</dt><dd>Compile time is when <code>javac</code> checks your code. Run time is when the program actually runs.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Integer extends Number. Can I pass a <code>List&lt;Integer&gt;</code> to a method that takes a <code>List&lt;Number&gt;</code>? Why or why not?"</em> Commit to yes or no before you read on.</p>
+
+<h2>1. The picture: labelled boxes</h2>
+<p>Imagine a storeroom full of boxes with no labels. You put shoes in one. Later a colleague opens it, expects books, and drops it on the floor in surprise. Now imagine every box has a label: "Shoes only". The person at the door checks the label and refuses to put books in it. Nobody gets a surprise later.</p>
+<p>Generics are those labels, and the compiler is the person at the door. Look at old code without generics:</p>
+<pre><code>List list = new ArrayList();      <span class="c">// no label: holds any Object</span>
+list.add("hello");
+list.add(42);                     <span class="c">// allowed, nobody checks</span>
+String s = (String) list.get(1);  <span class="hl">// ClassCastException at run time</span></code></pre>
+<p>And with a label:</p>
 <pre><code>List&lt;String&gt; list = new ArrayList&lt;&gt;();
 list.add("hello");
-String s = list.get(0);   // no cast</code></pre>
-<h2>Invariance</h2>
-<p>"Although Integer is a subtype of Number, List&lt;Integer&gt; is not a subtype of List&lt;Number&gt; and, in fact, these two types are not related."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a> If it were allowed you could add a <code>Double</code> through the <code>List&lt;Number&gt;</code> reference into what is really a <code>List&lt;Integer&gt;</code>, breaking type safety.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a> Wildcards give a legitimate relationship (next lesson).</p>
-<p>In <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a> the line <code>List&lt;Number&gt; nums = ints;</code> is commented out because it does not compile.</p>
+list.add(42);                     <span class="hl">// compile error: 42 is not a String</span>
+String s = list.get(0);           <span class="c">// no cast needed</span></code></pre>
+<p>The tutorial lists exactly three benefits: stronger type checks at compile time, elimination of casts, and the ability to write generic algorithms that work on collections of different types.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">Tutorial: why use generics</a> The big idea: a bug that used to appear in production (a <code>ClassCastException</code>) now appears in your editor.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Is List of Integer a subtype of List of Number?</p>
-  <button>Yes, always</button>
-  <button data-correct>No, unrelated types</button>
-  <button>Only for lists</button>
-  <button>Only for finals</button>
-  <p class="explain">Generic types are invariant.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. A benefit of generics?</p>
-  <button>Faster JIT</button>
-  <button data-correct>Compile-time type checks</button>
-  <button>No exceptions</button>
-  <button>Smaller bytecode</button>
-  <p class="explain">Stronger type checks at compile time.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. What do generics remove from client code?</p>
-  <button>All interfaces</button>
-  <button>Every warning</button>
-  <button>Static methods</button>
-  <button data-correct>Explicit casts</button>
-  <p class="explain">Casting is not necessary with generics.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Why is the assignment forbidden?</p>
-  <button data-correct>It breaks type safety</button>
-  <button>It skips erasure</button>
-  <button>It hides nulls</button>
-  <button>It is too slow</button>
-  <p class="explain">You could add a Double to a list that is really Integers.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">[2]</a></p>
-</div>
+<h2>2. Reading and writing <code>&lt;T&gt;</code></h2>
+<p>Here is a tiny generic class from the tutorial's style. <code>T</code> is a blank; whoever creates a <code>Box</code> decides what goes in it.</p>
+<pre><code>class Box&lt;T&gt; {
+    private T item;
+    void set(T item) { this.item = item; }
+    T get()          { return item; }
+}
+
+Box&lt;Integer&gt; b = new Box&lt;&gt;();
+b.set(7);
+int n = b.get();
+<span class="c">Step 1  Box&lt;Integer&gt;: the compiler reads every T as Integer</span>
+<span class="c">Step 2  b.set(7) is checked: 7 is an Integer → OK</span>
+<span class="c">Step 3  b.get() is known to return Integer → no cast needed</span>
+<span class="c">Step 4  b.set("seven") would be a compile error</span></code></pre>
+<p><strong>Names.</strong> "By convention, type parameter names are single, uppercase letters": <code>E</code> for Element (used all over the collections), <code>K</code> for Key, <code>V</code> for Value, <code>T</code> for Type, <code>N</code> for Number.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/types.html">Tutorial: generic types</a> So <code>Map&lt;K, V&gt;</code> reads "a map from keys to values".</p>
+<p><strong>The diamond <code>&lt;&gt;</code>.</strong> "In Java SE 7 and later", you may leave the brackets empty on the right side when the compiler can infer the type: <code>new Box&lt;&gt;()</code>.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/types.html">Tutorial: generic types</a> So this works the same on JDK 8, 17 and 21.</p>
+<h3>Trap: primitives cannot fill the blank</h3>
+<pre><code>List&lt;int&gt; nums;        <span class="hl">// compile error</span>
+List&lt;Integer&gt; nums;    <span class="c">// fix: use the wrapper class</span></code></pre>
+<p>The tutorial's list of restrictions starts with "Cannot Instantiate Generic Types with Primitive Types".<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Tutorial: restrictions on generics</a> Java converts between <code>int</code> and <code>Integer</code> for you when you add and get.</p>
+
+<h2>3. The surprising rule: no family relationship</h2>
+<p>Back to the storeroom. You have a box labelled "Apples only". A colleague asks for "a fruit box". An apple is a fruit, so you hand over the apple box. Your colleague, holding a "fruit box", puts a banana in it. That is allowed for a fruit box! Now your apple box contains a banana, and the next person who takes out "an apple" gets a banana.</p>
+<p>Java prevents this story at the door. The tutorial says: "Although Integer is a subtype of Number, List&lt;Integer&gt; is not a subtype of List&lt;Number&gt; and, in fact, these two types are not related."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Tutorial: generics and subtyping</a> If it were allowed, you could add a <code>Double</code> through the <code>List&lt;Number&gt;</code> reference into what is really a <code>List&lt;Integer&gt;</code>, breaking type safety.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Tutorial: generics and subtyping</a></p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="ints, a List of Integer, points to one ArrayList holding 1, 2, 3. If nums, a List of Number, could point to the same list, nums.add(3.14) would put a Double inside, and ints.get(3) would not be an Integer.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="40" width="200" height="36" rx="6"/>
+      <rect x="340" y="85" width="70" height="44"/><rect x="410" y="85" width="70" height="44"/>
+      <rect x="480" y="85" width="70" height="44"/>
+      <path d="M220 58H300V100H334M328 95l6 5-6 5"/>
+    </g>
+    <rect x="20" y="150" width="200" height="36" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/>
+    <rect x="550" y="85" width="70" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <path d="M220 168H300V118H334" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/>
+    <path d="M328 113l6 5-6 5" fill="none" stroke="var(--accent)"/>
+    <text x="120" y="63" text-anchor="middle">ints: List&lt;Integer&gt;</text>
+    <text x="120" y="173" text-anchor="middle" fill="var(--accent)">nums: List&lt;Number&gt;</text>
+    <text x="20" y="141" font-size="11" opacity=".75">imagine this were allowed:</text>
+    <text x="120" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">nums.add(3.14)</text>
+    <text x="480" y="75" text-anchor="middle" font-size="11" opacity=".75">one ArrayList object</text>
+    <g text-anchor="middle">
+      <text x="375" y="112">1</text><text x="445" y="112">2</text><text x="515" y="112">3</text>
+      <text x="585" y="112" fill="var(--accent)">3.14</text>
+    </g>
+    <text x="480" y="152" text-anchor="middle" font-size="11" fill="var(--accent)">ints.get(3) is not an Integer → crash</text>
+    <text x="340" y="230" text-anchor="middle" font-size="12">so javac rejects:  List&lt;Number&gt; nums = ints;</text>
+  </g>
+</svg>
+<figcaption>If a <code>List&lt;Number&gt;</code> reference could point at a list of integers, anyone could add a <code>Double</code> through it. Java stops the assignment instead.</figcaption>
+</figure>
+
+<p>Try it. The example has this line commented out because it does not compile:</p>
+<pre><code>List&lt;Integer&gt; ints = new ArrayList&lt;&gt;(List.of(1, 2, 3));
+// List&lt;Number&gt; nums = ints;   // compile error</code></pre>
+<p>If you remove the <code>//</code>, JDK 21's <code>javac</code> says:</p>
+<pre><code>error: incompatible types: List&lt;Integer&gt; cannot be converted to List&lt;Number&gt;</code></pre>
+<p>Interviewers call this rule <strong>invariance</strong>: a generic type does not follow the family tree of its type argument. <code>Integer → Number</code> is a relationship; <code>List&lt;Integer&gt; → List&lt;Number&gt;</code> is not.</p>
+<p class="muted">Reading is fine, though: a method that only <em>reads</em> numbers should accept a list of integers. That is what wildcards (<code>? extends Number</code>) give you, in <a href="0021-wildcards-and-type-erasure.html">lesson 0021</a>.</p>
+
+<h2>4. Arrays made the other choice</h2>
+<p>Arrays are older than generics, and they <em>do</em> follow the family tree: an <code>Integer[]</code> can be used as a <code>Number[]</code>. The JLS says such a variable "can hold a reference to an instance of any array type B[], provided B can be assigned to A", and warns: "This may result in a run-time exception on a <em>later</em> assignment".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-10.html#jls-10.2">JLS §10.2</a> That exception is <code>ArrayStoreException</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-10.html#jls-10.5">JLS §10.5</a></p>
+<pre><code>Number[] arr = new Integer[3];   <span class="c">// compiles</span>
+arr[0] = 3.14;                   <span class="hl">// ArrayStoreException at run time</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Arrays: Number array equals new Integer array compiles, and storing 3.14 fails at run time with ArrayStoreException. Generics: List of Number equals new ArrayList of Integer is a compile error, so the bug never runs.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <g text-anchor="middle" opacity=".75">
+      <text x="165" y="30">your code</text>
+      <text x="385" y="30">compile time</text>
+      <text x="565" y="30">run time</text>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="45" width="290" height="58" rx="6"/>
+      <rect x="330" y="54" width="110" height="40" rx="6"/>
+      <rect x="20" y="130" width="290" height="58" rx="6"/>
+      <rect x="470" y="139" width="190" height="40" rx="6" opacity=".5"/>
+      <path d="M310 74h14M320 70l4 4-4 4M440 74h24M460 70l4 4-4 4"/>
+      <path d="M310 159h14M320 155l4 4-4 4M440 159h24M460 155l4 4-4 4" opacity=".5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="470" y="54" width="190" height="40" rx="6"/>
+      <rect x="330" y="139" width="110" height="40" rx="6"/>
+    </g>
+    <text x="32" y="62" opacity=".75">arrays (covariant)</text>
+    <text x="32" y="80" font-size="12">Number[] arr = new Integer[3];</text>
+    <text x="32" y="96" font-size="12">arr[0] = 3.14;</text>
+    <text x="32" y="147" opacity=".75">generics (invariant)</text>
+    <text x="32" y="165" font-size="12">List&lt;Number&gt; n =</text>
+    <text x="32" y="181" font-size="12">    new ArrayList&lt;Integer&gt;();</text>
+    <text x="385" y="78" text-anchor="middle">compiles</text>
+    <text x="565" y="71" text-anchor="middle" fill="var(--accent)">ArrayStoreException</text>
+    <text x="565" y="86" text-anchor="middle" fill="var(--accent)">(a crash in production)</text>
+    <text x="385" y="163" text-anchor="middle" fill="var(--accent)">compile error</text>
+    <text x="565" y="156" text-anchor="middle" opacity=".6">never runs:</text>
+    <text x="565" y="171" text-anchor="middle" opacity=".6">bug caught early</text>
+  </g>
+</svg>
+<figcaption>Same mistake, two outcomes: arrays fail at run time; generics refuse to compile.</figcaption>
+</figure>
+<p>A good way to say it in an interview: invariance lets generics catch the "banana in the apple box" bug at compile time, where it is cheap to fix, instead of at run time, where it becomes a production incident.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Is <code>List&lt;Integer&gt;</code> a subtype of <code>List&lt;Number&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, the two types are not related</button>
+    <button class="opt">Yes, because Integer extends Number</button>
+    <button class="opt">Yes, but only for ArrayList objects</button>
+    <button class="opt">Only when the list is declared final</button>
+  </div>
+  <div class="why">Generic types are invariant: "List&lt;Integer&gt; is not a subtype of List&lt;Number&gt;" (Java Tutorials).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does Java refuse <code>List&lt;Number&gt; nums = ints;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Through nums you could add a Double to a list of Integers</button>
+    <button class="opt">Converting the list would copy every element, which is slow</button>
+    <button class="opt">Number is an abstract class, so lists of it are not allowed</button>
+    <button class="opt">The two lists would have different sizes after the cast</button>
+  </div>
+  <div class="why">Allowing it would break type safety: the "banana in the apple box" story.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which is one of the three benefits of generics in the tutorial?</p>
+  <div class="options">
+    <button class="opt" data-correct>Stronger type checks at compile time</button>
+    <button class="opt">Faster code because the JIT skips checks</button>
+    <button class="opt">Smaller class files with less bytecode</button>
+    <button class="opt">No exceptions can be thrown at run time</button>
+  </div>
+  <div class="why">The three: stronger compile-time checks, no casts, and generic algorithms.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does this print or do? <code>Number[] a = new Integer[1]; a[0] = 1.5;</code></p>
+  <div class="options">
+    <button class="opt" data-correct>Compiles, then throws ArrayStoreException</button>
+    <button class="opt">Does not compile: arrays are invariant too</button>
+    <button class="opt">Runs fine and stores 1.5 in the array</button>
+    <button class="opt">Runs fine and silently stores 1 instead</button>
+  </div>
+  <div class="why">Arrays are covariant, so the assignment compiles; the store is checked at run time and fails (JLS §10.5).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is wrong with <code>List&lt;int&gt; scores = new ArrayList&lt;&gt;();</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Primitives cannot be type arguments; use Integer</button>
+    <button class="opt">The diamond needs the type written out: &lt;int&gt;</button>
+    <button class="opt">Nothing, it compiles fine on JDK 17 and later</button>
+    <button class="opt">ArrayList needs a starting capacity to compile</button>
+  </div>
+  <div class="why">"Cannot Instantiate Generic Types with Primitive Types" is the first restriction in the tutorial.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">With <code>List&lt;String&gt; list</code>, why can you write <code>String s = list.get(0);</code> without a cast?</p>
+  <div class="options">
+    <button class="opt" data-correct>The compiler knows every element is a String</button>
+    <button class="opt">get() always returns a String in every List</button>
+    <button class="opt">Java converts any Object to a String by itself</button>
+    <button class="opt">The diamond operator inserts a hidden toString()</button>
+  </div>
+  <div class="why">The type argument tells the compiler what <code>get</code> returns, so the cast is no longer needed.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What are generics for, and is a <code>List&lt;Integer&gt;</code> a <code>List&lt;Number&gt;</code>?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Generics add a type parameter, like <code>List&lt;E&gt;</code>, that you fill with a type argument.</label></li>
+      <li><label><input type="checkbox"> Benefits: compile-time type checks, no casts, generic algorithms.</label></li>
+      <li><label><input type="checkbox"> No: <code>List&lt;Integer&gt;</code> and <code>List&lt;Number&gt;</code> are unrelated (generics are invariant).</label></li>
+      <li><label><input type="checkbox"> Reason: through a <code>List&lt;Number&gt;</code> you could add a <code>Double</code> into a list of integers.</label></li>
+      <li><label><input type="checkbox"> Arrays are covariant and fail later with <code>ArrayStoreException</code>; generics fail at compile time.</label></li>
+      <li><label><input type="checkbox"> To accept "a list of any kind of number" for reading, use a wildcard: <code>List&lt;? extends Number&gt;</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Generics let a class like <code>List</code> take a type parameter, so I write <code>List&lt;String&gt;</code> and the compiler knows what's inside. That gives three benefits: type errors are caught at compile time, I don't need casts, and I can write algorithms that work for many types. Now, is a <code>List&lt;Integer&gt;</code> a <code>List&lt;Number&gt;</code>? No, even though Integer is a Number. The two list types are unrelated; generics are invariant. If Java allowed it, I could take my list of integers, look at it as a list of numbers, and add a <code>Double</code>. Then code that reads integers would crash. Arrays actually allow this, and they fail at run time with <code>ArrayStoreException</code>; generics chose to fail at compile time instead. If I just want to read numbers from any such list, I use a wildcard: <code>List&lt;? extends Number&gt;</code>."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0020-generic-utility.md">Exercise 0020: a generic utility</a></p>
+<p><a href="../exercises/0020-generic-utility.md">Exercise 0020: a generic utility</a>. Write the method signature first and send it to the teacher before you implement it.</p>
 <p>Runnable example: <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/index.html">Java Tutorials: Generics trail</a>. Read 'Why Use Generics?' and 'Generics, Inheritance, and Subtypes'.</p>
-<p><a href="0002-choosing-a-list.html">← Choosing between ArrayList, LinkedList and ArrayDeque</a> &nbsp;|&nbsp; <a href="0021-wildcards-and-type-erasure.html">Wildcards (extends, super) and type erasure →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will continue: <em>"So how do you write a method that accepts <code>List&lt;Integer&gt;</code> and <code>List&lt;Double&gt;</code>? What is PECS? Do generics exist at run time?"</em> All three are in <a href="0021-wildcards-and-type-erasure.html">lesson 0021: wildcards and type erasure</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/index.html">Java Tutorials: Generics trail</a>. Read "Why Use Generics?" and "Generics, Inheritance, and Subtypes".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What is the difference between Integer and int?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0019-exceptions-checked-unchecked-try-with-resources.html">← What happens when Java code fails</a> &nbsp;|&nbsp; <a href="0021-wildcards-and-type-erasure.html">When to write ? extends and when ? super →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">Java Tutorials: Why use generics</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Java Tutorials: Generics and subtyping</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java Tutorials (Generics trail) and the Java Language Specification (Java SE 21), October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/java/generics/why.html">Java Tutorials: Why use generics</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/subtyping.html">Java Tutorials: Generics and subtyping</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/types.html">Java Tutorials: Generic types</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Java Tutorials: Restrictions on generics</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-10.html">JLS §10 Arrays</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

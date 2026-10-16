@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 4: Service: địa chỉ ổn định cho các Pod luôn thay đổi</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Service: địa chỉ ổn định cho các Pod luôn thay đổi</h1>
+<p class="meta">Kubernetes · Bài 0004 · bước 5/15 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-services.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vì sao cần Service, chọn đúng giữa ClusterIP, NodePort và LoadBalancer, và viết đúng <code>port</code> so với <code>targetPort</code>.</div>
+
+<h2>Vấn đề</h2>
+<p>Pod là thứ ngắn hạn; chúng được tạo ra, bị huỷ đi, và địa chỉ IP của chúng thay đổi. Service là "một lớp trừu tượng giúp expose một tập Pod ra mạng" và cho client một endpoint ổn định.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a> Nó tìm Pod của mình bằng một label selector.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+<pre><code>apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80</code></pre>
+<p><code>port</code> là port mà Service expose; <code>targetPort</code> là port của container (mặc định hai giá trị bằng nhau).<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a> File: <a href="../examples/service.yaml"><code>service.yaml</code></a>.</p>
+<h2>Các loại Service</h2>
+<table>
+<tr><th>Loại</th><th>Phạm vi expose<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></th></tr>
+<tr><td>ClusterIP (mặc định)</td><td>chỉ bên trong cluster</td></tr>
+<tr><td>NodePort</td><td>trên IP của từng node, tại một port cố định</td></tr>
+<tr><td>LoadBalancer</td><td>ra bên ngoài, qua load balancer của cloud provider</td></tr>
+<tr><td>ExternalName</td><td>ánh xạ Service tới một tên DNS bên ngoài</td></tr>
+</table>
+<p>Kubernetes liên tục cập nhật EndpointSlice khi các Pod khớp selector xuất hiện hoặc biến mất, nên ứng dụng của bạn không cần thay đổi gì.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a> Liên hệ với bài trước: selector <code>app: nginx</code> của Service khớp với label của Pod template trong Deployment.</p>
+<p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Loại Service mặc định?</p>
+  <button>ExternalName</button>
+  <button>LoadBalancer</button>
+  <button data-correct>ClusterIP</button>
+  <button>NodePort</button>
+  <p class="explain">ClusterIP chỉ expose Service bên trong cluster và là loại mặc định.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Trường nào của Service là port của container?</p>
+  <button>selector</button>
+  <button>protocol</button>
+  <button>nodeName</button>
+  <button data-correct>targetPort</button>
+  <p class="explain">targetPort là port của container; port là port mà Service expose.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Service tìm Pod của nó bằng cách nào?</p>
+  <button>Tag của image</button>
+  <button>Tên của node</button>
+  <button data-correct>Một label selector</button>
+  <button>Tên của Pod</button>
+  <p class="explain">Service dùng label và selector để xác định các Pod backend.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao không dùng thẳng IP của Pod?</p>
+  <button data-correct>Chúng thay đổi liên tục</button>
+  <button>Chúng đã bị mã hoá</button>
+  <button>Chúng chỉ đọc được</button>
+  <button>Chúng bị dùng chung</button>
+  <p class="explain">Pod là thứ ngắn hạn và IP của chúng thay đổi theo thời gian.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-wire-a-service.vi.md">Bài tập 0004: nối dây cho một Service</a></p>
+<p>Ví dụ chạy được: <a href="../examples/service.yaml"><code>service.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes Docs: Service</a>. Các phần về selector, port và các loại Service.</p>
+<p><a href="0003-deployments-and-labels.vi.html">← Deployment, ReplicaSet và label</a> &nbsp;|&nbsp; <a href="0009-configmaps.vi.html">ConfigMap: cấu hình nằm ngoài image →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes Docs: Service</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

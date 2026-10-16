@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình Docker</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Docker: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình Docker · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="docker" data-total="12">12 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Image, Dockerfile, volume, network, Compose, giới hạn tài nguyên cho JVM và hardening (gia cố bảo mật). 12 bài theo thứ tự nên đọc, học xong bài nào thì đánh dấu bài đó (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Foundation</h2>
+<ol class="steps" data-stack="docker">
+<li data-id="0001-containers-images-layers"><a href="lessons/0001-containers-images-layers.vi.html">Container, image và layer</a></li>
+<li data-id="0007-run-flags-and-container-lifecycle"><a href="lessons/0007-run-flags-and-container-lifecycle.vi.html">docker run: các flag và vòng đời của container</a></li>
+<li data-id="0008-dockerfile-instructions"><a href="lessons/0008-dockerfile-instructions.vi.html">Các lệnh trong Dockerfile: ENV vs ARG, COPY vs ADD, EXPOSE</a></li>
+<li data-id="0002-layer-cache-and-dockerfile-order"><a href="lessons/0002-layer-cache-and-dockerfile-order.vi.html">Layer cache và thứ tự lệnh trong Dockerfile</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="docker">
+<li data-id="0009-cmd-entrypoint-and-exec-form"><a href="lessons/0009-cmd-entrypoint-and-exec-form.vi.html">CMD, ENTRYPOINT và exec form vs shell form</a></li>
+<li data-id="0003-multi-stage-java-image"><a href="lessons/0003-multi-stage-java-image.vi.html">Image multi-stage cho ứng dụng Java</a></li>
+<li data-id="0010-volumes-and-bind-mounts"><a href="lessons/0010-volumes-and-bind-mounts.vi.html">Volume và bind mount</a></li>
+<li data-id="0011-networks-and-port-publishing"><a href="lessons/0011-networks-and-port-publishing.vi.html">Network, DNS theo tên và publish port</a></li>
+<li data-id="0004-compose-app-and-database"><a href="lessons/0004-compose-app-and-database.vi.html">Compose: một ứng dụng và một database</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="docker">
+<li data-id="0005-memory-cpu-limits-and-the-jvm"><a href="lessons/0005-memory-cpu-limits-and-the-jvm.vi.html">Giới hạn memory và CPU, và JVM nhìn thấy gì</a></li>
+<li data-id="0012-restart-policies"><a href="lessons/0012-restart-policies.vi.html">Restart policy</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="docker">
+<li data-id="0006-pinning-nonroot-and-signals"><a href="lessons/0006-pinning-nonroot-and-signals.vi.html">Image được pin phiên bản, chạy non-root và xử lý signal đúng</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Compose profiles và secrets <span class="meta">(dự kiến)</span></li>
+<li>Build đa nền tảng với buildx <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> nếu muốn thêm, sắp xếp lại hoặc bỏ qua bài nào, hoặc nhờ chạy một buổi phỏng vấn thử từ <a href="interview.vi.html">trang hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

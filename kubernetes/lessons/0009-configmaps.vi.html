@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 9: ConfigMap: cấu hình nằm ngoài image</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ConfigMap: cấu hình nằm ngoài image</h1>
+<p class="meta">Kubernetes · Bài 0009 · bước 6/15 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-configmaps.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tách cấu hình ra ngoài bằng ConfigMap và dùng nó dưới dạng biến môi trường lẫn file, biết rõ cách nào được cập nhật trực tiếp khi đang chạy.</div>
+
+<h2>ConfigMap là gì</h2>
+<p>ConfigMap lưu dữ liệu không nhạy cảm dưới dạng các cặp key-value, giúp tách cấu hình riêng của từng môi trường ra khỏi container image. Nó giới hạn 1 MiB và không được mã hoá (dữ liệu nhạy cảm thì dùng Secret).<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a> Pod có thể dùng nó qua command/args, biến môi trường, file chỉ đọc trong volume, hoặc qua API.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+<pre><code>env:
+- name: LOG_LEVEL
+  valueFrom:
+    configMapKeyRef: { name: app-config, key: LOG_LEVEL }
+volumes:
+- name: config
+  configMap:
+    name: app-config
+    items: [ { key: application.properties, path: application.properties } ]</code></pre>
+<h2>Cách nào được cập nhật trực tiếp?</h2>
+<p>Biến môi trường <strong>không</strong> được cập nhật trong container đang chạy (phải restart); file trong volume được mount thì <em>sau một lúc</em> sẽ được cập nhật. ConfigMap immutable (từ v1.19) giúp tránh thay đổi ngoài ý muốn.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+<pre><code>kubectl apply -f examples/configmap-secret.yaml ; kubectl logs config-demo
+LOG_LEVEL=debug
+--- file:
+server.port=8080
+feature.x=true</code></pre>
+<p>Liên hệ với Spring: một file <code>application.properties</code> được mount vào, hoặc các biến môi trường như <code>SERVER_PORT</code>, sẽ ghi đè cấu hình đóng gói sẵn (<a href="../../spring-boot/lessons/0008-externalized-configuration-and-profiles.vi.html">bài về externalized configuration</a>). File: <a href="../examples/configmap-secret.yaml"><code>configmap-secret.yaml</code></a>.</p><p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. ConfigMap dành cho loại dữ liệu nào?</p>
+  <button>Mật khẩu</button>
+  <button>Chỉ certificate</button>
+  <button data-correct>Không nhạy cảm</button>
+  <button>Chỉ file binary</button>
+  <p class="explain">Nó chứa dữ liệu không nhạy cảm dưới dạng các cặp key-value.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. ConfigMap thay đổi. Pod đọc qua env var thấy gì?</p>
+  <button>Bị crash</button>
+  <button>Bị rollback</button>
+  <button>Đổi ngay lập tức</button>
+  <button data-correct>Không đổi cho tới khi restart</button>
+  <p class="explain">Biến môi trường không được cập nhật trong container đang chạy.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. File ConfigMap được mount, sau khi thay đổi thì sao?</p>
+  <button>Không bao giờ cập nhật</button>
+  <button>Chỉ đọc một lần</button>
+  <button>Bị xoá</button>
+  <button data-correct>Sau một lúc sẽ cập nhật</button>
+  <p class="explain">File mount qua volume sau một lúc sẽ phản ánh thay đổi.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Giới hạn kích thước của một ConfigMap?</p>
+  <button data-correct>1 MiB</button>
+  <button>Không giới hạn</button>
+  <button>10 KiB</button>
+  <button>1 GiB</button>
+  <p class="explain">Giới hạn là 1 MiB.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-config-rollout.vi.md">Bài tập 0009: rollout cấu hình</a></p>
+<p>Ví dụ chạy được: <a href="../examples/configmap-secret.yaml"><code>configmap-secret.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/configuration/configmap/">Kubernetes Docs: ConfigMaps</a>. Đọc phần 'ConfigMaps and Pods' và hành vi khi cập nhật.</p>
+<p><a href="0004-services.vi.html">← Service: địa chỉ ổn định cho các Pod luôn thay đổi</a> &nbsp;|&nbsp; <a href="0010-secrets.vi.html">Secret: bảo vệ được gì và không bảo vệ được gì →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/configuration/configmap/">Kubernetes Docs: ConfigMaps</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

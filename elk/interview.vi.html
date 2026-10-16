@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn ELK Stack</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ELK Stack: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · ELK Stack · 13 câu hỏi · <a href="index.vi.html">Lộ trình ELK Stack</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi về Elasticsearch, Logstash, Kibana và Filebeat cho vòng phỏng vấn backend Senior. Các output được trích là từ script ví dụ chạy trên container Elasticsearch và Logstash 9.0.0 dùng xong bỏ.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn làm căn cứ cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Giải thích ELK stack và đường đi của một dòng log.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Filebeat gửi log đi, Logstash parse log, Elasticsearch index log, Kibana dùng để khám phá log.</p>
+<p>Harvester của Filebeat đọc từng dòng của file và input quản lý các harvester.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a> Logstash có ba giai đoạn: inputs, filters, outputs, với codec ở hai đầu.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[2]</a> Elasticsearch lưu các document JSON trong index, phân tán trên các shard.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a> Discover của Kibana là công cụ chính để khám phá dữ liệu, dùng KQL, Lucene hoặc ES|QL.<a class="cite" href="https://www.elastic.co/docs/explore-analyze/discover">[4]</a> Logstash là tuỳ chọn khi log vốn đã có cấu trúc.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn sẽ đặt Kafka ở đâu? (Làm buffer giữa các shipper và Logstash để Elasticsearch có sập thì cũng không mất log; đây là lựa chọn thiết kế, không nằm trong các tài liệu đã đọc.)</div>
+<p class="see">Học bài: <a href="lessons/0001-elk-overview-and-pipeline.vi.html">Tổng quan ELK</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Index, document và mapping là gì? Dynamic mapping khác explicit mapping thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> index = đơn vị lưu trữ; document = object JSON; mapping = kiểu field và cách đánh index.</p>
+<p>Một index gồm các document, mapping và settings (shard, replica, refresh interval). Dùng dynamic mapping khi khám phá dữ liệu và explicit mapping cho production; dùng alias để tách query khỏi tên index.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[3]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> text khác keyword thế nào? (text được analyze để full-text search; keyword giữ giá trị chính xác cho filter và aggregation; xem phần term và match.)</div>
+<p class="see">Học bài: <a href="lessons/0002-documents-indices-and-mappings.vi.html">Mapping</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Shard và replica hoạt động thế nào? Sau khi tạo index thì đổi được những gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> mỗi document nằm trong một primary shard; replica là bản sao để chịu lỗi và tăng năng lực đọc; số primary bị cố định, số replica thì không.</p>
+<p>"Mỗi document trong một index thuộc về một primary shard. Replica shard là bản sao của một primary shard." Replica chống sự cố phần cứng và tăng năng lực đọc. "Số primary shard của một index bị cố định tại thời điểm tạo index, nhưng số replica shard có thể thay đổi bất cứ lúc nào."<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[5]</a> Trên một node duy nhất, index của mình chuyển sang yellow: primary đã started, replica vẫn unassigned.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn chọn số shard thế nào? (Ước lượng khối lượng dữ liệu và mức tăng trưởng; hướng dẫn sizing nằm ngoài các trang đã đọc, nên hãy tra tài liệu và nói rõ điều đó.)</div>
+<p class="see">Học bài: <a href="lessons/0003-shards-and-replicas.vi.html">Shard và replica</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Vì sao một document chưa search được ngay sau khi index?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> search là gần thời gian thực (near real-time); document chỉ hiện ra sau một lần refresh.</p>
+<p>"Một lần refresh làm cho mọi thao tác thực hiện trên index kể từ lần refresh trước có thể được search." Mặc định index được refresh mỗi giây, nhưng chỉ với những index đã nhận search request trong 30 giây gần nhất.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[6]</a> Trong lần chạy của mình, count bằng 0 trước khi refresh thủ công và bằng 2 sau đó.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao tăng tốc bulk indexing? (Tăng hoặc tắt refresh_interval trong lúc load; hãy test thử, xem bài tập.)</div>
+<p class="see">Học bài: <a href="lessons/0004-near-real-time-search-and-refresh.vi.html">Tìm kiếm gần thời gian thực</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>term query khác match query thế nào? must và filter trong bool khác nhau ra sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>match</code> analyze query cho field text; <code>term</code> là khớp chính xác và nên dùng với field keyword. <code>filter</code> không tính điểm và được cache; <code>must</code> có tính điểm.</p>
+<p>"Tránh dùng <code>term</code> query cho các field <code>text</code>": analysis làm thay đổi các token được lưu, nên rất khó khớp chính xác; hãy dùng <code>match</code>.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[7]</a> Trong <code>bool</code>, <code>must</code> và <code>should</code> góp vào điểm; <code>filter</code> và <code>must_not</code> chạy trong filter context: bỏ qua điểm, kết quả được cache.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[8]</a> Đặt các điều kiện có/không vào <code>filter</code> và phần text cần relevance vào <code>must</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao term query cho 'Timeout' của tôi không ra gì? (Field text đã bị chuyển về chữ thường lúc index; lần chạy của mình: term 'Timeout' 0 hit, term 'timeout' 1 hit, match 'Timeout' 1 hit.)</div>
+<p class="see">Học bài: <a href="lessons/0005-query-dsl-term-match-bool.vi.html">Query DSL</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Grok làm gì và làm sao tìm ra các lỗi parse?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> nó parse văn bản phi cấu trúc thành các field bằng các pattern có tên; lỗi parse sẽ được gắn tag.</p>
+<p>Pattern dùng cú pháp <code>%{SYNTAX:SEMANTIC}</code>; event không khớp mặc định được gắn tag <code>_grokparsefailure</code>.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[9]</a> Trong lần chạy của mình, một dòng access log sinh ra các field client, method, path, status và duration, còn một dòng không khớp thì bị gắn tag. Search tag đó trong Kibana để tìm các pattern sai.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Stack trace nhiều dòng thì sao? (Cần multiline codec hoặc cấu hình ở phía shipper; tìm trong tài liệu, xem bài tập.)</div>
+<p class="see">Học bài: <a href="lessons/0006-logstash-grok-and-persistent-queues.vi.html">Logstash và grok</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Filebeat và Logstash đảm bảo giao nhận kiểu gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> cả hai đều at-least-once (Filebeat thì luôn luôn; Logstash khi bật persistent queue).</p>
+<p>Filebeat giữ state của từng file trong registry và "đảm bảo event sẽ được giao tới output đã cấu hình ít nhất một lần và không mất dữ liệu"; các event chưa được xác nhận sẽ được gửi lại sau khi restart, có thể gây trùng.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a> Persistent queue của Logstash lưu các event in-flight xuống đĩa và giao "cho tới khi giao thành công ít nhất một lần", hấp thụ các đợt tăng đột biến và tạo backpressure khi đầy.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[10]</a> Vì vậy hãy thiết kế để chịu được bản trùng, ví dụ gán document id lấy từ chính event.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Backpressure ở đây nghĩa là gì? (Input bị chặn lại cho tới khi queue vơi bớt.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[10]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0007-filebeat-delivery-and-backpressure.vi.html">Giao nhận của Filebeat</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Text analysis là gì, và làm sao xem một field sinh ra những token nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> là việc chuyển văn bản thành các token được tối ưu cho tìm kiếm, ở cả lúc index lẫn lúc search; dùng API <code>_analyze</code>.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[11]</a> Analyzer standard biến "Connection Timeout to payment-service!" thành connection, timeout, to, payment, service; analyzer keyword thì giữ nguyên một token.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao tìm khớp chính xác trên field text lại thất bại? (Analysis chuyển về chữ thường và tách từ; hãy dùng keyword.)</div>
+<p class="see">Học bài: <a href="lessons/0009-text-analysis.vi.html">Text analysis</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Làm sao index khối lượng lớn hiệu quả và phát hiện lỗi?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> dùng bulk API với NDJSON; kiểm tra kết quả của từng item.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[12]</a> Response có cờ <code>errors</code> và status cho từng item; lần gọi bulk của mình trả về các 201 và một 409 <code>version_conflict_engine_exception</code> cho một lệnh <code>create</code> bị trùng. Ngoài ra hãy tinh chỉnh refresh khi bulk load.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[6]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Lỗi nào thì retry được? (Bàn về 429/5xx so với 4xx; xem bài tập.)</div>
+<p class="see">Học bài: <a href="lessons/0010-bulk-api.vi.html">Bulk API</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Giải thích aggregation và cho một ví dụ.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> có aggregation metric, bucket và pipeline; một terms bucket kèm metric average và max cho ra latency theo từng service.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">[13]</a> Aggregate trên field text sẽ thất bại ("Fielddata is disabled"); hãy dùng field keyword.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Tương đương bên SQL là gì? (GROUP BY kèm các hàm aggregate.)</div>
+<p class="see">Học bài: <a href="lessons/0011-aggregations.vi.html">Aggregation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Ingest pipeline so với Logstash?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> ingest pipeline biến đổi từng document một ngay bên trong Elasticsearch; Logstash là một pipeline riêng biệt với nhiều input/output và có buffer.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[14]</a> Pipeline không thể tách hay aggregate trên nhiều document; test bằng simulate. Pipeline grok của mình đã parse được một dòng access log và báo lỗi cho một dòng không khớp.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào bạn vẫn giữ Logstash? (Nhiều nguồn/đích, cần persistent queue, biến đổi nặng hơn.)</div>
+<p class="see">Học bài: <a href="lessons/0012-ingest-pipelines.vi.html">Ingest pipeline</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Data stream là gì và ILM quản lý nó thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một lớp trừu tượng trên các backing index ẩn dành cho time series chỉ ghi thêm; ILM tự động hoá rollover, các phase và việc xoá.</p>
+<p><a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[15]</a> Bắt buộc có <code>@timestamp</code>; rollover tạo một write index mới. <a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[16]</a> Các phase hot, warm, cold, frozen, delete. Lần chạy của mình: một document thiếu <code>@timestamp</code> bị từ chối, một lần rollover tạo ra <code>...-000002</code>, và một ILM policy có rollover ở hot và xoá sau 30 ngày đã được chấp nhận.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cần update document theo id thì sao? (Dùng alias có write index, theo tài liệu.)</div>
+<p class="see">Học bài: <a href="lessons/0013-data-streams.vi.html">Data stream</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>KQL làm gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> lọc document trong Kibana; nó không aggregate và không sắp xếp.</p><p><a class="cite" href="https://www.elastic.co/docs/reference/query-languages/kql">[17]</a> <code>field:value</code>, cụm từ trong ngoặc kép, AND/OR/NOT, wildcard, khoảng giá trị.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vậy số liệu đếm lấy từ đâu? (Từ aggregation và dashboard.)</div>
+<p class="see">Học bài: <a href="lessons/0008-kql-and-discover.vi.html">KQL</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi mình lần lượt từng câu ELK Stack này và phản biện lại câu trả lời của mình".</p>
+  <p>Nguồn: [1] <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat: How it works</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash: How it works</a> · [3] <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch: Indices, documents, mappings</a> · [4] <a href="https://www.elastic.co/docs/explore-analyze/discover">Kibana: Discover</a> · [5] <a href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">Elasticsearch: Clusters, nodes, shards</a> · [6] <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">Elasticsearch: Near real-time search</a> · [7] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">Elasticsearch: Term query</a> · [8] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">Elasticsearch: Bool query</a> · [9] <a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">Logstash: Grok filter</a> · [10] <a href="https://www.elastic.co/docs/reference/logstash/persistent-queues">Logstash: Persistent queues</a> · [11] <a href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">Elasticsearch: Text analysis</a> · [12] <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">Elasticsearch: Bulk API</a> · [13] <a href="https://www.elastic.co/docs/explore-analyze/query-filter/aggregations">Elasticsearch: Aggregations</a> · [14] <a href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">Elasticsearch: Ingest pipelines</a> · [15] <a href="https://www.elastic.co/docs/manage-data/data-store/data-streams">Elasticsearch: Data streams</a> · [16] <a href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">Elasticsearch: ILM</a> · [17] <a href="https://www.elastic.co/docs/reference/query-languages/kql">Kibana: KQL</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

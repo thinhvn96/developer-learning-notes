@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 5: Giới hạn memory và CPU, và JVM nhìn thấy gì</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Giới hạn memory và CPU, và JVM nhìn thấy gì</h1>
+<p class="meta">Docker · Bài 0005 · bước 10/12 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-memory-cpu-limits-and-the-jvm.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dự đoán được heap của JVM và số CPU bên trong một container bị giới hạn memory và CPU, và giải thích cái gì kill container khi nó vượt giới hạn.</div>
+
+<h2>Các giới hạn của Docker</h2>
+<p><code>--memory</code> (<code>-m</code>) là "lượng memory tối đa container được dùng." Khi container vượt giới hạn trên Linux, cơ chế xử lý out-of-memory của kernel "bắt đầu kill các process để giải phóng memory". <code>--cpus</code> quy định container được dùng bao nhiêu CPU của host, ví dụ <code>--cpus="1.5"</code> trên host có hai CPU nghĩa là tối đa một CPU rưỡi.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[1]</a></p>
+<h2>JVM nhìn thấy gì</h2>
+<p>Trên Linux, JVM bật sẵn tính năng phát hiện container ("automatic container detection support"), nên nó đọc giới hạn memory và CPU của container; <code>-Xlog:os+container=trace</code> cho bạn thấy nó phát hiện được gì.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a> <code>-XX:MaxRAMPercentage</code> mặc định là 25 phần trăm memory tối đa; với heap nhỏ (khoảng 125 MB) thì <code>-XX:MinRAMPercentage</code> mặc định là 50 phần trăm.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a></p>
+<h2>Đo bằng image ví dụ</h2>
+<pre><code>docker run --rm hello-multi
+  processors: 12   max heap: 3920 MB      # no limits: 1/4 of host RAM
+
+docker run --rm --memory=256m --cpus=1 hello-multi
+  processors: 1    max heap: 121 MB       # heap about half of 256 MB
+
+docker run --rm --memory=256m \
+  -e JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75 hello-multi
+  max heap: 185 MB</code></pre>
+<p>Kết quả 121 MB khớp với mặc định 50 phần trăm cho heap nhỏ mà tài liệu ghi; mối liên hệ này là cách tôi hiểu tài liệu tham chiếu, nên hãy tự kiểm chứng trong bài tập bằng cách đổi giới hạn.</p>
+<div class="aside">Điểm cấp Senior: heap không phải phần memory duy nhất JVM dùng (còn metaspace, thread stack, direct buffer, code cache), nên đặt heap bằng 100 phần trăm giới hạn là tự mời OOM killer tới. Hãy chọn tỷ lệ dưới 100 và đo đạc. Bài Kubernetes về <a href="../../kubernetes/lessons/0005-requests-limits-and-the-jvm.vi.html">requests và limits</a> xây dựng tiếp trên nền này.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Container vượt <code>--memory</code>. Cái gì ra tay?</p>
+  <button>Image registry</button>
+  <button>Trình biên dịch Java</button>
+  <button data-correct>Cơ chế OOM của kernel</button>
+  <button>File Compose</button>
+  <p class="explain">Bộ quản lý out-of-memory của kernel bắt đầu kill các process.<a class="cite" href="https://docs.docker.com/engine/containers/resource_constraints/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Không có giới hạn, max heap mặc định khoảng...?</p>
+  <button>Đúng 512 MB</button>
+  <button>Toàn bộ RAM</button>
+  <button>Một phần mười RAM</button>
+  <button data-correct>Một phần tư RAM</button>
+  <p class="explain">Max heap mặc định là 25 phần trăm (MaxRAMPercentage), tức 3920 MB trên khoảng 15.7 GB trong lần chạy ở trên.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Trong container, JVM đọc gì để tự tính kích thước?</p>
+  <button>Chỉ tổng của host</button>
+  <button data-correct>Giới hạn của container</button>
+  <button>Kích thước image</button>
+  <button>Label trong Dockerfile</button>
+  <p class="explain">Hỗ trợ container được bật mặc định trên Linux.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao không đặt MaxRAMPercentage bằng 100?</p>
+  <button>GC ngừng hoạt động</button>
+  <button>Thread biến mất hết</button>
+  <button>Docker từ chối giá trị đó</button>
+  <button data-correct>Non-heap cũng cần chỗ</button>
+  <p class="explain">JVM còn dùng memory non-heap; heap cộng phần đó phải nằm gọn trong giới hạn (lập luận cấp senior; hãy đo để kiểm chứng).</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-heap-under-limits.vi.md">Bài tập 0005: heap dưới giới hạn tài nguyên</a></p>
+<p>Ví dụ chạy được: <a href="../examples/hello-java/src/Hello.java"><code>hello-java/src/Hello.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/engine/containers/resource_constraints/">Docker Docs: Resource constraints</a>. Sau đó đọc mục -XX:MaxRAMPercentage trong tài liệu tham chiếu lệnh java.</p>
+<p><a href="0004-compose-app-and-database.vi.html">← Compose: một ứng dụng và một database</a> &nbsp;|&nbsp; <a href="0012-restart-policies.vi.html">Restart policy →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/engine/containers/resource_constraints/">Docker Docs: Resource constraints</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

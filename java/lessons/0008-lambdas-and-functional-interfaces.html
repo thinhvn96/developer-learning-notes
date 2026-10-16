@@ -3,78 +3,279 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 8: JDK 8: lambdas, method references and functional interfaces</title>
+<title>Java 8: Lambdas and functional interfaces</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 8: lambdas, method references and functional interfaces</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0008 · step 7 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Lambdas: passing a piece of code as a value</h1>
+<p class="subtitle">What a lambda really is, which interface it turns into, and the "effectively final" rule.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0008 · step 23 of 46 · Core · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0008-lambdas-and-functional-interfaces.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> write a lambda, pick the right functional interface, and explain the 'effectively final' rule.</div>
+<div class="mission"><strong>Why this lesson?</strong> Since JDK 8, almost every Java codebase passes small functions around: <code>list.forEach(...)</code>, <code>stream().filter(...)</code>, <code>executor.submit(...)</code>. Interviewers ask <em>"What is a functional interface?"</em> and <em>"Why must a captured variable be effectively final?"</em> This lesson lets you answer both.</div>
 
-<h2>What a lambda is (JDK 8)</h2>
-<p>Lambda expressions let you "treat functionality as method argument, or code as data" and express instances of single-method classes more compactly than anonymous classes.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a> They work with <em>functional interfaces</em>: interfaces with exactly one abstract method (they may also have default or static methods).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a> The JDK ships standard ones in <code>java.util.function</code>, such as <code>Predicate&lt;T&gt;</code>, <code>Consumer&lt;T&gt;</code> and <code>Function&lt;T,R&gt;</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-<h2>Syntax</h2>
-<pre><code>(a, b) -&gt; a + b                 // parameters -&gt; expression
-p -&gt; p.getAge() &gt;= 18           // one parameter: parentheses optional
-email -&gt; System.out.println(email)
-String::length                  // method reference</code></pre>
-<p>A body is a single expression or a block in braces.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-<h2>The rule interviewers ask</h2>
-<p>"A lambda expression can only access local variables and parameters of the enclosing block that are final or effectively final."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a> Effectively final means never reassigned after initialization. Lambdas are also <em>lexically scoped</em>: they introduce no new scope level, so a lambda's declarations are interpreted as in the enclosing environment.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-<pre><code>java java/examples/jdk8/Lambdas.java
-3 3 2 3        (lengths of the short names, one per line)
+<div class="win"><b>Today's win:</b> write a lambda, pick the right standard functional interface for it, turn it into a method reference, and explain the "effectively final" rule in two sentences.</div>
+
+<dl class="words">
+  <dt>interface</dt><dd>A list of methods that a class promises to provide. It says <em>what</em>, not <em>how</em>.</dd>
+  <dt>abstract method</dt><dd>A method with a name but no body. Someone else must write the body.</dd>
+  <dt>functional interface</dt><dd>An interface with exactly one abstract method. A lambda can stand in for it.</dd>
+  <dt>lambda</dt><dd>A short, nameless function you write inline, like <code>s -&gt; s.length()</code>.</dd>
+  <dt>anonymous class</dt><dd>The pre-JDK 8 way: a class with no name, written and created in one go, often just to provide one method.</dd>
+  <dt>generic <code>&lt;T&gt;</code></dt><dd>A placeholder for a type. <code>Predicate&lt;String&gt;</code> means "a Predicate that works on Strings".</dd>
+  <dt>method reference</dt><dd>An even shorter lambda that just calls an existing method, like <code>String::length</code>.</dd>
+  <dt>effectively final</dt><dd>A local variable that is never given a new value after it is first set.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"What is the type of <code>s -&gt; s.length() &lt;= 3</code>?"</em> Is it a method? An object? Something else? Guess first, even if you are not sure. You will compare at the end.</p>
+
+<h2>1. The picture: a recipe card</h2>
+<p>Imagine you hire a cook. You don't want to describe a whole new employee; you only want to hand over <strong>one recipe card</strong>: "take a name, say yes if it has 3 letters or fewer". A lambda is that recipe card. You pass it to a method, and the method decides when to use it.</p>
+<p>Before JDK 8, Java had no recipe cards. To pass behaviour you wrote an <span class="term">anonymous class</span>, a whole class just to hold one method:</p>
+<pre><code><span class="c">// JDK 7 style: an anonymous class</span>
+Predicate&lt;String&gt; shortName = new Predicate&lt;String&gt;() {
+  @Override public boolean test(String s) {
+    return s.length() &lt;= 3;
+  }
+};
+
+<span class="c">// JDK 8 style: a lambda, same meaning</span>
+Predicate&lt;String&gt; shortName = <span class="hl">s -&gt; s.length() &lt;= 3</span>;</code></pre>
+<p>The official tutorial says lambdas let you "treat functionality as method argument, or code as data", and express instances of single-method classes more compactly than anonymous classes.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a></p>
+
+<h3>The syntax, piece by piece</h3>
+<pre><code>(a, b) -&gt; a + b              <span class="c">// params -&gt; expression</span>
+p -&gt; p.getAge() &gt;= 18        <span class="c">// one param: no ( ) needed</span>
+e -&gt; System.out.println(e)   <span class="c">// returns nothing</span>
+(a, b) -&gt; { return a + b; }  <span class="c">// block: braces + return</span></code></pre>
+<p>Left of the arrow: the parameters. Right of the arrow: the body, which is either a single expression or a block in braces.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> You usually don't write the parameter types: the compiler works them out from where the lambda is used.</p>
+
+<h2>2. A functional interface: one empty slot</h2>
+<p>A lambda is not a free-floating function. Java always turns it into an <strong>object</strong> that implements some interface. Which interface? One with exactly <strong>one empty slot</strong>, that is, one abstract method. That is a <span class="term">functional interface</span>. It may also have default or static methods; those already have bodies, so they don't count.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a></p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="The lambda s -&gt; s.length() &lt;= 3 fills the single abstract method test of Predicate of String. Default and static methods already have bodies.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="66" width="210" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="125" y="91" text-anchor="middle" fill="var(--accent)">s -&gt; s.length() &lt;= 3</text>
+    <text x="125" y="50" text-anchor="middle" font-size="11" opacity=".75">your lambda</text>
+    <g fill="none" stroke="var(--accent)"><path d="M230 86h68M292 81l6 5-6 5"/></g>
+    <text x="264" y="76" text-anchor="middle" font-size="11" fill="var(--accent)">fills</text>
+    <rect x="300" y="20" width="360" height="190" rx="6" fill="none" stroke="currentColor"/>
+    <text x="320" y="44">interface Predicate&lt;String&gt;</text>
+    <rect x="316" y="62" width="328" height="48" rx="4" fill="none" stroke="var(--accent)" stroke-dasharray="5 3"/>
+    <text x="330" y="82" fill="var(--accent)">boolean test(String s);</text>
+    <text x="330" y="100" font-size="11" fill="var(--accent)">the ONE abstract method (empty slot)</text>
+    <text x="330" y="136" opacity=".75">default and(...)    has a body</text>
+    <text x="330" y="160" opacity=".75">default negate()    has a body</text>
+    <text x="330" y="184" opacity=".75">static  not(...)    has a body</text>
+  </g>
+</svg>
+<figcaption>A functional interface has one empty slot. The lambda becomes the body of that slot; the default and static methods are already written.</figcaption>
+</figure>
+
+<p>So the answer to the pre-test: <code>s -&gt; s.length() &lt;= 3</code> has no type of its own. It takes the type of the place you put it. Assigned to <code>Predicate&lt;String&gt;</code>, it becomes a <code>Predicate&lt;String&gt;</code> object. The JDK says it directly: "Functional interfaces provide target types for lambda expressions and method references."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/package-summary.html">java.util.function</a></p>
+
+<h3>The <code>@FunctionalInterface</code> label</h3>
+<p>You can mark your own interface with <code>@FunctionalInterface</code>. Then, if someone adds a second abstract method, the compiler is "required to generate an error message". The label is optional: the compiler treats any interface that fits the definition as functional "regardless of whether or not a <code>FunctionalInterface</code> annotation is present".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/FunctionalInterface.html">FunctionalInterface javadoc</a></p>
+<pre><code>@FunctionalInterface
+interface PriceRule {
+  int apply(int price);      <span class="c">// the one abstract method</span>
+}
+PriceRule tenOff = p -&gt; p - 10;
+tenOff.apply(100);           <span class="hl">// 90</span></code></pre>
+
+<h2>3. The standard toolbox: java.util.function</h2>
+<p>You rarely need your own interface. The package <code>java.util.function</code> ships ready-made ones, such as <code>Predicate&lt;T&gt;</code>, <code>Consumer&lt;T&gt;</code> and <code>Function&lt;T,R&gt;</code>.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> Learn them by their shape: what goes in, what comes out.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/package-summary.html">java.util.function</a></p>
+<table>
+<tr><th>Interface</th><th>Method</th><th>In → out</th><th>Typical use</th></tr>
+<tr><td><code>Predicate&lt;T&gt;</code></td><td><code>test</code></td><td>T → boolean</td><td><code>filter(...)</code></td></tr>
+<tr><td><code>Function&lt;T,R&gt;</code></td><td><code>apply</code></td><td>T → R</td><td><code>map(...)</code></td></tr>
+<tr><td><code>Consumer&lt;T&gt;</code></td><td><code>accept</code></td><td>T → nothing</td><td><code>forEach(...)</code></td></tr>
+<tr><td><code>Supplier&lt;T&gt;</code></td><td><code>get</code></td><td>nothing → T</td><td><code>orElseGet(...)</code>, factories</td></tr>
+<tr><td><code>BiFunction&lt;T,U,R&gt;</code></td><td><code>apply</code></td><td>T, U → R</td><td>two inputs</td></tr>
+<tr><td><code>UnaryOperator&lt;T&gt;</code></td><td><code>apply</code></td><td>T → T</td><td>same type in and out</td></tr>
+<tr><td><code>BinaryOperator&lt;T&gt;</code></td><td><code>apply</code></td><td>T, T → T</td><td>merging two values</td></tr>
+</table>
+<p class="muted">There are also versions for primitive numbers, such as <code>IntPredicate</code>, which take an <code>int</code> directly and avoid boxing it into an <code>Integer</code>.</p>
+
+<h2>4. Method references: the shortest lambda</h2>
+<p>If your lambda only calls one method that already exists, you can just <em>name</em> that method. The tutorial calls method references "compact, easy-to-read lambda expressions for methods that already have a name".<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/methodreferences.html">Method references tutorial</a> There are four kinds:</p>
+<table>
+<tr><th>Kind</th><th>Syntax</th><th>Same as the lambda</th></tr>
+<tr><td>Static method</td><td><code>Integer::parseInt</code></td><td><code>s -&gt; Integer.parseInt(s)</code></td></tr>
+<tr><td>Method of a particular object</td><td><code>System.out::println</code></td><td><code>x -&gt; System.out.println(x)</code></td></tr>
+<tr><td>Method of an arbitrary object of a type</td><td><code>String::length</code></td><td><code>s -&gt; s.length()</code></td></tr>
+<tr><td>Constructor</td><td><code>HashSet::new</code></td><td><code>() -&gt; new HashSet&lt;&gt;()</code></td></tr>
+</table>
+<p>The third kind confuses beginners. <code>String::length</code> does not name a particular string. It means "whatever string comes in, call <code>length()</code> on it".</p>
+
+<h2>5. The rule interviewers ask: effectively final</h2>
+<p>A lambda can use local variables from the method around it. But there is a rule: "A lambda expression can only access local variables and parameters of the enclosing block that are final or effectively final."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> <span class="term">Effectively final</span> means you never assign it a new value after it is first set. You don't need to write the word <code>final</code>.</p>
+<p>Think of the recipe card again. You write "add <em>base</em> grams of salt" and hand the card over with base = 10. If you could secretly change base to 11 later, which value would the cook use? Java avoids the question: once a lambda reads a local variable, that variable may not change.</p>
+
+<figure>
+<svg viewBox="0 0 680 190" role="img" aria-label="Timeline: int base = 10, then the lambda x -&gt; x + base reads base, then base = 11 is a compile error because base is no longer effectively final.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="40" width="190" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="115" y="67" text-anchor="middle">int base = 10;</text>
+    <g fill="none" stroke="currentColor"><path d="M210 62h33M237 57l6 5-6 5"/></g>
+    <rect x="245" y="40" width="190" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="67" text-anchor="middle">x -&gt; x + base</text>
+    <g fill="none" stroke="currentColor"><path d="M435 62h33M462 57l6 5-6 5"/></g>
+    <rect x="470" y="40" width="190" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="565" y="67" text-anchor="middle" fill="var(--accent)">base = 11;</text>
+    <text x="115" y="25" text-anchor="middle" font-size="11" opacity=".75">step 1: set once</text>
+    <text x="340" y="25" text-anchor="middle" font-size="11" opacity=".75">step 2: lambda reads it</text>
+    <text x="565" y="25" text-anchor="middle" font-size="11" fill="var(--accent)">step 3: reassign</text>
+    <text x="115" y="110" text-anchor="middle" font-size="11">never changed so far</text>
+    <text x="340" y="110" text-anchor="middle" font-size="11">plusBase.apply(5) → 15</text>
+    <text x="565" y="110" text-anchor="middle" font-size="11" fill="var(--accent)">compile error</text>
+    <path d="M30 140h620" stroke="currentColor" opacity=".3"/>
+    <text x="340" y="168" text-anchor="middle" font-size="12">only if step 3 never exists is base "effectively final"</text>
+  </g>
+</svg>
+<figcaption>The compiler checks the whole method. One reassignment anywhere, even after the lambda, makes the capture illegal.</figcaption>
+</figure>
+
+<h3>Lambdas don't open a new scope</h3>
+<p>Lambdas are <em>lexically scoped</em>: they don't inherit names from a supertype and don't introduce a new level of scoping, so names inside the lambda mean the same as just outside it.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> In practice: you cannot declare a lambda parameter with the same name as a local variable of the method around it; the tutorial shows the compiler error "Lambda expression's parameter x cannot redeclare another local variable defined in an enclosing scope". An anonymous class, in contrast, is a real class and has its own scope.</p>
+
+<h3>Trace the example step by step</h3>
+<pre><code>List&lt;String&gt; names = Arrays.asList("ann", "bob", "cy", "dee");
+Predicate&lt;String&gt; shortName = s -&gt; s.length() &lt;= 3;
+Function&lt;String, Integer&gt; length = String::length;
+names.stream().filter(shortName).map(length).forEach(System.out::println);
+<span class="c">Step 1  "ann": test → 3 &lt;= 3 true  → apply → 3 → println</span>
+<span class="c">Step 2  "bob": test → true         → 3 → println</span>
+<span class="c">Step 3  "cy":  test → true         → 2 → println</span>
+<span class="c">Step 4  "dee": test → true         → 3 → println</span>
+
+int base = 10;                                  <span class="c">// effectively final</span>
+Function&lt;Integer, Integer&gt; plusBase = x -&gt; x + base;
+System.out.println(plusBase.apply(5));          <span class="hl">// 15</span></code></pre>
+<p>Run it yourself (it compiles with <code>javac --release 8</code>, so it uses only JDK 8 features):</p>
+<pre><code>$ java java/examples/jdk8/Lambdas.java
+3
+3
+2
+3
 15</code></pre>
-<p>Source: <a href="../examples/jdk8/Lambdas.java"><code>Lambdas.java</code></a>, compiled with <code>javac --release 8</code> to prove it uses only JDK 8 features.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. A functional interface has exactly how many abstract methods?</p>
-  <button>Exactly two</button>
-  <button data-correct>Exactly one</button>
-  <button>At least two</button>
-  <button>Zero methods</button>
-  <p class="explain">It contains only one abstract method, though it may have default or static methods.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. A lambda reads a local variable that is reassigned later. Result?</p>
-  <button data-correct>Compile error</button>
-  <button>Runtime exception</button>
-  <button>Runs with latest</button>
-  <button>Runs with a copy</button>
-  <p class="explain">Captured locals must be final or effectively final.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Which standard interface takes T and returns boolean?</p>
-  <button>Consumer of T</button>
-  <button>Function of T,R</button>
-  <button data-correct>Predicate of T</button>
-  <button>Supplier of T</button>
-  <p class="explain">Predicate&lt;T&gt; is the boolean-returning test interface in java.util.function.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Lambdas are lexically scoped. Meaning?</p>
-  <button>A separate class scope</button>
-  <button data-correct>No new name scope</button>
-  <button>Inherit supertype names</button>
-  <button>A new inner scope</button>
-  <p class="explain">They do not inherit names from a supertype or introduce a new level of scoping.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">[1]</a></p>
-</div>
+<h3>Common mistake: counting inside a lambda</h3>
+<pre><code>int count = 0;
+names.forEach(n -&gt; count++);   <span class="hl">// compile error: count is not effectively final</span></code></pre>
+<p>The fix is not to "trick" the compiler. Ask the stream for the answer instead: <code>long count = names.stream().count();</code>. <a href="0004-streams-and-optional.html">Lesson 0004</a> explains why side effects inside stream lambdas are discouraged.</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<p>Lambdas, method references and <code>java.util.function</code> all arrived in JDK 8 and work the same on 17 and 21. Newer JDKs add more methods that <em>take</em> lambdas (for example the static <code>Predicate.not</code>, added in JDK 11 and shown in the diagram<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/Predicate.html">Predicate javadoc</a>), but the rules in this lesson have not changed.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">How many abstract methods does a functional interface have?</p>
+  <div class="options">
+    <button class="opt" data-correct>Exactly one, plus any number of default or static methods</button>
+    <button class="opt">Exactly two, one for input and one for the output value</button>
+    <button class="opt">At least one, and every other method must be abstract too</button>
+    <button class="opt">None at all, because the lambda supplies every method body</button>
+  </div>
+  <div class="why">One abstract method, the "empty slot" the lambda fills. Default and static methods already have bodies, so they don't count.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the type of the lambda <code>s -&gt; s.isEmpty()</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Whatever functional interface the context expects, e.g. Predicate&lt;String&gt;</button>
+    <button class="opt">Always java.lang.Function, the single built-in type of every lambda</button>
+    <button class="opt">A method, so it has no type and cannot be stored in a variable</button>
+    <button class="opt">Always Object, and you must cast it before you can call it</button>
+  </div>
+  <div class="why">A lambda takes its type from its target: functional interfaces "provide target types for lambda expressions and method references".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A lambda reads the local variable <code>limit</code>. Three lines later, the method runs <code>limit = 5;</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It does not compile</button>
+    <button class="opt">It throws at runtime</button>
+    <button class="opt">The lambda sees 5</button>
+    <button class="opt">The lambda sees the old value</button>
+  </div>
+  <div class="why">Captured locals must be final or effectively final. A reassignment anywhere in the method breaks that, so the compiler rejects it.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which standard interface takes a <code>T</code> and returns a <code>boolean</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Predicate&lt;T&gt;</button>
+    <button class="opt">Consumer&lt;T&gt;</button>
+    <button class="opt">Supplier&lt;T&gt;</button>
+    <button class="opt">Function&lt;T,R&gt;</button>
+  </div>
+  <div class="why"><code>Predicate&lt;T&gt;</code> has <code>boolean test(T t)</code>. Consumer returns nothing, Supplier takes nothing, Function returns any R.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which lambda is the same as the method reference <code>String::length</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>s -&gt; s.length()</button>
+    <button class="opt">() -&gt; String.length()</button>
+    <button class="opt">s -&gt; String.length(s)</button>
+    <button class="opt">() -&gt; new String().length()</button>
+  </div>
+  <div class="why">This is "an instance method of an arbitrary object of a type": the incoming string becomes the object the method is called on.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">"Lambdas are lexically scoped." What does that mean in practice?</p>
+  <div class="options">
+    <button class="opt" data-correct>Names inside mean the same as just outside; no new scope is added</button>
+    <button class="opt">The lambda gets its own scope, so it may shadow any local variable</button>
+    <button class="opt">The lambda inherits field and method names from its interface type</button>
+    <button class="opt">The lambda can only see static fields, never local variables at all</button>
+  </div>
+  <div class="why">Lambdas don't inherit names from a supertype or introduce a new level of scoping. An anonymous class, by contrast, does have its own scope.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is a lambda, and what is a functional interface?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A lambda is a short nameless function that lets you pass behaviour as a value (JDK 8).</label></li>
+      <li><label><input type="checkbox"> It replaces most single-method anonymous classes with much less code.</label></li>
+      <li><label><input type="checkbox"> A functional interface has exactly one abstract method; default and static methods don't count.</label></li>
+      <li><label><input type="checkbox"> The lambda gets its type from the target interface, e.g. <code>Predicate</code>, <code>Function</code>, <code>Consumer</code>, <code>Supplier</code>.</label></li>
+      <li><label><input type="checkbox"> Method references like <code>String::length</code> are shorter lambdas for existing methods.</label></li>
+      <li><label><input type="checkbox"> Captured local variables must be final or effectively final.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A lambda, added in JDK 8, is a short anonymous function, so I can pass behaviour as a value, for example to <code>filter</code> or <code>forEach</code>. Before that we wrote anonymous classes just to hold one method. A lambda always becomes an object of a functional interface, which is an interface with exactly one abstract method; it can still have default and static methods. The JDK gives the common shapes in <code>java.util.function</code>: <code>Predicate</code> returns a boolean, <code>Function</code> maps T to R, <code>Consumer</code> takes a value and returns nothing, <code>Supplier</code> produces one. If the lambda only calls an existing method, I use a method reference like <code>String::length</code>. And one rule: a lambda can only read local variables that are final or effectively final, so I can't increment a counter inside it."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0008-refactor-anonymous-classes.md">Exercise 0008: replace anonymous classes</a></p>
+<p><a href="../exercises/0008-refactor-anonymous-classes.md">Exercise 0008: replace anonymous classes</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/jdk8/Lambdas.java"><code>jdk8/Lambdas.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a>. Read the whole page, including 'Accessing Local Variables'.</p>
-<p><a href="0021-wildcards-and-type-erasure.html">← Wildcards (extends, super) and type erasure</a> &nbsp;|&nbsp; <a href="0009-default-methods-and-conflicts.html">JDK 8: default methods and conflict resolution →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"How did the JDK add methods like <code>Predicate.and</code> or <code>List.forEach</code> to old interfaces without breaking every class that implements them?"</em> That is <a href="0009-default-methods-and-conflicts.html">lesson 0009, default methods</a>. Then <a href="0004-streams-and-optional.html">lesson 0004</a> puts lambdas to work in streams.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a>. Read the whole page, including "Accessing Local Variables of the Enclosing Scope".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What does target type mean exactly?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0043-review-collections-advanced.html">← Review 4: navigable, priority, special and concurrent collections</a> &nbsp;|&nbsp; <a href="0009-default-methods-and-conflicts.html">Default methods: adding to an interface without breaking anyone →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Oracle Java Tutorials and the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a> · <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/methodreferences.html">Oracle Java Tutorials: Method References</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/package-summary.html">java.util.function Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/FunctionalInterface.html">FunctionalInterface Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

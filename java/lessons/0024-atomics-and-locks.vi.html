@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 24: Atomic và ReentrantLock: sửa lỗi mất update</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Vì sao <code>count++</code> làm mất update, và cách sửa</h1>
+<p class="subtitle">Một dòng Java, ba bước với CPU. Atomic và lock gắn chúng lại thành một.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0024 · bước 31/46 · Advanced · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0024-atomics-and-locks.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Bộ đếm, số dư, tồn kho, rate limit: service thật cập nhật các con số dùng chung từ nhiều thread liên tục. Interviewer hỏi <em>"<code>volatile int count; count++</code> có thread-safe không?"</em> ngay sau câu happens-before. Bài này cho bạn thấy vì sao câu trả lời là không, và cách chọn giữa atomic và lock.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> chứng minh <code>volatile</code> <code>count++</code> làm mất update và sửa nó bằng atomic hoặc lock.</div>
+
+<dl class="words">
+  <dt>atomic</dt><dd>Nguyên tử, "tất cả hoặc không gì, trong một lần": không thread nào thấy thao tác làm dở hay chen vào giữa các bước của nó.</dd>
+  <dt>read-modify-write</dt><dd>Thao tác ba bước: đọc giá trị cũ, tính giá trị mới, ghi lại. <code>count++</code> là một ví dụ.</dd>
+  <dt>lost update</dt><dd>Mất update: hai thread cùng ghi kết quả, kết quả này đè lên kết quả kia, nên một thay đổi biến mất.</dd>
+  <dt>compare-and-set (CAS)</dt><dd>"Đặt giá trị thành 6, nhưng chỉ khi nó vẫn còn là 5." Thành công hay thất bại trong một bước nguyên tử.</dd>
+  <dt>lock</dt><dd>Một object mà tại một thời điểm chỉ một thread được giữ. Các thread khác muốn lấy thì phải chờ.</dd>
+  <dt>reentrant</dt><dd>Một thread đang giữ lock có thể lấy lại nó lần nữa mà không tự chặn chính mình.</dd>
+  <dt>contention</dt><dd>Tranh chấp: nhiều thread cùng cố dùng một lock hoặc một biến tại cùng thời điểm.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Bốn thread, mỗi thread chạy <code>count++</code> 200.000 lần trên một <code>volatile int</code>. Giá trị cuối cùng là bao nhiêu?"</em> Chọn một con số và nói vì sao. Kết quả thật nằm ở mục 2.</p>
+
+<h2>1. Một dòng, ba bước</h2>
+<p>Hãy tưởng tượng một tờ giấy đếm dán trên tường. Để cộng thêm một, một người (1) đọc con số, (2) cộng một trong đầu, (3) xóa đi và viết số mới. Nếu hai người làm cùng lúc, cả hai có thể đọc 5, cả hai nghĩ "6", và cả hai viết 6. Hai người đã đếm, nhưng tờ giấy chỉ tăng một.</p>
+<p>Đó chính xác là <code>count++</code>. Tutorial của Oracle tách <code>c++</code> thành ba bước: "Lấy giá trị hiện tại của <code>c</code>", "Tăng giá trị vừa lấy thêm 1", "Lưu giá trị đã tăng trở lại vào <code>c</code>".<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interfere.html">Java tutorial: thread interference</a> Một thread khác có thể chạy chen vào giữa bất kỳ hai bước nào.</p>
+
+<figure>
+<svg viewBox="0 0 680 320" role="img" aria-label="Thread A và thread B cùng đọc count bằng 5, cùng cộng 1, cùng ghi 6. Biến count dùng chung kết thúc ở 6 thay vì 7: một update bị mất.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="140" y="26" text-anchor="middle" font-size="13">thread A</text>
+    <text x="340" y="26" text-anchor="middle" font-size="13">count dùng chung</text>
+    <text x="540" y="26" text-anchor="middle" font-size="13">thread B</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="44" width="220" height="30" rx="4"/>
+      <rect x="430" y="84" width="220" height="30" rx="4"/>
+      <rect x="30" y="124" width="220" height="30" rx="4"/>
+      <rect x="430" y="164" width="220" height="30" rx="4"/>
+      <rect x="30" y="204" width="220" height="30" rx="4"/>
+      <rect x="290" y="44" width="100" height="30" rx="4"/>
+      <rect x="290" y="84" width="100" height="30" rx="4"/>
+      <rect x="290" y="124" width="100" height="30" rx="4"/>
+      <rect x="290" y="164" width="100" height="30" rx="4"/>
+      <rect x="290" y="204" width="100" height="30" rx="4"/>
+      <path d="M290 59h-34M262 54l-6 5 6 5"/>
+      <path d="M390 99h34M418 94l6 5-6 5"/>
+      <path d="M250 219h34M278 214l6 5-6 5"/>
+      <path d="M430 259h-34M402 254l-6 5 6 5" stroke="var(--accent)"/>
+    </g>
+    <rect x="430" y="244" width="220" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="290" y="244" width="100" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="140" y="64" text-anchor="middle">1. đọc count → 5</text>
+    <text x="540" y="104" text-anchor="middle">2. đọc count → 5</text>
+    <text x="140" y="144" text-anchor="middle">3. 5 + 1 = 6 (cục bộ)</text>
+    <text x="540" y="184" text-anchor="middle">4. 5 + 1 = 6 (cục bộ)</text>
+    <text x="140" y="224" text-anchor="middle">5. ghi 6</text>
+    <text x="540" y="264" text-anchor="middle" fill="var(--accent)">6. ghi 6</text>
+    <text x="340" y="64" text-anchor="middle">5</text>
+    <text x="340" y="104" text-anchor="middle">5</text>
+    <text x="340" y="144" text-anchor="middle">5</text>
+    <text x="340" y="184" text-anchor="middle">5</text>
+    <text x="340" y="224" text-anchor="middle">6</text>
+    <text x="340" y="264" text-anchor="middle" fill="var(--accent)">6 (lẽ ra 7)</text>
+    <text x="340" y="304" text-anchor="middle" font-size="12" fill="var(--accent)">hai lần tăng, count chỉ tăng một: update của A bị mất</text>
+  </g>
+</svg>
+<figcaption>Một lost update. Bước đọc, cộng, ghi của mỗi thread tự nó đều đúng; vấn đề là B đã chen vào giữa lần đọc và lần ghi của A.</figcaption>
+</figure>
+
+<p>Giờ bạn thấy vì sao <code>volatile</code> không giúp được. <a href="0005-visibility-and-happens-before.vi.html">Bài 0005</a> nói <code>volatile</code> cho visibility và thứ tự,<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17</a> không cho read-modify-write nguyên tử. Trong hình, mọi lần đọc <em>đều</em> mới: cả hai thread thật sự thấy 5. Visibility chưa bao giờ là vấn đề. Vấn đề là khoảng hở giữa bước 1 và bước 5.</p>
+
+<h2>2. Xem nó xảy ra</h2>
+<p>Ví dụ <code>AtomicDemo.java</code> khởi động bốn thread. Mỗi thread tăng 200.000 lần trên ba bộ đếm: một <code>volatile int</code>, một <code>AtomicInteger</code>, và một <code>int</code> được bảo vệ bởi <code>ReentrantLock</code>.</p>
+<pre><code>volatileCount++;                    <span class="c">// read-modify-write: NOT atomic</span>
+atomicCount.incrementAndGet();      <span class="c">// atomic</span>
+lock.lock();
+try { lockedCount++; } finally { lock.unlock(); }   <span class="c">// one thread at a time</span></code></pre>
+<pre><code>$ java java/examples/AtomicDemo.java
+expected       : 800000
+volatile int   : <span class="hl">797349  (lost updates: 2651)</span>
+AtomicInteger  : 800000
+ReentrantLock  : 800000</code></pre>
+<p class="muted">Con số volatile thay đổi mỗi lần chạy (một lần chạy trước đó mất 1642 update). Đó là chuyện bình thường với race: kết quả phụ thuộc vào cách các thread tình cờ xen kẽ. Đôi khi nó còn ra đúng, đó là lý do test hiếm khi bắt được bug này.</p>
+
+<h2>3. Cách sửa 1: atomic và compare-and-set</h2>
+<p>Quay lại tờ giấy đếm. Một quy tắc khôn hơn: "Đọc con số. Tính số mới. Trước khi viết, kiểm tra tờ giấy <em>vẫn</em> ghi đúng số bạn đã đọc. Nếu đúng, viết. Nếu ai đó đã đổi, làm lại từ đầu." Bước kiểm tra-và-viết là một hành động duy nhất, không ai chen vào được. Quy tắc đó là <span class="term">compare-and-set</span>.</p>
+<p><code>AtomicInteger</code> là "Một giá trị <code>int</code> có thể được cập nhật một cách nguyên tử", dùng "trong các ứng dụng như bộ đếm tăng nguyên tử".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a> Phương thức <code>compareAndSet(expected, newValue)</code> của nó "Đặt giá trị thành <code>newValue</code> một cách nguyên tử nếu giá trị hiện tại <code>== expectedValue</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Vòng lặp compare-and-set: đọc giá trị hiện tại 5, tính 6, compareAndSet từ 5 sang 6. Nếu true thì xong. Nếu false vì thread khác đã đổi, quay lại đọc lần nữa.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="50" width="180" height="44" rx="6"/>
+      <rect x="250" y="50" width="180" height="44" rx="6"/>
+      <path d="M200 72h44M238 67l6 5-6 5"/>
+      <path d="M430 72h44M468 67l6 5-6 5"/>
+      <path d="M570 94v40M565 128l5 6 5-6"/>
+    </g>
+    <rect x="480" y="50" width="180" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="480" y="136" width="180" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <path d="M570 50V30H110v14M105 38l5 6 5-6" fill="none" stroke="var(--accent)"/>
+    <text x="110" y="77" text-anchor="middle">cur = get() → 5</text>
+    <text x="340" y="77" text-anchor="middle">next = cur + 1</text>
+    <text x="570" y="77" text-anchor="middle" fill="var(--accent)">CAS(5, 6)</text>
+    <text x="580" y="118" font-size="11">true</text>
+    <text x="570" y="163" text-anchor="middle">count là 6, xong</text>
+    <text x="340" y="22" text-anchor="middle" font-size="11" fill="var(--accent)">false: thread khác đã đổi nó → đọc lại</text>
+  </g>
+</svg>
+<figcaption>Vòng lặp compare-and-set. Nếu thread B ghi trước, CAS của A thất bại (giá trị không còn là 5), nên A chỉ việc thử lại với giá trị mới. Không update nào bị mất và không thread nào phải chờ lock.</figcaption>
+</figure>
+
+<p>Lần lại kiểu xen kẽ xấu ở mục 1, giờ với CAS:</p>
+<pre><code><span class="c">Bước 1  A đọc 5              B đọc 5</span>
+<span class="c">Bước 2  A: CAS(5, 6) → true  count là 6</span>
+<span class="c">Bước 3  B: CAS(5, 6) → <span class="hl">false</span>  (count là 6, không phải 5)</span>
+<span class="c">Bước 4  B đọc lại → 6, CAS(6, 7) → true   count là 7 ✓</span></code></pre>
+<p>Hiếm khi bạn tự viết vòng lặp đó. Package atomic là "một bộ công cụ nhỏ gồm các class hỗ trợ lập trình thread-safe không cần lock trên từng biến đơn lẻ", với <code>compareAndSet</code> ở mức thấp và các phương thức mức cao như <code>getAndUpdate</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">atomic package</a> Việc đọc và ghi của chúng publish giá trị giống field volatile: <code>get()</code> có "memory effect như đặc tả của <code>VarHandle.getVolatile</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a></p>
+<pre><code>AtomicInteger count = new AtomicInteger();
+count.incrementAndGet();               <span class="c">// ++count, atomically</span>
+count.updateAndGet(x -&gt; x * 2);        <span class="c">// any function, atomically</span>
+count.compareAndSet(10, 0);            <span class="c">// reset only if it is still 10</span></code></pre>
+<p><strong>Bẫy:</strong> hàm bạn truyền cho <code>updateAndGet</code> "nên không có side effect, vì nó có thể được gọi lại khi việc cập nhật thất bại do tranh chấp giữa các thread".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a> Đừng gửi email hay ghi nhận thanh toán bên trong nó: nó có thể chạy hai lần.</p>
+<h3>Nhiều thread, một bộ đếm: <code>LongAdder</code></h3>
+<p>Khi tranh chấp rất nặng, nhiều lần CAS thất bại và phải thử lại. Với bộ đếm có <code>LongAdder</code> và các class cùng họ. <code>LongAdder</code> "thường nên dùng hơn <code>AtomicLong</code> khi nhiều thread cùng cập nhật một tổng chung dùng cho mục đích như thu thập thống kê"; khi tranh chấp cao, thông lượng của nó "cao hơn đáng kể, đổi lại tốn nhiều bộ nhớ hơn".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html">LongAdder javadoc</a> Bạn sẽ gặp lại nó ở <a href="0025-concurrenthashmap.vi.html">bài 0025</a>.</p>
+
+<h2>4. Cách sửa 2: một lock</h2>
+<p>Hãy nghĩ tới chiếc chìa khóa nhà vệ sinh duy nhất của một cửa hàng. Ai cầm chìa thì vào; những người khác xếp hàng chờ. Khi ra, bạn trả chìa lại. Một <span class="term">lock</span> hoạt động y như vậy: code nằm giữa <code>lock()</code> và <code>unlock()</code> chỉ chạy trong một thread tại một thời điểm, nên ba bước của <code>count++</code> không còn bị tách ra được.</p>
+<p>Java có hai loại. Loại có sẵn là <code>synchronized</code>. Loại trong thư viện là <code>ReentrantLock</code>: "Một <code>Lock</code> loại trừ lẫn nhau có tính reentrant, có hành vi và ngữ nghĩa cơ bản giống monitor lock ngầm định dùng qua các method và câu lệnh <code>synchronized</code>, nhưng có thêm khả năng mở rộng."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a></p>
+<pre><code><span class="c">// built-in lock</span>
+synchronized (this) { count++; }
+
+<span class="c">// ReentrantLock: the documented idiom</span>
+lock.lock();
+try { count++; } finally { lock.unlock(); }</code></pre>
+<p>Từng dòng một:</p>
+<ol class="steps">
+  <li><code>lock.lock()</code> chờ đến khi không thread nào khác giữ lock, rồi lấy nó. Đặt nó ngay trước <code>try</code>.</li>
+  <li>Khối <code>try</code> là phần việc được bảo vệ.</li>
+  <li><code>unlock()</code> đứng đầu trong <code>finally</code>, nên lock được nhả ra kể cả khi phần việc ném exception. Javadoc khuyên "<em>luôn luôn</em> theo ngay sau lời gọi <code>lock</code> bằng một khối <code>try</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a></li>
+</ol>
+<p>Lock cũng tạo ra cạnh happens-before của bài 0005: một lần <code>unlock</code> happens-before lần <code>lock</code> thành công kế tiếp trên cùng lock đó.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent: memory consistency</a> Vì vậy thread tiếp theo thấy được count đã cập nhật.</p>
+<h3>"Reentrant" nghĩa là gì</h3>
+<p>Nếu một thread đang giữ lock và gọi <code>lock()</code> lần nữa (ví dụ một method có lock gọi một method khác), nó không tự chặn mình: "Nếu thread hiện tại đã giữ lock thì hold count tăng thêm một và method trả về ngay lập tức."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a> Nó phải gọi <code>unlock()</code> đúng bấy nhiêu lần.</p>
+<h3>ReentrantLock có thêm gì so với synchronized</h3>
+<ul>
+  <li><strong><code>tryLock()</code>:</strong> chỉ lấy lock nếu ngay lúc này nó đang rảnh; nếu không thì trả về <code>false</code> ngay. <code>tryLock(time, unit)</code> chờ tối đa chừng đó thời gian. Hữu ích để chống deadlock (<a href="0026-deadlock-and-lock-ordering.vi.html">bài 0026</a>).</li>
+  <li><strong><code>lockInterruptibly()</code>:</strong> thread đang chờ có thể bị interrupt thay vì chờ mãi.</li>
+  <li><strong>Fairness (công bằng):</strong> với <code>new ReentrantLock(true)</code>, "khi có tranh chấp, lock ưu tiên trao quyền cho thread đã chờ lâu nhất"; nếu không thì không có thứ tự cụ thể nào.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a></li>
+  <li><strong>Condition:</strong> <code>newCondition()</code> cho các hàng chờ kiểu wait/notify.</li>
+</ul>
+
+<h2>5. Nên dùng cái nào?</h2>
+<table>
+  <tr><th>Tình huống</th><th>Dùng</th><th>Vì sao</th></tr>
+  <tr><td>Một bộ đếm hoặc một giá trị, cập nhật đơn giản</td><td><code>AtomicInteger</code> / <code>AtomicLong</code></td><td>Không cần lock, ngắn gọn, không có unlock để quên</td></tr>
+  <tr><td>Bộ đếm thống kê bị nhiều thread cùng đập vào</td><td><code>LongAdder</code></td><td>Thông lượng cao hơn khi có tranh chấp</td></tr>
+  <tr><td>Nhiều biến phải đổi cùng nhau</td><td><code>synchronized</code> hoặc một lock</td><td>Atomic chỉ bảo vệ một biến</td></tr>
+  <tr><td>Cần timeout, chờ có thể interrupt, hoặc fairness</td><td><code>ReentrantLock</code></td><td><code>synchronized</code> không có những thứ này</td></tr>
+</table>
+<h3>Lỗi thường gặp</h3>
+<ul>
+  <li><strong>Check-then-act trên atomic:</strong> <code>if (a.get() == 0) a.set(1);</code> là hai bước nguyên tử riêng biệt, nên thread khác có thể chen vào giữa. Dùng <code>a.compareAndSet(0, 1)</code>.</li>
+  <li><strong>Hai atomic, một quy tắc:</strong> giữ <code>min</code> và <code>max</code> trong hai <code>AtomicInteger</code> không làm quy tắc "min ≤ max" an toàn. Dùng một lock cho cả hai.</li>
+  <li><strong>unlock() không nằm trong finally:</strong> chỉ cần một exception là lock bị giữ mãi; mọi thread khác đều chờ.</li>
+  <li><strong>Lock khác nhau:</strong> hai thread lock hai object <em>khác nhau</em> thì hoàn toàn không loại trừ nhau.</li>
+</ul>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Bốn thread chạy <code>count++</code> trên một <code>volatile int</code>. Điều gì có thể sai?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mất update: tổng cuối cùng bị thấp hơn</button>
+    <button class="opt">Deadlock giữa bốn thread với nhau</button>
+    <button class="opt">Lỗi compile liên quan tới field volatile</button>
+    <button class="opt">Không gì cả, volatile làm nó thread-safe</button>
+  </div>
+  <div class="why"><code>count++</code> là read-modify-write. <code>volatile</code> làm mỗi lần đọc là mới nhất nhưng không ngăn thread khác ghi chen giữa lần đọc và lần ghi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao lost update trong hình lại xảy ra, dù cả hai lần đọc đều mới nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>B chạy chen giữa lần đọc và lần ghi của A</button>
+    <button class="opt">A đọc một giá trị cũ từ CPU cache của nó</button>
+    <button class="opt">Compiler đã xóa mất một trong hai lần ghi</button>
+    <button class="opt">Biến int bị tràn vượt qua giá trị lớn nhất</button>
+  </div>
+  <div class="why">Vấn đề là tính nguyên tử, không phải visibility: ba bước bị tách ra, và lần ghi của B thay thế lần ghi của A.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Giá trị đang là 6. Thread B gọi <code>compareAndSet(5, 6)</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Trả về false và không đổi gì</button>
+    <button class="opt">Đặt giá trị thành 6 và trả về true</button>
+    <button class="opt">Chặn lại cho đến khi giá trị thành 5</button>
+    <button class="opt">Ném ra IllegalStateException</button>
+  </div>
+  <div class="why">CAS chỉ ghi nếu giá trị hiện tại bằng giá trị mong đợi. Nó thất bại, nên B phải đọc lại và thử lại.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Khi dùng <code>ReentrantLock</code>, <code>unlock()</code> nên đặt ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Câu lệnh đầu tiên trong finally</button>
+    <button class="opt">Câu lệnh cuối cùng bên trong try</button>
+    <button class="opt">Chỉ đặt bên trong khối catch</button>
+    <button class="opt">Ngay trước khi gọi lock()</button>
+  </div>
+  <div class="why">Idiom trong tài liệu: <code>lock()</code> ngay trước <code>try</code>, <code>unlock()</code> trong <code>finally</code>, để exception không thể để lại lock bị giữ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Method nào thử lấy lock mà không bị chặn?</p>
+  <div class="options">
+    <button class="opt" data-correct>tryLock()</button>
+    <button class="opt">lock()</button>
+    <button class="opt">newCondition()</button>
+    <button class="opt">getHoldCount()</button>
+  </div>
+  <div class="why"><code>tryLock()</code> chỉ lấy lock nếu lúc đó không thread nào khác giữ nó; nếu không thì trả về <code>false</code> ngay.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn phải cập nhật <code>balance</code> và <code>history</code> cùng nhau để chúng luôn khớp. Công cụ tốt nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một lock bao quanh cả hai lần cập nhật</button>
+    <button class="opt">Mỗi field một AtomicInteger riêng</button>
+    <button class="opt">Đánh dấu cả hai field là volatile</button>
+    <button class="opt">Một LongAdder cho số dư balance</button>
+  </div>
+  <div class="why">Atomic chỉ bảo vệ một biến. Một quy tắc liên quan tới hai biến cần một lock (hoặc <code>synchronized</code>) bao quanh cả hai.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Nhiều thread cùng tăng một bộ đếm thống kê, và nó chậm. Javadoc gợi ý gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>LongAdder, đổi bộ nhớ lấy thông lượng</button>
+    <button class="opt">Một ReentrantLock fair bao quanh bộ đếm</button>
+    <button class="opt">Một volatile long với count++ trong vòng lặp</button>
+    <button class="opt">AtomicLong với một vòng thử lại liên tục</button>
+  </div>
+  <div class="why">Khi tranh chấp cao, thông lượng kỳ vọng của <code>LongAdder</code> cao hơn đáng kể, đổi lại tốn thêm bộ nhớ.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"<code>volatile int count; count++</code> có thread-safe không? Bạn sửa thế nào?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Không: count++ là đọc, cộng, ghi, ba bước tách biệt.</label></li>
+      <li><label><input type="checkbox"> Hai thread có thể đọc cùng giá trị và lần ghi này đè lần ghi kia (lost update).</label></li>
+      <li><label><input type="checkbox"> volatile sửa visibility, không sửa tính nguyên tử.</label></li>
+      <li><label><input type="checkbox"> Cách 1: AtomicInteger, dùng compare-and-set và thử lại; không cần lock.</label></li>
+      <li><label><input type="checkbox"> Cách 2: synchronized hoặc ReentrantLock, với unlock() trong finally.</label></li>
+      <li><label><input type="checkbox"> Lựa chọn: atomic cho một biến, lock cho nhiều biến cùng lúc; LongAdder cho bộ đếm nóng.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Không ạ. count++ nhìn như một câu lệnh nhưng thật ra là đọc, cộng và ghi. Hai thread có thể cùng đọc 5 và cùng ghi 6, nên mất một lần tăng. volatile không giúp được, vì nó chỉ đảm bảo visibility và thứ tự, chứ không bảo đảm ba bước chạy như một. Em sẽ sửa bằng AtomicInteger với incrementAndGet: nó dùng compare-and-set, nên nếu thread khác đổi giá trị ở giữa thì CAS fail và nó retry, không cần lock. Nếu cần cập nhật nhiều field cùng nhau, em dùng synchronized hoặc ReentrantLock, lock trước try và unlock trong finally; ReentrantLock còn cho em tryLock có timeout và fairness. Với một bộ đếm thống kê rất nóng thì em dùng LongAdder, scale tốt hơn khi có contention, đổi lại tốn thêm chút bộ nhớ."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0024-fix-the-counter.vi.md">Bài tập 0024: sửa bộ đếm</a>. Hãy gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior sẽ chuyển từ một bộ đếm sang cả một map: <em>"Nhiều thread đếm từ trong một map dùng chung. <code>ConcurrentHashMap</code> đã đủ chưa, hay vẫn có thể mất update?"</em> <a href="0025-concurrenthashmap.vi.html">Bài 0025</a> cho thấy check-then-put vẫn bị race, và method nào là nguyên tử.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">package java.util.concurrent.atomic</a>, rồi phần mô tả class của <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock</a>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào synchronized tốt hơn ReentrantLock?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0005-visibility-and-happens-before.vi.html">← Vì sao một thread có thể không thấy giá trị mà thread khác đã ghi</a> &nbsp;|&nbsp; <a href="0025-concurrenthashmap.vi.html">Dùng chung một map giữa các thread: ConcurrentHashMap →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, Java Language Specification (Java SE 21) và Oracle Java Tutorials, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">Javadoc của AtomicInteger</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html">Javadoc của LongAdder</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">Javadoc của ReentrantLock</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS chapter 17</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interfere.html">Java Tutorials: Thread Interference</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

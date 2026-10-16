@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 17: SOLID 1: Single Responsibility Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 1: Single Responsibility Principle</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0017 · bước 17/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0017-single-responsibility-principle.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> phát biểu SRP là 'chỉ một lý do để thay đổi' và tách một class theo các lý do thay đổi của nó.</div>
+
+<h2>Nguyên lý</h2>
+<p>SOLID bắt nguồn từ bài viết năm 2000 "Design Principles and Design Patterns" của Robert C. Martin; Michael Feathers là người đặt ra từ viết tắt này. <strong>Single Responsibility Principle</strong>: "Không bao giờ nên có quá một lý do để một class phải thay đổi."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+<h2>Áp dụng</h2>
+<p>Một class hoá đơn vừa tính thuế, vừa định dạng văn bản, vừa lưu xuống storage thì có ba lý do để thay đổi (quy định thuế, bố cục, cách lưu trữ). Hãy tách nó ra:</p>
+<pre><code>java oop/examples/SrpDemo.java
+INVOICE amount=200
+saved invoice 200
+tax: 20</code></pre>
+<p><code>TaxCalculator</code>, <code>InvoicePrinter</code> và <code>InvoiceStore</code> mỗi class chỉ thay đổi vì đúng một lý do. Mã nguồn: <a href="../examples/SrpDemo.java"><code>SrpDemo.java</code></a>. Dấu hiệu cho thấy bạn đang vi phạm: tên class kết thúc bằng Manager hoặc Util, import nhiều thứ chẳng liên quan gì nhau, test cần setup rất nặng. Đừng tách quá đà: một "trách nhiệm" là một lý do để thay đổi, chứ không phải mỗi class một method. Anti-pattern ở thái cực ngược lại là <a href="0022-god-objects-and-refactoring.vi.html">God object</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. SRP trong một cụm từ?</p>
+  <button>Mỗi class một field</button>
+  <button>Mỗi class một method</button>
+  <button data-correct>Một lý do để thay đổi</button>
+  <button>Mỗi file một class</button>
+  <p class="explain">Không bao giờ nên có quá một lý do để một class phải thay đổi.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Ai đưa ra SOLID?</p>
+  <button>Linus Torvalds</button>
+  <button data-correct>Robert C. Martin</button>
+  <button>Ada Lovelace</button>
+  <button>James Gosling</button>
+  <p class="explain">Bài viết năm 2000 của Martin; Feathers đặt ra từ viết tắt.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Class hoá đơn có bao nhiêu lý do để thay đổi?</p>
+  <button>Một</button>
+  <button>Năm</button>
+  <button>Không</button>
+  <button data-correct>Ba</button>
+  <p class="explain">Thuế, bố cục và lưu trữ.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một triệu chứng của vi phạm SRP?</p>
+  <button data-correct>Một class Manager làm mọi thứ</button>
+  <button>Có test</button>
+  <button>Có interface</button>
+  <button>Class nhỏ</button>
+  <p class="explain">Tên quá chung chung và import không liên quan là dấu hiệu điển hình.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0017-split-by-reason.vi.md">Bài tập 17: tách theo lý do thay đổi</a></p>
+<p>Ví dụ chạy được: <a href="../examples/SrpDemo.java"><code>SrpDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. Trang tổng quan về SOLID.</p>
+<p><a href="0016-law-of-demeter.vi.html">← Law of Demeter</a> &nbsp;|&nbsp; <a href="0018-open-closed-principle.vi.html">SOLID 2: Open/Closed Principle →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

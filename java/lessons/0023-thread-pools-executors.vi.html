@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 23: Thread pool: core, max, queue và từ chối task</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Thread pool quyết định thế nào: chạy, xếp hàng hay từ chối</h1>
+<p class="subtitle">Core size, queue, max size và rejection policy, lần theo từng task một.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0023 · bước 33/46 · Advanced · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0023-thread-pools-executors.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Hầu như service Java nào cũng chạy công việc trên thread pool: xử lý web request, method <code>@Async</code>, Kafka consumer, job định kỳ. Một pool cấu hình sai sẽ cho bạn lỗi hết bộ nhớ hoặc request chờ mãi không xong. Interviewer hỏi <em>"Giải thích corePoolSize, maximumPoolSize và queue"</em> và <em>"Khi pool đầy thì chuyện gì xảy ra?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> dự đoán khi nào một <code>ThreadPoolExecutor</code> tạo thread, đưa task vào queue hoặc từ chối task.</div>
+
+<dl class="words">
+  <dt>task</dt><dd>Một phần việc nhỏ cần chạy, thường là một <code>Runnable</code> (code có method <code>run()</code>) hoặc một lambda.</dd>
+  <dt>thread pool</dt><dd>Một nhóm thread được tạo một lần và dùng lại cho nhiều task, thay vì tạo thread mới cho mỗi task.</dd>
+  <dt>executor</dt><dd>Object Java mà bạn giao task cho; nó quyết định thread nào chạy task. <code>ThreadPoolExecutor</code> là loại chính.</dd>
+  <dt>corePoolSize</dt><dd>Số thread mà pool cố giữ lại, kể cả khi chúng không có việc gì làm.</dd>
+  <dt>work queue</dt><dd>Hàng chờ cho task khi các core thread đều đang bận.</dd>
+  <dt>maximumPoolSize</dt><dd>Giới hạn trên cứng cho số lượng thread.</dd>
+  <dt>rejection</dt><dd>Từ chối: điều xảy ra với task mà pool không nhận được, mặc định là một exception.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Một pool có core 2, max 4, và một queue chứa được 2 task. Bảy task chậm tới cùng lúc. Có bao nhiêu thread được tạo, bao nhiêu task phải chờ, và task 7 thì sao?"</em> Ghi các con số ra. Mục 3 sẽ chạy thật.</p>
+
+<h2>1. Bức tranh: ngân hàng và giao dịch viên</h2>
+<p>Một ngân hàng có <strong>2 giao dịch viên cố định</strong> (core thread), một <strong>khu chờ có 2 ghế</strong> (queue), và <strong>2 giao dịch viên tăng cường</strong> chỉ tới vào những ngày rất đông (tối đa 4 người). Khi cả 4 giao dịch viên đều bận và mọi ghế đều có người, bảo vệ ở cửa sẽ mời khách mới về (từ chối).</p>
+<p>Điểm bất ngờ: ngân hàng chỉ gọi giao dịch viên tăng cường <strong>sau khi ghế chờ đã kín</strong>, không phải trước. Nhiều người nghĩ pool tăng lên max trước rồi mới xếp hàng. Thực tế thì ngược lại.</p>
+<p>Vì sao lại cần pool? Tạo một platform thread tốn kém, nên bạn tạo vài cái và dùng lại. (Với virtual thread trong JDK 21, sự đánh đổi (trade-off) này thay đổi; xem <a href="0006-virtual-threads.vi.html">bài 0006</a>.)</p>
+<pre><code>ThreadPoolExecutor pool = new ThreadPoolExecutor(
+        2,                               <span class="c">// corePoolSize</span>
+        4,                               <span class="c">// maximumPoolSize</span>
+        1, TimeUnit.SECONDS,             <span class="c">// extra threads die after 1 s idle</span>
+        new ArrayBlockingQueue&lt;&gt;(2),     <span class="c">// bounded queue: 2 places</span>
+        new ThreadPoolExecutor.AbortPolicy());  <span class="c">// what to do when full</span>
+pool.execute(() -&gt; doWork());            <span class="c">// hand over a task</span></code></pre>
+
+<h2>2. Các quy tắc, theo thứ tự</h2>
+<p>Mỗi lần bạn gọi <code>execute(task)</code>, pool hỏi các câu sau theo đúng thứ tự này:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a></p>
+<ol class="steps">
+  <li>Đang chạy ít hơn <code>corePoolSize</code> thread: tạo thread mới, kể cả khi các thread khác đang rảnh.</li>
+  <li>Đang chạy từ <code>corePoolSize</code> thread trở lên: ưu tiên đưa task vào queue.</li>
+  <li>Queue đầy và ít hơn <code>maximumPoolSize</code> thread: tạo thêm một thread.</li>
+  <li>Còn lại: task bị từ chối.</li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Luồng quyết định của execute: nếu số thread đang chạy ít hơn core thì tạo thread. Nếu không mà queue còn chỗ thì đưa task vào queue. Nếu không mà số thread ít hơn max thì tạo thread tăng cường. Nếu không thì từ chối task.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="20" width="150" height="44" rx="6"/>
+      <rect x="210" y="20" width="250" height="44" rx="22"/>
+      <rect x="210" y="100" width="250" height="44" rx="22"/>
+      <rect x="210" y="180" width="250" height="44" rx="22"/>
+      <rect x="510" y="20" width="150" height="44" rx="6"/>
+      <rect x="510" y="100" width="150" height="44" rx="6"/>
+      <rect x="510" y="180" width="150" height="44" rx="6"/>
+      <path d="M170 42h34M198 37l6 5-6 5"/>
+      <path d="M460 42h44M498 37l6 5-6 5"/>
+      <path d="M460 122h44M498 117l6 5-6 5"/>
+      <path d="M460 202h44M498 197l6 5-6 5"/>
+      <path d="M335 64v30M330 88l5 6 5-6"/>
+      <path d="M335 144v30M330 168l5 6 5-6"/>
+      <path d="M335 224v32M330 250l5 6 5-6" stroke="var(--accent)"/>
+    </g>
+    <rect x="160" y="258" width="350" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="95" y="47" text-anchor="middle">execute(task)</text>
+    <text x="335" y="47" text-anchor="middle">đang chạy &lt; core ?</text>
+    <text x="335" y="127" text-anchor="middle">queue còn chỗ ?</text>
+    <text x="335" y="207" text-anchor="middle">đang chạy &lt; max ?</text>
+    <text x="585" y="47" text-anchor="middle">thread mới</text>
+    <text x="585" y="127" text-anchor="middle">chờ trong queue</text>
+    <text x="585" y="207" text-anchor="middle">thread thêm</text>
+    <text x="335" y="280" text-anchor="middle" fill="var(--accent)">TỪ CHỐI → RejectedExecutionHandler</text>
+    <text x="335" y="298" text-anchor="middle" font-size="11" fill="var(--accent)">mặc định AbortPolicy ném exception</text>
+    <g font-size="11" opacity=".8">
+      <text x="482" y="36" text-anchor="middle">có</text>
+      <text x="482" y="116" text-anchor="middle">có</text>
+      <text x="482" y="196" text-anchor="middle">có</text>
+      <text x="345" y="84">không</text>
+      <text x="345" y="164">không</text>
+      <text x="345" y="244">không</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Thứ tự là core → queue → max → từ chối. Thread tăng cường (vượt core) chỉ được tạo khi queue đã đầy.</figcaption>
+</figure>
+
+<h2>3. Lần theo bảy task</h2>
+<p>Ví dụ <code>PoolDemo.java</code> dựng đúng pool ở trên (core 2, max 4, queue 2). Mỗi task chặn lại tới cuối, nên trong lúc test không thread nào rảnh ra. Đi theo các quy tắc:</p>
+<pre><code><span class="c">Task 1  đang chạy 0 &lt; core 2    → thread mới (pool = 1)</span>
+<span class="c">Task 2  đang chạy 1 &lt; core 2    → thread mới (pool = 2)</span>
+<span class="c">Task 3  core đầy, queue 0/2     → vào queue  (queue = 1)</span>
+<span class="c">Task 4  core đầy, queue 1/2     → vào queue  (queue = 2)</span>
+<span class="c">Task 5  queue đầy, 2 &lt; max 4    → thread thêm (pool = 3)</span>
+<span class="c">Task 6  queue đầy, 3 &lt; max 4    → thread thêm (pool = 4)</span>
+<span class="c">Task 7  queue đầy, pool = max   → <span class="hl">BỊ TỪ CHỐI</span></span></code></pre>
+<pre><code>$ java java/examples/PoolDemo.java
+=== AbortPolicy (core 2, max 4, queue 2)
+task 1: accepted  pool=1 queue=0
+task 2: accepted  pool=2 queue=0
+task 3: accepted  pool=2 queue=1
+task 4: accepted  pool=2 queue=2
+task 5: accepted  pool=3 queue=2
+task 6: accepted  pool=4 queue=2
+<span class="hl">task 7: REJECTED (RejectedExecutionException)</span>
+  task 1 ran on pool-1-thread-1
+  task 5 ran on pool-1-thread-3
+  task 2 ran on pool-1-thread-2
+  task 6 ran on pool-1-thread-4
+  task 3 ran on pool-1-thread-1
+  task 4 ran on pool-1-thread-3
+</code></pre>
+<p class="muted">Các dòng "accepted" lần nào cũng giống nhau. Các dòng "ran on" đến từ bốn thread cùng lúc, nên thứ tự và tên thread thay đổi giữa các lần chạy.</p>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Ảnh chụp sau bảy task: bốn thread đang chạy task 1, 2, 5 và 6; task 3 và 4 chờ trong queue sức chứa 2; task 7 bị từ chối.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="13">thread (tối đa 4)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="36" width="145" height="50" rx="4"/>
+      <rect x="180" y="36" width="145" height="50" rx="4"/>
+    </g>
+    <g fill="none" stroke="currentColor" stroke-dasharray="5 4">
+      <rect x="340" y="36" width="145" height="50" rx="4"/>
+      <rect x="500" y="36" width="145" height="50" rx="4"/>
+    </g>
+    <text x="92" y="57" text-anchor="middle">thread-1</text>
+    <text x="92" y="75" text-anchor="middle" font-size="11" opacity=".75">task 1 · core</text>
+    <text x="252" y="57" text-anchor="middle">thread-2</text>
+    <text x="252" y="75" text-anchor="middle" font-size="11" opacity=".75">task 2 · core</text>
+    <text x="412" y="57" text-anchor="middle">thread-3</text>
+    <text x="412" y="75" text-anchor="middle" font-size="11" opacity=".75">task 5 · thêm</text>
+    <text x="572" y="57" text-anchor="middle">thread-4</text>
+    <text x="572" y="75" text-anchor="middle" font-size="11" opacity=".75">task 6 · thêm</text>
+    <text x="20" y="128" font-size="13">queue (chứa 2)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="180" y="108" width="145" height="34" rx="4"/>
+      <rect x="340" y="108" width="145" height="34" rx="4"/>
+    </g>
+    <text x="252" y="130" text-anchor="middle">task 3</text>
+    <text x="412" y="130" text-anchor="middle">task 4</text>
+    <rect x="500" y="108" width="145" height="34" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="572" y="130" text-anchor="middle" fill="var(--accent)">task 7: từ chối</text>
+    <text x="340" y="180" text-anchor="middle" font-size="12">chỗ cho 4 đang chạy + 2 đang chờ = 6 task cùng lúc</text>
+    <text x="340" y="200" text-anchor="middle" font-size="11" opacity=".75">nét đứt = thread thêm, bị bỏ đi sau keepAliveTime rảnh rỗi</text>
+  </g>
+</svg>
+<figcaption>Pool sau task 7. Để ý rằng task 5 và 6 bắt đầu <em>trước</em> task 3 và 4, hai task này vẫn đang chờ trong queue.</figcaption>
+</figure>
+<p><strong>Bẫy:</strong> một thread tăng cường mới sẽ nhận chính task đã khiến nó được tạo ra ("một thread mới được tạo để xử lý request"<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a>), không phải task chờ lâu nhất. Vì thế pool không hẳn là vào trước, ra trước.</p>
+
+<h2>4. Chọn queue</h2>
+<p>Javadoc mô tả ba chiến lược:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a></p>
+<ul><li><strong>Giao tay trực tiếp</strong> (<code>SynchronousQueue</code>): không có ghế chờ nào; mỗi task đi thẳng tới một thread. Một lựa chọn mặc định tốt; cần max size không giới hạn để tránh bị từ chối; rủi ro số thread tăng không giới hạn.</li>
+<li><strong>Queue không giới hạn</strong> (ví dụ <code>LinkedBlockingQueue</code> không đặt capacity): không bao giờ vượt quá số core thread, nên max không có tác dụng; rủi ro queue phình ra không giới hạn.</li>
+<li><strong>Queue có giới hạn</strong> (ví dụ <code>ArrayBlockingQueue</code>): giúp tránh cạn kiệt tài nguyên nhưng khó tinh chỉnh hơn.</li></ul>
+<h3>Bẫy: pool "cố định" của <code>Executors</code></h3>
+<p><code>Executors.newFixedThreadPool(n)</code> "dùng lại một số lượng thread cố định, làm việc trên một queue dùng chung không giới hạn".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors javadoc</a> Nếu task tới nhanh hơn tốc độ <code>n</code> thread làm xong, queue cứ lớn dần cho tới khi hết bộ nhớ. Nó không bao giờ từ chối. <code>newCachedThreadPool()</code> thì ngược lại: nó "tạo thread mới khi cần", nên một đợt tải đột biến có thể tạo ra rất nhiều thread.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors javadoc</a> Với service production, hãy dựng một <code>ThreadPoolExecutor</code> với queue có giới hạn và một rejection policy được chọn rõ ràng, để các giới hạn được viết ra.</p>
+
+<h2>5. Khi pool đầy: rejection policy</h2>
+<p>Quay lại ngân hàng: bảo vệ làm gì với vị khách không vào được?</p>
+<ul>
+  <li><strong><code>AbortPolicy</code></strong> (mặc định): ném <code>RejectedExecutionException</code>. "Xin lỗi, quay lại sau nhé," và code của bạn phải xử lý nó.</li>
+  <li><strong><code>CallerRunsPolicy</code></strong>: chính thread đã gọi <code>execute</code> tự chạy task, "một cơ chế điều khiển phản hồi đơn giản giúp làm chậm tốc độ submit task mới". Bảo vệ tự phục vụ khách, và trong lúc đó anh ta không cho ai khác vào được.</li>
+  <li><strong><code>DiscardPolicy</code></strong> và <strong><code>DiscardOldestPolicy</code></strong>: âm thầm bỏ việc và hiếm khi chấp nhận được.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a></li>
+</ul>
+<p>Task cũng bị từ chối sau khi pool "đã bị shutdown".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a> <code>shutdown()</code> để các task đã submit chạy xong nhưng không nhận task mới, và nó "không chờ"; hãy gọi <code>awaitTermination</code> để chờ, như demo làm.</p>
+<p class="muted">JDK 8 vs 17 vs 21: <code>ThreadPoolExecutor</code> hoạt động như nhau ở cả ba. JDK 21 thêm <code>Executors.newVirtualThreadPerTaskExecutor()</code>, thứ "tạo một virtual Thread mới cho mỗi task", không pool, không queue<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors javadoc</a>; bài 0006 so sánh hai cách.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Mọi core thread đều bận và queue còn chỗ. Một task mới tới. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Task chờ trong queue</button>
+    <button class="opt">Một thread thêm được tạo ngay</button>
+    <button class="opt">Task bị từ chối ngay lập tức</button>
+    <button class="opt">Thread gọi tự chạy task đó</button>
+  </div>
+  <div class="why">Từ core size trở lên, executor ưu tiên xếp hàng. Thread thêm chỉ tới khi queue đầy.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Core 2, max 10, <code>LinkedBlockingQueue</code> không giới hạn. Khi tải nặng, bạn có bao nhiêu thread?</p>
+  <div class="options">
+    <button class="opt" data-correct>Tối đa 2: queue không bao giờ đầy</button>
+    <button class="opt">Tới 10 khi tải trở nên nặng</button>
+    <button class="opt">Không thread nào tới khi queue có 10 task</button>
+    <button class="opt">Số thread nhiều vô hạn</button>
+  </div>
+  <div class="why">Với queue không giới hạn thì không bao giờ có nhiều hơn số core thread, nên max không có tác dụng. Queue phình ra thay vào đó.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Core 2, max 4, queue 2, mọi task đều chậm. Task số mấy là task đầu tiên bị từ chối?</p>
+  <div class="options">
+    <button class="opt" data-correct>Task 7</button>
+    <button class="opt">Task 5</button>
+    <button class="opt">Task 3</button>
+    <button class="opt">Task 9</button>
+  </div>
+  <div class="why">2 core thread + 2 trong queue + 2 thread thêm = 6 task. Task thứ 7 không còn chỗ nào.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Rejection policy mặc định của <code>ThreadPoolExecutor</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>AbortPolicy, ném ra một exception</button>
+    <button class="opt">CallerRunsPolicy, chạy task tại chỗ</button>
+    <button class="opt">DiscardPolicy, âm thầm bỏ task đi</button>
+    <button class="opt">DiscardOldestPolicy, bỏ task đầu hàng</button>
+  </div>
+  <div class="why"><code>AbortPolicy</code> mặc định ném <code>RejectedExecutionException</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Policy nào làm chậm code đang submit task, tạo ra back-pressure tự nhiên?</p>
+  <div class="options">
+    <button class="opt" data-correct>CallerRunsPolicy</button>
+    <button class="opt">DiscardPolicy</button>
+    <button class="opt">AbortPolicy</button>
+    <button class="opt">DiscardOldestPolicy</button>
+  </div>
+  <div class="why">Thread submit tự chạy task, nên trong lúc bận nó không submit thêm được.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một service dùng <code>Executors.newFixedThreadPool(8)</code> và dần dần hết bộ nhớ khi tải cao. Nguyên nhân khả dĩ nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>Queue không giới hạn của nó cứ lớn dần</button>
+    <button class="opt">Nó cứ tạo thêm thread mới mãi không dừng</button>
+    <button class="opt">Các task bị từ chối được giữ lại trong RAM</button>
+    <button class="opt">Tám thread của nó bị rò rỉ sau mỗi task</button>
+  </div>
+  <div class="why">Fixed pool làm việc trên một queue không giới hạn: nó không bao giờ từ chối, nên task chờ chất đống khi việc tới nhanh hơn việc được làm xong.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"ThreadPoolExecutor xử lý một task mới thế nào? Khi nó đầy thì sao?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Dưới core size: tạo thread mới, kể cả khi các thread khác đang rảnh.</label></li>
+      <li><label><input type="checkbox"> Đạt core size: đưa task vào queue.</label></li>
+      <li><label><input type="checkbox"> Queue đầy: thêm thread tới max; vượt nữa thì từ chối.</label></li>
+      <li><label><input type="checkbox"> Với queue không giới hạn, max chẳng bao giờ có tác dụng (và bộ nhớ có thể nổ).</label></li>
+      <li><label><input type="checkbox"> Từ chối: mặc định AbortPolicy; CallerRunsPolicy để có back-pressure; các policy discard làm mất việc.</label></li>
+      <li><label><input type="checkbox"> Trên production: queue có giới hạn + policy rõ ràng, thay vì queue không giới hạn của newFixedThreadPool.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Khi em submit một task, nếu đang có ít hơn corePoolSize thread thì pool tạo thread mới cho nó, kể cả khi có thread khác đang rảnh. Khi đã đủ core, nó ưu tiên đưa task vào work queue. Chỉ khi queue đầy nó mới thêm thread, tới maximumPoolSize. Nếu đã ở max mà queue cũng đầy thì task bị reject. AbortPolicy mặc định ném RejectedExecutionException; CallerRunsPolicy bắt thread submit tự chạy task, làm producer chậm lại, nên nó là một kiểu back-pressure đơn giản. Một cái bẫy hay gặp là newFixedThreadPool: nó dùng queue không giới hạn, nên không bao giờ reject và max chẳng có ý nghĩa gì, khi tải cao queue có thể phình tới mức hết bộ nhớ. Trong service thật em sẽ dùng ThreadPoolExecutor với bounded queue và rejection policy rõ ràng, và monitor kích thước queue."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0023-size-a-pool.vi.md">Bài tập 0023: chọn kích thước pool</a>. Hãy gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/PoolDemo.java"><code>PoolDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Nhiều thread hơn cũng có nghĩa là nhiều lock hơn, và lock lấy sai thứ tự có thể làm service đứng hình hoàn toàn. Interviewer cấp senior hỏi: <em>"Deadlock là gì, bạn tìm nó trên production thế nào, và phòng tránh ra sao?"</em> <a href="0026-deadlock-and-lock-ordering.vi.html">Bài 0026</a> tạo ra một deadlock và sửa nó. So sánh thêm với <a href="0006-virtual-threads.vi.html">virtual thread</a>, nơi bạn hoàn toàn không cần pool.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">Javadoc của ThreadPoolExecutor</a>: các mục "Core and maximum pool sizes", "Queuing" và "Rejected tasks".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Pool gọi database thì nên có bao nhiêu thread?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0025-concurrenthashmap.vi.html">← Dùng chung một map giữa các thread: ConcurrentHashMap</a> &nbsp;|&nbsp; <a href="0026-deadlock-and-lock-ordering.vi.html">Khi hai thread chờ nhau mãi mãi: deadlock →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">Javadoc của ThreadPoolExecutor</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Javadoc của Executors</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

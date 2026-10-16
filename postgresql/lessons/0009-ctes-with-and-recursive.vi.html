@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 9: CTE: WITH và WITH RECURSIVE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>CTE: WITH và WITH RECURSIVE</h1>
+<p class="meta">PostgreSQL · Bài 0009 · bước 6/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-ctes-with-and-recursive.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết một CTE để đặt tên cho các kết quả trung gian, và một CTE đệ quy để duyệt một cấu trúc phân cấp.</div>
+
+<h2>WITH</h2>
+<p><code>WITH</code> định nghĩa các câu lệnh phụ (CTE) hoạt động như "các table tạm chỉ tồn tại trong một query". Mỗi CTE có thể là <code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> hoặc <code>MERGE</code>.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a> Chúng giúp các query dài dễ đọc hơn.</p>
+<h2>Đệ quy</h2>
+<p>Một query đệ quy "luôn có một phần không đệ quy, sau đó là UNION (hoặc UNION ALL), rồi đến phần đệ quy", trong đó chỉ phần đệ quy được tham chiếu tới output của chính nó. Nó chạy phần không đệ quy trước, rồi lặp lại phần đệ quy trên working table cho tới khi không sinh ra dòng nào nữa.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+<pre><code>WITH RECURSIVE chain AS (
+    SELECT id, name, manager_id, 0 AS level FROM emp WHERE name = 'dev'
+  UNION ALL
+    SELECT e.id, e.name, e.manager_id, c.level + 1 FROM emp e JOIN chain c ON e.id = c.manager_id
+) SELECT level, name FROM chain ORDER BY level;
+-- 0 dev, 1 lead, 2 vp, 3 ceo</code></pre>
+<h2>Inline</h2>
+<p>Một CTE không đệ quy, không có side effect và chỉ được tham chiếu một lần sẽ mặc định được gộp (inline) vào query cha; <code>MATERIALIZED</code> buộc nó được tính riêng (hữu ích với các hàm tốn kém), <code>NOT MATERIALIZED</code> buộc nó được inline.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a> Source: <a href="../examples/09-cte.sql"><code>09-cte.sql</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một CTE tồn tại trong phạm vi...?</p>
+  <button>Một server</button>
+  <button>Một session</button>
+  <button>Một database</button>
+  <button data-correct>Một query</button>
+  <p class="explain">CTE hoạt động như table tạm chỉ dành cho một query.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Cấu trúc của một CTE đệ quy?</p>
+  <button>Hai phần đệ quy</button>
+  <button>JOIN, GROUP, HAVING</button>
+  <button data-correct>Không đệ quy, UNION, đệ quy</button>
+  <button>Chỉ có phần đệ quy</button>
+  <p class="explain">Phần không đệ quy, sau đó UNION [ALL], rồi một phần đệ quy.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Khi nào CTE đệ quy dừng lại?</p>
+  <button>Không bao giờ dừng</button>
+  <button>Sau 100 dòng</button>
+  <button>Khi hết giờ hẹn</button>
+  <button data-correct>Khi không sinh dòng mới</button>
+  <p class="explain">Nó lặp cho tới khi phần đệ quy không sinh ra dòng nào.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Từ khóa nào buộc CTE được tính riêng?</p>
+  <button>INLINE</button>
+  <button data-correct>MATERIALIZED</button>
+  <button>CACHED</button>
+  <button>STORED</button>
+  <p class="explain">AS MATERIALIZED buộc CTE được tính toán riêng.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-org-chart.vi.md">Bài tập 0009: sơ đồ tổ chức</a></p>
+<p>Ví dụ chạy được: <a href="../examples/09-cte.sql"><code>09-cte.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/queries-with.html">PostgreSQL Docs: WITH Queries</a>. Mục 7.8.</p>
+<p><a href="0003-window-functions.vi.html">← Window function</a> &nbsp;|&nbsp; <a href="0004-indexes-what-they-buy.vi.html">Index: được gì và mất gì →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/queries-with.html">PostgreSQL Docs: WITH Queries</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 14: Throughput của producer: batching và nén</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Throughput của producer: batching và nén</h1>
+<p class="meta">Kafka · Bài 0014 · bước 11/23 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0014-producer-throughput-batching-compression.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tinh chỉnh <code>linger.ms</code>, <code>batch.size</code> và <code>compression.type</code> để tăng throughput, giải thích vì sao Kafka nhanh (batching, page cache, zero-copy), và đọc hiểu một benchmark.</div>
+
+<h2>Vì sao Kafka nhanh</h2>
+<ul>
+<li><strong>Batching:</strong> "Batching là một trong những động lực lớn của hiệu năng"; producer sẵn sàng "đánh đổi thêm một chút latency để có throughput tốt hơn".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><strong>Nén theo batch:</strong> "Nén hiệu quả đòi hỏi nén nhiều message cùng nhau thay vì nén riêng từng message." Batch vẫn ở dạng nén khi nằm trong log và khi đi tới consumer.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><strong>Page cache và zero-copy:</strong> "dữ liệu được copy vào pagecache đúng một lần và được dùng lại cho mỗi lần consume", và <code>sendfile</code> cho phép hệ điều hành "gửi dữ liệu thẳng từ pagecache ra network".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> TLS vô hiệu hoá đường zero-copy này, vì dữ liệu phải được mã hoá trong user space.</li>
+</ul>
+<h2>Các nút vặn</h2>
+<ul>
+<li><code>linger.ms</code> (mặc định 5, trước 4.0 là 0): chờ một chút để các record gom vào cùng batch; dù sao thì một batch đầy <code>batch.size</code> vẫn được gửi ngay.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></li>
+<li><code>batch.size</code> (mặc định 16384 byte): buffer batch cho mỗi partition.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></li>
+<li><code>compression.type</code> (mặc định <code>none</code>; <code>gzip</code>, <code>snappy</code>, <code>lz4</code>, <code>zstd</code>): áp dụng cho cả batch, nên batching tốt hơn thì nén tốt hơn.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></li>
+<li><code>buffer.memory</code> (32 MB): khi đầy, "các lời gọi send tiếp theo sẽ bị block" tối đa <code>max.block.ms</code>, sau đó thất bại.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[3]</a> Đây chính là cơ chế backpressure của producer.</li>
+</ul>
+<h2>Benchmark: một laptop, một broker</h2>
+<p><a href="../examples/06-batching-and-compression.sh"><code>06-batching-and-compression.sh</code></a> gửi 500.000 record JSON nhỏ bằng <code>kafka-producer-perf-test</code>, với <code>acks=all</code>:</p>
+<pre><code>linger.ms=0  batch.size=16384  compression.type=none  247892 records/sec (20.39 MB/sec) | on disk: 47036 KB
+linger.ms=5  batch.size=16384  compression.type=none  351864 records/sec (28.94 MB/sec) | on disk: 47036 KB
+linger.ms=20 batch.size=131072 compression.type=none  616522 records/sec (50.71 MB/sec) | on disk: 47016 KB
+linger.ms=20 batch.size=131072 compression.type=lz4   510725 records/sec (42.01 MB/sec) | on disk:  5812 KB
+linger.ms=20 batch.size=131072 compression.type=zstd  486854 records/sec (40.04 MB/sec) | on disk:  3528 KB</code></pre>
+<p>Cách đọc: batch lớn hơn cho throughput gấp 2,5 lần. Nén tốn thêm chút CPU trên một broker local duy nhất (không có network thật), nhưng giảm dung lượng đĩa 8 đến 13 lần; qua network thật và với replication factor 3, gửi ít byte hơn thường sẽ thắng. Số liệu của bạn sẽ khác; điều quan trọng là hình dạng của kết quả.</p>
+<div class="aside">Câu trả lời khi phỏng vấn: "Để tăng throughput: tăng <code>linger.ms</code> và <code>batch.size</code>, bật <code>lz4</code> hoặc <code>zstd</code>, giữ idempotence và <code>acks=all</code>. Để có latency thấp nhất: linger nhỏ, chấp nhận batch nhỏ hơn. Luôn đo bằng perf-test trên dữ liệu giống production."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Trong Kafka, nén được áp dụng lên cái gì?</p>
+  <button data-correct>Cả batch record</button>
+  <button>Chỉ key của record</button>
+  <button>Từng record riêng lẻ</button>
+  <button>Chỉ phần header</button>
+  <p class="explain">Nén áp dụng cho cả batch, nên batching tốt hơn sẽ cải thiện tỉ lệ nén.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. linger.ms mặc định trong Kafka 4.x là bao nhiêu?</p>
+  <button data-correct>Năm mili giây</button>
+  <button>Một trăm ms</button>
+  <button>Không mili giây</button>
+  <button>Tròn một giây</button>
+  <p class="explain">Giá trị mặc định đổi từ 0 sang 5 trong Apache Kafka 4.0.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. buffer.memory đã đầy. send() sẽ làm gì?</p>
+  <button>Bỏ qua batching</button>
+  <button>Bỏ record đi</button>
+  <button data-correct>Block, rồi thất bại</button>
+  <button>Ghi ra đĩa</button>
+  <p class="explain">Lời gọi send bị block tối đa max.block.ms rồi trả về một future thất bại.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Tính năng nào giúp broker bỏ qua việc copy qua user space?</p>
+  <button>Idempotence</button>
+  <button>Consumer group</button>
+  <button data-correct>Zero-copy với sendfile</button>
+  <button>Log compaction</button>
+  <p class="explain">sendfile gửi dữ liệu thẳng từ pagecache ra network.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0014-tune-a-producer.vi.md">Bài tập 0014: tinh chỉnh một producer</a></p>
+<p>Ví dụ chạy được: <a href="../examples/06-batching-and-compression.sh"><code>06-batching-and-compression.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a>. Đọc mục 'Efficiency' và 'The Producer' (cân bằng tải, gửi bất đồng bộ).</p>
+<p><a href="0005-replication-isr-and-durability.vi.html">← Replication, ISR và độ bền dữ liệu</a> &nbsp;|&nbsp; <a href="0015-rebalancing-and-group-protocols.vi.html">Rebalance: giao thức classic và giao thức consumer mới →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

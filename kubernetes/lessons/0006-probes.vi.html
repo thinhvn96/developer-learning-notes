@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 6: Liveness, readiness và startup probe</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Liveness, readiness và startup probe</h1>
+<p class="meta">Kubernetes · Bài 0006 · bước 10/15 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-probes.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn đúng probe cho từng việc, và giải thích một probe sai sẽ làm gì với một service Java khởi động chậm.</div>
+
+<h2>Ba probe, ba hệ quả</h2>
+<table>
+<tr><th>Probe</th><th>Câu hỏi</th><th>Khi thất bại<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></th></tr>
+<tr><td>Liveness</td><td>Nó có hỏng tới mức không tự hồi phục được không?</td><td>container bị kill và khởi động lại</td></tr>
+<tr><td>Readiness</td><td>Ngay lúc này nó nhận traffic được chưa?</td><td>bị gỡ khỏi endpoint của Service, không bị restart</td></tr>
+<tr><td>Startup</td><td>Nó đã khởi động xong chưa?</td><td>liveness và readiness phải chờ nó xong</td></tr>
+</table>
+<p>Tài liệu mô tả liveness probe dành cho các ứng dụng "đến một lúc nào đó rơi vào trạng thái hỏng, và không thể phục hồi trừ khi được khởi động lại", còn startup probe là lớp bảo vệ cho các container khởi động chậm.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+<pre><code>livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 3</code></pre>
+<p>Một HTTP probe được tính là thành công với bất kỳ status nào từ 200 đến 399.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+<h2>Vì sao điều này quan trọng với Java</h2>
+<p>Một ứng dụng JVM có thể mất nhiều giây để khởi động. Liveness probe bắt đầu quá sớm sẽ kill nó trước khi nó kịp lên, và nó restart liên tục thành vòng lặp. Điều đó suy ra trực tiếp từ quy tắc liveness ở trên; cách khắc phục mà tài liệu đưa ra là startup probe. Bản phác thảo trong <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a> dùng cả ba probe.</p>
+<h2>Đã kiểm chứng trên cluster</h2>
+<pre><code>kubectl apply -f examples/probe-demo.yaml
+liveness-demo    1/1 Running  ...  Warning Unhealthy: Liveness probe failed: cat: can't open '/tmp/healthy'
+                                    Normal  Killing:   Container app failed liveness probe, will be restarted
+readiness-demo   0/1 Running          # never Ready
+kubectl get endpoints readiness-demo   # ENDPOINTS: (empty)</code></pre>
+<p>Sau khi liveness thất bại, việc restart xảy ra khoảng 30 s sau đó (<code>RESTARTS 1</code>, exit code cuối là 137): shell của container (PID 1) không phản ứng với <code>SIGTERM</code>, nên Kubernetes phải chờ hết <code>terminationGracePeriodSeconds</code> mặc định là 30 rồi mới kill nó. Đó chính là vấn đề xử lý signal trong <a href="../../docker/lessons/0006-pinning-nonroot-and-signals.vi.html">bài hardening Docker</a>, giờ thấy tận mắt. File: <a href="../examples/probe-demo.yaml"><code>probe-demo.yaml</code></a>.</p>
+<div class="aside">Nguyên tắc thiết kế để trả lời phỏng vấn: giữ liveness thật nhẹ và không phụ thuộc vào các dependency. Nếu liveness fail khi database sập, thì restart Pod cũng không sửa được gì. Hãy dùng readiness cho câu hỏi "tôi có phục vụ được không?".</div>
+<p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Liveness probe thất bại. Chuyện gì xảy ra?</p>
+  <button>Node bị drain</button>
+  <button data-correct>Container bị restart</button>
+  <button>Không có gì cả</button>
+  <button>Pod chỉ bị gỡ khỏi endpoint</button>
+  <p class="explain">Kubernetes kill rồi khởi động lại container.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Readiness probe thất bại. Chuyện gì xảy ra?</p>
+  <button>Pod bị xoá</button>
+  <button data-correct>Bị gỡ khỏi endpoint của Service</button>
+  <button>Container bị restart</button>
+  <button>Image bị pull lại</button>
+  <p class="explain">Container bị gỡ khỏi endpoint của service nhưng không bị restart.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. JVM khởi động chậm cứ bị restart mãi. Thêm probe nào?</p>
+  <button>Một NodePort</button>
+  <button>Thêm một liveness</button>
+  <button data-correct>Một startup probe</button>
+  <button>Một limit lớn hơn</button>
+  <p class="explain">Startup probe hoãn các lần kiểm tra liveness và readiness cho tới khi khởi tạo xong.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. HTTP probe trả về 204. Kết quả?</p>
+  <button>Thất bại</button>
+  <button>Timeout</button>
+  <button data-correct>Thành công</button>
+  <button>Restart</button>
+  <p class="explain">Mọi status từ 200 đến 399 đều được tính là thành công.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-probe-design.vi.md">Bài tập 0006: thiết kế probe</a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes Docs: Configure liveness, readiness and startup probes</a>. Nếu có cluster, hãy làm theo ví dụ liveness.</p>
+<p><a href="0005-requests-limits-and-the-jvm.vi.html">← Request, limit và JVM</a> &nbsp;|&nbsp; <a href="0007-rolling-updates-and-rollbacks.vi.html">Rolling update và rollback →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes Docs: Configure liveness, readiness and startup probes</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

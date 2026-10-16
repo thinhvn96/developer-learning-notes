@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 12: var và text block</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>var và text block: gõ ít hơn, kiểu vẫn y nguyên</h1>
+<p class="subtitle">Hai tính năng nhỏ của JDK 10 và JDK 15 mà bạn sẽ gặp trong mọi codebase Java hiện đại.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0012 · bước 37/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-var-and-text-blocks.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Khi team chuyển từ JDK 8 lên 17 hoặc 21, <code>var</code> và text block xuất hiện trong code review ngay ngày đầu. Interviewer rất hay hỏi <em>"<code>var</code> có làm Java thành ngôn ngữ kiểu động không?"</em> Câu trả lời là không, và bài này cho bạn thấy vì sao.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết lại một biến local kiểu JDK 8 và một chuỗi JSON nhiều dòng kiểu JDK 8 bằng <code>var</code> và text block, và kể ra bốn chỗ <strong>không</strong> được dùng <code>var</code>.</div>
+
+<dl class="words">
+  <dt>local variable</dt><dd>Biến khai báo bên trong một method. Nó chỉ tồn tại trong lúc method đó chạy.</dd>
+  <dt>initializer</dt><dd>Giá trị sau dấu <code>=</code> khi khai báo biến: trong <code>int n = 5;</code> thì initializer là <code>5</code>.</dd>
+  <dt>type inference (suy luận kiểu)</dt><dd>Compiler tự tìm ra kiểu bằng cách nhìn code xung quanh, nên bạn không cần viết ra.</dd>
+  <dt>static typing (kiểu tĩnh)</dt><dd>Mỗi biến có một kiểu cố định, được kiểm tra lúc compile. Java xưa nay vẫn vậy.</dd>
+  <dt>compiler (javac)</dt><dd>Chương trình biến file <code>.java</code> thành bytecode trước khi chạy. Nhiều lỗi bị bắt ngay ở bước này.</dd>
+  <dt>escape sequence</dt><dd>Mã bắt đầu bằng dấu gạch ngược trong chuỗi, như <code>\n</code> (xuống dòng) hay <code>\"</code> (ký tự dấu nháy).</dd>
+  <dt>string literal</dt><dd>Đoạn text viết thẳng trong code giữa hai dấu nháy, như <code>"hello"</code>.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói to: <em>"Sau <code>var x = "hi";</code>, dòng tiếp theo mình viết <code>x = 42;</code> được không?"</em> Chọn có hoặc không và nêu lý do. Bạn sẽ kiểm tra lại ở mục 2.</p>
+
+<h2>1. var: để compiler chép kiểu giúp bạn</h2>
+<p>Hãy nghĩ tới một tờ khai ở ngân hàng. Một ô ghi "Họ tên", ô kế bên ghi "Họ tên, ghi lại cho biên lai". Viết một thứ hai lần vừa chán vừa chẳng thêm thông tin gì. Nhân viên có thể chép giúp bạn.</p>
+<p>Code JDK 8 thường giống tờ khai đó. Kiểu được viết bên trái, rồi lại viết đúng kiểu đó bên phải:</p>
+<pre><code><span class="c">// JDK 8: the type appears twice</span>
+ArrayList&lt;String&gt; names = new ArrayList&lt;String&gt;();
+Map&lt;String, List&lt;Order&gt;&gt; byCustomer = new HashMap&lt;String, List&lt;Order&gt;&gt;();
+
+<span class="c">// JDK 10+: the compiler copies the type from the right side</span>
+var names = new ArrayList&lt;String&gt;();
+var byCustomer = new HashMap&lt;String, List&lt;Order&gt;&gt;();</code></pre>
+<p>JEP 286, ra mắt ở JDK 10, được viết ra để "mở rộng type inference cho các khai báo biến local có initializer".<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> Nói đơn giản: nếu một <span class="term">local variable</span> có <span class="term">initializer</span>, bạn có thể viết <code>var</code> và compiler tự điền kiểu. JDK 17 và 21 đều có, vì mỗi bản phát hành giữ lại mọi thứ của các bản trước.</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Bạn viết var list bằng new ArrayList of String. Compiler đọc vế phải và biến nó thành ArrayList of String list, đúng như code JDK 8. Bên dưới là bốn dòng bị lỗi: null, không có initializer, array initializer, lambda.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="165" y="26" text-anchor="middle" font-size="11" opacity=".75">bạn viết (JDK 10+)</text>
+    <text x="515" y="26" text-anchor="middle" font-size="11" opacity=".75">compiler thấy (giống JDK 8)</text>
+    <rect x="20" y="36" width="290" height="64" rx="6" fill="none" stroke="currentColor"/>
+    <text x="36" y="73"><tspan fill="var(--accent)">var</tspan> list = new ArrayList&lt;String&gt;();</text>
+    <g fill="none" stroke="var(--accent)"><path d="M310 68h56M360 63l6 5-6 5"/></g>
+    <text x="338" y="58" text-anchor="middle" font-size="11" fill="var(--accent)">javac</text>
+    <rect x="370" y="36" width="290" height="64" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="386" y="62"><tspan fill="var(--accent)">ArrayList&lt;String&gt;</tspan> list =</text>
+    <text x="386" y="84">&#160;&#160;&#160;&#160;new ArrayList&lt;String&gt;();</text>
+    <text x="340" y="126" text-anchor="middle" font-size="11" opacity=".8">Kiểu được chốt lúc compile. Lúc chạy không có gì khác cả.</text>
+    <text x="20" y="156" font-size="11" opacity=".75">không có kiểu để chép, nên compiler từ chối:</text>
+    <text x="36" y="180">var x = null;</text><text x="250" y="180" fill="var(--accent)">✗ initializer là 'null'</text>
+    <text x="36" y="198">var y;</text><text x="250" y="198" fill="var(--accent)">✗ không có initializer</text>
+    <text x="36" y="216">var a = {1, 2};</text><text x="250" y="216" fill="var(--accent)">✗ array initializer</text>
+    <text x="36" y="234">var f = () -&gt; 1;</text><text x="250" y="234" fill="var(--accent)">✗ lambda</text>
+  </g>
+</svg>
+<figcaption><code>var</code> không tạo ra một loại biến mới. Compiler đọc vế phải và viết kiểu vào giúp bạn.</figcaption>
+</figure>
+
+<h2>2. Đi theo compiler, từng bước</h2>
+<pre><code>var names = new ArrayList&lt;String&gt;();
+<span class="c">Step 1  javac reads the right side: new ArrayList&lt;String&gt;()</span>
+<span class="c">Step 2  its type is ArrayList&lt;String&gt;</span>
+<span class="c">Step 3  javac gives names that type, for ever: ArrayList&lt;String&gt; names</span>
+
+names.add("ann");   <span class="c">// fine</span>
+names.add(42);      <span class="hl">// compile error: 42 is not a String</span>
+names = "hello";    <span class="hl">// compile error: a String is not an ArrayList</span></code></pre>
+<p>Vậy câu trả lời cho "Trước khi bắt đầu" là <strong>không</strong>. Sau <code>var x = "hi";</code> biến <code>x</code> là <code>String</code>, và <code>x = 42;</code> không compile được. Ví dụ của chính JEP 286 là <code>var list = new ArrayList&lt;String&gt;();</code>, theo JEP thì nó "suy ra ArrayList&lt;String&gt;".<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> Java vẫn là <span class="term">static typing</span>; <code>var</code> chỉ giúp bạn gõ ít hơn.</p>
+<p class="muted">Để ý kiểu là <code>ArrayList&lt;String&gt;</code>, không phải <code>List&lt;String&gt;</code>. Compiler chép đúng kiểu ở vế phải.</p>
+
+<h3>Những chỗ không được dùng var</h3>
+<p><code>var</code> dùng được cho biến local có initializer và cho biến đếm của vòng <code>for</code>. Nó <strong>không</strong> dùng được cho tham số method, tham số constructor, kiểu trả về, field hay tham số của catch, và cũng không dùng cho biến không có initializer.<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> JEP cũng nói initializer có kiểu null là lỗi, còn array initializer hay lambda sẽ "gây ra lỗi", vì vế phải không có kiểu nào để chép.<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> Mình đã chạy cả bốn trường hợp qua <code>javac</code> 21:</p>
+<pre><code>var x = null;
+<span class="c">  error: cannot infer type for local variable x</span>
+<span class="c">    (variable initializer is 'null')</span>
+var y;
+<span class="c">    (cannot use 'var' on variable without initializer)</span>
+var a = {1, 2};
+<span class="c">    (array initializer needs an explicit target-type)</span>
+var f = () -&gt; 1;
+<span class="c">    (lambda expression needs an explicit target-type)</span></code></pre>
+<p>Một chi tiết thú vị: theo JEP, "định danh <code>var</code> không phải là keyword; nó là một reserved type name (tên kiểu được giữ chỗ)".<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> Vì vậy code cũ có biến tên <code>var</code> vẫn compile được. Từ JDK 11 bạn còn có thể viết <code>var</code> cho tham số lambda, chủ yếu để gắn annotation lên chúng: <code>(@Nonnull var x, @Nullable var y) -&gt; x.process(y)</code>.<a class="src" href="https://openjdk.org/jeps/323">JEP 323</a></p>
+
+<h3>Bẫy: var đi cùng diamond <code>&lt;&gt;</code></h3>
+<pre><code>var list = new ArrayList&lt;&gt;();   <span class="hl">// ArrayList&lt;Object&gt;, not what you wanted</span>
+list.add(1);
+list.add("a");                   <span class="c">// compiles: anything goes in</span></code></pre>
+<p>Diamond <code>&lt;&gt;</code> bình thường lấy kiểu từ vế trái. Với <code>var</code> thì vế trái trống, nên compiler không có gì để chép. Style guide của OpenJDK đánh dấu đúng trường hợp này là "NGUY HIỂM: suy ra thành PriorityQueue&lt;Object&gt;".<a class="src" href="https://openjdk.org/projects/amber/guides/lvti-style-guide">LVTI style guide</a> Guide này cũng cảnh báo về số literal: với <code>var</code>, <code>17</code> thành <code>int</code>, dù bạn muốn <code>long</code>.<a class="src" href="https://openjdk.org/projects/amber/guides/lvti-style-guide">LVTI style guide</a></p>
+<p><strong>Cách sửa:</strong> khi dùng <code>var</code>, luôn viết type argument ở vế phải (<code>new ArrayList&lt;String&gt;()</code>), và chỉ dùng <code>var</code> khi vế phải làm kiểu hiện rõ cho người đọc.</p>
+
+<h2>3. Text block: dán text đúng như nó hiển thị</h2>
+<p>Thử tưởng tượng bạn chép tay một bài thơ, nhưng mỗi lần xuống dòng phải viết chữ "XUỐNG_DÒNG" và mỗi dấu nháy phải viết "DẤU_NHÁY". Bạn sẽ chép sai, và chẳng ai đọc nổi kết quả. Đó chính là một chuỗi JSON trong JDK 8:</p>
+<pre><code><span class="c">// JDK 8: escapes and + everywhere</span>
+String json = "{\n" +
+              "  \"name\": \"orders\",\n" +
+              "  \"port\": 8080\n" +
+              "}\n";
+
+<span class="c">// JDK 15+: a text block</span>
+var json = """
+        {
+          "name": "orders",
+          "port": 8080
+        }
+        """;</code></pre>
+<p>JEP 378 định nghĩa: "Text block là một string literal nhiều dòng, tránh được hầu hết escape sequence, tự động định dạng chuỗi theo cách dễ đoán, và cho lập trình viên quyền kiểm soát định dạng khi cần."<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> Nó chính thức (final) ở JDK 15, sau hai lần preview ở JDK 13 và 14.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></p>
+<p>Các quy tắc bạn cần nhớ:</p>
+<ol class="steps">
+  <li>Mở đầu bằng <code>"""</code> rồi xuống dòng. Không được viết text trên cùng dòng với <code>"""</code> mở.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></li>
+  <li>Dấu nháy kép bên trong không cần escape.</li>
+  <li>Phần thụt lề mà mọi dòng cùng có sẽ bị cắt bỏ, và khoảng trắng thừa ở cuối mỗi dòng bị xoá.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></li>
+  <li>Kết quả là một <code>String</code> bình thường: JEP gọi nó là "một constant expression kiểu <code>String</code>, giống hệt string literal".<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Một text block trong source code. 8 cột đầu của mỗi dòng được tô màu là thụt lề chung và bị cắt bỏ. Dấu ba nháy đóng quyết định mép trái. Chuỗi kết quả không còn khoảng trắng trước dấu ngoặc nhọn.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="175" y="22" text-anchor="middle" font-size="11" opacity=".75">source code</text>
+    <text x="520" y="22" text-anchor="middle" font-size="11" opacity=".75">String bạn nhận được</text>
+    <rect x="20" y="32" width="310" height="140" rx="6" fill="none" stroke="currentColor"/>
+    <rect x="36" y="64" width="54" height="98" fill="var(--accent-soft)"/>
+    <text x="36" y="56">var json = """</text>
+    <text x="36" y="76">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;{</text>
+    <text x="36" y="96">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;"name": "orders",</text>
+    <text x="36" y="116">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;"port": 8080</text>
+    <text x="36" y="136">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;}</text>
+    <text x="36" y="156">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<tspan fill="var(--accent)">"""</tspan>;</text>
+    <path d="M90 64v100" stroke="var(--accent)" stroke-dasharray="3 3"/>
+    <g fill="none" stroke="currentColor"><path d="M330 102h40M364 97l6 5-6 5"/></g>
+    <rect x="374" y="62" width="290" height="100" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="390" y="86">{\n</text>
+    <text x="390" y="104">&#160;&#160;"name": "orders",\n</text>
+    <text x="390" y="122">&#160;&#160;"port": 8080\n</text>
+    <text x="390" y="140">}\n</text>
+    <text x="36" y="196" font-size="11" fill="var(--accent)">phần tô màu = thụt lề chung, bị cắt bỏ</text>
+    <text x="36" y="214" font-size="11" opacity=".8">""" đóng nằm ở cột 8, nên mỗi dòng bị bỏ 8 khoảng trắng</text>
+  </g>
+</svg>
+<figcaption>Compiler bỏ phần thụt lề mà mọi dòng cùng có. Vị trí của <code>"""</code> đóng quyết định bỏ bao nhiêu.</figcaption>
+</figure>
+
+<h2>4. Compiler dọn một text block như thế nào</h2>
+<p>JEP 378 xử lý nội dung theo ba bước.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> Hãy theo dõi chúng trên ví dụ ở trên:</p>
+<pre><code><span class="c">Step 1  Line breaks become \n, whatever your editor used (Windows \r\n too).</span>
+<span class="c">Step 2  Find the smallest indentation of the non-blank lines and of the</span>
+<span class="c">        closing """ line: 8 spaces. Remove 8 spaces from every line.</span>
+<span class="c">        Remove trailing spaces at the end of each line.</span>
+<span class="c">Step 3  Turn escape sequences like \n, \t, \s into real characters.</span>
+<span class="hl">Result  "{\n  \"name\": \"orders\",\n  \"port\": 8080\n}\n"</span></code></pre>
+<p>Dấu <code>"""</code> mở không ảnh hưởng tới thụt lề, "nhưng vị trí của <code>"""</code> đóng thì có ảnh hưởng nếu nó nằm trên một dòng riêng".<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> Dời nó sang trái thì bạn giữ lại một phần thụt lề. Mình đã chạy cả hai phiên bản:</p>
+<pre><code>String t1 = """
+        &lt;p&gt;
+          hi
+        &lt;/p&gt;
+        """;               <span class="c">// closing """ in line with &lt;p&gt;</span>
+
+String t2 = """
+        &lt;p&gt;
+          hi
+        &lt;/p&gt;
+    """;                   <span class="c">// closing """ 4 columns further left</span>
+
+<span class="c">t1 prints:</span>
+&lt;p&gt;
+  hi
+&lt;/p&gt;
+<span class="c">t2 prints:</span>
+<span class="hl">    &lt;p&gt;</span>
+<span class="hl">      hi</span>
+<span class="hl">    &lt;/p&gt;</span></code></pre>
+<p>Thêm nữa: khi <code>"""</code> đóng nằm trên dòng riêng, chuỗi kết thúc bằng <code>\n</code>. Đặt nó ngay sau chữ cuối cùng nếu bạn không muốn dấu xuống dòng cuối đó.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></p>
+
+<h3>Hai escape mới và một method mới</h3>
+<p>Có hai escape đi kèm tính năng này. Theo JEP, <code>\&lt;line-terminator&gt;</code> (dấu gạch ngược ở đúng cuối dòng) "chặn hẳn việc chèn ký tự xuống dòng", còn <code>\s</code> "đơn giản là một khoảng trắng".<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> <code>\s</code> hữu ích vì khoảng trắng cuối dòng bình thường sẽ bị xoá. JEP cũng thêm <code>String::formatted(Object... args)</code> để điền giá trị vào:<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></p>
+<pre><code>String sql = """
+    SELECT id, name \
+    FROM users""";                       <span class="c">// "SELECT id, name FROM users" on one line</span>
+String hi = """
+    Hello, %s!""".formatted("Ann");       <span class="hl">// "Hello, Ann!"</span></code></pre>
+
+<h3>Chạy ví dụ thật</h3>
+<p>Ví dụ của khoá học dùng <code>var</code>, một text block và một switch expression (bài sau). Nó compile được với <code>--release 17</code>:</p>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+{
+  "name": "orders",
+  "port": 8080
+}
+weekend, weekday, invalid: 9
+3.14 4.00 6.00</code></pre>
+<p>Bốn dòng đầu đến từ text block: 16 khoảng trắng thụt lề trong source đã biến mất, chỉ còn 2 khoảng trắng bạn thật sự muốn.</p>
+<div class="aside"><strong>Ghi chú khi nâng từ JDK 8 lên 17:</strong> JDK 8 không có tính năng nào trong hai cái này. Code dùng chúng chỉ compile được với <code>--release 10</code>+ (<code>var</code>) hoặc <code>--release 15</code>+ (text block). Nếu library của bạn vẫn phải chạy trên JDK 8 thì không dùng được.</div>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Sau <code>var x = "hi";</code>, chuyện gì xảy ra với <code>x = 42;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không compile được: x là String</button>
+    <button class="opt">Compile được và x thành Integer</button>
+    <button class="opt">Compile được nhưng lỗi lúc chạy</button>
+    <button class="opt">Compile được và x thành Object</button>
+  </div>
+  <div class="why">Compiler chốt kiểu của <code>x</code> là <code>String</code> từ initializer. Java vẫn là kiểu tĩnh; <code>var</code> chỉ giúp gõ ít hơn.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Chỗ nào được phép dùng <code>var</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Biến local có initializer</button>
+    <button class="opt">Tham số của một public method</button>
+    <button class="opt">Field khai báo trong thân class</button>
+    <button class="opt">Kiểu trả về của static method</button>
+  </div>
+  <div class="why"><code>var</code> dành cho biến local có initializer và biến đếm vòng for. Không dùng cho tham số, field, kiểu trả về hay tham số catch.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Lỗi trong <code>var ids = new ArrayList&lt;&gt;(); ids.add("x");</code> là gì, khi bạn muốn một list <code>Long</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó là ArrayList&lt;Object&gt;, nên "x" lọt vào</button>
+    <button class="opt">Nó là ArrayList&lt;Long&gt;, nên "x" lỗi lúc chạy</button>
+    <button class="opt">Không compile: var cần có type argument</button>
+    <button class="opt">Nó là raw list, ném lỗi ở lần add đầu</button>
+  </div>
+  <div class="why">Với <code>var</code> không có vế trái để diamond chép kiểu, nên nó lùi về <code>Object</code>. Hãy viết <code>new ArrayList&lt;Long&gt;()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Dòng nào là cách mở đầu hợp lệ của một text block?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ba dấu nháy, rồi xuống dòng</button>
+    <button class="opt">Ba dấu nháy, rồi chữ đầu tiên</button>
+    <button class="opt">Một dấu backtick, rồi xuống dòng</button>
+    <button class="opt">Hai dấu nháy, rồi xuống dòng</button>
+  </div>
+  <div class="why"><code>"""</code> mở phải đi kèm một dấu xuống dòng; nội dung bắt đầu ở dòng kế tiếp.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn dời <code>"""</code> đóng của text block sang trái bốn cột. Điều gì thay đổi?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mỗi dòng giữ thêm bốn khoảng trắng</button>
+    <button class="opt">Không gì cả: chỉ dấu nháy mở quan trọng</button>
+    <button class="opt">Code không compile được nữa</button>
+    <button class="opt">Dấu xuống dòng cuối cùng bị xoá</button>
+  </div>
+  <div class="why">Dấu đóng nằm trên dòng riêng được tính khi tìm thụt lề chung. Càng sang trái thì càng ít bị cắt.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Text block trở thành tính năng chính thức (không còn preview) ở bản nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>JDK 15</button>
+    <button class="opt">JDK 10</button>
+    <button class="opt">JDK 8</button>
+    <button class="opt">JDK 21</button>
+  </div>
+  <div class="why">Text block là preview ở 13 và 14, chính thức ở 15. <code>var</code> có sớm hơn, từ JDK 10.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"<code>var</code> trong Java là gì, nó có làm Java thành kiểu động không? Còn text block là gì?"</strong> Bấm giờ. Trả lời to, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>var</code> (JDK 10) là type inference cho biến local: compiler lấy kiểu từ initializer.</label></li>
+      <li><label><input type="checkbox"> Java vẫn là kiểu tĩnh: kiểu được chốt lúc compile và không đổi được.</label></li>
+      <li><label><input type="checkbox"> Chỉ cho biến local có initializer và biến vòng lặp: không cho field, tham số, kiểu trả về; không với <code>null</code>, lambda hay array initializer.</label></li>
+      <li><label><input type="checkbox"> Bẫy: <code>var</code> với <code>&lt;&gt;</code> ra <code>Object</code>; chỉ dùng khi vế phải làm rõ kiểu.</label></li>
+      <li><label><input type="checkbox"> Text block (JDK 15) là chuỗi nhiều dòng trong <code>"""</code>, không cần escape dấu nháy.</label></li>
+      <li><label><input type="checkbox"> Thụt lề chung bị cắt bỏ, và <code>"""</code> đóng quyết định cắt bao nhiêu.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"<code>var</code> có từ JDK 10, là local-variable type inference: em viết <code>var</code> và compiler lấy kiểu từ vế phải. Nó không làm Java thành dynamic. Nếu em viết <code>var names = new ArrayList&lt;String&gt;()</code> thì <code>names</code> là <code>ArrayList&lt;String&gt;</code> mãi mãi, gán một số vào là không compile. Nó chỉ dùng cho biến local có initializer và biến vòng lặp, không dùng cho field, tham số hay kiểu trả về, và không dùng với <code>null</code> hay lambda vì không có kiểu để chép. Có một cái bẫy: <code>var</code> đi với diamond sẽ ra <code>ArrayList&lt;Object&gt;</code>. Em chỉ dùng khi nhìn vế phải là thấy rõ kiểu. Còn text block thì chính thức từ JDK 15: chuỗi nhiều dòng nằm giữa ba dấu nháy. Không cần <code>\n</code> hay <code>\"</code>, compiler tự cắt phần thụt lề chung, và vị trí dấu nháy đóng quyết định cắt bao nhiêu. Rất tiện cho JSON, SQL và test data."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-var-and-text-block-review.vi.md">Bài tập 0012: review code có var và text block</a>. Viết nhận xét review gửi giáo viên trước, rồi compile code để kiểm tra.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer senior có thể hỏi: <em>"Khi nào bạn <strong>không</strong> nên dùng <code>var</code> trong code review?"</em> Trả lời tốt: khi vế phải che mất kiểu (<code>var result = service.process();</code>), và khi đi với diamond hay số literal. Bài sau cho thấy hai thay đổi nữa từ JDK 8 lên 17 giúp code hằng ngày gọn hơn: <a href="0013-switch-expressions-and-instanceof-patterns.vi.html">switch expression và <code>instanceof</code> pattern</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a> (phần Description có rất nhiều ví dụ nhỏ), và <a href="https://openjdk.org/projects/amber/guides/lvti-style-guide">hướng dẫn style cho <code>var</code></a> của OpenJDK.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao field không được dùng var?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ báo luôn điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0045-review-concurrency-jvm.vi.html">← Ôn tập 6: concurrency và JVM</a> &nbsp;|&nbsp; <a href="0013-switch-expressions-and-instanceof-patterns.vi.html">switch trả về giá trị, instanceof tự cast giúp bạn →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với các JEP của OpenJDK và style guide của OpenJDK, và compile thử bằng JDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a> · <a href="https://openjdk.org/jeps/323">JEP 323: Local-Variable Syntax for Lambda Parameters</a> · <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a> · <a href="https://openjdk.org/projects/amber/guides/lvti-style-guide">LVTI Style Guidelines</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

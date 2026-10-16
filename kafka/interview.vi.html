@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn Kafka</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Kafka · 22 câu hỏi · <a href="index.vi.html">Lộ trình Kafka</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi Kafka cho vòng phỏng vấn backend cấp Senior. Các lệnh và output được nhắc tới đều lấy từ một container <code>apache/kafka</code> một node dùng xong bỏ; topic trên production nên dùng replication factor 3.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Kafka là gì, và nó khác message queue truyền thống ở điểm nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một nền tảng event streaming phân tán, lưu event bền vững trong một log chỉ ghi nối (append-only) cho mỗi partition; việc consume không xoá event.</p>
+<p>Kafka publish và subscribe các luồng event, lưu chúng bền vững và xử lý chúng ngay khi xảy ra hoặc xử lý lại sau. "Event không bị xoá sau khi được consume"; retention được cấu hình theo từng topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> Vì vị trí của consumer chỉ là một offset, nó có thể tua lại và xử lý lại dữ liệu.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Một queue kiểu cổ điển thì xoá message khi đã được ack.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào queue phù hợp hơn? (Phân phối task với routing, retry và dead-letter theo từng message; xem bài so sánh với RabbitMQ.)</div>
+<p class="see">Học bài: <a href="lessons/0001-events-topics-partitions.vi.html">Event, topic và partition</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Kafka đảm bảo thứ tự như thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> chỉ trong phạm vi một partition; các event cùng key sẽ vào cùng một partition.</p>
+<p>Một topic được trải trên nhiều partition nằm ở các broker khác nhau. Event cùng key được ghi vào cùng partition, và consumer của partition đó đọc chúng theo đúng thứ tự đã ghi.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> Không có thứ tự toàn cục giữa các partition. Muốn giữ thứ tự theo từng thực thể thì dùng id của thực thể làm key. Trong lần chạy của tôi, cả ba event <code>u1</code> đều vào cùng một partition.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Thứ tự theo key sẽ ra sao nếu sau này bạn thêm partition? (Ánh xạ của partitioner mặc định thay đổi và dữ liệu cũ không được di chuyển, nên event của một key sẽ nằm ở hai partition; số partition thì không giảm được.)<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[9]</a></div>
+<p class="see">Học bài: <a href="lessons/0001-events-topics-partitions.vi.html">Event, topic và partition</a> · <a href="lessons/0012-partitioning-and-partition-count.vi.html">Partitioning và số partition</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Giải thích consumer group, việc phân công partition và rebalance.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> trong một group, mỗi partition thuộc về đúng một consumer; thành viên thay đổi sẽ kích hoạt rebalance.</p>
+<p>"Mỗi partition được giao cho đúng một consumer trong group"; thành viên của group là động và partition được rebalance khi consumer tham gia hoặc rời đi.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a> Vì vậy consumer vượt quá số partition sẽ ngồi không (hệ quả của quy tắc trên). Phát hiện sự cố: với <code>session.timeout.ms</code>, không có heartbeat thì broker loại client đó ra và rebalance; <code>max.poll.interval.ms</code> giới hạn khoảng cách giữa hai lần gọi <code>poll()</code>.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[4]</a> Một instance <code>KafkaConsumer</code> không thread-safe.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Consumer lag cứ tăng mãi. Bạn kiểm tra gì? (Thời gian xử lý so với poll interval, số partition so với số consumer, <code>kafka-consumer-groups.sh --describe</code>.)</div>
+<p class="see">Học bài: <a href="lessons/0003-consumers-groups-and-offsets.vi.html">Consumer group</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>At-most-once, at-least-once, exactly-once: làm sao để có từng loại?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> thứ tự giữa xử lý và commit offset quyết định at-most hay at-least once; exactly-once cần idempotence hoặc transaction.</p>
+<p>Nếu consumer lưu vị trí trước rồi mới xử lý, crash sẽ làm mất message (at-most-once). Xử lý trước, lưu vị trí sau: at-least-once, có thể bị gửi lại.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Gọi <code>commitSync()</code> sau khi làm xong việc cho at-least-once.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a> Từ 0.11.0.0, idempotent producer ngăn bản trùng do gửi lại, và transaction ghi nguyên tử vào nhiều partition.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Các side effect bên ngoài (email, database khác) vẫn cần xử lý idempotent.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao để một lần ghi database trở nên idempotent? (Dùng event id duy nhất làm key; upsert; kiểm tra bảng processed-events trong cùng transaction.)</div>
+<p class="see">Học bài: <a href="lessons/0004-delivery-semantics.vi.html">Ngữ nghĩa giao nhận</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>acks=all làm gì, và làm sao để tránh mất dữ liệu?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>acks=all</code> chờ toàn bộ tập in-sync replica; kết hợp với replication và <code>min.insync.replicas</code>.</p>
+<p><code>acks=0</code>: không chờ. <code>acks=1</code>: leader ghi local rồi phản hồi. <code>acks=all</code>: chờ mọi in-sync replica và record không bị mất "chừng nào còn ít nhất một in-sync replica sống".<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a> Chỉ những message đã commit (đã được mọi in-sync replica nhận) mới được giao cho consumer; <code>min.insync.replicas</code> đảm bảo lần ghi được ack bởi ít nhất chừng đó in-sync replica.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Replication factor 3 là cấu hình production phổ biến.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> Một producer bền vững: <code>acks=all</code>, idempotence (mặc định true theo tài liệu 4.3), <code>delivery.timeout.ms</code> hợp lý.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Unclean leader election là gì? (Cho phép một replica không in-sync làm leader, ưu tiên tính sẵn sàng hơn tính nhất quán và có thể làm mất dữ liệu.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0005-replication-isr-and-durability.vi.html">Replication và độ bền dữ liệu</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>ISR là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> tập các replica đang đồng bộ với leader.</p>
+<p>Mỗi partition có một leader nhận các lần ghi; follower replicate bằng cách kéo (pull) dữ liệu. Leader giữ tập in-sync replica (ISR). Một message được coi là đã commit khi mọi in-sync replica đều có nó, và chỉ message đã commit mới tới được consumer.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Nếu một follower tụt lại phía sau thì sao? (Nó rời khỏi ISR; tiêu chí cụ thể nằm trong tài liệu design, ngoài các đoạn trích đã dùng.)</div>
+<p class="see">Học bài: <a href="lessons/0005-replication-isr-and-durability.vi.html">Replication và độ bền dữ liệu</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Idempotent producer đảm bảo gì? Còn transaction?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> không có bản trùng do producer retry; ghi nguyên tử vào nhiều partition.</p>
+<p>Tuỳ chọn idempotent "đảm bảo việc gửi lại sẽ không tạo ra bản ghi trùng"; nó được bật mặc định theo tài liệu config 4.3. Transaction cho phép một producer ghi vào nhiều partition một cách nguyên tử: hoặc tất cả, hoặc không gì cả.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a><a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a> Chúng không mở rộng exactly-once ra các hệ thống bên ngoài Kafka.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Điều này tương tác với consumer thế nào? (Consumer phải idempotent hoặc đọc theo kiểu transactional; chi tiết nằm ở mục delivery semantics trong tài liệu design.)</div>
+<p class="see">Học bài: <a href="lessons/0006-idempotence-and-transactions.vi.html">Idempotence và transaction</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Tinh chỉnh producer: linger.ms và batch.size làm gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> chúng đánh đổi một chút latency để có batch lớn hơn và throughput tốt hơn.</p>
+<p>Producer gom các record cùng partition thành ít request hơn, tối đa <code>batch.size</code> (mặc định 16384 byte); <code>linger.ms</code> (mặc định 5 ms theo tài liệu này) thêm một độ trễ nhỏ để nhiều record hơn vào cùng batch.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a> Hãy đo latency đầu-cuối và throughput; tôi chưa benchmark phần này.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cái gì giới hạn thời gian một record có thể bị trì hoãn? (<code>delivery.timeout.ms</code>, mặc định 120000.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[5]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0002-producers-keys-and-acks.vi.html">Producer và acks</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Kafka giữ dữ liệu bao lâu, và log compaction là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> mặc định 7 ngày (<code>cleanup.policy=delete</code>, <code>retention.ms=604800000</code>); compaction giữ lại ít nhất giá trị mới nhất cho mỗi key.</p>
+<p><a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[6]</a> Việc xoá diễn ra theo từng file segment. Compaction: "luôn giữ lại ít nhất giá trị cuối cùng đã biết cho mỗi message key"; offset được giữ ổn định; giá trị null là một tombstone dùng để xoá key, và bản thân tombstone sẽ được dọn sau <code>delete.retention.ms</code> (mặc định 24 h).<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Lần chạy của tôi (với cấu hình demo rất gắt): key u1 và u2 có nhiều lần cập nhật được compact về giá trị mới nhất, và một tombstone đã xoá u2.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Dùng topic compacted làm audit trail được không? (Không: nó quên lịch sử; hãy dùng retention kiểu delete.)</div>
+<p class="see">Học bài: <a href="lessons/0008-log-compaction.vi.html">Log compaction</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Kafka Streams là gì, và stream khác table thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một client library để xử lý stream; KStream là luồng record không giới hạn, KTable là ảnh chụp của một bảng; xử lý có state dùng state store và có hỗ trợ exactly-once.</p>
+<p><a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[7]</a> Lần chạy WordCount của tôi cho ra <code>kafka 1</code> rồi <code>kafka 2</code>: đó là changelog của một KTable chứa các bộ đếm.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Nó mở rộng thế nào? (Chạy thêm instance của ứng dụng; các task được chia cho chúng; chi tiết nằm trong tài liệu, ngoài các đoạn trích.)</div>
+<p class="see">Học bài: <a href="lessons/0009-kafka-streams-basics.vi.html">Kafka Streams</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Kafka Connect là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một framework để stream dữ liệu giữa Kafka và các hệ thống khác bằng source connector và sink connector, task và converter, được quản lý qua REST API.</p>
+<p><a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[8]</a> Chế độ distributed cho khả năng chịu lỗi và mở rộng; chế độ standalone thì không. Lần chạy của tôi chuyển các dòng từ một file vào topic rồi ra một file khác bằng các connector FileStream có sẵn.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn stream các thay đổi của PostgreSQL sang Elasticsearch thế nào? (Source connector, topic, sink connector; bài tập thiết kế.)</div>
+<p class="see">Học bài: <a href="lessons/0010-kafka-connect.vi.html">Kafka Connect</a></p>
+</div>
+</details>
+
+<details class="qa">
+<summary><span class="n">12.</span>Bạn chọn key và số partition cho một topic thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> lấy key theo thực thể có event cần giữ thứ tự; định cỡ số partition theo mức song song consumer lúc cao điểm trong tương lai, vì tăng sau này sẽ ánh xạ lại key còn giảm thì không thể.</p>
+<p>Partitioner mặc định băm key; record không có key dùng một sticky partition cho mỗi batch. Thêm partition làm thay đổi ánh xạ key và Kafka không di chuyển dữ liệu cũ; giảm số partition thì không được hỗ trợ.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[9]</a> Số partition cũng là giới hạn trên của số consumer trong một group. Trong lần chạy của tôi, các key <code>u1</code>, <code>u3</code>, <code>u6</code> chuyển từ partition 1 sang 4 sau khi tăng từ 3 lên 6 partition.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Topic có key của bạn phải tăng gấp 4. Bạn migrate thế nào? (Tạo topic mới nhiều partition hơn, chuyển producer sang, xử lý hết topic cũ trước khi chuyển consumer, để một key không bao giờ bị hai consumer xử lý cùng lúc.)</div>
+<p class="see">Học bài: <a href="lessons/0012-partitioning-and-partition-count.vi.html">Partitioning</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Vì sao rebalance là vấn đề, và bạn giảm nó bằng cách nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> rebalance kiểu classic do client điều khiển và có thể làm cả group dừng lại; dùng cooperative sticky assignment và static membership, hoặc giao thức KIP-848 mới.</p>
+<p><code>group.instance.id</code> biến consumer thành static member, nên restart nhanh vẫn giữ được partition. KIP-848 (<code>group.protocol=consumer</code>, GA từ 4.0) chuyển việc phân công lên broker với thiết kế hoàn toàn incremental và không có rào đồng bộ toàn cục; <code>session.timeout.ms</code> và <code>partition.assignment.strategy</code> không được hỗ trợ khi dùng nó.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[10]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào giao thức mới trở thành mặc định của client? (Bản 5.0; đến 6.0 client chỉ còn hỗ trợ giao thức này.)</div>
+<p class="see">Học bài: <a href="lessons/0015-rebalancing-and-group-protocols.vi.html">Rebalance</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Một record cứ thất bại mãi trong consumer của bạn. Bạn làm gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> phân loại lỗi; retry lỗi tạm thời với backoff có giới hạn; đưa lỗi vĩnh viễn (poison pill) sang dead letter topic kèm header mô tả lỗi; cảnh báo và replay.</p>
+<p>Trong Spring Kafka, <code>DefaultErrorHandler</code> retry (mặc định 9 lần, không chờ) rồi ghi log; với <code>DeadLetterPublishingRecoverer</code> nó publish sang <code>&lt;topic&gt;-dlt</code> vào cùng partition. Lỗi deserialize và lỗi chuyển đổi mặc định là fatal và không được retry.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[11]</a> Retry topic (<code>@RetryableTopic</code>) giữ cho partition tiếp tục chảy nhưng từ bỏ thứ tự chặt chẽ theo key.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao để poison pill không làm consumer crash khi deserialize? (Dùng <code>ErrorHandlingDeserializer</code> bọc quanh deserializer thật.)</div>
+<p class="see">Học bài: <a href="lessons/0016-error-handling-and-dead-letter-topics.vi.html">Xử lý lỗi</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>Làm sao để thay đổi định dạng message một cách an toàn?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> lưu schema trong registry với một chế độ tương thích; BACKWARD (mặc định) nghĩa là nâng cấp consumer trước và chỉ thêm field có giá trị mặc định.</p>
+<p>BACKWARD: consumer dùng schema mới đọc được dữ liệu ghi bằng schema gần nhất. FORWARD: consumer cũ đọc được dữ liệu mới, nâng cấp producer trước. FULL: cả hai. Các biến thể transitive kiểm tra với mọi version cũ. Thêm một field có mặc định là thay đổi tương thích hoàn toàn trong Avro và Protobuf.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[12]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao một topic compacted cần BACKWARD_TRANSITIVE? (Consumer mới replay từ đầu và phải đọc được mọi version trong lịch sử.)</div>
+<p class="see">Học bài: <a href="lessons/0017-schemas-and-schema-registry.vi.html">Schema</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">16.</span>KRaft là gì và vì sao cần 3 controller?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> metadata quorum dùng Raft tích hợp sẵn trong Kafka, thay thế ZooKeeper; phải có đa số controller còn sống, nên 3 chịu được 1 sự cố và 5 chịu được 2.</p>
+<p>Các node nhận <code>process.roles</code> là broker, controller hoặc cả hai; chế độ combined không được khuyến nghị cho môi trường quan trọng. Bridge release cuối cùng để migrate từ ZooKeeper là 3.9.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[13]</a> <code>kafka-metadata-quorum.sh describe --status</code> cho thấy leader, các voter và độ trễ của follower.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Sao không dùng 4 controller? (Đa số của 4 là 3, nên vẫn chỉ chịu được 1 sự cố.)</div>
+<p class="see">Học bài: <a href="lessons/0019-kraft-and-controllers.vi.html">KRaft</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">17.</span>Bạn đặt cảnh báo trên những metric nào cho một cluster Kafka?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> under-replicated partition, under-min-ISR partition, offline partition, active controller count, tỉ lệ idle của handler/network, và xu hướng consumer lag.</p>
+<p>UnderReplicatedPartitions và UnderMinIsrPartitionCount phải bằng 0, đúng một node báo ActiveControllerCount bằng 1, và tỉ lệ idle của request handler và network processor nên ở trên 0.3. <code>TotalTimeMs</code> chia latency thành thời gian queue, local, remote và gửi response.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[14]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Lag tăng nhưng broker trông vẫn ổn. Bước tiếp theo? (Kiểm tra thời gian xử lý mỗi record, max.poll.interval, các lần rebalance, độ lệch partition giữa các consumer.)</div>
+<p class="see">Học bài: <a href="lessons/0020-monitoring-and-operations.vi.html">Giám sát</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">18.</span>Giờ Kafka có hoạt động như một queue được không? Share group là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> được, từ 4.2 share group (KIP-932) đã sẵn sàng cho production: nhiều consumer chia nhau một partition, record được lock và ack riêng lẻ, với cái giá là thứ tự.</p>
+<p>Record được acquire kèm một lock có thời hạn (mặc định 30 s); consumer trả lời ACCEPT, RELEASE, REJECT hoặc RENEW cho từng record; có giới hạn số lần giao (mặc định 5); share group đánh đổi thứ tự để chia sẻ linh hoạt.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[15]</a> Trong lần chạy của tôi, hai share consumer chia nhau 20 record từ một partition duy nhất, 8 và 12.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào bạn vẫn chọn RabbitMQ? (Routing phong phú qua exchange, TTL và độ ưu tiên theo từng message, hệ sinh thái AMQP sẵn có.)</div>
+<p class="see">Học bài: <a href="lessons/0021-share-groups.vi.html">Share group</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">19.</span>Bạn bảo mật một cluster Kafka thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> TLS để mã hoá, SASL (SCRAM hoặc OAUTHBEARER) hoặc mTLS để xác thực, StandardAuthorizer với ACL theo nguyên tắc quyền tối thiểu, và quota cho các client "ồn ào".</p>
+<p>Khi đã có authorizer mà không có ACL khớp thì chỉ super user được truy cập. <code>kafka-acls.sh --producer</code> / <code>--consumer --group</code> cấp các quyền cần thiết.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[16]</a> Mặc định client có quota không giới hạn; hãy đặt <code>producer_byte_rate</code>, <code>consumer_byte_rate</code> và <code>request_percentage</code> theo từng user.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[9]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Cái gì hỏng ngay khi bạn bật authorizer? (Mọi client không phải super user mà chưa có ACL; hãy thêm ACL trước.)</div>
+<p class="see">Học bài: <a href="lessons/0022-security-and-quotas.vi.html">Bảo mật</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">20.</span>Làm sao sống sót khi mất cả một region?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> MirrorMaker 2 (xây trên Connect) replicate topic và offset của consumer sang một cluster khác; replication là bất đồng bộ, nên hãy chấp nhận một khoảng nhỏ có thể mất dữ liệu.</p>
+<p>Topology là active/passive hoặc active/active; topic được mirror mang tiền tố là alias của cluster nguồn (<code>us-west.foo</code>); offset của consumer được replicate qua các checkpoint; exactly-once được hỗ trợ cho các cluster MirrorMaker chuyên trách từ bản 3.5.0.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[17]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn giảm chi phí lưu trữ cho retention một năm thế nào? (Tiered storage lên object storage, trừ các topic compacted.)</div>
+<p class="see">Học bài: <a href="lessons/0023-multi-cluster-and-tiered-storage.vi.html">Đa cluster</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">21.</span>Kafka Streams: window, join và exactly-once trong một câu trả lời?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> tổng hợp theo window với grace period cho dữ liệu muộn; equi-join cần đầu vào được co-partition; processing.guarantee=exactly_once_v2 làm cho vòng đọc-xử lý-ghi trở nên nguyên tử.</p>
+<p>KStream-KStream join luôn có window; GlobalKTable và foreign-key join không cần co-partitioning; <code>groupBy</code> luôn gây repartition, và các thao tác đổi key sẽ đánh dấu stream cần repartition.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[18]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao nên ưu tiên mapValues hơn map? (Không đổi key, nên không cần repartition topic.)</div>
+<p class="see">Học bài: <a href="lessons/0018-streams-windows-joins-exactly-once.vi.html">Window và join trong Streams</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">22.</span>Spring Kafka commit offset khi nào, và điều đó có ý nghĩa gì với listener của bạn?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> auto-commit bị tắt; container commit theo AckMode, mặc định BATCH sau khi xử lý xong toàn bộ lần poll: đó là at-least-once, nên listener phải idempotent.</p>
+<p>RECORD commit theo từng record, MANUAL / MANUAL_IMMEDIATE giao việc đó cho <code>Acknowledgment.acknowledge()</code>; <code>concurrency</code> tạo một consumer cho mỗi container và bị giới hạn bởi số partition.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[19]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao dùng chung một KafkaProducer nhưng mỗi thread một KafkaConsumer? (Producer thread-safe; consumer thì không.)<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[20]</a></div>
+<p class="see">Học bài: <a href="lessons/0013-spring-kafka.vi.html">Spring Kafka</a> · <a href="lessons/0011-java-producer-and-consumer.vi.html">Java client</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi tôi lần lượt từng câu Kafka này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka: Introduction</a> · [2] <a href="https://kafka.apache.org/43/design/design/">Kafka: Design</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [4] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka: Consumer configs</a> · [5] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka: Producer configs</a> · [6] <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka: Topic configs</a> · [7] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams: core concepts</a> · [8] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect: user guide</a> · [9] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka: Basic operations</a> · [10] <a href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">Kafka: Consumer rebalance protocol</a> · [11] <a href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">Spring Kafka: Handling exceptions</a> · [12] <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">Confluent: Schema evolution</a> · [13] <a href="https://kafka.apache.org/43/operations/kraft/">Kafka: KRaft</a> · [14] <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka: Monitoring</a> · [15] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">KafkaShareConsumer Javadoc</a> · [16] <a href="https://kafka.apache.org/43/security/authorization-and-acls/">Kafka: Authorization and ACLs</a> · [17] <a href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">Kafka: Geo-replication</a> · [18] <a href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">Kafka Streams: DSL API</a> · [19] <a href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">Spring Kafka: Listener containers</a> · [20] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

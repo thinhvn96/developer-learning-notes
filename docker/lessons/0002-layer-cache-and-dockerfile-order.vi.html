@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 2: Layer cache và thứ tự lệnh trong Dockerfile</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Layer cache và thứ tự lệnh trong Dockerfile</h1>
+<p class="meta">Docker · Bài 0002 · bước 4/12 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-layer-cache-and-dockerfile-order.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> sắp xếp một Dockerfile sao cho bước cài dependency vẫn dùng cache khi chỉ có source code thay đổi.</div>
+
+<h2>Quy tắc</h2>
+<p>"Mỗi lệnh trong Dockerfile này tương ứng với một layer trong image cuối cùng." Khi một layer thay đổi, cache của nó bị vô hiệu, và "nếu một layer thay đổi, mọi layer đứng sau nó cũng bị ảnh hưởng."<a class="cite" href="https://docs.docker.com/build/cache/">[1]</a></p>
+<h2>Hệ quả</h2>
+<p>Đặt các lệnh ít thay đổi lên trước, các lệnh hay thay đổi xuống cuối. Trang build cache chỉ nêu quy tắc invalidation; lời khuyên về thứ tự là hệ quả thực tế của quy tắc đó (trong phần tài liệu tôi đã đọc không ghi rõ công thức sắp xếp này, nên hãy coi đây là suy luận, không phải trích dẫn).</p>
+<pre><code># slow: any source edit invalidates the dependency download
+COPY . .
+RUN ./download-dependencies.sh
+
+# better: dependency descriptor first, source afterwards
+COPY pom.xml .
+RUN ./download-dependencies.sh
+COPY src/ src/</code></pre>
+<p>Với thứ tự thứ hai, sửa một file trong <code>src/</code> chỉ làm mất cache các layer từ <code>COPY src/</code> trở đi; layer dependency tốn kém vẫn được dùng lại.</p>
+<p class="aside"><code>.dockerignore</code> loại các file như <code>.git/</code> và output của build ra khỏi build context, nên những thay đổi không liên quan cũng không làm mất cache của các layer <code>COPY</code>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một layer thay đổi. Các layer phía sau thì sao?</p>
+  <button>Chúng bị xóa đi</button>
+  <button data-correct>Chúng cũng build lại</button>
+  <button>Chúng được dùng lại</button>
+  <button>Chúng gộp vào nhau</button>
+  <p class="explain">Nếu một layer thay đổi, mọi layer phía sau nó đều bị ảnh hưởng.<a class="cite" href="https://docs.docker.com/build/cache/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lệnh nào nên đặt sớm nhất?</p>
+  <button>Lệnh ghi timestamp</button>
+  <button data-correct>Phần setup ít thay đổi</button>
+  <button>Build id ngẫu nhiên</button>
+  <button>Source hay bị sửa</button>
+  <p class="explain">Đặt các layer ổn định lên trước để chúng luôn nằm trong cache.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bạn chỉ sửa một file source. Layer nào chạy lại đầu tiên?</p>
+  <button>Dòng CMD cuối cùng</button>
+  <button>Bước cài dependency</button>
+  <button>Bước pull base image</button>
+  <button data-correct>Lệnh COPY source</button>
+  <p class="explain">Cache bị vô hiệu bắt đầu từ layer đầu tiên thay đổi, tức lệnh COPY source, rồi lan xuống các layer sau.<a class="cite" href="https://docs.docker.com/build/cache/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao nên thêm <code>.dockerignore</code>?</p>
+  <button>JVM khởi động nhanh hơn</button>
+  <button data-correct>Context nhỏ và ổn định hơn</button>
+  <button>Tự vá lỗ hổng bảo mật</button>
+  <button>Bật được multi-stage build</button>
+  <p class="explain">Nó loại các file không liên quan ra khỏi build context và các layer.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-order-the-dockerfile.vi.md">Bài tập 0002: sắp xếp lại Dockerfile</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/build/cache/">Docker Docs: Build cache</a>. Sau đó đọc tiếp trang về cache invalidation được link trong đó.</p>
+<p><a href="0008-dockerfile-instructions.vi.html">← Các lệnh trong Dockerfile: ENV vs ARG, COPY vs ADD, EXPOSE</a> &nbsp;|&nbsp; <a href="0009-cmd-entrypoint-and-exec-form.vi.html">CMD, ENTRYPOINT và exec form vs shell form →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/build/cache/">Docker Docs: Build cache</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

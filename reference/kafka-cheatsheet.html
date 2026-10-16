@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main style="max-width:52rem">
+<h1>Kafka cheat sheet</h1>
+<p class="meta"><a href="../index.html">Home</a> · Reference · <a href="../kafka/index.html">Kafka ladder</a> · <a href="../kafka/interview.html">Interview Q&amp;A</a> · Apache Kafka 4.3 defaults · print-friendly · <a class="lang" href="kafka-cheatsheet.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<h2>Glossary</h2>
+<table>
+<tr><th>Term</th><th>One line</th><th>Lesson</th></tr>
+<tr><td>topic / partition</td><td>named stream / ordered append-only log; order is per partition only</td><td><a href="../kafka/lessons/0001-events-topics-partitions.html">0001</a></td></tr>
+<tr><td>offset</td><td>position of a record in a partition; a consumer's offset = next record to read</td><td><a href="../kafka/lessons/0003-consumers-groups-and-offsets.html">0003</a></td></tr>
+<tr><td>consumer group</td><td>consumers sharing <code>group.id</code>; each partition goes to exactly one member</td><td><a href="../kafka/lessons/0003-consumers-groups-and-offsets.html">0003</a></td></tr>
+<tr><td>share group</td><td>queue-style group: many consumers per partition, per-record lock and ack, no ordering</td><td><a href="../kafka/lessons/0021-share-groups.html">0021</a></td></tr>
+<tr><td>leader / follower / ISR</td><td>leader takes writes; followers copy; ISR = replicas caught up</td><td><a href="../kafka/lessons/0005-replication-isr-and-durability.html">0005</a></td></tr>
+<tr><td>committed (message)</td><td>written to all ISR members; only committed data is served to consumers</td><td><a href="../kafka/lessons/0005-replication-isr-and-durability.html">0005</a></td></tr>
+<tr><td>lag</td><td>log-end offset − committed offset, per partition</td><td><a href="../kafka/lessons/0020-monitoring-and-operations.html">0020</a></td></tr>
+<tr><td>rebalance</td><td>redistribution of partitions when group membership changes</td><td><a href="../kafka/lessons/0015-rebalancing-and-group-protocols.html">0015</a></td></tr>
+<tr><td>compaction / tombstone</td><td>keep latest value per key / <code>null</code> value that deletes a key</td><td><a href="../kafka/lessons/0008-log-compaction.html">0008</a></td></tr>
+<tr><td>KRaft / controller</td><td>Raft metadata quorum that replaced ZooKeeper / node holding it</td><td><a href="../kafka/lessons/0019-kraft-and-controllers.html">0019</a></td></tr>
+<tr><td>DLT</td><td>dead letter topic for records that cannot be processed</td><td><a href="../kafka/lessons/0016-error-handling-and-dead-letter-topics.html">0016</a></td></tr>
+<tr><td>subject / compatibility</td><td>Schema Registry name for a schema history / rule for allowed changes</td><td><a href="../kafka/lessons/0017-schemas-and-schema-registry.html">0017</a></td></tr>
+</table>
+
+<h2>Recipes</h2>
+<table>
+<tr><th>Goal</th><th>Settings</th></tr>
+<tr><td>No acknowledged write lost on one broker failure</td><td>RF 3 · topic <code>min.insync.replicas=2</code> · producer <code>acks=all</code> (default) · <code>enable.idempotence=true</code> (default) · <code>unclean.leader.election.enable=false</code> (default)</td></tr>
+<tr><td>At-least-once consumer</td><td><code>enable.auto.commit=false</code> · process, then <code>commitSync()</code> · idempotent processing</td></tr>
+<tr><td>Exactly-once inside Kafka</td><td>transactional producer (<code>transactional.id</code>) + consumers with <code>isolation.level=read_committed</code>; Streams: <code>processing.guarantee=exactly_once_v2</code></td></tr>
+<tr><td>Per-entity ordering</td><td>key = entity id · never increase partitions of a live keyed topic</td></tr>
+<tr><td>Throughput</td><td>raise <code>linger.ms</code> and <code>batch.size</code> · <code>compression.type=lz4</code> or <code>zstd</code></td></tr>
+<tr><td>Fewer rebalances</td><td><code>group.protocol=consumer</code> (KIP-848), or classic with <code>CooperativeStickyAssignor</code> + <code>group.instance.id</code></td></tr>
+<tr><td>Latest value per key, forever</td><td><code>cleanup.policy=compact</code></td></tr>
+</table>
+
+<h2>Defaults worth memorising</h2>
+<table>
+<tr><th>Config</th><th>Default</th><th>Config</th><th>Default</th></tr>
+<tr><td><code>acks</code></td><td>all</td><td><code>enable.auto.commit</code></td><td>true (Spring: false)</td></tr>
+<tr><td><code>enable.idempotence</code></td><td>true</td><td><code>auto.offset.reset</code></td><td>latest</td></tr>
+<tr><td><code>linger.ms</code></td><td>5 (0 before 4.0)</td><td><code>max.poll.records</code></td><td>500</td></tr>
+<tr><td><code>batch.size</code></td><td>16384 B</td><td><code>max.poll.interval.ms</code></td><td>300000 (5 min)</td></tr>
+<tr><td><code>compression.type</code></td><td>none</td><td><code>session.timeout.ms</code></td><td>45000 (classic only)</td></tr>
+<tr><td><code>delivery.timeout.ms</code></td><td>120000</td><td><code>heartbeat.interval.ms</code></td><td>3000 (classic only)</td></tr>
+<tr><td><code>buffer.memory</code></td><td>32 MB</td><td><code>group.protocol</code></td><td>classic</td></tr>
+<tr><td><code>max.block.ms</code></td><td>60000</td><td><code>isolation.level</code></td><td>read_uncommitted</td></tr>
+<tr><td><code>min.insync.replicas</code> (broker)</td><td>1</td><td><code>share.record.lock.duration.ms</code></td><td>30000</td></tr>
+<tr><td><code>auto.create.topics.enable</code></td><td>true</td><td><code>share.delivery.count.limit</code></td><td>5</td></tr>
+</table>
+<p class="aside">Sources: <a href="https://kafka.apache.org/43/configuration/producer-configs/">producer</a>, <a href="https://kafka.apache.org/43/configuration/consumer-configs/">consumer</a>, <a href="https://kafka.apache.org/43/configuration/broker-configs/">broker</a> and <a href="https://kafka.apache.org/43/configuration/group-configs/">group</a> configs (4.3).</p>
+
+<h2>CLI</h2>
+<pre><code>kafka-topics.sh --bootstrap-server B --create --topic T --partitions 6 --replication-factor 3
+kafka-topics.sh --bootstrap-server B --describe --topic T
+kafka-topics.sh --bootstrap-server B --alter --topic T --partitions 12      # remaps keys!
+kafka-configs.sh --bootstrap-server B --alter --entity-type topics --entity-name T --add-config retention.ms=604800000
+kafka-consumer-groups.sh --bootstrap-server B --describe --group G           # offsets, lag
+kafka-consumer-groups.sh --bootstrap-server B --group G --reset-offsets --to-earliest --topic T --execute
+kafka-share-groups.sh --bootstrap-server B --describe --group G
+kafka-metadata-quorum.sh --bootstrap-server B describe --status
+kafka-acls.sh --bootstrap-server B --add --allow-principal User:svc --consumer --topic T --group G
+kafka-producer-perf-test.sh --topic T --num-records 500000 --throughput -1 --record-size 100 \
+  --command-property bootstrap.servers=B acks=all linger.ms=20 compression.type=zstd</code></pre>
+
+<h2>Choosing</h2>
+<table>
+<tr><th>Question</th><th>Pick</th></tr>
+<tr><td>Ordered per key, replayable?</td><td>consumer group</td></tr>
+<tr><td>Independent jobs, scale past partition count, per-record retry?</td><td>share group (4.2+)</td></tr>
+<tr><td>Rich routing, per-message TTL, priorities?</td><td>RabbitMQ (<a href="../system-design/lessons/0003-queue-versus-log.html">queue vs log</a>)</td></tr>
+<tr><td>Transform topic to topic with state?</td><td>Kafka Streams</td></tr>
+<tr><td>Move data to/from a database or search engine?</td><td>Kafka Connect</td></tr>
+<tr><td>Survive a region loss?</td><td>MirrorMaker 2 (async, small RPO)</td></tr>
+</table>
+<footer><p>Compressed from the <a href="../kafka/index.html">Kafka ladder</a>; each lesson has the citations. <a href="../RESOURCES.md">All resources</a></p></footer>
+</main>
+</body>
+</html>

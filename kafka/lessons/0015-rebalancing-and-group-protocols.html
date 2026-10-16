@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 15: Rebalancing: classic vs the new consumer protocol</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Rebalancing: classic vs the new consumer protocol</h1>
+<p class="meta">Kafka · Lesson 0015 · step 12 of 23 · Advanced · ~14 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0015-rebalancing-and-group-protocols.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> explain what a rebalance costs, how cooperative and static membership reduce it, and what the new consumer group protocol (KIP-848, GA in 4.0) changes.</div>
+
+<h2>Why rebalances hurt</h2>
+<p>When a consumer joins, leaves or misses its deadline, the group's partitions are redistributed. In the <strong>classic</strong> protocol the clients do this themselves: a leader consumer runs the assignor and the group passes through a synchronization barrier. With eager assignment every consumer gives up its partitions first, so the whole group pauses. Rolling a 20-instance deployment can mean 20 pauses.</p>
+<h2>Classic protocol: the mitigations</h2>
+<ul>
+<li><strong>Cooperative rebalancing.</strong> The default <code>partition.assignment.strategy</code> is <code>[RangeAssignor, CooperativeStickyAssignor]</code>; it uses Range by default and lets you switch to cooperative sticky with a rolling bounce that removes Range from the list.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a> Cooperative sticky only moves the partitions that must move, so the others keep processing.</li>
+<li><strong>Static membership.</strong> Set <code>group.instance.id</code> and "the consumer is treated as a static member": a restart within <code>session.timeout.ms</code> (default 45 s) keeps its partitions, with no rebalance.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a> Good for Kubernetes StatefulSets with stable names.</li>
+<li><strong>Liveness.</strong> Heartbeats every <code>heartbeat.interval.ms</code> (3 s), failure after <code>session.timeout.ms</code>, and separately <code>max.poll.interval.ms</code> (5 min) between polls.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a></li>
+</ul>
+<h2>The new protocol (KIP-848)</h2>
+<p>The next-generation protocol "improves the scalability of consumer groups while simplifying consumers", uses a "fully incremental design" and "no longer relies on a global synchronization barrier".<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a> Assignment moves to the broker's group coordinator. It is GA and enabled on the server since 4.0; clients opt in with <code>group.protocol=consumer</code>.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+<ul>
+<li>Server-side assignors: <code>uniform</code> (default) and <code>range</code>, chosen with <code>group.remote.assignor</code>. CooperativeSticky, Sticky and RoundRobin map to <code>uniform</code>.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></li>
+<li>Not supported with it: <code>heartbeat.interval.ms</code>, <code>session.timeout.ms</code>, <code>partition.assignment.strategy</code>, <code>enforceRebalance()</code>.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a> Timing moves to the group config (<code>consumer.session.timeout.ms</code> 45 s, <code>consumer.heartbeat.interval.ms</code> 5 s).<a class="cite" href="https://kafka.apache.org/43/configuration/group-configs/">[3]</a></li>
+<li>Default timeline: in 5.0 <code>KafkaConsumer</code> defaults to the new protocol; in 6.0 the client supports only it.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></li>
+<li>Migration: online, by rolling out the config, if the classic group uses an assignor without custom metadata.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></li>
+</ul>
+<p>Our example consumer ran with both protocols; <code>--describe --state</code> shows the server-side assignor:</p>
+<pre><code>GROUP            COORDINATOR (ID)  ASSIGNMENT-STRATEGY STATE #MEMBERS
+billing-consumer localhost:9092 (1) uniform            Empty 0
+billing-classic  localhost:9092 (1) -                  Empty 0</code></pre>
+<div class="aside">Interview answer: "Classic rebalances are client-driven and can stop the world; I'd use CooperativeSticky plus static membership. On 4.x I'd move to <code>group.protocol=consumer</code>: incremental, broker-side assignment, no global barrier."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Which config makes a consumer a static member?</p>
+  <button>group.remote.assignor</button>
+  <button data-correct>group.instance.id</button>
+  <button>isolation.level</button>
+  <button>client.rack</button>
+  <p class="explain">If group.instance.id is set, the consumer is treated as a static member.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. How do clients enable the KIP-848 protocol?</p>
+  <button>protocol.version=2</button>
+  <button data-correct>group.protocol=consumer</button>
+  <button>enable.kip848=true</button>
+  <button>assignor=uniform</button>
+  <p class="explain">group.protocol must be set to consumer.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Where does KIP-848 compute assignments?</p>
+  <button data-correct>On the group coordinator</button>
+  <button>On the group leader client</button>
+  <button>On every consumer</button>
+  <button>In ZooKeeper nodes</button>
+  <p class="explain">Assignment moves to the server; client-side assignors are not used.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which client config is unsupported under KIP-848?</p>
+  <button>group.id</button>
+  <button data-correct>session.timeout.ms</button>
+  <button>bootstrap.servers</button>
+  <button>max.poll.records</button>
+  <p class="explain">heartbeat.interval.ms, session.timeout.ms and partition.assignment.strategy are unsupported.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0015-stop-the-rebalance-storm.md">Exercise 0015: stop the rebalance storm</a></p>
+<p>Runnable example: <a href="../examples/java-clients/run.sh"><code>run.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">Kafka Operations: Consumer Rebalance Protocol</a>. Read the whole page, then the group.instance.id entry in the consumer configs.</p>
+<p><a href="0014-producer-throughput-batching-compression.html">← Producer throughput: batching and compression</a> &nbsp;|&nbsp; <a href="0016-error-handling-and-dead-letter-topics.html">Error handling: retries, poison pills, dead letter topics →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka Consumer Configs</a> · [2] <a href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">Kafka Operations: Consumer Rebalance Protocol</a> · [3] <a href="https://kafka.apache.org/43/configuration/group-configs/">Kafka Group Configs</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

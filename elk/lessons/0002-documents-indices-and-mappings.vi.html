@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 2: Document, index và mapping</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Document, index và mapping</h1>
+<p class="meta">ELK Stack · Bài 0002 · bước 3/14 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-documents-indices-and-mappings.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được index, document và mapping, và vì sao trên production bạn chọn explicit mapping.</div>
+
+<h2>Định nghĩa</h2>
+<p>Theo tài liệu, "index là đơn vị lưu trữ cơ bản trong Elasticsearch, và là tầng mà bạn tương tác với dữ liệu của mình." Một index gồm các <strong>document</strong> (object JSON với các field dạng key-value), <strong>mapping</strong> (kiểu dữ liệu của field và cách field được đánh index, được query), và <strong>settings</strong> (shard, replica, refresh interval).<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+<p>Tài liệu khuyên dùng dynamic mapping khi khám phá dữ liệu và explicit mapping cho production, đồng thời dùng alias để tách query khỏi tên index.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+<h2>Một explicit mapping</h2>
+<pre><code>PUT /logs
+{ "mappings": { "properties": {
+    "message": { "type": "text" },       // analyzed: full-text search
+    "level":   { "type": "keyword" },    // exact value: filters and aggregations
+    "service": { "type": "keyword" } } } }</code></pre>
+<p>Chọn <code>text</code> hay <code>keyword</code> chính là quyết định khiến query của bạn chạy đúng hay không, như <a href="0005-query-dsl-term-match-bool.vi.html">bài 5</a> sẽ cho thấy. Script: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a>.</p>
+<div class="aside">Câu hỏi phỏng vấn: "Nếu tôi để dynamic mapping tự đoán thì sao?" Nó suy ra kiểu từ document đầu tiên nó thấy, mà kiểu đó có thể không hợp với query của bạn; mapping của các field đã tồn tại thì không thể đơn giản là sửa, nên hãy lên kế hoạch từ đầu (cách reindex nằm ngoài các đoạn trích đã đọc ở đây; hãy hỏi giáo viên).</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mapping định nghĩa điều gì?</p>
+  <button>Vai trò người dùng</button>
+  <button data-correct>Kiểu field và cách index</button>
+  <button>Vị trí đặt shard</button>
+  <button>Đường dẫn trên đĩa</button>
+  <p class="explain">Mapping xác định kiểu dữ liệu của field và điều khiển cách đánh index, cách query.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Document trong Elasticsearch là gì?</p>
+  <button>Một panel Kibana</button>
+  <button data-correct>Một object JSON</button>
+  <button>Một file log</button>
+  <button>Một class Java</button>
+  <p class="explain">Document là object JSON chứa các field dạng key-value.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Production nên dùng dynamic hay explicit mapping?</p>
+  <button>Để dynamic tự đoán</button>
+  <button>Không dùng mapping</button>
+  <button>Kiểu ngẫu nhiên</button>
+  <button data-correct>Explicit mapping</button>
+  <p class="explain">Dùng dynamic mapping khi khám phá, explicit mapping cho production.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Phần nào của index chứa refresh interval?</p>
+  <button>Alias</button>
+  <button data-correct>Settings</button>
+  <button>Mapping</button>
+  <button>Document</button>
+  <p class="explain">Settings điều khiển shard, replica và refresh interval.<a class="cite" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-map-an-access-log.vi.md">Bài tập 0002: viết mapping cho access log</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch Docs: Indices, documents and mappings</a>. Đọc phần 'Index basics' và 'Mappings'.</p>
+<p><a href="0008-kql-and-discover.vi.html">← Tìm kiếm trong Kibana: Discover và KQL</a> &nbsp;|&nbsp; <a href="0009-text-analysis.vi.html">Text analysis: analyzer và token →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/documents-indices.html">Elasticsearch Docs: Indices, documents and mappings</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

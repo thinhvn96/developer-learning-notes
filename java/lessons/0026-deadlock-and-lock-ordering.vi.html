@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 26: Deadlock và thứ tự lấy lock</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Khi hai thread chờ nhau mãi mãi: deadlock</h1>
+<p class="subtitle">Nó xảy ra thế nào, cách tìm nó trong một JVM đang chạy, và một quy tắc giúp phòng tránh.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0026 · bước 34/46 · Advanced · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0026-deadlock-and-lock-ordering.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Một service bị deadlock không crash và không ghi log lỗi nào: nó chỉ ngừng trả lời, còn CPU thì vẫn thấp. Biết cách phát hiện và phòng tránh nó là câu hỏi Senior kinh điển: <em>"Deadlock là gì? Bạn tìm nó trên production thế nào? Tránh nó ra sao?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích một deadlock do thứ tự lấy lock xảy ra thế nào, phát hiện nó bằng <code>ThreadMXBean</code>, và phòng tránh nó.</div>
+
+<dl class="words">
+  <dt>lock / monitor</dt><dd>Thứ mà tại một thời điểm chỉ một thread được giữ. Mỗi object Java có sẵn một cái, gọi là <em>monitor</em>, được <code>synchronized</code> dùng.</dd>
+  <dt>blocked</dt><dd>Bị chặn: một thread đang chờ lấy lock và không làm được gì khác cho tới khi lấy được.</dd>
+  <dt>deadlock</dt><dd>Các thread mà mỗi cái giữ một lock và chờ một lock do thread khác trong nhóm giữ, thành một vòng tròn, nên không ai đi tiếp được.</dd>
+  <dt>lock ordering</dt><dd>Thứ tự lấy lock: quy tắc mọi thread lấy nhiều lock theo cùng một thứ tự cố định, ví dụ luôn A trước B.</dd>
+  <dt>thread dump</dt><dd>Một ảnh chụp dạng text của mọi thread trong JVM đang chạy: nó đang làm gì, giữ lock nào và chờ lock nào.</dd>
+  <dt><code>jstack</code></dt><dd>Một công cụ dòng lệnh của JDK, in ra thread dump của một process Java đang chạy.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Thread 1 lock A, rồi B. Thread 2 lock B, rồi A. Chuyện này có thể làm đứng hình không? Với thời điểm thế nào?"</em> Thử mô tả đúng khoảnh khắc nó bị kẹt. Mục 2 sẽ lần theo.</p>
+
+<h2>1. Bức tranh: hai người, hai chìa khóa</h2>
+<p>Hai đồng nghiệp cần hai thứ để làm việc: chìa khóa phòng họp và máy chiếu. Anna lấy chìa khóa phòng rồi đi lấy máy chiếu. Ben đã lấy máy chiếu và đi lấy chìa khóa phòng. Anna chờ máy chiếu của Ben. Ben chờ chìa khóa của Anna. Không ai trả lại gì, vì chưa ai làm xong. Họ chờ mãi mãi.</p>
+<p>Định nghĩa trong tutorial của Oracle: "Deadlock mô tả tình huống hai hoặc nhiều thread bị chặn mãi mãi, chờ lẫn nhau."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java tutorial: deadlock</a> Ví dụ của nó: hai người bạn cúi chào nhau và mỗi người phải giữ nguyên tư thế cúi cho tới khi người kia chào lại, với cả hai method đều <code>synchronized</code>.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java tutorial: deadlock</a></p>
+
+<figure>
+<svg viewBox="0 0 680 290" role="img" aria-label="Vòng deadlock: thread T1 giữ lock A và chờ lock B; thread T2 giữ lock B và chờ lock A. Các mũi tên tạo thành một vòng tròn.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="40" y="120" width="150" height="50" rx="25"/>
+      <rect x="490" y="120" width="150" height="50" rx="25"/>
+      <rect x="265" y="20" width="150" height="50" rx="4"/>
+      <rect x="265" y="220" width="150" height="50" rx="4"/>
+      <path d="M140 120 L265 58"/>
+      <path d="M540 170 L415 232"/>
+    </g>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="6 4">
+      <path d="M140 170 L259 229"/>
+      <path d="M540 120 L421 61"/>
+    </g>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5">
+      <path d="M249 230l10-1-6-8"/>
+      <path d="M431 60l-10 1 6 8"/>
+    </g>
+    <text x="115" y="150" text-anchor="middle">thread T1</text>
+    <text x="565" y="150" text-anchor="middle">thread T2</text>
+    <text x="340" y="50" text-anchor="middle">lock A</text>
+    <text x="340" y="250" text-anchor="middle">lock B</text>
+    <text x="160" y="80" font-size="12">giữ</text>
+    <text x="475" y="226" font-size="12">giữ</text>
+    <text x="90" y="222" font-size="12" fill="var(--accent)">chờ</text>
+    <text x="500" y="76" font-size="12" fill="var(--accent)">chờ</text>
+    <text x="340" y="140" text-anchor="middle" font-size="12" fill="var(--accent)">một vòng tròn:</text>
+    <text x="340" y="158" text-anchor="middle" font-size="12" fill="var(--accent)">không ai đi tiếp được</text>
+  </g>
+</svg>
+<figcaption>T1 giữ A và chờ B; T2 giữ B và chờ A. Đi theo mũi tên: T1 → B → T2 → A → T1. Một vòng "chờ" khép kín chính là deadlock.</figcaption>
+</figure>
+
+<h2>2. Tái hiện nó</h2>
+<p>Ví dụ <code>DeadlockDemo.java</code> khởi động hai thread với thứ tự lấy lock <strong>ngược nhau</strong>. Phần quan trọng:</p>
+<pre><code>synchronized (first) {               <span class="c">// T1: first = A    T2: first = B</span>
+    bothHoldFirst.countDown();       <span class="c">// "I have my first lock"</span>
+    bothHoldFirst.await();           <span class="c">// wait until the other one has its first lock too</span>
+    synchronized (second) {          <span class="c">// T1: second = B   T2: second = A</span>
+        System.out.println(name + " got both locks");
+    }
+}</code></pre>
+<p><code>CountDownLatch</code> chỉ để ép thời điểm xấu xảy ra lần nào cũng như lần nào, cho demo ổn định. Lần theo:</p>
+<pre><code><span class="c">Bước 1  T1 lock A                  T2 lock B</span>
+<span class="c">Bước 2  cả hai qua latch: mỗi bên biết bên kia đã giữ lock đầu tiên của nó</span>
+<span class="c">Bước 3  T1 xin B → B đang do T2 giữ → T1 bị chặn</span>
+<span class="c">Bước 4  T2 xin A → A đang do T1 giữ → T2 bị chặn</span>
+<span class="c">Bước 5  <span class="hl">không lần chặn nào kết thúc: "got both locks" không bao giờ được in</span></span></code></pre>
+<p>Trong code thật không có latch; thời điểm xấu chỉ thỉnh thoảng xảy ra, khi tải cao. Đó là lý do deadlock xuất hiện trên production chứ không phải trong test.</p>
+<pre><code>$ java java/examples/DeadlockDemo.java
+--- opposite lock order (A then B, B then A)
+<span class="hl">deadlocked threads detected: 2</span>
+--- same lock order everywhere (A then B)
+T5 got both locks
+T6 got both locks</code></pre>
+<p class="muted">Hai thread bị kẹt là daemon thread, nên cuối cùng chương trình vẫn thoát được. Một thread bình thường (không phải daemon) bị deadlock sẽ giữ JVM chạy mãi.</p>
+
+<h2>3. Phát hiện nó</h2>
+<h3>Từ bên trong chương trình: <code>ThreadMXBean</code></h3>
+<p>Demo gọi <code>ManagementFactory.getThreadMXBean().findDeadlockedThreads()</code>, trả về các thread bị kẹt. Theo Javadoc, nó "Tìm các vòng platform thread đang deadlock trong lúc chờ lấy object monitor hoặc ownable synchronizer" (tức là <code>synchronized</code> và các lock như <code>ReentrantLock</code>). Nó trả về ID các thread, hoặc "<code>null</code> nếu không có", nên hãy kiểm tra <code>null</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.management/java/lang/management/ThreadMXBean.html#findDeadlockedThreads()">ThreadMXBean javadoc</a> Nó "được thiết kế để dùng khi xử lý sự cố, không phải để điều khiển đồng bộ. Nó có thể là một thao tác tốn kém." Trong JDK 21, "Các vòng có chứa virtual thread sẽ không được method này tìm thấy."</p>
+<h3>Từ bên ngoài: thread dump</h3>
+<p>Trên production bạn thường lấy thread dump bằng <code>jstack &lt;pid&gt;</code>; nó cũng báo deadlock. Đây là phần cuối thật của một dump từ một chương trình nhỏ có cùng pattern A/B, B/A (địa chỉ đã rút gọn):</p>
+<pre><code>$ jstack 13046
+...
+Found one Java-level deadlock:
+=============================
+"T1":
+  waiting to lock monitor 0x...1920 (object 0x...e8e8, a java.lang.Object),
+  <span class="hl">which is held by "T2"</span>
+
+"T2":
+  waiting to lock monitor 0x...0f60 (object 0x...e8d8, a java.lang.Object),
+  <span class="hl">which is held by "T1"</span>
+...
+Found 1 deadlock.</code></pre>
+<p>Đọc nó như sơ đồ: T1 chờ thứ T2 đang giữ, và T2 chờ thứ T1 đang giữ. Dump còn cho thấy chính xác dòng code, nên bạn biết phải sửa chỗ nào.</p>
+
+<h2>4. Phòng tránh nó</h2>
+<h3>Quy tắc 1: một thứ tự lấy lock chung</h3>
+<p>Nếu mọi thread đều lấy A trước B, vòng tròn không thể khép lại: ai lấy được A trước sẽ lấy được cả B; thread kia chỉ việc chờ A, rồi đi tiếp. Phần thứ hai của demo (T5, T6) làm đúng như vậy và cả hai thread đều xong.</p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Cùng thứ tự lấy lock: T1 lock A rồi B, làm việc, rồi unlock. T2 chờ A, rồi lock A và B sau khi T1 xong. Không có vòng tròn.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="62" font-size="13">T1</text>
+    <text x="20" y="132" font-size="13">T2</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="60" y="40" width="100" height="34" rx="4"/>
+      <rect x="170" y="40" width="100" height="34" rx="4"/>
+      <rect x="280" y="40" width="100" height="34" rx="4"/>
+      <rect x="390" y="40" width="110" height="34" rx="4"/>
+      <rect x="60" y="110" width="440" height="34" rx="4" stroke-dasharray="5 4" opacity=".8"/>
+      <path d="M500 74 L516 104M508 100l8 4 1-9"/>
+      <path d="M60 176h590M644 171l6 5-6 5" opacity=".6"/>
+    </g>
+    <rect x="520" y="110" width="140" height="34" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="110" y="62" text-anchor="middle">lock A</text>
+    <text x="220" y="62" text-anchor="middle">lock B</text>
+    <text x="330" y="62" text-anchor="middle">làm việc</text>
+    <text x="445" y="62" text-anchor="middle">unlock B, A</text>
+    <text x="280" y="132" text-anchor="middle" opacity=".8">lock A … chờ (T1 giữ A), không giữ gì cả</text>
+    <text x="590" y="132" text-anchor="middle" fill="var(--accent)">lock A, lock B</text>
+    <text x="355" y="194" text-anchor="middle" font-size="11" opacity=".75">thời gian</text>
+  </g>
+</svg>
+<figcaption>Cùng thứ tự ở mọi nơi: T2 chờ trong khi <em>không giữ gì cả</em>, nên không có vòng tròn. Chờ thì không sao; chờ thành vòng tròn mới là bug.</figcaption>
+</figure>
+
+<p>Một trường hợp kinh điển là chuyển tiền, <code>transfer(from, to)</code>. Một thread chuyển từ X sang Y trong khi thread khác chuyển từ Y sang X: thứ tự ngược nhau. Cách sửa là sắp thứ tự theo thứ gì đó ổn định, như ID tài khoản:</p>
+<pre><code>Account first  = a.id() &lt; b.id() ? a : b;   <span class="c">// always the smaller ID first</span>
+Account second = a.id() &lt; b.id() ? b : a;
+synchronized (first) {
+    synchronized (second) {
+        <span class="c">// move the money</span>
+    }
+}</code></pre>
+<p>Lời khuyên tương tự cũng có ở database: tài liệu PostgreSQL nói cách phòng thủ tốt nhất là "lấy lock trên nhiều object theo một thứ tự nhất quán ở mọi ứng dụng", và PostgreSQL phát hiện deadlock rồi hủy một transaction, nên ứng dụng phải sẵn sàng retry.<a class="src" href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: explicit locking</a> Xem <a href="../../postgresql/index.vi.html">PostgreSQL locking</a>.</p>
+<h3>Quy tắc 2: đừng chờ mãi</h3>
+<p>Với <code>ReentrantLock</code> (từ <a href="0024-atomics-and-locks.vi.html">các bài trước</a>), <code>tryLock(timeout, unit)</code> "Lấy lock nếu nó không bị thread khác giữ trong khoảng thời gian chờ cho trước".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a> Nếu nó trả về <code>false</code>, hãy nhả những gì đang giữ, chờ một chút, rồi thử lại. Khối <code>synchronized</code> không làm được vậy: nó chờ mãi.</p>
+<h3>Quy tắc 3: giữ ít lock hơn, trong thời gian ngắn hơn</h3>
+<p>Các công cụ phòng tránh khác: giữ ít lock hơn, và không gọi code bên ngoài khi đang giữ lock (callback, listener, lời gọi từ xa), vì bạn không biết code đó lấy những lock nào. Đây là kinh nghiệm chung, không lấy từ tutorial.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Câu nào là định nghĩa của deadlock?</p>
+  <div class="options">
+    <button class="opt" data-correct>Hai hoặc nhiều thread bị chặn mãi mãi, chờ lẫn nhau</button>
+    <button class="opt">Hai thread ghi đè update của nhau trên cùng một field</button>
+    <button class="opt">Một thread chạy chậm vì lock đang bị dùng quá nhiều</button>
+    <button class="opt">Một thread ném exception trong lúc đang giữ một lock</button>
+  </div>
+  <div class="why">Đó là định nghĩa của tutorial. Đáp án thứ hai là lost update (bài 0024), thứ ba là tranh chấp (contention).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">T1 chạy <code>synchronized(A){ synchronized(B){…} }</code>. T2 chạy <code>synchronized(B){ synchronized(A){…} }</code>. Điều gì có thể xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đôi khi cả hai đứng hình mãi mãi</button>
+    <button class="opt">Luôn deadlock ngay ở lần chạy đầu</button>
+    <button class="opt">Không bao giờ deadlock, Java đã chặn</button>
+    <button class="opt">Compiler từ chối khối lồng nhau</button>
+  </div>
+  <div class="why">Nó chỉ deadlock khi thời điểm xấu: T1 giữ A và T2 giữ B cùng lúc. Vì thế nó hiếm gặp trong test và xuất hiện khi tải cao.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cách đáng tin cậy nhất để tránh deadlock do thứ tự lấy lock là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lấy lock theo cùng một thứ tự ở mọi nơi</button>
+    <button class="opt">Cho JVM một heap lớn hơn bằng -Xmx</button>
+    <button class="opt">Tạo thêm nhiều thread trong thread pool</button>
+    <button class="opt">Đánh dấu các field của lock là volatile</button>
+  </div>
+  <div class="why">Với một thứ tự chung, thread đang chờ không giữ thứ gì mà thread kia cần, nên vòng tròn không thể hình thành.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">API nào tìm được các thread bị deadlock từ bên trong JVM?</p>
+  <div class="options">
+    <button class="opt" data-correct>ThreadMXBean.findDeadlockedThreads()</button>
+    <button class="opt">Thread.getAllStackTraces().size()</button>
+    <button class="opt">Runtime.getRuntime().availableProcessors()</button>
+    <button class="opt">ReentrantLock.getHoldCount() trên một lock</button>
+  </div>
+  <div class="why"><code>findDeadlockedThreads()</code> tìm các vòng platform thread đang chờ monitor hoặc ownable synchronizer, và trả về <code>null</code> nếu không có.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một service ngừng trả lời, CPU gần bằng không, log không có lỗi nào. Bạn làm gì đầu tiên?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lấy thread dump bằng jstack và đọc nó</button>
+    <button class="opt">Restart nó và tăng heap lên một chút</button>
+    <button class="opt">Bật GC log rồi chờ một lỗi xuất hiện</button>
+    <button class="opt">Thêm thread vào pool xử lý request</button>
+  </div>
+  <div class="why">Kẹt mà rảnh trông giống các thread đang chờ lock. Thread dump sẽ hiện "Found one Java-level deadlock" và chính xác các dòng code liên quan.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">PostgreSQL báo deadlock và hủy transaction của bạn. Code của bạn nên làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Retry transaction đó</button>
+    <button class="opt">Bỏ qua lỗi và chạy tiếp</button>
+    <button class="opt">Tắt việc lock theo dòng</button>
+    <button class="opt">Khởi động lại process JVM</button>
+  </div>
+  <div class="why">PostgreSQL phát hiện deadlock và hủy một transaction; ứng dụng nên sẵn sàng retry nó.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Deadlock là gì? Bạn phát hiện và phòng tránh nó thế nào?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Định nghĩa: các thread bị chặn mãi mãi, mỗi cái chờ một lock mà thread khác đang giữ.</label></li>
+      <li><label><input type="checkbox"> Nguyên nhân điển hình: hai lock lấy theo thứ tự ngược nhau (A→B và B→A).</label></li>
+      <li><label><input type="checkbox"> Nó phụ thuộc thời điểm, nên xuất hiện khi tải cao, không phải trong test.</label></li>
+      <li><label><input type="checkbox"> Phát hiện: thread dump (jstack) hiện "Found one Java-level deadlock"; hoặc ThreadMXBean.findDeadlockedThreads().</label></li>
+      <li><label><input type="checkbox"> Phòng tránh: một thứ tự lấy lock chung (ví dụ theo ID).</label></li>
+      <li><label><input type="checkbox"> Thêm: tryLock có timeout, ít lock hơn, không gọi code bên ngoài khi đang giữ lock; với database thì retry.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Deadlock là khi hai hoặc nhiều thread bị chặn mãi mãi, mỗi thread chờ một lock mà thread khác đang giữ. Trường hợp kinh điển là thứ tự lấy lock: một thread lấy A rồi B, thread kia lấy B rồi A; nếu mỗi bên vừa giữ được lock đầu tiên cùng lúc thì chúng chờ nhau mãi. Nó phụ thuộc timing, nên thường chỉ lộ ra dưới tải production. Để phát hiện, em lấy thread dump bằng jstack; JVM in ra 'Found one Java-level deadlock' kèm các thread và dòng code. Từ trong code thì ThreadMXBean.findDeadlockedThreads cũng kiểm tra được như vậy. Để phòng tránh, em bắt mọi đường code lấy lock theo một thứ tự chung, ví dụ theo account ID khi chuyển tiền. Chỗ nào khó làm vậy thì em dùng ReentrantLock.tryLock có timeout rồi lùi lại, giữ càng ít lock càng tốt, và không bao giờ gọi code lạ khi đang giữ lock. Database cũng gặp chuyện này; PostgreSQL sẽ abort một transaction, nên ứng dụng cần retry."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0026-find-the-deadlock.vi.md">Bài tập 0026: tìm deadlock</a>. Hãy gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Bạn đã thấy các thread giành nhau lock. Chủ đề runtime lớn còn lại trong interview Senior là bộ nhớ: <em>"Heap mặc định lớn cỡ nào? Garbage collector làm gì, và đọc GC log ra sao?"</em> <a href="0007-heap-and-garbage-collection.vi.html">Bài 0007</a> trả lời câu đó.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a>, một trang ngắn có trọn ví dụ cúi chào.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Deadlock khác livelock thế nào?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0023-thread-pools-executors.vi.html">← Thread pool quyết định thế nào: chạy, xếp hàng hay từ chối</a> &nbsp;|&nbsp; <a href="0007-heap-and-garbage-collection.vi.html">Object của bạn sống ở đâu, và ai dọn dẹp chúng →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Oracle Java Tutorials, tài liệu Java 21 và tài liệu PostgreSQL, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.management/java/lang/management/ThreadMXBean.html">Javadoc của ThreadMXBean</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">Javadoc của ReentrantLock</a> · <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: Explicit locking and deadlocks</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

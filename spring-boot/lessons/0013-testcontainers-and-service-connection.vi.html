@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 13: Testcontainers và @ServiceConnection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Testcontainers và @ServiceConnection</h1>
+<p class="meta">Spring Boot · Bài 0013 · bước 13/13 · Senior · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-testcontainers-and-service-connection.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích Testcontainers và <code>@ServiceConnection</code> giúp integration test dùng một database container thật như thế nào.</div>
+
+<h2>Ý tưởng</h2>
+<p>"Thư viện Testcontainers cung cấp cách quản lý các service chạy bên trong Docker container. Nó tích hợp với JUnit, cho phép bạn viết một test class khởi động container trước khi bất kỳ test nào chạy. Testcontainers đặc biệt hữu ích để viết integration test làm việc với một backend service thật."<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+<h2>@ServiceConnection</h2>
+<p>"Service connection là kết nối tới bất kỳ service từ xa nào." Đánh dấu một field container bằng <code>@ServiceConnection</code> sẽ tự động định nghĩa thông tin kết nối, và chúng "được ưu tiên hơn mọi configuration property liên quan tới kết nối".<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+<pre><code>@Testcontainers
+@SpringBootTest
+class MyIntegrationTests {
+    @Container
+    @ServiceConnection
+    static Neo4jContainer neo4j = new Neo4jContainer("neo4j:5");
+    ...
+}</code></pre>
+<p>(Ví dụ trong tài liệu dùng Neo4j; với container PostgreSQL thì hình dạng y hệt. <strong>Tôi chưa chạy pattern của bài này</strong>: demo project dùng H2 in-memory, và chạy Testcontainers bên trong Maven container của tôi sẽ cần quyền truy cập Docker mà tôi chưa cấu hình.) Vì sao điều này quan trọng: H2 có thể hành xử khác PostgreSQL (isolation, locking, SQL dialect), nên các team Senior test tầng persistence trên engine thật; xem <a href="../../postgresql/lessons/0006-mvcc-and-isolation-levels.vi.html">bài về isolation của PostgreSQL</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Testcontainers quản lý cái gì?</p>
+  <button>JVM heap</button>
+  <button>Nhánh Git</button>
+  <button data-correct>Service chạy bằng Docker</button>
+  <button>Plugin Maven</button>
+  <p class="explain">Nó quản lý các service chạy bên trong Docker container.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. @ServiceConnection cung cấp gì?</p>
+  <button>Một profile</button>
+  <button>Một database mới</button>
+  <button>Một mock bean</button>
+  <button data-correct>Tự động thông tin kết nối</button>
+  <p class="explain">Nó định nghĩa ConnectionDetails cho service của container.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cái nào thắng: connection details hay property?</p>
+  <button data-correct>Connection details</button>
+  <button>Không cái nào</button>
+  <button>Ngẫu nhiên</button>
+  <button>Property</button>
+  <p class="explain">Connection details được ưu tiên hơn các property về kết nối.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Testcontainers phù hợp nhất cho việc gì?</p>
+  <button>Cache khi build</button>
+  <button>Unit test cho getter</button>
+  <button data-correct>Integration test với backend thật</button>
+  <button>Chụp ảnh màn hình UI</button>
+  <p class="explain">Nó đặc biệt hữu ích cho integration test với các service thật.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-postgres-integration-test.vi.md">Bài tập 0013: một integration test với PostgreSQL</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">Spring Boot: Testcontainers</a>. Đọc phần 'Service Connections'.</p>
+<p><a href="0012-test-slices-and-springboottest.vi.html">← Testing: @SpringBootTest và test slice</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-boot/reference/testing/testcontainers.html">Spring Boot: Testcontainers</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

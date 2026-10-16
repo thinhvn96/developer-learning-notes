@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 2: ArrayList, LinkedList hay ArrayDeque?</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>ArrayList, LinkedList hay ArrayDeque?</h1>
+<p class="subtitle">Ba cách xếp phần tử thành hàng, và vì sao gần như lúc nào đáp án cũng là một trong số đó.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0002 · bước 7/46 · Foundation · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-choosing-a-list.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> "ArrayList hay LinkedList?" là một trong những câu hỏi phỏng vấn Java phổ biến nhất, và nhiều người trả lời theo truyền miệng ("LinkedList insert nhanh hơn"). Bài này cho bạn câu trả lời mà tài liệu thật sự ủng hộ, kèm một hình vẽ để giải thích.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được ArrayList và LinkedList lưu phần tử thế nào, chọn đúng loại (và ArrayDeque cho queue, stack) dựa trên chi phí được ghi trong tài liệu, và tránh ba lỗi thường gặp.</div>
+
+<dl class="words">
+  <dt>list</dt><dd>Một dãy phần tử có thứ tự. Mỗi phần tử có một vị trí gọi là <em>index</em>, bắt đầu từ 0.</dd>
+  <dt>array (mảng)</dt><dd>Một khối ô có kích thước cố định, nằm cạnh nhau trong bộ nhớ. Java nhảy thẳng tới ô <code>i</code> được.</dd>
+  <dt>node</dt><dd>Một object nhỏ chứa một phần tử cùng các link (reference) tới node trước và node sau.</dd>
+  <dt>capacity</dt><dd>Số ô của mảng ẩn bên trong ArrayList. Luôn lớn hơn hoặc bằng size của list.</dd>
+  <dt>queue / stack</dt><dd>Queue là vào trước ra trước (như xếp hàng ở ngân hàng). Stack là vào sau ra trước (như chồng đĩa).</dd>
+  <dt>deque</dt><dd>"Double-ended queue", đọc là "đéc": thêm và lấy được ở cả hai đầu.</dd>
+  <dt>amortized O(1)</dt><dd>Thường là thời gian hằng số; thỉnh thoảng chậm hơn, nhưng tính trung bình mỗi thao tác vẫn là hằng số.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói thành tiếng: <em>"Vì sao <code>list.get(500_000)</code> lại chậm trên một loại list nhưng nhanh trên loại khác?"</em> Cứ đoán, kể cả khi chưa chắc. Bạn sẽ kiểm tra lại ở phần 1.</p>
+
+<h2>1. Hình dung: dãy tủ đồ và trò truy tìm kho báu</h2>
+<p><strong>ArrayList</strong> giống một dãy tủ đồ có đánh số. Muốn mở tủ số 3, bạn đi thẳng tới đó, không cần mở tủ 0, 1, 2 trước. Bên trong, ArrayList "được xây trên một mảng" có capacity "tự động tăng".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+<p><strong>LinkedList</strong> giống trò truy tìm kho báu. Mỗi manh mối (một <span class="term">node</span>) chỉ cho bạn manh mối tiếp theo nằm ở đâu. Muốn tới manh mối 3, bạn phải đi qua manh mối 0, 1 và 2. Javadoc nói rõ: "Các thao tác truy cập theo index sẽ duyệt list từ đầu hoặc từ cuối, tùy phía nào gần index được chỉ định hơn."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedList.html">LinkedList javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="ArrayList get(3) nhảy thẳng tới ô 3 của mảng. LinkedList get(3) đi theo các link next từ node 0 tới node 3.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="30" font-weight="600">ArrayList: một mảng, các ô nằm cạnh nhau</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="50" width="90" height="44"/><rect x="110" y="50" width="90" height="44"/>
+      <rect x="200" y="50" width="90" height="44"/><rect x="380" y="50" width="90" height="44"/>
+      <rect x="470" y="50" width="90" height="44" stroke-dasharray="4 3" opacity=".5"/>
+      <rect x="560" y="50" width="90" height="44" stroke-dasharray="4 3" opacity=".5"/>
+    </g>
+    <rect x="290" y="50" width="90" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="65" y="77" text-anchor="middle">"a"</text><text x="155" y="77" text-anchor="middle">"b"</text>
+    <text x="245" y="77" text-anchor="middle">"c"</text><text x="335" y="77" text-anchor="middle" fill="var(--accent)">"d"</text>
+    <text x="425" y="77" text-anchor="middle">"e"</text>
+    <text x="515" y="77" text-anchor="middle" font-size="11" opacity=".6">trống</text>
+    <text x="605" y="77" text-anchor="middle" font-size="11" opacity=".6">trống</text>
+    <g font-size="10" opacity=".7"><text x="24" y="110">0</text><text x="114" y="110">1</text><text x="204" y="110">2</text><text x="294" y="110">3</text><text x="384" y="110">4</text><text x="474" y="110">5</text><text x="564" y="110">6</text></g>
+    <text x="335" y="130" text-anchor="middle" font-size="11" fill="var(--accent)">get(3): nhảy thẳng tới đây, 1 bước</text>
+    <text x="560" y="130" text-anchor="middle" font-size="10" opacity=".7">capacity còn trống</text>
+
+    <text x="20" y="175" font-weight="600">LinkedList: các node rời nhau, nối bằng link</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="195" width="100" height="44" rx="6"/><rect x="160" y="195" width="100" height="44" rx="6"/>
+      <rect x="300" y="195" width="100" height="44" rx="6"/><rect x="580" y="195" width="80" height="44" rx="6"/>
+      <path d="M120 211h34M148 206l6 5-6 5"/><path d="M260 211h34M288 206l6 5-6 5"/><path d="M400 211h34M428 206l6 5-6 5"/><path d="M540 211h34M568 206l6 5-6 5"/>
+      <path d="M154 225h-34M126 220l-6 5 6 5" opacity=".5"/><path d="M294 225h-34M266 220l-6 5 6 5" opacity=".5"/><path d="M434 225h-34M406 220l-6 5 6 5" opacity=".5"/><path d="M574 225h-34M546 220l-6 5 6 5" opacity=".5"/>
+    </g>
+    <rect x="440" y="195" width="100" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="70" y="222" text-anchor="middle">"a"</text><text x="210" y="222" text-anchor="middle">"b"</text>
+    <text x="350" y="222" text-anchor="middle">"c"</text><text x="490" y="222" text-anchor="middle" fill="var(--accent)">"d"</text>
+    <text x="620" y="222" text-anchor="middle">"e"</text>
+    <text x="340" y="270" text-anchor="middle" font-size="11" fill="var(--accent)">get(3): bắt đầu từ đầu, đi next, next, next → ghé 4 node</text>
+    <text x="340" y="288" text-anchor="middle" font-size="10" opacity=".7">(link next → và previous ←; nó bắt đầu từ đầu nào gần hơn)</text>
+  </g>
+</svg>
+<figcaption>Cùng năm phần tử, hai cách sắp xếp. Với mảng, Java tính được ô 3 nằm đâu; với các node nối nhau thì phải đi từng bước.</figcaption>
+</figure>
+
+<p>Vậy với <code>get(i)</code>: ArrayList là thời gian hằng số, còn LinkedList phải đi bộ, list càng dài càng lâu. Đó là đáp án cho câu hỏi ở phần "Trước khi bắt đầu".</p>
+
+<h2>2. Mỗi thao tác tốn bao nhiêu (theo tài liệu)</h2>
+<p>Javadoc của ArrayList ghi thẳng chi phí: "Các thao tác <code>size</code>, <code>isEmpty</code>, <code>get</code>, <code>set</code>, <code>iterator</code> và <code>listIterator</code> chạy trong thời gian hằng số. Thao tác <code>add</code> chạy trong thời gian hằng số khấu hao ... Tất cả các thao tác còn lại chạy trong thời gian tuyến tính (nói đại khái). Hằng số này thấp so với cài đặt <code>LinkedList</code>."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+<table>
+<tr><th>Thao tác</th><th>ArrayList</th><th>LinkedList</th><th>ArrayDeque</th></tr>
+<tr><td><code>get(i)</code>, <code>set(i, x)</code></td><td>hằng số</td><td>đi tới i (tuyến tính)</td><td>không truy cập theo index</td></tr>
+<tr><td>thêm vào cuối</td><td>hằng số khấu hao</td><td>hằng số</td><td>hằng số</td></tr>
+<tr><td>thêm / xóa ở đầu</td><td>tuyến tính (dịch mọi phần tử)</td><td>hằng số</td><td>hằng số</td></tr>
+<tr><td>thêm / xóa ở giữa, tại index i</td><td>tuyến tính (dịch phần còn lại)</td><td>tuyến tính (phải đi tới i trước)</td><td>không hỗ trợ</td></tr>
+<tr><td>bộ nhớ mỗi phần tử</td><td>một ô mảng</td><td>một object node với hai link</td><td>một ô mảng</td></tr>
+</table>
+<p>Nhìn hàng ở giữa. "Insert nhanh" của LinkedList chỉ đúng khi bạn đã đứng sẵn ở node đó. Muốn insert tại index 500.000, nó phải <em>đi bộ</em> tới đó trước. Vì vậy "LinkedList insert nhanh hơn" chỉ là truyền miệng, không phải quy tắc.</p>
+
+<h3>Vì sao add là "khấu hao" (amortized)?</h3>
+<p>Mảng ẩn có các ô dư. Phần lớn lần gọi <code>add</code> chỉ điền vào ô trống kế tiếp. Khi mảng đầy, ArrayList tạo một mảng lớn hơn và copy mọi thứ sang, đó là một lần gọi chậm. Tài liệu chỉ cam kết rằng "thêm một phần tử có chi phí thời gian hằng số khấu hao".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a> Trong source của OpenJDK, mảng tăng khoảng 1,5 lần mỗi lần, nên list càng lớn thì càng ít phải copy (chi tiết ở <a href="0038-capacity-boxing-and-memory.vi.html">bài 0038</a>).</p>
+<pre><code>List&lt;String&gt; names = new ArrayList&lt;&gt;();
+names.add("a");   <span class="c">// điền ô 0 (lần add đầu tiên tạo mảng)</span>
+names.add("b");   <span class="c">// điền ô 1, rẻ</span>
+...               <span class="c">// đầy? mảng lớn hơn + copy: một lần gọi chậm</span>
+names.add("z");   <span class="c">// lại rẻ</span></code></pre>
+
+<h2>3. Queue và stack: dùng ArrayDeque</h2>
+<p>Với kiểu "lấy ở một đầu, thêm ở đầu kia", bạn không cần index. <code>ArrayDeque</code> là một mảng dùng như vòng tròn: vị trí <em>head</em> và <em>tail</em> di chuyển quanh vòng, nên thêm hay lấy ở đầu nào cũng không phải dịch phần tử khác. Javadoc: nó "nhiều khả năng nhanh hơn <code>Stack</code> khi dùng làm stack, và nhanh hơn <code>LinkedList</code> khi dùng làm queue".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="ArrayDeque như một vòng đệm: head trỏ vào phần tử cũ nhất, tail trỏ vào ô trống kế tiếp. poll lấy ở head, offer thêm ở tail, push thêm trước head.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="40" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/>
+      <rect x="415" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/><rect x="490" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/>
+      <rect x="565" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/>
+    </g>
+    <rect x="115" y="70" width="75" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g fill="none" stroke="currentColor"><rect x="190" y="70" width="75" height="44"/><rect x="265" y="70" width="75" height="44"/><rect x="340" y="70" width="75" height="44"/></g>
+    <text x="152" y="97" text-anchor="middle" fill="var(--accent)">job1</text><text x="227" y="97" text-anchor="middle">job2</text>
+    <text x="302" y="97" text-anchor="middle">job3</text><text x="377" y="97" text-anchor="middle">job4</text>
+    <g fill="none" stroke="var(--accent)"><path d="M152 44v20M147 58l5 6 5-6"/></g>
+    <text x="152" y="36" text-anchor="middle" font-size="11" fill="var(--accent)">head: poll() lấy ở đây</text>
+    <g fill="none" stroke="currentColor"><path d="M452 44v20M447 58l5 6 5-6"/></g>
+    <text x="452" y="36" text-anchor="middle" font-size="11">tail: offer() thêm ở đây</text>
+    <g fill="none" stroke="currentColor" opacity=".6"><path d="M640 136c0 40-600 40-600 0M44 142l-4-6-4 6"/></g>
+    <text x="340" y="190" text-anchor="middle" font-size="11" opacity=".8">khi tail tới ô cuối, nó quay vòng về ô 0: không phần tử nào bị dịch chuyển</text>
+  </g>
+</svg>
+<figcaption>ArrayDeque: hai vị trí di chuyển trên một mảng. Cả hai đầu đều là thời gian hằng số, không cần object node nào.</figcaption>
+</figure>
+
+<pre><code>Deque&lt;String&gt; queue = new ArrayDeque&lt;&gt;();     <span class="c">// FIFO: xếp hàng ở ngân hàng</span>
+queue.offer("job1"); queue.offer("job2");
+queue.poll();                                  <span class="hl">// "job1"</span>
+
+Deque&lt;String&gt; stack = new ArrayDeque&lt;&gt;();     <span class="c">// LIFO: chồng đĩa</span>
+stack.push("a"); stack.push("b");
+stack.pop();                                   <span class="hl">// "b"</span></code></pre>
+<p class="muted">Class <code>Stack</code> cũ (từ JDK 1.0) vẫn còn, nhưng Javadoc khuyên dùng <code>Deque</code> thay thế. Trên JDK 8, 17 hay 21 đều nên chọn <code>ArrayDeque</code>.</p>
+
+<h2>4. Ba lỗi, một lần chạy</h2>
+<pre><code>$ java java/examples/ListPitfalls.java
+ArrayDeque rejects null: NullPointerException
+for-each + list.remove: ConcurrentModificationException
+removeIf result: [1, 3]</code></pre>
+<ol class="steps">
+  <li><strong>ArrayDeque từ chối <code>null</code>.</strong> "Không cho phép phần tử null."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque javadoc</a> <code>poll()</code> trả về <code>null</code> để báo "rỗng", nên lưu null vào sẽ gây nhập nhằng.</li>
+  <li><strong>Xóa trong vòng lặp for-each</strong> sẽ ném <code>ConcurrentModificationException</code>, dù chỉ có một thread. Iterator phát hiện list bị thay đổi sau lưng nó (iterator của ArrayList là "fail-fast").<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a> <a href="0029-iterators-and-fail-fast.vi.html">Bài 0029</a> giải thích cơ chế.</li>
+  <li><strong>Cách sửa:</strong> <code>list.removeIf(x -&gt; x % 2 == 0)</code> (JDK 8+) hoặc dùng chính <code>remove()</code> của iterator.</li>
+</ol>
+<p>Thêm một điều cho phỏng vấn: cả ba class đều không được synchronized. Nếu nhiều thread cùng sửa một list, bạn phải tự bảo vệ (ví dụ <code>Collections.synchronizedList</code>) hoặc dùng concurrent collection (<a href="0039-concurrent-collections.vi.html">bài 0039</a>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+
+<h2>5. Quyết định trong một dòng</h2>
+<div class="win">Cần list? <strong>ArrayList</strong>. Cần queue hoặc stack? <strong>ArrayDeque</strong>. Chỉ dùng LinkedList khi có lý do cụ thể và đã đo đạc.</div>
+<p class="muted">Một lý do cụ thể có thể là: bạn đang cầm sẵn một <code>ListIterator</code> ở giữa một list dài và thêm hoặc xóa rất nhiều phần tử ngay tại đó. Kể cả vậy, hãy đo trước.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>get(i)</code> nhanh trên ArrayList nhưng chậm trên LinkedList?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayList nhảy thẳng tới ô i; LinkedList đi từng node một</button>
+    <button class="opt">ArrayList luôn giữ phần tử theo thứ tự sắp xếp, LinkedList thì không</button>
+    <button class="opt">LinkedList copy toàn bộ list mỗi lần gọi get</button>
+    <button class="opt">ArrayList cache lại phần tử bạn hỏi lần gần nhất</button>
+  </div>
+  <div class="why">Vị trí một ô trong mảng tính được ngay. LinkedList "sẽ duyệt list từ đầu hoặc từ cuối".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn insert một phần tử tại index 500.000 của một LinkedList có 1.000.000 phần tử. Phần nào chậm?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đi tới index 500.000 trước khi nối node vào</button>
+    <button class="opt">Nối node mới vào hai node hàng xóm của nó</button>
+    <button class="opt">Dịch 500.000 phần tử còn lại sang phải một ô</button>
+    <button class="opt">Không phần nào; insert của LinkedList luôn là hằng số</button>
+  </div>
+  <div class="why">Nối node thì rẻ, nhưng LinkedList phải đi tới vị trí đó trước. ArrayList thì phải dịch phần tử; cả hai đều tuyến tính.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Nên dùng class nào cho một queue FIFO chứa các job?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayDeque, với offer và poll</button>
+    <button class="opt">Stack, với push và pop</button>
+    <button class="opt">ArrayList, xóa ở index 0</button>
+    <button class="opt">Vector, với add và remove</button>
+  </div>
+  <div class="why">Tài liệu ghi ArrayDeque nhiều khả năng nhanh hơn LinkedList khi làm queue và nhanh hơn Stack khi làm stack. Xóa index 0 của ArrayList phải dịch mọi phần tử.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>new ArrayDeque&lt;String&gt;().offer(null)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó ném NullPointerException</button>
+    <button class="opt">Nó lưu null như phần tử bình thường</button>
+    <button class="opt">Nó lặng lẽ bỏ qua lời gọi</button>
+    <button class="opt">Nó trả về false và không lưu gì</button>
+  </div>
+  <div class="why">ArrayDeque "không cho phép phần tử null", vì null là giá trị poll() trả về để báo "rỗng".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>add</code> của ArrayList được gọi là thời gian hằng số "khấu hao"?</p>
+  <div class="options">
+    <button class="opt" data-correct>Phần lớn lần add điền ô dư; hiếm khi phải copy mảng</button>
+    <button class="opt">Mỗi lần add đều copy toàn bộ mảng sang mảng mới</button>
+    <button class="opt">Lúc đầu add chậm, càng về sau càng nhanh dần</button>
+    <button class="opt">Tùy vào số thread cùng gọi add một lúc</button>
+  </div>
+  <div class="why">Khi mảng ẩn đầy, một lần add sẽ tạo mảng lớn hơn và copy. Tính trung bình, mỗi lần add vẫn là hằng số.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Hai thread cùng add vào một ArrayList thường. Tài liệu nói gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó không synchronized; bạn phải tự thêm đồng bộ</button>
+    <button class="opt">Nó an toàn vì add chỉ là một lời gọi method</button>
+    <button class="opt">Nó ném exception ngay khi thread thứ hai tham gia</button>
+    <button class="opt">Nó tự chuyển thành LinkedList khi tải cao</button>
+  </div>
+  <div class="why">ArrayList, LinkedList và ArrayDeque đều không synchronized. Bài 0039 cho thấy các lần cập nhật bị mất mà không báo lỗi.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"ArrayList hay LinkedList? Khi nào dùng cái nào?"</strong> Bấm giờ, trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> ArrayList dựa trên một mảng; LinkedList là chuỗi node nối với nhau bằng link.</label></li>
+      <li><label><input type="checkbox"> <code>get(i)</code>: hằng số trên ArrayList, phải đi bộ (tuyến tính) trên LinkedList.</label></li>
+      <li><label><input type="checkbox"> Thêm vào cuối ArrayList là hằng số khấu hao (thỉnh thoảng copy mảng).</label></li>
+      <li><label><input type="checkbox"> Insert ở giữa đều tuyến tính với cả hai (dịch phần tử vs đi bộ), nên "LinkedList insert nhanh hơn" là ngộ nhận.</label></li>
+      <li><label><input type="checkbox"> Cần queue hoặc stack thì dùng ArrayDeque.</label></li>
+      <li><label><input type="checkbox"> Không class nào trong số này thread-safe.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Mặc định em dùng ArrayList. Nó dựa trên một mảng, nên <code>get</code> và <code>set</code> theo index là hằng số, còn thêm vào cuối là hằng số khấu hao, thỉnh thoảng nó copy sang mảng lớn hơn. LinkedList là chuỗi node, nên lấy theo index phải đi bộ qua list. Nhiều người nói LinkedList insert tốt hơn, nhưng insert ở giữa vẫn phải đi tới vị trí đó trước, nên cả hai đều tuyến tính, mà hằng số của ArrayList lại thấp hơn. Nếu cần queue hay stack thì em dùng ArrayDeque, tài liệu nói nó nhanh hơn LinkedList khi làm queue và nhanh hơn Stack. Và không cái nào thread-safe, nên khi dùng chung giữa các thread em sẽ đồng bộ hoặc dùng concurrent collection."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-list-choice.vi.md">Bài tập 0002: chọn collection</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ListPitfalls.java"><code>ListPitfalls.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi tiếp: <em>"Chính xác thì vì sao xóa trong vòng for-each lại ném exception?"</em> (<a href="0029-iterators-and-fail-fast.vi.html">bài 0029</a>) hoặc <em>"Một LinkedList chứa một triệu Integer tốn bao nhiêu bộ nhớ?"</em> (<a href="0038-capacity-boxing-and-memory.vi.html">bài 0038</a>).</p>
+<p><strong>Đọc thêm:</strong> phần mô tả class của <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList</a> và <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque</a>, mỗi cái năm phút.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Reference chính xác là gì?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Hãy cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0028-collections-framework-map.vi.html">← Bản đồ các collection trong Java</a> &nbsp;|&nbsp; <a href="0029-iterators-and-fail-fast.vi.html">Vì sao xóa phần tử trong vòng lặp lại bị crash →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedList.html">LinkedList Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

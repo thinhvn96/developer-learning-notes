@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 6: Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</h1>
+<p class="meta">Spring Boot · Bài 0006 · bước 10/13 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-transaction-propagation.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn giữa REQUIRED, REQUIRES_NEW và NESTED cho một tình huống cụ thể và nêu được rủi ro của từng cái.</div>
+
+<h2>Ba chế độ</h2>
+<table>
+<tr><th>Chế độ</th><th>Hành vi<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></th><th>Cần để ý</th></tr>
+<tr><td>REQUIRED (mặc định)</td><td>một physical transaction; tham gia vào transaction bên ngoài nếu đã có</td><td>đánh dấu rollback-only ở bên trong ảnh hưởng tới bên ngoài; có thể ném <code>UnexpectedRollbackException</code></td></tr>
+<tr><td>REQUIRES_NEW</td><td>luôn là một physical transaction mới, độc lập</td><td>có thể làm cạn connection pool và gây deadlock nếu pool quá nhỏ</td></tr>
+<tr><td>NESTED</td><td>một physical transaction với các savepoint; bên trong rollback được mà không kéo theo bên ngoài</td><td>chỉ hoạt động với JDBC resource transaction (ví dụ <code>DataSourceTransactionManager</code>)</td></tr>
+</table>
+<h2>Chọn thế nào</h2>
+<p><strong>REQUIRED</strong> hợp với call stack thông thường: một service uỷ quyền cho các repository.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a> Dùng <strong>REQUIRES_NEW</strong> khi một phần việc phải commit hoặc rollback độc lập với bên gọi, ví dụ một bản ghi audit phải được lưu lại kể cả khi transaction nghiệp vụ thất bại. Vì transaction bên ngoài vẫn giữ connection của nó trong lúc transaction bên trong chạy, tài liệu reference khuyên rằng pool phải lớn hơn số thread chạy đồng thời ít nhất một.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a> <strong>NESTED</strong> cho phép rollback một phần thông qua savepoint.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+<h2>Đã kiểm chứng</h2>
+<pre><code>RESULT REQUIRES_NEW audit            -&gt; accounts: 0, audit rows: 1
+RESULT REQUIRED audit (joins caller) -&gt; accounts: 0, audit rows: 0</code></pre>
+<p>Cả hai kịch bản đều làm đơn hàng thất bại sau lời gọi audit. Transaction độc lập đã commit bản ghi audit của nó; transaction tham gia chung thì bị rollback cùng đơn hàng. Code: <a href="../examples/demo-app/src/main/java/com/example/demo/bank/AuditService.java"><code>AuditService.java</code></a>.</p>
+<p class="aside">Hãy nhớ quy tắc proxy ở <a href="0005-transactional-proxies-and-rollback.vi.html">bài trước</a>: propagation đặt trên một method bị self-invoke sẽ bị bỏ qua, nên một method REQUIRES_NEW được gọi từ chính class đó sẽ không mở transaction mới.</p><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Commit độc lập bất kể kết quả của bên gọi?</p>
+  <button data-correct>REQUIRES_NEW</button>
+  <button>NESTED</button>
+  <button>SUPPORTS</button>
+  <button>REQUIRED</button>
+  <p class="explain">REQUIRES_NEW luôn tạo một physical transaction độc lập.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Chế độ nào dùng savepoint?</p>
+  <button>REQUIRED</button>
+  <button>REQUIRES_NEW</button>
+  <button data-correct>NESTED</button>
+  <button>MANDATORY</button>
+  <p class="explain">NESTED dùng một physical transaction với các savepoint.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Rủi ro vận hành chính của REQUIRES_NEW?</p>
+  <button>Checked exception</button>
+  <button>Thiếu getter</button>
+  <button data-correct>Cạn connection pool</button>
+  <button>Ghi log chậm</button>
+  <p class="explain">Nó có thể làm cạn pool và gây deadlock nếu pool không được định cỡ đúng.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Chế độ mặc định tham gia vào transaction đang có?</p>
+  <button data-correct>REQUIRED</button>
+  <button>NEVER</button>
+  <button>NESTED</button>
+  <button>REQUIRES_NEW</button>
+  <p class="explain">REQUIRED tham gia vào transaction bên ngoài đang tồn tại.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-audit-log-scenario.vi.md">Bài tập 0006: tình huống audit log</a></p>
+<p>Ví dụ chạy được: <a href="../examples/TransactionalPitfalls.java"><code>TransactionalPitfalls.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring Framework Reference: Transaction Propagation</a>. Đọc cả trang; trang ngắn.</p>
+<p><a href="0005-transactional-proxies-and-rollback.vi.html">← @Transactional: proxy và quy tắc rollback</a> &nbsp;|&nbsp; <a href="0011-actuator-and-kubernetes-probes.vi.html">Actuator và Kubernetes probe →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html">Spring Framework Reference: Transaction Propagation</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

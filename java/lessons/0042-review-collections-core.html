@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 42: Review 3: HashMap internals, ordering and immutability</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 3: HashMap internals, ordering and immutability</h1>
+<p class="subtitle">Four lessons, one map in your head: how a key finds its bucket, who decides "equal", who may change a list, and which map remembers order.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0042 · step 15 of 46 · Review · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0042-review-collections-core.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> In a real interview the questions come mixed: "How does HashMap resize?" is followed by "Why did my TreeSet lose an element?" and "How do you return a list nobody can change?". This review mixes lessons <a href="0030-hashmap-internals.html">0030</a>, <a href="0031-comparable-comparator-and-ordering.html">0031</a>, <a href="0032-unmodifiable-vs-immutable.html">0032</a> and <a href="0033-hashset-linkedhashmap-and-lru.html">0033</a> the same way, so you practise switching between them. There are no new facts here.</div>
+
+<div class="win"><b>Today's win:</b> answer 10 or more of the 12 mixed questions, find the three bugs in the mixed task, and say all three 60-second answers with at least 5 checklist points each.</div>
+
+<dl class="words">
+  <dt>bucket (bin)</dt><dd>One slot of the array inside a HashMap. The key's hash code chooses the slot (lesson 0030).</dd>
+  <dt>load factor</dt><dd>How full the map may get before it grows. The default is 0.75, so 16 buckets hold 12 entries before a resize.</dd>
+  <dt>treeify</dt><dd>Turning one long bucket chain into a small sorted tree, so a lookup stays fast even with many collisions.</dd>
+  <dt>comparator</dt><dd>An object that compares two values and says which comes first. Sorted collections use it to decide order <em>and</em> sameness (lesson 0031).</dd>
+  <dt>view</dt><dd>A collection that does not hold its own copy; it reads through to another collection, so it shows that collection's changes (lesson 0032).</dd>
+  <dt>access order</dt><dd>A <code>LinkedHashMap</code> mode where every read moves the entry to the end, so the first entry is the least recently used one (lesson 0033).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking back, say out loud the <strong>four steps</strong> of <code>map.put("apple", 1)</code> in a JDK 8+ HashMap, then name <strong>one</strong> way to build a list that nobody can change. Write down how sure you are (0 to 100%). At the end, compare with your score: people are often more sure than they should be, and that gap is what a review fixes.</p>
+
+<h2>1. The whole path of one key</h2>
+<p>Think of a post office again. The postcode (hash code) picks the right mailbox wall (bucket); the name on the letter (<code>equals</code>) picks the right letter in it. When a wall is too full, the post office builds a wall twice as big. When one mailbox gets absurdly full, it stops stacking letters and files them in a small sorted cabinet (a tree). Here is the whole path from lesson 0030 in one picture.</p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="The path of put: hashCode, spread the bits, choose bucket with (n-1) and hash, walk the bucket with equals, then resize when size passes 0.75 times n, or treeify a bin with 8 nodes when the table has at least 64 buckets">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <rect x="20" y="30" width="140" height="50" rx="6"/>
+      <rect x="190" y="30" width="140" height="50" rx="6"/>
+      <rect x="360" y="30" width="140" height="50" rx="6"/>
+      <path d="M160 55h24M178 50l6 5-6 5"/>
+      <path d="M330 55h24M348 50l6 5-6 5"/>
+      <path d="M500 55h24M518 50l6 5-6 5"/>
+    </g>
+    <rect x="530" y="30" width="130" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="90" y="52" text-anchor="middle">hashCode()</text>
+    <text x="90" y="70" text-anchor="middle" font-size="11" opacity=".75">from the key</text>
+    <text x="260" y="52" text-anchor="middle">h ^ (h &gt;&gt;&gt; 16)</text>
+    <text x="260" y="70" text-anchor="middle" font-size="11" opacity=".75">spread high bits</text>
+    <text x="430" y="52" text-anchor="middle">(n - 1) &amp; hash</text>
+    <text x="430" y="70" text-anchor="middle" font-size="11" opacity=".75">bucket index</text>
+    <text x="595" y="52" text-anchor="middle" fill="var(--accent)">walk bucket</text>
+    <text x="595" y="70" text-anchor="middle" font-size="11" fill="var(--accent)">hash, then equals</text>
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <path d="M595 80v40H175v34M170 148l5 6 5-6"/>
+      <path d="M595 120h0v34M590 148l5 6 5-6"/>
+    </g>
+    <rect x="30" y="160" width="290" height="110" rx="6" fill="none" stroke="currentColor"/>
+    <text x="175" y="184" text-anchor="middle">size &gt; n × 0.75 ?  → resize</text>
+    <text x="175" y="206" text-anchor="middle" font-size="11" opacity=".8">n doubles: 16 → 32</text>
+    <text x="175" y="226" text-anchor="middle" font-size="11" opacity=".8">each entry stays at i</text>
+    <text x="175" y="244" text-anchor="middle" font-size="11" opacity=".8">or moves to i + old n</text>
+    <rect x="360" y="160" width="300" height="110" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="510" y="184" text-anchor="middle" fill="var(--accent)">bin has 8 nodes ?  → treeify</text>
+    <text x="510" y="206" text-anchor="middle" font-size="11">only if table ≥ 64 buckets,</text>
+    <text x="510" y="226" text-anchor="middle" font-size="11">otherwise resize instead;</text>
+    <text x="510" y="244" text-anchor="middle" font-size="11">back to a list below 6 nodes</text>
+  </g>
+</svg>
+<figcaption>One <code>put</code> in a JDK 8+ HashMap (lesson 0030). The numbers 8, 64 and 6 are OpenJDK constants, not Javadoc promises.</figcaption>
+</figure>
+
+<p>Three sentences to keep from this picture:</p>
+<ol class="steps">
+  <li><strong>Only the low bits pick the bucket</strong>, so Java first mixes the high bits into the low ones. With <code>n</code> a power of two, <code>(n - 1) &amp; hash</code> equals <code>hash % n</code>, but cheaper.</li>
+  <li><strong>Resizing doubles the table</strong> and each entry either stays at index <code>i</code> or moves to <code>i + old n</code>: one extra bit decides.</li>
+  <li><strong>A tree is the emergency plan</strong>, not the normal case: with good hash codes, buckets stay tiny. If keys are <code>Comparable</code>, the tree can use <code>compareTo</code> to break ties, which made 20,000 colliding keys go from about 3,658 ms to 69 ms in that lesson's single run.</li>
+</ol>
+<p class="muted">Need the details again? <a href="0030-hashmap-internals.html">Lesson 0030</a> traces every step with real output.</p>
+
+<h2>2. Who decides "equal"? It depends on the collection</h2>
+<p>This is the idea that connects lessons 0001, 0030, 0031 and 0033. A <code>HashMap</code> and a <code>HashSet</code> ask <code>hashCode()</code> and <code>equals()</code>. A <code>TreeMap</code> and a <code>TreeSet</code> never call <code>equals()</code> at all: they ask <code>compareTo()</code> or your comparator, and a result of 0 means "same key".</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Hash collections ask hashCode and equals. Sorted collections ask compare and treat 0 as a duplicate. Linked collections are hash collections plus a linked list that remembers order.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="20" width="200" height="190" rx="6"/>
+      <rect x="240" y="20" width="200" height="190" rx="6"/>
+    </g>
+    <rect x="460" y="20" width="200" height="190" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="44" text-anchor="middle" font-size="13">HashMap / HashSet</text>
+    <text x="340" y="44" text-anchor="middle" font-size="13">LinkedHashMap/Set</text>
+    <text x="560" y="44" text-anchor="middle" font-size="13" fill="var(--accent)">TreeMap / TreeSet</text>
+    <g font-size="11">
+      <text x="34" y="78">same key?</text>
+      <text x="34" y="96">hashCode + equals</text>
+      <text x="34" y="132">order?</text>
+      <text x="34" y="150">none promised;</text>
+      <text x="34" y="168">may change over time</text>
+      <text x="254" y="78">same key?</text>
+      <text x="254" y="96">hashCode + equals</text>
+      <text x="254" y="132">order?</text>
+      <text x="254" y="150">insertion order, or</text>
+      <text x="254" y="168">access order (LRU)</text>
+      <text x="474" y="78" fill="var(--accent)">same key?</text>
+      <text x="474" y="96" fill="var(--accent)">compare(a, b) == 0</text>
+      <text x="474" y="132">order?</text>
+      <text x="474" y="150">sorted by comparator</text>
+      <text x="474" y="168">or natural order</text>
+    </g>
+    <text x="340" y="196" text-anchor="middle" font-size="10" opacity=".7">a HashMap + a linked list</text>
+    <text x="560" y="196" text-anchor="middle" font-size="10" fill="var(--accent)">equals() is never called</text>
+  </g>
+</svg>
+<figcaption>The same two employees can be "different" in a HashSet and "the same" in a TreeSet if the comparator only looks at salary (lesson 0031).</figcaption>
+</figure>
+
+<p>That is why a comparator must end with a <strong>unique tie-breaker</strong> (for example <code>.thenComparing(Employee::name)</code>), and why <code>new BigDecimal("4.0")</code> and <code>new BigDecimal("4.00")</code> give a HashSet of size 2 but a TreeSet of size 1. And never write <code>(a, b) -&gt; a - b</code>: with <code>Integer.MIN_VALUE</code> it overflows; use <code>Integer.compare</code> or <code>Comparator.comparingInt</code>. Re-read <a href="0031-comparable-comparator-and-ordering.html">lesson 0031</a> if any of this feels new.</p>
+
+<h2>3. Who may change the list?</h2>
+<p>Lesson 0032 in one table. Picture a shop window: <code>Arrays.asList</code> is a window you can rearrange but not extend; <code>unmodifiableList</code> is glass in front of someone else's shelf (they can still move things); <code>List.of</code> / <code>List.copyOf</code> is a photo: frozen, your own copy.</p>
+<table>
+<tr><th></th><th>add / remove</th><th>set</th><th>sees later changes to the source</th><th>null</th></tr>
+<tr><td><code>Arrays.asList(arr)</code></td><td>no (UOE)</td><td>yes, writes the array</td><td>yes (it is the array)</td><td>yes</td></tr>
+<tr><td><code>Collections.unmodifiableList(l)</code></td><td>no (UOE)</td><td>no</td><td>yes, it is a view</td><td>as the source</td></tr>
+<tr><td><code>List.of(...)</code>, <code>List.copyOf(c)</code></td><td>no (UOE)</td><td>no</td><td>no, own copy</td><td>no (NPE)</td></tr>
+</table>
+<p>Two more things a senior answer adds: <strong>unmodifiable is shallow</strong> (a <code>List.of(new StringBuilder("hi"))</code> still let us append " there"), and <strong>the JDK version matters</strong>: <code>List.of</code> is JDK 9, <code>copyOf</code> JDK 10, <code>Stream.toList()</code> JDK 16. On JDK 8 the defensive copy is <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code>. See <a href="0032-unmodifiable-vs-immutable.html">lesson 0032</a>.</p>
+
+<h2>4. Which map remembers order, and the LRU trick</h2>
+<p>From lesson 0033: a <code>HashSet</code> is a <code>HashMap</code> whose values are one shared dummy object, so it inherits everything from section 1. <code>LinkedHashMap</code> threads a doubly linked list through the entries. In the default mode the list keeps <strong>insertion order</strong>, and re-putting a key does not move it. With the constructor flag <code>accessOrder = true</code>, every <code>get</code> moves the entry to the end, and overriding <code>removeEldestEntry</code> turns it into an LRU cache:</p>
+<pre><code>class LruCache&lt;K, V&gt; extends LinkedHashMap&lt;K, V&gt; {
+    private final int capacity;
+    LruCache(int capacity) { super(16, 0.75f, <span class="hl">true</span>); this.capacity = capacity; }
+    @Override protected boolean removeEldestEntry(Map.Entry&lt;K, V&gt; eldest) {
+        return size() &gt; capacity;   <span class="c">// called by put/putAll after inserting</span>
+    }
+}</code></pre>
+<pre><code>$ java java/examples/collections/LruCache.java
+insertion order (re-put 'a' keeps its place): {c=3, a=10, b=2}
+HashSet: [java, kafka, redis, docker, sql]   LinkedHashSet: [kafka, java, docker, sql, redis]
+LRU after get(a), put(d): [c, a, d]     <span class="c">// b was least recently used</span>
+LRU after put(e):         [a, d, e]</code></pre>
+<p>The trap: in access-order mode even <code>get</code> is a structural change, so threads that share it need a lock (or a cache library such as Caffeine). See <a href="0033-hashset-linkedhashmap-and-lru.html">lesson 0033</a>.</p>
+
+<h2>5. Mixed task: find the three bugs</h2>
+<p>Read this code like a reviewer. There are three bugs, each from a different lesson. Find them, name the lesson, and say the fix <em>before</em> opening the answer.</p>
+<pre><code>record Order(String id, int cents) {}
+
+class OrderBook {
+    <span class="c">// (A) we expect about 1,000 orders and never want a resize</span>
+    private final Map&lt;String, Order&gt; byId = new HashMap&lt;&gt;(1000);
+
+    <span class="c">// (B) cheapest first</span>
+    private final Set&lt;Order&gt; byPrice =
+        new TreeSet&lt;&gt;((a, b) -&gt; a.cents() - b.cents());
+
+    private final List&lt;Order&gt; all = new ArrayList&lt;&gt;();
+
+    void add(Order o) { byId.put(o.id(), o); byPrice.add(o); all.add(o); }
+
+    <span class="c">// (C) callers must get a snapshot that never changes</span>
+    List&lt;Order&gt; snapshot() { return Collections.unmodifiableList(all); }
+}</code></pre>
+<details class="qa">
+<summary>Show the three bugs</summary>
+<div class="ans">
+<p><strong>(B) Lesson 0031, the worst one.</strong> The TreeSet decides duplicates with the comparator. Two different orders with the same price compare as 0, so the second one is silently dropped. Also <code>a - b</code> can overflow. Fix: <code>Comparator.comparingInt(Order::cents).thenComparing(Order::id)</code>.</p>
+<p><strong>(C) Lesson 0032.</strong> <code>unmodifiableList</code> is a <em>view</em>: callers cannot change it, but they see every later <code>add</code>. That is not a snapshot. Fix: <code>List.copyOf(all)</code> (JDK 10+) or <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(all))</code> on JDK 8.</p>
+<p><strong>(A) Lesson 0030.</strong> The table size must be a power of two, so capacity 1000 becomes 1024 buckets, and 1024 × 0.75 = 768, so the map still resizes when it passes 768 entries. Fix: <code>HashMap.newHashMap(1000)</code> on JDK 19+ (so 21), or <code>new HashMap&lt;&gt;((int) (1000 / 0.75f) + 1)</code> on 8/17.</p>
+</div>
+</details>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">A HashMap has 16 buckets. Which expression picks the bucket for a spread hash <code>h</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>(16 - 1) &amp; h</code></button>
+    <button class="opt"><code>h &gt;&gt;&gt; 16</code></button>
+    <button class="opt"><code>16 % h</code></button>
+    <button class="opt"><code>h / 16</code></button>
+  </div>
+  <div class="why">The index is <code>(n - 1) &amp; hash</code>, which equals <code>hash % n</code> when n is a power of two. See lesson 0030.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A <code>TreeSet</code> uses a comparator that compares employees by salary only. You add Lan (3000) and Minh (3000). What is the size?</p>
+  <div class="options">
+    <button class="opt" data-correct>1, because compare returns 0 for them</button>
+    <button class="opt">2, because their names are different</button>
+    <button class="opt">2, because equals returns false for them</button>
+    <button class="opt">It throws an exception on the second add</button>
+  </div>
+  <div class="why">Sorted sets decide duplicates with <code>compare</code>, never <code>equals</code>. Add a unique tie-breaker. See lesson 0031.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>Arrays.asList(arr).set(0, "X")</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>It works and also changes <code>arr[0]</code></button>
+    <button class="opt">It throws UnsupportedOperationException</button>
+    <button class="opt">It works but leaves the array unchanged</button>
+    <button class="opt">It appends "X" at the end of the list</button>
+  </div>
+  <div class="why"><code>Arrays.asList</code> is a fixed-size list backed by the array: <code>set</code> writes through, <code>add</code> throws. See lesson 0032.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In a default (insertion-order) <code>LinkedHashMap</code> you <code>put("a", 1)</code>, <code>put("b", 2)</code>, then <code>put("a", 10)</code>. What is the order?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>{a=10, b=2}</code></button>
+    <button class="opt"><code>{b=2, a=10}</code></button>
+    <button class="opt"><code>{a=1, b=2, a=10}</code></button>
+    <button class="opt"><code>{b=2, a=1}</code></button>
+  </div>
+  <div class="why">Re-inserting an existing key does not change its place in insertion order. See lesson 0033.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">When does OpenJDK turn a HashMap bucket into a red-black tree?</p>
+  <div class="options">
+    <button class="opt" data-correct>At 8 nodes, if the table has at least 64 buckets</button>
+    <button class="opt">At 2 nodes, whatever the size of the table is</button>
+    <button class="opt">At 8 nodes, even if the table has 16 buckets</button>
+    <button class="opt">Every time the whole table is resized</button>
+  </div>
+  <div class="why"><code>TREEIFY_THRESHOLD = 8</code> and <code>MIN_TREEIFY_CAPACITY = 64</code>; a smaller table resizes instead. See lesson 0030.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the bug in <code>list.sort((a, b) -&gt; a - b)</code> for a <code>List&lt;Integer&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The subtraction can overflow and give the wrong sign</button>
+    <button class="opt">It sorts in descending order instead of ascending</button>
+    <button class="opt">The lambda boxes every int and runs out of memory</button>
+    <button class="opt">List.sort is not stable when you pass a lambda</button>
+  </div>
+  <div class="why"><code>MIN_VALUE - 1</code> becomes a large positive number. Use <code>Integer.compare</code> or <code>Comparator.comparingInt</code>. See lesson 0031.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You return <code>Collections.unmodifiableList(items)</code>, then your class adds to <code>items</code>. What does the caller see?</p>
+  <div class="options">
+    <button class="opt" data-correct>The new element, because it is a read-through view</button>
+    <button class="opt">The old list, because the view copied it on creation</button>
+    <button class="opt">An exception the next time the caller reads it</button>
+    <button class="opt">An empty list, because the source has changed</button>
+  </div>
+  <div class="why">An unmodifiable view blocks the caller's writes but reads through to the source. Use <code>List.copyOf</code> for a snapshot. See lesson 0032.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What backs a <code>HashSet</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>A HashMap whose values are one dummy object</button>
+    <button class="opt">A sorted array searched with binary search</button>
+    <button class="opt">A red-black tree ordered by hash code</button>
+    <button class="opt">A linked list that is checked from the start</button>
+  </div>
+  <div class="why">The Javadoc says it is backed by a hash table, actually a HashMap instance. See lesson 0033.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A HashMap with 16 buckets resizes to 32. An entry was at index 1. Where can it be now?</p>
+  <div class="options">
+    <button class="opt" data-correct>At index 1 or at index 17</button>
+    <button class="opt">At index 2, always twice the old one</button>
+    <button class="opt">At any index, all keys are rehashed</button>
+    <button class="opt">At index 0, the table starts again</button>
+  </div>
+  <div class="why">One extra hash bit decides: stay at i or move to i + old n. The example showed apple going 1 → 17. See lesson 0030.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>List.of("a", null)</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>It throws NullPointerException</button>
+    <button class="opt">It returns a list of size 2</button>
+    <button class="opt">It returns a list of size 1</button>
+    <button class="opt">It throws UnsupportedOperation</button>
+  </div>
+  <div class="why"><code>List.of</code> and <code>List.copyOf</code> disallow null elements; even <code>contains(null)</code> throws. See lesson 0032.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You want an LRU cache with <code>LinkedHashMap</code>. Which two things do you need?</p>
+  <div class="options">
+    <button class="opt" data-correct>accessOrder = true and override removeEldestEntry</button>
+    <button class="opt">accessOrder = false and override removeEldestEntry</button>
+    <button class="opt">accessOrder = true and override the get method</button>
+    <button class="opt">A TreeMap comparator and a fixed capacity of 16</button>
+  </div>
+  <div class="why">Access order moves read entries to the end; <code>removeEldestEntry</code> is called after <code>put</code> inserts. See lesson 0033.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">20,000 keys all return <code>hashCode() == 42</code>. What made lookups much faster in lesson 0030's run?</p>
+  <div class="options">
+    <button class="opt" data-correct>The keys implemented Comparable, so the tree could order them</button>
+    <button class="opt">The map was created with a larger initial capacity of 1024</button>
+    <button class="opt">The keys overrode toString, so the tree could print them</button>
+    <button class="opt">The load factor was set to 1.0 to avoid any resize at all</button>
+  </div>
+  <div class="why">With all hashes equal, only <code>compareTo</code> can break ties inside the tree bin (about 3,658 ms vs 69 ms in one run). See lesson 0030.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">Recall 1. An interviewer asks: <strong>"Walk me through a put in a HashMap, including resize and treeification."</strong> Start a timer. Answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> An array of buckets; default 16 buckets, load factor 0.75.</label></li>
+      <li><label><input type="checkbox"> The hash is spread: <code>h ^ (h &gt;&gt;&gt; 16)</code>, because only low bits choose the bucket.</label></li>
+      <li><label><input type="checkbox"> Index = <code>(n - 1) &amp; hash</code>; n is a power of two.</label></li>
+      <li><label><input type="checkbox"> In the bucket: compare hash, then <code>equals</code>; replace or append.</label></li>
+      <li><label><input type="checkbox"> Above capacity × 0.75 it doubles; each entry stays at i or moves to i + old n.</label></li>
+      <li><label><input type="checkbox"> In OpenJDK a bin of 8 becomes a red-black tree if the table has ≥ 64 buckets; worst case O(log n).</label></li>
+      <li><label><input type="checkbox"> Presize when you know the size: <code>HashMap.newHashMap(n)</code> on JDK 19+.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A HashMap is an array of buckets, 16 by default with a load factor of 0.75. On put, it takes the key's hashCode and XORs the high 16 bits into the low bits, because only the low bits pick the bucket. The index is (n minus 1) AND hash, which is a cheap modulo since n is a power of two. In the bucket it compares the hash, then equals: if the key exists it replaces the value, otherwise it appends a node. When size goes past capacity times 0.75, the table doubles, and every entry either stays at its index or moves by the old size. If one bucket reaches 8 nodes and the table has at least 64 buckets, OpenJDK turns it into a red-black tree, so the worst case is O(log n) instead of linear. And if I know the size up front, I presize with HashMap.newHashMap so it never resizes."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 2. <strong>"Comparable versus Comparator, and what does 'consistent with equals' mean?"</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Comparable = the class's one natural order, <code>compareTo</code> inside the class.</label></li>
+      <li><label><input type="checkbox"> Comparator = an outside order; you can have many (by price, by date, reversed).</label></li>
+      <li><label><input type="checkbox"> Consistent with equals: compare is 0 exactly when equals is true.</label></li>
+      <li><label><input type="checkbox"> TreeSet/TreeMap use compare, not equals, for duplicates; BigDecimal 4.0 vs 4.00 is the JDK example.</label></li>
+      <li><label><input type="checkbox"> Build with <code>Comparator.comparing(...).thenComparing(...)</code> and end with a unique tie-breaker.</label></li>
+      <li><label><input type="checkbox"> Never <code>a - b</code> (overflow); use <code>Integer.compare</code>; <code>nullsFirst</code> for nullable fields.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Comparable is the natural ordering that a class defines for itself, like String or LocalDate. A Comparator is an ordering from outside, so I can have several, by price, by date, reversed. An ordering is consistent with equals when compare returns zero exactly when equals is true. It's strongly recommended because TreeSet and TreeMap use compare, not equals, to decide duplicates: BigDecimal 4.0 and 4.00 are not equal but compare as zero, so a TreeSet keeps only one. In practice I build comparators with Comparator.comparing and thenComparing and always end with a unique field as tie-breaker. And I never write a minus b, because it overflows; I use Integer.compare or comparingInt."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 3. <strong>"How do you return a collection that callers cannot change? And how would you build an LRU cache?"</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>List.copyOf(items)</code> on 17/21; on 8 <code>unmodifiableList(new ArrayList&lt;&gt;(items))</code>.</label></li>
+      <li><label><input type="checkbox"> <code>unmodifiableList</code> alone is a view: it still shows the owner's changes.</label></li>
+      <li><label><input type="checkbox"> <code>Arrays.asList</code> is fixed-size and writes through to the array.</label></li>
+      <li><label><input type="checkbox"> Unmodifiable is shallow: elements must be immutable too.</label></li>
+      <li><label><input type="checkbox"> LRU: <code>LinkedHashMap(16, 0.75f, true)</code> + <code>removeEldestEntry</code> returning <code>size() &gt; capacity</code>.</label></li>
+      <li><label><input type="checkbox"> In access order <code>get</code> is a structural change: lock it, or use Caffeine.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"To return internal state safely I return List.copyOf, which is a real unmodifiable copy and rejects nulls. On Java 8 I copy into a new ArrayList and wrap it with Collections.unmodifiableList. Wrapping without copying is only a view: the caller can't write, but sees my later changes. Arrays.asList is different again: fixed-size, but set writes into the array. And all of these are shallow, so the elements should be immutable too, like records or Strings. For an LRU cache I extend LinkedHashMap with accessOrder true, so each get moves the entry to the end, and override removeEldestEntry to return size greater than capacity. One caveat: in access order even get changes the structure, so with several threads I need a lock, or in production I'd use a library like Caffeine."</em></p>
+  </div>
+</div>
+
+<h2>If you missed questions, re-read</h2>
+<table>
+<tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+<tr><td>bucket index, resize, treeify, presizing</td><td><a href="0030-hashmap-internals.html">Lesson 0030: HashMap internals</a></td></tr>
+<tr><td>TreeSet losing elements, comparator chains, <code>a - b</code>, stable sort</td><td><a href="0031-comparable-comparator-and-ordering.html">Lesson 0031: Comparable and Comparator</a></td></tr>
+<tr><td><code>Arrays.asList</code>, views, <code>List.of</code> nulls, <code>Map.of</code> duplicates</td><td><a href="0032-unmodifiable-vs-immutable.html">Lesson 0032: Unmodifiable vs immutable</a></td></tr>
+<tr><td>HashSet internals, insertion vs access order, LRU</td><td><a href="0033-hashset-linkedhashmap-and-lru.html">Lesson 0033: HashSet, LinkedHashMap and LRU</a></td></tr>
+</table>
+
+<h2>Now do the exercise</h2>
+<p>If you skipped any of these, do it now; if you did them, redo the one with your lowest score from memory:</p>
+<ul>
+<li><a href="../exercises/0030-trace-a-put.md">Exercise 0030: trace a put</a></li>
+<li><a href="../exercises/0031-sort-the-orders.md">Exercise 0031: sort the orders</a></li>
+<li><a href="../exercises/0032-defend-the-state.md">Exercise 0032: defend the state</a></li>
+<li><a href="../exercises/0033-build-an-lru.md">Exercise 0033: build an LRU cache</a></li>
+</ul>
+<p>Runnable examples: <a href="../examples/collections/HashMapInternals.java"><code>HashMapInternals.java</code></a> · <a href="../examples/collections/OrderingAndComparators.java"><code>OrderingAndComparators.java</code></a> · <a href="../examples/collections/UnmodifiableVsImmutable.java"><code>UnmodifiableVsImmutable.java</code></a> · <a href="../examples/collections/LruCache.java"><code>LruCache.java</code></a></p>
+
+<h2>What's next</h2>
+<p>The next block leaves hash tables behind. A senior interviewer will ask: <em>"How do you find the price tier for an amount? How do you keep the top 10 of a million numbers? Which collection do you share between threads?"</em> <a href="0034-treemap-and-navigable-maps.html">Lesson 0034</a> starts with TreeMap and nearest-key queries.</p>
+<p><strong>Read more:</strong> <a href="https://dev.java/learn/api/collections-framework/">dev.java: The Collections Framework</a>, Oracle's official tutorial, to see the four lessons from the angle of the interfaces.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why does only the low part of the hash pick the bucket?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and your three checklist scores: they help me choose your next lesson.</div>
+
+<p><a href="0033-hashset-linkedhashmap-and-lru.html">← Which collections remember order, and an LRU cache in ten lines</a> &nbsp;|&nbsp; <a href="0034-treemap-and-navigable-maps.html">TreeMap and NavigableMap: range and nearest-key queries →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation and the OpenJDK 21 source, October 2026 (all facts come from lessons 0030 to 0033).</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">OpenJDK HashMap.java</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

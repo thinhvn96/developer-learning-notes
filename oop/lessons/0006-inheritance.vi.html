@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 6: Kế thừa: extends, super và quan hệ is-a</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kế thừa: extends, super và quan hệ is-a</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0006 · bước 5/22 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-inheritance.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng được <code>extends</code> và <code>super</code>, giải thích được constructor chaining, và nói được quan hệ 'is-a' hứa hẹn điều gì.</div>
+
+<h2>Ý tưởng</h2>
+<p>Class có thể kế thừa (inherit) state và behavior dùng chung từ class khác: <em>superclass</em> là class cha; các <em>subclass</em> là class kế thừa. Trong Java, "mỗi class chỉ được có một superclass trực tiếp, và mỗi superclass có thể có không giới hạn số subclass." Cú pháp: <code>class MountainBike extends Bicycle</code>, giúp nó có toàn bộ field và method của Bicycle, còn code của chính nó chỉ cần tập trung vào những gì riêng biệt.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[1]</a></p>
+<pre><code>java oop/examples/InheritanceDemo.java
+Bike constructor
+MountainBike constructor
+gear 6, speed 12, full suspension
+b instanceof MountainBike: true
+Bike constructor
+new Bike() instanceof MountainBike: false</code></pre>
+<p>Constructor của subclass gọi <code>super(gear)</code> trước tiên, nên phần của class cha được dựng xong trước phần của class con; <code>super.describe()</code> tái sử dụng behavior của class cha bên trong một override; <code>instanceof</code> cho thấy quan hệ is-a chỉ đúng theo một chiều. Mã nguồn: <a href="../examples/InheritanceDemo.java"><code>InheritanceDemo.java</code></a>.</p>
+<div class="aside">Kế thừa khiến subclass bị gắn chặt (coupling) với cách hiện thực của class cha. <a href="0011-composition-over-inheritance.vi.html">Bài composition</a> cho thấy một bug thật do điều này gây ra; chỉ dùng kế thừa cho quan hệ is-a thực sự và với base class ổn định.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một class Java có thể có bao nhiêu superclass trực tiếp?</p>
+  <button>Không giới hạn</button>
+  <button data-correct>Một</button>
+  <button>Không có</button>
+  <button>Hai</button>
+  <p class="explain">Mỗi class có một superclass trực tiếp.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Từ khoá để tạo subclass?</p>
+  <button>inherits</button>
+  <button data-correct>extends</button>
+  <button>super</button>
+  <button>implements</button>
+  <p class="explain">class MountainBike extends Bicycle.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Constructor nào chạy trước?</p>
+  <button>Cả hai cùng lúc</button>
+  <button>Của class con</button>
+  <button>Không cái nào</button>
+  <button data-correct>Của class cha</button>
+  <p class="explain">Demo in "Bike constructor" trước "MountainBike constructor".</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một object Bike instanceof MountainBike?</p>
+  <button>Null</button>
+  <button>Lỗi compile</button>
+  <button>True</button>
+  <button data-correct>False</button>
+  <p class="explain">is-a đúng theo chiều từ subclass lên superclass, không đúng theo chiều ngược lại.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-vehicle-hierarchy.vi.md">Bài tập 6: cây kế thừa phương tiện</a></p>
+<p>Ví dụ chạy được: <a href="../examples/InheritanceDemo.java"><code>InheritanceDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">Java Tutorials: What Is Inheritance?</a>. Trang ngắn.</p>
+<p><a href="0004-static-members.vi.html">← Static member: state dùng chung và hằng số</a> &nbsp;|&nbsp; <a href="0005-initialization-order.vi.html">Thứ tự khởi tạo: static block, field, constructor →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/inheritance.html">Java Tutorials: What Is Inheritance?</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

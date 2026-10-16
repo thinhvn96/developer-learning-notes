@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 18: String: tính bất biến, pool và StringBuilder</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Vì sao String trong Java không bao giờ thay đổi</h1>
+<p class="subtitle">Tính bất biến, string pool, cái bẫy <code>==</code>, và khi nào nên dùng <code>StringBuilder</code>.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0018 · bước 1/46 · Foundation · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0018-strings-immutability-and-stringbuilder.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> String có mặt ở mọi dòng code backend: ID, JSON, SQL, log. Interviewer rất thích hỏi <em>"Vì sao String là immutable?"</em> và <em>"<code>==</code> khác <code>equals()</code> thế nào?"</em>, vì trả lời sai sẽ sinh ra những bug thật, lúc có lúc không.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích trong khoảng 60 giây vì sao <code>==</code> trên string là cái bẫy, string pool là gì, và khi nào dùng <code>StringBuilder</code>.</div>
+
+<dl class="words">
+  <dt>object</dt><dd>Một thứ chương trình tạo ra trong bộ nhớ, ví dụ một <code>String</code> chứa chữ "abc".</dd>
+  <dt>reference</dt><dd>Một biến trỏ tới object, giống địa chỉ ghi trên tấm thẻ. Hai biến có thể trỏ cùng một object.</dd>
+  <dt>immutable</dt><dd>Bất biến: không đổi được sau khi tạo. Muốn giá trị khác thì phải tạo object mới.</dd>
+  <dt>literal</dt><dd>Giá trị viết thẳng trong code, như <code>"abc"</code> nằm giữa hai dấu nháy kép.</dd>
+  <dt>string pool</dt><dd>Một danh sách string dùng chung do class <code>String</code> tự giữ, để các literal giống nhau dùng chung một object.</dd>
+  <dt>==</dt><dd>Với object, nó hỏi "hai biến có trỏ vào <em>cùng một</em> object không?". Nó không nhìn vào nội dung chữ.</dd>
+  <dt>equals()</dt><dd>Method hỏi "hai string này có chứa cùng các ký tự không?".</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"<code>String a = "abc"; String c = new String("abc");</code> Vậy <code>a == c</code> in ra gì, và vì sao?"</em> Cứ đoán trước, dù chưa chắc. Bạn sẽ kiểm tra lại ở phần 3.</p>
+
+<h2>1. Hình dung: một cái nhãn đã in</h2>
+<p>Hãy nghĩ tới cái nhãn đã in dán trên thùng hàng. Bạn không tẩy chữ trên đó được. Muốn nội dung khác, bạn in một nhãn <strong>mới</strong> rồi dán lên. Nhãn cũ vẫn còn đó cho tới khi có người vứt đi.</p>
+<p><code>String</code> trong Java cũng vậy. Theo tài liệu, "String là hằng; giá trị của chúng không thể thay đổi sau khi được tạo."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> Những method trông như đang sửa string, ví dụ <code>concat</code>, <code>toUpperCase</code> hay <code>replace</code>, thực ra đều trả về một string <em>mới</em>.</p>
+<pre><code>String s = "x";
+String t = s.concat("y");
+<span class="c">Bước 1  s trỏ tới object "x"</span>
+<span class="c">Bước 2  concat tạo một object MỚI "xy" và trả nó về</span>
+<span class="c">Bước 3  t trỏ tới "xy"; s vẫn trỏ tới "x"</span>
+System.out.println(s + ", " + t);   <span class="hl">// x, xy</span></code></pre>
+<p>Ví dụ chạy được in ra đúng như vậy:</p>
+<pre><code>$ java java/examples/StringDemo.java
+...
+s after concat  : x, t = xy</code></pre>
+<h3>Bẫy: gọi method rồi bỏ quên kết quả</h3>
+<pre><code>String name = "anna";
+name.toUpperCase();              <span class="c">// result thrown away</span>
+System.out.println(name);        <span class="hl">// still "anna"</span>
+
+name = name.toUpperCase();       <span class="c">// fix: keep the new string</span></code></pre>
+<p>Vì string không bao giờ đổi, bạn phải lưu kết quả vào một biến. Quên điều này là bug kinh điển của người mới.</p>
+
+<h2>2. Vì sao bất biến lại là ý hay</h2>
+<p>Tài liệu nêu lý do chính trong một câu: "Vì các object String là bất biến nên chúng có thể được dùng chung."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> Nếu không ai sửa được object, thì nhiều biến (và nhiều thread) cùng trỏ vào nó cũng không có rủi ro gì.</p>
+<ul>
+  <li><strong>Dùng chung an toàn.</strong> Bạn truyền string vào bất kỳ method nào. Method đó không thể lén sửa bản của bạn.</li>
+  <li><strong>Key an toàn cho map.</strong> Ở <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a> bạn đã thấy một key bị đổi sẽ bị lạc trong <code>HashMap</code>. Key là string thì không đổi được, nên không bị lạc.</li>
+  <li><strong>Có thể có pool dùng chung.</strong> Vì dùng chung là an toàn, Java có thể giữ một bản duy nhất cho mỗi literal. Đó là phần tiếp theo.</li>
+</ul>
+
+<h2>3. String sống ở đâu: string pool</h2>
+<p>Hãy tưởng tượng một văn phòng có một cuốn từ điển chung trên kệ. Ai cần thì đi tới cùng cái kệ đó. Không ai mua thêm cuốn thứ hai, vì không ai được phép viết vào nó.</p>
+<p>Class <code>String</code> giữ một cái kệ như thế. Tài liệu của <code>intern()</code> viết: "Một pool các string, ban đầu rỗng, được class String duy trì một cách riêng tư." và "Mọi string literal và mọi biểu thức hằng có giá trị string đều được intern."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> Đặc tả ngôn ngữ nói cùng điều đó từ phía bên kia: "một string literal luôn tham chiếu tới <em>cùng một</em> instance của class String".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5</a></p>
+
+<figure>
+<svg viewBox="0 0 680 275" role="img" aria-label="Biến a và b cùng trỏ vào một object abc trong string pool. Biến c trỏ vào một object abc riêng do new String tạo ra. c.intern() trả về object trong pool.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="65" y="28" text-anchor="middle" font-size="11" opacity=".75">biến</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="40" width="70" height="34" rx="4"/>
+      <rect x="30" y="100" width="70" height="34" rx="4"/>
+      <rect x="30" y="180" width="70" height="34" rx="4"/>
+      <rect x="150" y="20" width="510" height="220" rx="8" opacity=".5"/>
+      <rect x="220" y="45" width="220" height="100" rx="6" stroke-dasharray="5 4"/>
+      <rect x="480" y="177" width="120" height="40" rx="6"/>
+      <path d="M100 57H190V88H274M268 83l6 5-6 5"/>
+      <path d="M100 117H190V108H274M268 103l6 5-6 5"/>
+      <path d="M100 197H474M468 192l6 5-6 5"/>
+    </g>
+    <text x="65" y="62" text-anchor="middle">a</text>
+    <text x="65" y="122" text-anchor="middle">b</text>
+    <text x="65" y="202" text-anchor="middle">c</text>
+    <text x="645" y="40" text-anchor="end" font-size="11" opacity=".75">heap</text>
+    <text x="232" y="62" font-size="11" opacity=".75">string pool</text>
+    <rect x="280" y="75" width="120" height="46" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="103" text-anchor="middle" fill="var(--accent)">"abc"</text>
+    <text x="540" y="202" text-anchor="middle">"abc"</text>
+    <text x="300" y="190" text-anchor="middle" font-size="11" opacity=".75">new String("abc")</text>
+    <g fill="none" stroke="var(--accent)" stroke-dasharray="4 3">
+      <path d="M540 177V98H406"/>
+    </g>
+    <path d="M406 93l-6 5 6 5" fill="none" stroke="var(--accent)"/>
+    <text x="548" y="140" font-size="11" fill="var(--accent)">c.intern()</text>
+    <text x="340" y="262" text-anchor="middle" font-size="12">a == b → true  ·  a == c → false  ·  a == c.intern() → true</text>
+  </g>
+</svg>
+<figcaption>Hai literal giống nhau dùng chung một object trong pool. <code>new String(...)</code> luôn tạo thêm object khác; <code>intern()</code> dẫn về lại object trong pool.</figcaption>
+</figure>
+
+<p>Giờ chạy ví dụ và đi theo từng dòng:</p>
+<pre><code>String a = "abc";
+String b = "abc";               <span class="c">// same literal</span>
+String c = new String("abc");   <span class="c">// explicitly a new object</span>
+
+$ java java/examples/StringDemo.java
+a == b          : true
+a == c          : false
+a.equals(c)     : true
+a == c.intern() : true</code></pre>
+<ol class="steps">
+  <li><strong><code>a == b</code> là true.</strong> Cả hai đều là literal <code>"abc"</code>, nên cùng trỏ tới một object trong pool.</li>
+  <li><strong><code>a == c</code> là false.</strong> <code>new</code> luôn tạo object mới, nên <code>c</code> trỏ chỗ khác. Chữ giống nhau, nhưng object thì không.</li>
+  <li><strong><code>a.equals(c)</code> là true.</strong> <code>equals</code> so sánh các ký tự, không so địa chỉ.</li>
+  <li><strong><code>a == c.intern()</code> là true.</strong> <code>intern()</code> tìm trong pool, thấy một string bằng nó, và trả về bản trong pool. Theo tài liệu, với hai string bất kỳ, "<code>s.intern() == t.intern()</code> là true khi và chỉ khi <code>s.equals(t)</code> là true".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a></li>
+</ol>
+
+<h3>String tạo lúc chạy là object mới</h3>
+<p>Đặc tả còn nói các string nối từ hằng số "được tính lúc compile rồi được xem như literal", nhưng "các string được tính bằng phép nối lúc chạy là mới tạo, vì thế là khác biệt."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5</a> Ví dụ của chính đặc tả:</p>
+<pre><code>String hello = "Hello", lo = "lo";
+hello == ("Hel" + "lo")   <span class="c">// true: two constants, joined by javac</span>
+hello == ("Hel" + lo)     <span class="hl">// false: lo is a variable → new object</span></code></pre>
+<p>Đây là lý do <code>==</code> trên string nguy hiểm: nó <em>thỉnh thoảng</em> chạy đúng (trong test nhỏ dùng literal), rồi hỏng trên production, nơi string đến từ request, file hay database.</p>
+
+<h2>4. Quy tắc: so sánh nội dung bằng <code>equals</code></h2>
+<div class="win">So sánh <strong>nội dung</strong> string bằng <code>equals()</code>. Không bao giờ dùng <code>==</code>.</div>
+<p><code>equals</code> được định nghĩa: "Kết quả là true khi và chỉ khi đối số khác null và là một object String biểu diễn cùng dãy ký tự với object này."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a></p>
+<h3>Bẫy: kiểm tra input của người dùng</h3>
+<pre><code><span class="c">// answer comes from an HTTP request: built at run time</span>
+String answer = request.getParameter("confirm");
+
+if (answer == "yes") { ... }        <span class="hl">// bug: almost never true</span>
+if (answer.equals("yes")) { ... }   <span class="c">// NPE if answer is null</span>
+if ("yes".equals(answer)) { ... }   <span class="c">// best: null gives false</span></code></pre>
+<p>Dòng cuối đặt literal lên trước. Vì đối số có thể null và <code>equals</code> chỉ đơn giản trả về false khi gặp null, bạn tránh được <code>NullPointerException</code>.</p>
+<p class="muted">Có nên gọi <code>intern()</code> khắp nơi để <code>==</code> chạy đúng không? Không. Đó là một lần tra cứu trong pool dùng chung, nó không cứu được chỗ code quên gọi nó, còn <code>equals</code> thì rõ ràng và đúng. Hãy hiểu <code>intern()</code> làm gì; đừng dùng nó để sửa phép so sánh.</p>
+
+<h2>5. Ghép string: <code>+</code> hay <code>StringBuilder</code></h2>
+<p>Quay lại chuyện nhãn in. Nếu mỗi lần thêm một chữ bạn lại in nguyên một nhãn mới, bạn sẽ vứt đi rất nhiều nhãn. Tốt hơn: dùng một tấm bảng trắng, viết hết các chữ, rồi in một lần ở cuối. <code>StringBuilder</code> chính là tấm bảng trắng đó.</p>
+<p>Tài liệu gọi nó là "một dãy ký tự có thể thay đổi" và khuyên dùng nó thay cho <code>StringBuffer</code> cũ "vì nó sẽ nhanh hơn trên hầu hết các implementation". Cái giá phải trả: "Các instance của StringBuilder không an toàn khi dùng bởi nhiều thread."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html">StringBuilder javadoc</a> Điều đó không sao, vì bình thường bạn ghép string bên trong một method, trên một thread.</p>
+
+<figure>
+<svg viewBox="0 0 680 215" role="img" aria-label="Trên: ba lần += tạo ra bốn object string riêng, ba cái đầu thành rác. Dưới: một buffer StringBuilder 16 ô được điền 0,1,2, và toString tạo một string cuối cùng.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="30" y="28" font-size="11" opacity=".75">String s = ""; rồi 3 lần s += i + ","</text>
+    <g fill="none" stroke="currentColor" opacity=".5">
+      <rect x="30" y="45" width="100" height="40" rx="6"/>
+      <rect x="160" y="45" width="100" height="40" rx="6"/>
+      <rect x="290" y="45" width="100" height="40" rx="6"/>
+    </g>
+    <rect x="420" y="45" width="100" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g opacity=".5">
+      <text x="80" y="70" text-anchor="middle">""</text>
+      <text x="210" y="70" text-anchor="middle">"0,"</text>
+      <text x="340" y="70" text-anchor="middle">"0,1,"</text>
+    </g>
+    <text x="470" y="70" text-anchor="middle" fill="var(--accent)">"0,1,2,"</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M130 65h24M150 60l4 5-4 5"/>
+      <path d="M260 65h24M280 60l4 5-4 5"/>
+      <path d="M390 65h24M410 60l4 5-4 5"/>
+    </g>
+    <text x="210" y="104" text-anchor="middle" font-size="11" opacity=".75">bản cũ thành rác (mỗi += chép lại mọi ký tự)</text>
+    <text x="530" y="70" font-size="11" fill="var(--accent)">4 object</text>
+    <text x="30" y="140" font-size="11" opacity=".75">StringBuilder sb = new StringBuilder(); rồi 3 lần sb.append(i).append(',')</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="30" y="152" width="24" height="30"/><rect x="54" y="152" width="24" height="30"/>
+      <rect x="78" y="152" width="24" height="30"/><rect x="102" y="152" width="24" height="30"/>
+      <rect x="126" y="152" width="24" height="30"/><rect x="150" y="152" width="24" height="30"/>
+      <rect x="174" y="152" width="24" height="30"/><rect x="198" y="152" width="24" height="30"/>
+      <rect x="222" y="152" width="24" height="30"/><rect x="246" y="152" width="24" height="30"/>
+      <rect x="270" y="152" width="24" height="30"/><rect x="294" y="152" width="24" height="30"/>
+      <rect x="318" y="152" width="24" height="30"/><rect x="342" y="152" width="24" height="30"/>
+      <rect x="366" y="152" width="24" height="30"/><rect x="390" y="152" width="24" height="30"/>
+    </g>
+    <rect x="30" y="152" width="144" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="42" y="172">0</text><text x="66" y="172">,</text><text x="90" y="172">1</text>
+      <text x="114" y="172">,</text><text x="138" y="172">2</text><text x="162" y="172">,</text>
+    </g>
+    <text x="222" y="200" text-anchor="middle" font-size="11" opacity=".75">một buffer, 16 ô, ghi đè tại chỗ</text>
+    <g fill="none" stroke="currentColor"><path d="M420 167h74M488 162l6 5-6 5"/></g>
+    <text x="457" y="157" text-anchor="middle" font-size="11">toString()</text>
+    <rect x="500" y="147" width="120" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="560" y="172" text-anchor="middle" fill="var(--accent)">"0,1,2,"</text>
+  </g>
+</svg>
+<figcaption>Trên: mỗi <code>+=</code> tạo một string mới và chép toàn bộ chữ cũ vào. Dưới: <code>StringBuilder</code> ghi vào một buffer và chỉ tạo string cuối cùng một lần.</figcaption>
+</figure>
+
+<p>Đi theo vòng lặp trong ví dụ:</p>
+<pre><code>StringBuilder sb = new StringBuilder();
+for (int i = 0; i &lt; 5; i++) sb.append(i).append(',');
+<span class="c">Bước 1  new StringBuilder(): buffer rỗng, đủ chỗ cho 16 ký tự</span>
+<span class="c">Bước 2  mỗi append ghi vào cùng buffer đó (không có String mới)</span>
+<span class="c">Bước 3  in sb sẽ gọi toString(): tạo một String ở cuối</span>
+
+$ java java/examples/StringDemo.java
+...
+StringBuilder   : 0,1,2,3,4,</code></pre>
+<p>Con số "16 ký tự" lấy từ tài liệu của constructor: "dung lượng ban đầu là 16 ký tự".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html">StringBuilder javadoc</a> Nếu bạn append nhiều hơn, builder tự lớn lên.</p>
+
+<h3>Vậy <code>+</code> là xấu à? JDK 8 so với 9+</h3>
+<p>Không. Với một biểu thức như <code>"id=" + id + ", name=" + name</code>, cứ dùng <code>+</code> cho dễ đọc. Việc <code>+</code> được compile ra sao là do compiler quyết định: "compiler javac có thể hiện thực toán tử này bằng StringBuffer, StringBuilder, hoặc java.lang.invoke.StringConcatFactory tùy theo phiên bản JDK."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String javadoc</a> Nên bytecode của <code>+</code> trên JDK 8 khác với JDK 17 và 21, nhưng source code của bạn vẫn giữ nguyên.</p>
+<p>Vấn đề nằm ở <code>+=</code> <strong>trong vòng lặp</strong>. Mỗi vòng tạo một string mới và chép toàn bộ ký tự cũ vào, nên khối lượng công việc tăng dần theo từng vòng (đây là hệ quả của tính bất biến). Trong vòng lặp, hãy dùng một <code>StringBuilder</code> rõ ràng. Như mọi khi: đo trước khi tối ưu những trường hợp nhỏ.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Sau <code>String s = "x"; s.concat("y");</code> thì <code>s</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Vẫn là "x"; concat đã trả về một string mới</button>
+    <button class="opt">Thành "xy" vì concat sửa trực tiếp string đó</button>
+    <button class="opt">Thành null vì phần chữ cũ đã bị xóa mất</button>
+    <button class="opt">Ném exception vì string không nối được nhau</button>
+  </div>
+  <div class="why">String là hằng. <code>concat</code> trả về một string <em>mới</em>; nếu bỏ qua kết quả thì không có gì thay đổi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Với hai literal giống hệt nhau, <code>"abc" == "abc"</code> in ra gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>true, cả hai trỏ vào một object trong pool</button>
+    <button class="opt">false, mỗi literal là một object mới riêng</button>
+    <button class="opt">Không compile được khi so hai literal</button>
+    <button class="opt">Còn tùy vào độ dài của đoạn chữ đó</button>
+  </div>
+  <div class="why">"Một string literal luôn tham chiếu tới cùng một instance của class String" (JLS §3.10.5). Demo in ra <code>a == b : true</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>String a = "abc"; String c = new String("abc");</code> Vậy <code>a == c</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>false, vì new luôn tạo ra một object khác</button>
+    <button class="opt">true, vì các ký tự bên trong giống nhau</button>
+    <button class="opt">true, vì new String dùng lại object trong pool</button>
+    <button class="opt">Ném NullPointerException khi chương trình chạy</button>
+  </div>
+  <div class="why"><code>==</code> so địa chỉ. <code>new</code> tạo một object riêng, nên địa chỉ khác nhau dù chữ giống nhau.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bug trong <code>if (status == "ACTIVE")</code> là gì, khi <code>status</code> được đọc từ database?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó so object, mà string tạo lúc chạy là object mới</button>
+    <button class="opt">Nó chỉ so độ dài, nên "ACTIVE" và "PAUSED" bằng nhau</button>
+    <button class="opt">Nó bỏ qua hoa thường, nên "active" cũng khớp luôn</button>
+    <button class="opt">Không có bug; database luôn trả string trong pool</button>
+  </div>
+  <div class="why">String tính lúc chạy là object mới, nên <code>==</code> ra false. Dùng <code>"ACTIVE".equals(status)</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>intern()</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Bản dùng chung duy nhất của đoạn chữ đó trong pool</button>
+    <button class="opt">Một bản sao mới có thể sửa được tùy ý</button>
+    <button class="opt">Hash code của string dưới dạng một số nguyên</button>
+    <button class="opt">Các ký tự của string dưới dạng mảng char</button>
+  </div>
+  <div class="why">Nó trả về "một biểu diễn chuẩn": string trong pool bằng với string này, nếu cần thì thêm vào pool trước.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn dựng một báo cáo 10 000 dòng trong vòng <code>for</code>. Cách nào tốt nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một StringBuilder, append trong vòng, toString một lần</button>
+    <button class="opt">report += line trong vòng, vì + luôn được tối ưu sẵn</button>
+    <button class="opt">Mỗi dòng một StringBuffer, rồi nối tất cả bằng +</button>
+    <button class="opt">Gọi intern() trên từng dòng để pool dùng lại chúng</button>
+  </div>
+  <div class="why">Mỗi <code>+=</code> tạo string mới và chép lại chữ cũ. <code>StringBuilder</code> ghi vào một buffer; đó là lựa chọn được tài liệu khuyên dùng khi ghép trên một thread.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Vì sao String trong Java là immutable, và <code>==</code> khác <code>equals()</code> thế nào?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> String không đổi được sau khi tạo; các method như <code>concat</code> trả về string mới.</label></li>
+      <li><label><input type="checkbox"> Bất biến giúp string dùng chung an toàn (giữa các biến, các thread, và làm key của map).</label></li>
+      <li><label><input type="checkbox"> Các literal giống nhau dùng chung một object trong string pool; <code>intern()</code> trả về bản trong pool.</label></li>
+      <li><label><input type="checkbox"> <code>==</code> so reference; <code>equals()</code> so các ký tự.</label></li>
+      <li><label><input type="checkbox"> String tạo lúc chạy hoặc bằng <code>new</code> là object mới, nên <code>==</code> sai ở đó. Dùng <code>"literal".equals(x)</code>.</label></li>
+      <li><label><input type="checkbox"> Trong vòng lặp dùng <code>StringBuilder</code> (không thread-safe nhưng nhanh); một biểu thức <code>+</code> đơn lẻ thì không sao.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"String trong Java là immutable: tạo ra rồi thì ký tự bên trong không bao giờ đổi, mấy method như <code>concat</code> hay <code>toUpperCase</code> đều trả về string mới. Lợi ích lớn nhất là string dùng chung được một cách an toàn, giữa các thread và làm key cho HashMap. Nhờ vậy Java mới có string pool: mọi literal cùng nội dung đều trỏ về một object chung, và <code>intern()</code> trả cho mình bản trong pool. Đó cũng chính là lý do <code>==</code> là cái bẫy. <code>==</code> so reference, nên hai literal thì trông như bằng nhau, nhưng string tạo bằng <code>new</code> hay lấy từ request là object khác, và <code>==</code> ra false. Để so nội dung thì em luôn dùng <code>equals</code>, thường viết <code>"yes".equals(input)</code> cho an toàn với null. Còn khi ghép string trong vòng lặp thì em dùng <code>StringBuilder</code>, vì mỗi lần <code>+=</code> lại tạo một string mới và chép lại mọi thứ."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0018-string-traps.vi.md">Bài tập 0018: các bẫy với string</a>. Ghi dự đoán của bạn ra trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/StringDemo.java"><code>StringDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior có thể hỏi tiếp: <em>"StringBuilder có thread-safe không? Vì sao object bất biến tốt cho concurrency? Bạn làm class của mình thành immutable thế nào?"</em> Câu đầu đã có ở trên (không, hãy dùng nó trên một thread). Các câu còn lại, xem <a href="0032-unmodifiable-vs-immutable.vi.html">bài 0032</a> về collection bất biến và <a href="0005-visibility-and-happens-before.vi.html">bài 0005</a> về chia sẻ dữ liệu giữa các thread. Bài tiếp theo trong lộ trình: chuyện gì xảy ra khi có lỗi, ở <a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">bài 0019</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String Javadoc</a>: phần mô tả class và method <code>intern()</code>. Sau đó là <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5</a> cho các quy tắc về literal và ví dụ <code>"Hel" + lo</code>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Heap chính xác là gì?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p> &nbsp;|&nbsp; <a href="0019-exceptions-checked-unchecked-try-with-resources.vi.html">Chuyện gì xảy ra khi code Java gặp lỗi →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và Java Language Specification (Java SE 21), tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html">String Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/StringBuilder.html">StringBuilder Javadoc</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html#jls-3.10.5">JLS §3.10.5 String Literals</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

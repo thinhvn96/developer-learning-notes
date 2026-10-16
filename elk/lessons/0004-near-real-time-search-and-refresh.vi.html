@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 4: Tìm kiếm gần thời gian thực và refresh</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Tìm kiếm gần thời gian thực và refresh</h1>
+<p class="meta">ELK Stack · Bài 0004 · bước 6/14 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-near-real-time-search-and-refresh.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được vì sao một document vừa index xong có thể chưa search ra, refresh làm gì, và lịch refresh mặc định.</div>
+
+<h2>Gần thời gian thực (near real-time)</h2>
+<p>"Một lần refresh làm cho mọi thao tác thực hiện trên index kể từ lần refresh trước có thể được search." Refresh khá nhẹ: các segment mới được ghi vào filesystem cache và mở ra cho search mà không cần một lần commit đầy đủ xuống đĩa.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a> "Thay đổi trên document không hiện ra ngay với search", vì thế mới gọi là <em>gần</em> thời gian thực.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+<p>Mặc định "Elasticsearch refresh index định kỳ mỗi giây, nhưng chỉ với những index đã nhận ít nhất một search request trong 30 giây gần nhất."<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+<h2>Xem tận mắt</h2>
+<pre><code>hits before refresh: 0
+hits after  refresh: 2</code></pre>
+<p>Script index hai document, đếm (0), gọi <code>_refresh</code>, rồi đếm lại (2). Lần đếm đầu ra 0 vì index đang rảnh chưa được refresh, đúng với quy tắc ở trên; thời điểm có thể xê dịch, nên nếu bạn thấy 2 thì đơn giản là refresh định kỳ đã chạy trước.</p>
+<div class="aside">Góc phỏng vấn: "Test của tôi index một document rồi search mà không thấy gì." Trả lời: trong test hãy gọi refresh (hoặc chờ), còn trên production đừng gọi refresh sau mỗi document vì refresh tốn throughput; hãy tinh chỉnh <code>refresh_interval</code> khi bulk load.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Điều gì làm document mới search được?</p>
+  <button>Di chuyển replica</button>
+  <button>Đổi mapping</button>
+  <button>Restart</button>
+  <button data-correct>Một lần refresh</button>
+  <p class="explain">Refresh làm cho các thao tác kể từ lần refresh trước có thể được search.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Tần suất refresh mặc định cho index đang được dùng?</p>
+  <button data-correct>Mỗi giây</button>
+  <button>Mỗi giờ</button>
+  <button>Không bao giờ</button>
+  <button>Mỗi lần ghi</button>
+  <p class="explain">Index được refresh mỗi giây nếu có search trong 30 giây gần nhất.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao là 'gần' thời gian thực?</p>
+  <button>Replica trễ hàng giờ</button>
+  <button>Search chậm</button>
+  <button data-correct>Thay đổi không hiện ra ngay</button>
+  <button>Ghi mất cả ngày</button>
+  <p class="explain">Thay đổi trên document hiện ra trong khoảng thời gian refresh, không phải ngay lập tức.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Refresh ghi ra cái gì?</p>
+  <button>Một lần commit đĩa đầy đủ</button>
+  <button>Một shard mới</button>
+  <button>Một mapping mới</button>
+  <button data-correct>Segment mới trong cache</button>
+  <p class="explain">Nó ghi segment vào filesystem cache mà không cần commit đầy đủ.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-bulk-load-tuning.vi.md">Bài tập 0004: tinh chỉnh bulk load</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">Elasticsearch Docs: Near real-time search</a>. Trang ngắn.</p>
+<p><a href="0003-shards-and-replicas.vi.html">← Shard và replica</a> &nbsp;|&nbsp; <a href="0005-query-dsl-term-match-bool.vi.html">Query DSL: term, match và bool →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search">Elasticsearch Docs: Near real-time search</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

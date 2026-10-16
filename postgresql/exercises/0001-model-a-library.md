@@ -1,5 +1,7 @@
 # Exercise 0001: model a library
 
+[Tiếng Việt](0001-model-a-library.vi.md)
+
 Companion to [lesson 1](../lessons/0001-tables-and-constraints.html).
 
 Design tables `authors`, `books`, `members`, `loans`. Requirements: an ISBN is unique; a member has one email; a loan cannot reference a missing book or member; a book cannot be deleted while loans exist; a loan's return date cannot precede its loan date.

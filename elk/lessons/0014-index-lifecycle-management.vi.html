@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 14: Index lifecycle management (ILM)</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Index lifecycle management (ILM)</h1>
+<p class="meta">ELK Stack · Bài 0014 · bước 14/14 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0014-index-lifecycle-management.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> mô tả được các phase của ILM và rollover, và viết được một policy rollover ở phase hot rồi xoá dữ liệu sau 30 ngày.</div>
+
+<h2>ILM tự động hoá những gì</h2>
+<p>"ILM tự động hoá việc quản lý các index theo thời gian, như log và metric" để cân bằng giữa hiệu năng, khả năng chịu lỗi, thời gian lưu giữ và chi phí. Index lần lượt đi qua các phase <strong>hot, warm, cold, frozen và delete</strong>. <strong>Rollover</strong> "tạo một write index mới khi index hiện tại đạt tới một kích thước, số lượng document hoặc độ tuổi nhất định". Các action gồm rollover, shrink, force merge và delete.<a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[1]</a></p>
+<h2>Một policy</h2>
+<pre><code>PUT _ilm/policy/logs-policy
+{ "policy": { "phases": {
+    "hot":    { "actions": { "rollover": { "max_age": "7d", "max_primary_shard_size": "50gb" } } },
+    "delete": { "min_age": "30d", "actions": { "delete": {} } } } } }
+GET _ilm/policy/logs-policy  -&gt;  hot 0ms [rollover]   delete 30d [delete]</code></pre>
+<p>Trong lần chạy của mình, API đã nhận và trả về đúng policy này. Gắn nó vào settings của một index template và quan sát một lần chuyển phase thật thì cần dữ liệu của nhiều ngày hoặc phải rút ngắn poll interval, việc mà mình chưa demo. Vài ý về sizing nên mang theo khi phỏng vấn: giữ shard ở kích thước dễ quản lý (các điều kiện rollover ở trên giới hạn kích thước đó), và chọn thời gian lưu giữ dựa trên yêu cầu; các con số cụ thể (như 50gb) chỉ là ví dụ, không phải khuyến nghị có trong tài liệu. Script: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a>. So sánh với <a href="../../kafka/lessons/0007-retention-and-topic-configs.vi.html">cấu hình retention</a> của Kafka.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Các phase của ILM?</p>
+  <button data-correct>hot, warm, cold, frozen, delete</button>
+  <button>new, old, gone</button>
+  <button>start, middle, end</button>
+  <button>read, write, archive</button>
+  <p class="explain">Index đi qua các phase hot, warm, cold, frozen và delete.<a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Rollover được kích hoạt bởi...?</p>
+  <button>Thay đổi mapping</button>
+  <button>Số replica</button>
+  <button>Restart</button>
+  <button data-correct>Kích thước, số doc hoặc tuổi</button>
+  <p class="explain">Khi write index đạt tới một kích thước, số document hoặc độ tuổi.<a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. ILM quản lý loại index nào?</p>
+  <button>Chỉ index hệ thống</button>
+  <button data-correct>Index theo thời gian</button>
+  <button>Chỉ alias</button>
+  <button>Dữ liệu tham chiếu tĩnh</button>
+  <p class="explain">Nó tự động hoá việc quản lý các index theo thời gian như log và metric.<a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Action nào xoá dữ liệu cũ?</p>
+  <button>shrink</button>
+  <button>force merge</button>
+  <button data-correct>delete</button>
+  <button>rollover</button>
+  <p class="explain">Action delete xoá dữ liệu ở cuối vòng đời.<a class="cite" href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0014-retention-plan.vi.md">Bài tập 0014: kế hoạch lưu giữ dữ liệu</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">Elasticsearch: Index lifecycle management</a>. Phần tổng quan và các phase.</p>
+<p><a href="0013-data-streams.vi.html">← Data stream và rollover</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/manage-data/lifecycle/index-lifecycle-management">Elasticsearch: Index lifecycle management</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

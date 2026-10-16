@@ -1,5 +1,7 @@
 # Exercise 0013: modernize a cast chain
 
+[Tiếng Việt](0013-modernize-a-visitor.vi.md)
+
 Companion to [lesson 13](../lessons/0013-switch-expressions-and-instanceof-patterns.html).
 
 Modernize:

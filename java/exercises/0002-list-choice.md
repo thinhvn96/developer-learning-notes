@@ -1,5 +1,7 @@
 # Exercise 0002: pick the collection
 
+[Tiếng Việt](0002-list-choice.vi.md)
+
 Companion to [lesson 2](../lessons/0002-choosing-a-list.html). For each requirement, name the class and cite the Javadoc sentence that justifies it. Say your answers to the teacher before checking.
 
 1. A browser-history "back" stack, single thread.

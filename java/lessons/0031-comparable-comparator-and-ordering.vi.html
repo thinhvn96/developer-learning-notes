@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 31: Sắp xếp mọi thứ theo thứ tự</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Java sắp xếp mọi thứ theo thứ tự như thế nào</h1>
+<p class="subtitle"><code>Comparable</code>, <code>Comparator</code>, và vì sao một <code>TreeSet</code> có thể lặng lẽ làm mất phần tử.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0031 · bước 12/46 · Core · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0031-comparable-comparator-and-ordering.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Sắp đơn hàng theo giá, hiển thị nhân viên theo phòng ban, giữ bảng xếp hạng trong một <code>TreeMap</code>: thứ tự có mặt ở khắp nơi. Người phỏng vấn hỏi <em>"Comparable hay Comparator?"</em> rồi đến câu bẫy: <em>"Vì sao TreeSet của tôi mất một nhân viên?"</em> Sau bài này bạn trả lời được cả hai và viết được comparator không bao giờ bị tràn số.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết Comparator đúng bằng chuỗi <code>Comparator.comparing</code>, và giải thích vì sao một TreeSet có thể lặng lẽ làm mất phần tử.</div>
+
+<dl class="words">
+  <dt>kết quả so sánh</dt><dd>So sánh <code>a</code> với <code>b</code> trả về một <code>int</code>: âm nghĩa là "a đứng trước", 0 nghĩa là "cùng vị trí", dương nghĩa là "b đứng trước".</dd>
+  <dt><code>Comparable&lt;T&gt;</code></dt><dd>Interface mà một class implement để tự có một thứ tự có sẵn, qua method <code>compareTo</code>. <code>&lt;T&gt;</code> là kiểu được so sánh.</dd>
+  <dt>natural ordering</dt><dd>Thứ tự có sẵn đó (thứ tự tự nhiên): số từ nhỏ đến lớn, chuỗi theo bảng chữ cái, ngày từ cũ đến mới.</dd>
+  <dt><code>Comparator&lt;T&gt;</code></dt><dd>Một object riêng có method <code>compare(a, b)</code>. Bạn tạo bao nhiêu cái cũng được: theo giá, theo tên, đảo ngược.</dd>
+  <dt>method reference</dt><dd>Cách viết ngắn của một lambda: <code>Employee::salary</code> nghĩa là "nhận một nhân viên, trả về lương của người đó".</dd>
+  <dt>TreeSet, TreeMap</dt><dd>Một set và một map luôn giữ các phần tử ở trạng thái đã sắp xếp, dựa trên kết quả so sánh.</dd>
+  <dt>stable sort</dt><dd>Thuật toán sắp xếp ổn định: giữ nguyên thứ tự ban đầu của các phần tử so sánh bằng nhau.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Dự đoán: bạn đưa bốn nhân viên vào một <code>TreeSet</code> chỉ sắp theo lương. Hai người trong số đó, Lan và Minh, đều lương 3000. Sau đó set chứa bao nhiêu nhân viên? Nói ra con số và lý do. Phần 3 có kết quả chạy thật.</p>
+
+<h2>1. Hình dung: xếp hàng mọi người</h2>
+<p>Chụp ảnh lớp: thợ ảnh xếp các bạn nhỏ theo chiều cao. Chiều cao là thuộc tính <em>của chính</em> các bạn, và ai cũng đồng ý với nó: đó là <strong>natural ordering</strong>. Nhưng cô giáo có thể muốn một hàng khác, theo bảng chữ cái để điểm danh hay theo ngày sinh để làm tiệc. Cô mang quy tắc riêng từ bên ngoài vào: đó là <strong>comparator</strong>.</p>
+<ul>
+  <li><code>Comparable&lt;T&gt;</code>: <em>natural ordering</em> của class, một <code>compareTo</code> nằm bên trong class (<code>String</code>, <code>Integer</code>, <code>LocalDate</code>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a></li>
+  <li><code>Comparator&lt;T&gt;</code>: một thứ tự từ bên ngoài, bao nhiêu cái cũng được (theo giá, theo ngày, đảo ngược).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator javadoc</a></li>
+</ul>
+<pre><code>record Money(long cents) implements Comparable&lt;Money&gt; {
+  public int compareTo(Money o) { return Long.compare(cents, o.cents); }
+}
+<span class="c">// natural order, written once inside the class</span>
+
+Comparator&lt;Employee&gt; byName = Comparator.comparing(Employee::name);
+<span class="c">// an outside rule; you can have many</span></code></pre>
+<p>Chỉ có <strong>dấu</strong> của kết quả là quan trọng: <code>Long.compare(5, 9)</code> trả về một số âm, nên 5 đứng trước. Đừng dựa vào việc nó đúng bằng -1.</p>
+
+<h3>Các quy tắc mọi compareTo phải tuân theo</h3>
+<p>Contract: <code>sgn(x.compareTo(y)) == -sgn(y.compareTo(x))</code> (nếu x đứng trước y thì y đứng sau x), tính bắc cầu (nếu x &lt; y và y &lt; z thì x &lt; z), và <code>compareTo(null)</code> ném <code>NullPointerException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a> Các thuật toán sắp xếp tin vào những quy tắc này. Phá chúng thì kết quả sắp xếp có thể kỳ quặc.</p>
+
+<h2>2. Nhất quán với equals</h2>
+<p>Một thứ tự gọi là nhất quán với equals khi <code>compareTo == 0</code> đúng vào những lúc <code>equals</code> là true. Theo tài liệu, điều này "rất được khuyến nghị (dù không bắt buộc)" vì nếu không, sorted set và sorted map sẽ "hành xử 'kỳ lạ'": chúng dùng <code>compareTo</code>, không phải <code>equals</code>, để quyết định trùng lặp.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a></p>
+<p>TreeMap cũng nói y như vậy: "hai key được method này coi là bằng nhau thì, từ góc nhìn của sorted map, là bằng nhau."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a> So với bài 0001: <code>HashSet</code> hỏi <code>hashCode</code> và <code>equals</code>; <code>TreeSet</code> không hề gọi <code>equals</code>.</p>
+<p>Ví dụ chính của JDK là <code>BigDecimal</code> 4.0 và 4.00.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a> Chúng là cùng một số, nhưng viết với số chữ số thập phân khác nhau, nên <code>equals</code> nói không còn <code>compareTo</code> nói "như nhau":</p>
+<pre><code>$ java java/examples/collections/OrderingAndComparators.java
+4.0 equals 4.00?     false   compareTo == 0? true
+HashSet size: 2   TreeSet size: 1
+TreeSet by salary only keeps 3 of 4: [Hoa, Lan, An]
+  ...</code></pre>
+<p>Cùng hai object: <code>HashSet</code> giữ cả hai, <code>TreeSet</code> giữ một.</p>
+
+<h2>3. Cái bẫy: TreeSet làm mất người</h2>
+<p>Dòng thứ ba của output là bug thật trên production. Đây là đoạn code:</p>
+<pre><code>Set&lt;Employee&gt; bySalary =
+    new TreeSet&lt;&gt;(Comparator.comparingInt(Employee::salary));
+bySalary.addAll(List.of(lan3000, minh3000, hoa2500, an4000));
+
+<span class="c">Step 1  add Lan  (3000)  tree is empty         → root</span>
+<span class="c">Step 2  add Minh (3000)  compare(Minh, Lan) = 0 → "already there"</span>
+<span class="c">Step 3  add Hoa  (2500)  compare(Hoa, Lan) &lt; 0  → goes left</span>
+<span class="c">Step 4  add An   (4000)  compare(An, Lan)  &gt; 0  → goes right</span>
+                                         <span class="hl">size 3, Minh is gone</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Một TreeSet sắp theo lương: Lan 3000 ở gốc, Hoa 2500 bên trái, An 4000 bên phải. Minh 3000 so sánh bằng 0 với Lan và bị bỏ.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <rect x="230" y="30" width="140" height="46" rx="6" fill="none" stroke="currentColor"/>
+    <text x="300" y="50" text-anchor="middle">Lan</text>
+    <text x="300" y="68" text-anchor="middle" font-size="11" opacity=".75">3000 (gốc)</text>
+    <g fill="none" stroke="currentColor"><path d="M260 76l-80 56M340 76l80 56"/></g>
+    <text x="196" y="104" font-size="11" opacity=".75">&lt; 0</text>
+    <text x="388" y="104" font-size="11" opacity=".75">&gt; 0</text>
+    <rect x="110" y="132" width="140" height="46" rx="6" fill="none" stroke="currentColor"/>
+    <text x="180" y="152" text-anchor="middle">Hoa</text>
+    <text x="180" y="170" text-anchor="middle" font-size="11" opacity=".75">2500</text>
+    <rect x="350" y="132" width="140" height="46" rx="6" fill="none" stroke="currentColor"/>
+    <text x="420" y="152" text-anchor="middle">An</text>
+    <text x="420" y="170" text-anchor="middle" font-size="11" opacity=".75">4000</text>
+    <rect x="520" y="30" width="140" height="46" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="5 3"/>
+    <text x="590" y="50" text-anchor="middle" fill="var(--accent)">Minh</text>
+    <text x="590" y="68" text-anchor="middle" font-size="11" fill="var(--accent)">3000</text>
+    <g fill="none" stroke="var(--accent)"><path d="M520 53h-142M384 48l-6 5 6 5"/></g>
+    <text x="450" y="22" text-anchor="middle" font-size="11" fill="var(--accent)">compare(Minh, Lan) = 0</text>
+    <text x="590" y="100" text-anchor="middle" font-size="11" fill="var(--accent)">"trùng lặp"</text>
+    <text x="590" y="116" text-anchor="middle" font-size="11" fill="var(--accent)">→ bị bỏ</text>
+    <text x="340" y="220" text-anchor="middle" font-size="12" opacity=".8">Cây hỏi comparator, không bao giờ hỏi equals(): 0 là "cùng phần tử"</text>
+  </g>
+</svg>
+<figcaption>Minh là một người khác, nhưng comparator chỉ nhìn vào lương. Với cây, kết quả so sánh bằng 0 nghĩa là "phần tử này đã có rồi".</figcaption>
+</figure>
+
+<p>Không exception, không cảnh báo: <code>add</code> chỉ trả về <code>false</code>. <strong>Cách sửa:</strong> luôn kết thúc comparator bằng một tiêu chí phân định duy nhất, ví dụ <code>.thenComparing(Employee::name)</code> hoặc một id.</p>
+
+<h2>4. Xây dựng comparator (JDK 8+)</h2>
+<p>Hãy nghĩ tới bảng xếp hạng bóng đá: xếp theo điểm; nếu bằng điểm thì theo hiệu số; nếu vẫn bằng thì theo tên. Mỗi quy tắc chỉ có tác dụng khi mọi quy tắc trước đó đều hòa. Chuỗi comparator của Java hoạt động đúng như vậy:</p>
+<pre><code>staff.sort(Comparator.comparing(Employee::dept)
+        .thenComparing(Employee::salary, Comparator.reverseOrder())
+        .thenComparing(Employee::name));
+  Employee[dept=eng, name=An, salary=4000]
+  Employee[dept=eng, name=Lan, salary=3000]
+  Employee[dept=eng, name=Minh, salary=3000]
+  Employee[dept=ops, name=Hoa, salary=2500]</code></pre>
+<p>Từng dòng: <code>comparing(Employee::dept)</code> sắp theo phòng ban, A đến Z. <code>thenComparing(Employee::salary, Comparator.reverseOrder())</code> phân định khi hòa bằng lương, cao nhất trước. <code>thenComparing(Employee::name)</code> phân định nốt những trường hợp hòa còn lại bằng tên.</p>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Comparator dạng chuỗi quyết định hai cặp như thế nào. Lan với Minh: dept hòa, lương hòa, tên quyết định Lan trước. An với Lan: dept hòa, lương quyết định An trước, tên không bao giờ được xét.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="12">compare(Lan, Minh)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="34" width="190" height="54" rx="6"/>
+      <rect x="245" y="34" width="190" height="54" rx="6"/>
+      <path d="M210 61h29M233 56l6 5-6 5M435 61h29M458 56l6 5-6 5"/>
+    </g>
+    <rect x="470" y="34" width="190" height="54" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="115" y="56" text-anchor="middle">1. dept</text>
+    <text x="115" y="76" text-anchor="middle" font-size="11" opacity=".8">eng vs eng → 0, tiếp</text>
+    <text x="340" y="56" text-anchor="middle">2. lương giảm dần</text>
+    <text x="340" y="76" text-anchor="middle" font-size="11" opacity=".8">3000 vs 3000 → 0, tiếp</text>
+    <text x="565" y="56" text-anchor="middle" fill="var(--accent)">3. tên</text>
+    <text x="565" y="76" text-anchor="middle" font-size="11" fill="var(--accent)">Lan &lt; Minh → Lan trước</text>
+
+    <text x="20" y="128" font-size="12">compare(An, Lan)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="138" width="190" height="54" rx="6"/>
+      <path d="M210 165h29M233 160l6 5-6 5"/>
+    </g>
+    <rect x="245" y="138" width="190" height="54" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="470" y="138" width="190" height="54" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".4"/>
+    <text x="115" y="160" text-anchor="middle">1. dept</text>
+    <text x="115" y="180" text-anchor="middle" font-size="11" opacity=".8">eng vs eng → 0, tiếp</text>
+    <text x="340" y="160" text-anchor="middle" fill="var(--accent)">2. lương giảm dần</text>
+    <text x="340" y="180" text-anchor="middle" font-size="11" fill="var(--accent)">4000 &gt; 3000 → An trước</text>
+    <text x="565" y="160" text-anchor="middle" opacity=".45">3. tên</text>
+    <text x="565" y="180" text-anchor="middle" font-size="11" opacity=".45">không cần xét</text>
+  </g>
+</svg>
+<figcaption>Comparator dạng chuỗi dừng ở quy tắc đầu tiên cho kết quả khác 0. Quy tắc cuối cùng nên là duy nhất, để kết quả 0 chỉ xảy ra với các phần tử thật sự bằng nhau.</figcaption>
+</figure>
+
+<h3>Tính ổn định (stability)</h3>
+<p>Theo tài liệu, việc sắp xếp object (<code>List.sort</code>, <code>Arrays.sort(Object[])</code>) "được đảm bảo là ổn định: các phần tử bằng nhau sẽ không bị đổi thứ tự", dùng TimSort; mảng kiểu nguyên thủy dùng Dual-Pivot Quicksort.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays javadoc</a> Tính ổn định giúp việc sắp theo một key rồi theo key khác trở nên dễ đoán: nếu bạn sắp theo tên rồi theo phòng ban, những người trong cùng một phòng vẫn giữ thứ tự theo tên.</p>
+
+<h3>JDK 8, 17 và 21</h3>
+<p><code>Comparator.comparing</code>, <code>thenComparing</code>, <code>reverseOrder</code> và <code>nullsFirst</code> có từ JDK 8, nên dùng được ở mọi phiên bản. Trên JDK 17 và 21 bạn sẽ hay so sánh <code>record</code>, như trong ví dụ, vì record cho sẵn các method truy cập (<code>Employee::salary</code>).</p>
+
+<h2>5. Hai bug kinh điển</h2>
+<h3>Bug 1: so sánh bằng phép trừ</h3>
+<pre><code>Comparator&lt;Integer&gt; broken = (a, b) -&gt; a - b;   <span class="c">// looks fine, is not</span>
+
+<span class="c">Step 1  a = Integer.MIN_VALUE = -2147483648, b = 1</span>
+<span class="c">Step 2  a - b = -2147483649, which does not fit in an int</span>
+<span class="c">Step 3  the int wraps around                    → +2147483647</span>
+<span class="c">Step 4  positive means "a comes after b"</span>       <span class="hl">→ claims MIN_VALUE &gt; 1</span></code></pre>
+<pre><code>broken compare(MIN_VALUE, 1) = 2147483647  (positive: claims MIN_VALUE &gt; 1)
+Integer.compare(MIN_VALUE, 1) = -1</code></pre>
+<p><code>(a, b) -&gt; a - b</code> bị tràn số; hãy dùng <code>Integer.compare</code> hoặc <code>Comparator.comparingInt</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator javadoc</a></p>
+
+<h3>Bug 2: list có null</h3>
+<pre><code>naturalOrder with null -&gt; NullPointerException
+nullsFirst -&gt; [null, a, b]</code></pre>
+<p>Natural order không so sánh được <code>null</code>. Với field có thể null, hãy bọc bằng <code>Comparator.nullsFirst/nullsLast</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator javadoc</a></p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>TreeSet</code> dùng gì để quyết định hai phần tử là trùng lặp?</p>
+  <div class="options">
+    <button class="opt" data-correct>compareTo hoặc comparator trả về 0</button>
+    <button class="opt">equals trả về true cho hai phần tử đó</button>
+    <button class="opt">hashCode trả về cùng một số cho cả hai</button>
+    <button class="opt">== là true vì chúng là cùng một object</button>
+  </div>
+  <div class="why">Sorted set và sorted map thực hiện mọi phép so sánh bằng <code>compareTo</code> hoặc <code>compare</code>. <code>equals</code> không bao giờ được gọi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn thêm <code>new BigDecimal("4.0")</code> và <code>new BigDecimal("4.00")</code> vào một <code>HashSet</code> và một <code>TreeSet</code>. Size của chúng là bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>HashSet 2, TreeSet 1</button>
+    <button class="opt">HashSet 1, TreeSet 2</button>
+    <button class="opt">HashSet 1, TreeSet 1</button>
+    <button class="opt">HashSet 2, TreeSet 2</button>
+  </div>
+  <div class="why"><code>equals</code> là false (khác scale), nên HashSet giữ cả hai. <code>compareTo</code> là 0, nên TreeSet giữ một.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một TreeSet chỉ sắp theo lương nhận Lan (3000), Minh (3000), Hoa (2500) và An (4000). Size của nó là bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>3, Minh bị bỏ một cách lặng lẽ</button>
+    <button class="opt">4, mọi nhân viên đều được giữ</button>
+    <button class="opt">Ném exception khi thêm Minh</button>
+    <button class="opt">2, cả hai người 3000 đều bị bỏ</button>
+  </div>
+  <div class="why">Minh so sánh bằng 0 với Lan, nên cây coi Minh là trùng lặp. Hãy thêm tiêu chí phân định duy nhất như tên.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Comparator <code>(a, b) -&gt; a - b</code> sai ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Phép trừ có thể tràn số và làm đổi dấu</button>
+    <button class="opt">Nó sắp các số từ lớn nhất đến nhỏ nhất</button>
+    <button class="opt">Nó không compile với tham số Integer</button>
+    <button class="opt">Nó đúng nhưng chậm hơn compare rất nhiều</button>
+  </div>
+  <div class="why"><code>MIN_VALUE - 1</code> quay vòng thành 2147483647, một số dương. Hãy dùng <code>Integer.compare</code> hoặc <code>Comparator.comparingInt</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List.sort</code> trên object có ổn định (stable) không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Có, phần tử bằng nhau giữ nguyên thứ tự</button>
+    <button class="opt">Không, phần tử bằng nhau có thể bị xáo</button>
+    <button class="opt">Chỉ khi list là một ArrayList</button>
+    <button class="opt">Chỉ với mảng nguyên thủy như int[]</button>
+  </div>
+  <div class="why">Sắp xếp object được đảm bảo ổn định (TimSort). Mảng nguyên thủy dùng Dual-Pivot Quicksort, ở đó tính ổn định không quan trọng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong <code>comparing(Employee::dept).thenComparing(Employee::name)</code>, khi nào tên được so sánh?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chỉ khi hai phòng ban bằng nhau</button>
+    <button class="opt">Luôn luôn, và kết quả theo tên thắng dept</button>
+    <button class="opt">Chỉ khi hai phòng ban khác nhau</button>
+    <button class="opt">Không bao giờ, vì thenComparing thay thế dept</button>
+  </div>
+  <div class="why">Chuỗi comparator dừng ở kết quả khác 0 đầu tiên. Quy tắc tiếp theo chỉ phân định những trường hợp hòa mà các quy tắc trước để lại.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một list có chứa <code>null</code>. Làm sao sắp nó theo natural order mà không bị exception?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>Comparator.nullsFirst(Comparator.naturalOrder())</code></button>
+    <button class="opt"><code>Comparator.naturalOrder().reversed()</code></button>
+    <button class="opt"><code>Comparator.comparing(Object::toString)</code></button>
+    <button class="opt"><code>Collections.unmodifiableList(list)</code></button>
+  </div>
+  <div class="why"><code>naturalOrder</code> ném <code>NullPointerException</code> khi gặp null. <code>nullsFirst</code> đặt null lên đầu và so sánh phần còn lại bình thường: <code>[null, a, b]</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Comparable và Comparator khác nhau thế nào, và làm sao một TreeSet có thể làm mất phần tử?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>Comparable</code> = natural order của chính class (<code>compareTo</code>); <code>Comparator</code> = bao nhiêu thứ tự bên ngoài cũng được.</label></li>
+      <li><label><input type="checkbox"> Âm / 0 / dương; chỉ có dấu là quan trọng.</label></li>
+      <li><label><input type="checkbox"> TreeSet và TreeMap dùng compare, không dùng equals: 0 nghĩa là trùng lặp.</label></li>
+      <li><label><input type="checkbox"> Ví dụ: comparator chỉ theo lương sẽ bỏ người thứ hai cùng lương (hoặc BigDecimal 4.0 và 4.00).</label></li>
+      <li><label><input type="checkbox"> Cách sửa: nối bằng <code>thenComparing</code> và kết thúc bằng tiêu chí duy nhất.</label></li>
+      <li><label><input type="checkbox"> Không bao giờ dùng <code>a - b</code>: tràn số. Dùng <code>Integer.compare</code> / <code>comparingInt</code>.</label></li>
+      <li><label><input type="checkbox"> Sắp xếp object là stable; dùng <code>nullsFirst</code>/<code>nullsLast</code> cho null.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"<code>Comparable</code> là natural order mà class tự định nghĩa cho mình, bằng một method <code>compareTo</code>, ví dụ string theo bảng chữ cái. <code>Comparator</code> là thứ tự từ bên ngoài, và em có thể có bao nhiêu cái cũng được, theo giá, theo ngày, đảo ngược. Cả hai đều trả về âm, 0 hoặc dương. Cái bẫy là TreeSet và TreeMap quyết định trùng lặp bằng comparator, chứ không phải <code>equals</code>. Nên nếu em sắp nhân viên chỉ theo lương, hai người cùng lương sẽ so sánh bằng 0 và người thứ hai bị bỏ mà không báo gì. Cách sửa là nối bằng <code>thenComparing</code> và kết thúc bằng thứ gì đó duy nhất, như id. Em cũng không bao giờ viết <code>a - b</code>, vì có thể tràn số; em dùng <code>Integer.compare</code> hoặc <code>comparingInt</code>. Và sắp xếp object trong Java là stable, nên sắp theo nhiều key sẽ dễ đoán."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0031-sort-the-orders.vi.md">Bài tập 0031: sắp xếp các đơn hàng</a>. Viết comparator trước, dự đoán thứ tự, rồi mới chạy.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/OrderingAndComparators.java"><code>OrderingAndComparators.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi tiếp: <em>"Làm sao tìm mức giá gần nhất dưới 100 trong một sorted map?"</em> Việc đó dùng <code>TreeMap</code> với comparator của bạn: xem <a href="0034-treemap-and-navigable-maps.vi.html">bài 0034</a>. Trước đó, <a href="0032-unmodifiable-vs-immutable.vi.html">bài 0032</a> trả lời một câu hỏi được ưa chuộng khác: <em>"Làm sao trả về một list mà không ai sửa được?"</em></p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable Javadoc (JDK 21)</a>. Đọc phần mô tả class (natural ordering và tính nhất quán với equals); sau đó lướt qua các static method của Comparator.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao BigDecimal quan tâm đến số chữ số thập phân?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0030-hashmap-internals.vi.html">← Bên trong HashMap: bucket, resize và tree</a> &nbsp;|&nbsp; <a href="0032-unmodifiable-vs-immutable.vi.html">List không ai sửa được (thật không?) →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

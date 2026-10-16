@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 2: Producer, key và acks</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Producer, key và acks</h1>
+<p class="meta">Kafka · Bài 0002 · bước 2/23 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-producers-keys-and-acks.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn được <code>acks</code>, cấu hình batching và retry cho một producer, và nói rõ mỗi lựa chọn đánh đổi điều gì.</div>
+
+<h2>acks: chờ xác nhận đến mức nào</h2>
+<table>
+<tr><th>acks</th><th>Ý nghĩa<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></th></tr>
+<tr><td><code>0</code></td><td>"producer sẽ hoàn toàn không chờ bất kỳ xác nhận nào từ server"; record được coi là đã gửi ngay khi nằm trong socket buffer</td></tr>
+<tr><td><code>1</code></td><td>leader ghi vào log cục bộ của nó rồi phản hồi "mà không chờ xác nhận đầy đủ từ tất cả follower"</td></tr>
+<tr><td><code>all</code> / <code>-1</code></td><td>leader chờ "toàn bộ tập in-sync replica"; record sẽ không bị mất "chừng nào còn ít nhất một in-sync replica còn sống"</td></tr>
+</table>
+<h2>Batching và timeout</h2>
+<ul>
+<li><code>batch.size</code> (mặc định 16384 byte): producer gom các record cùng partition lại thành ít request hơn.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+<li><code>linger.ms</code> (mặc định 5 ms trong tài liệu 4.3 này): một độ trễ nhân tạo nhỏ để nhiều record kịp vào chung một batch.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+<li><code>delivery.timeout.ms</code> (mặc định 120000): giới hạn trên cho toàn bộ quá trình gửi, tính cả các lần retry.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+<li><code>enable.idempotence</code>: mặc định là true, nên retry không tạo ra record trùng lặp.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></li>
+</ul>
+<p>Phác thảo cấu hình: <a href="../examples/reliable-producer.properties"><code>reliable-producer.properties</code></a> (không chạy ở đây).</p>
+<div class="aside">Câu trả lời phỏng vấn: "Với dữ liệu không được phép mất: <code>acks=all</code>, bật idempotence, và đặt <code>min.insync.replicas</code> trên topic (xem bài về replication). Với metric kiểu bắn rồi quên, tôi có thể chấp nhận <code>acks=1</code> hoặc thấp hơn để đổi lấy latency."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Giá trị acks nào dễ mất dữ liệu âm thầm nhất?</p>
+  <button>acks bằng -1</button>
+  <button data-correct>acks bằng 0</button>
+  <button>acks bằng all</button>
+  <button>acks bằng 1</button>
+  <p class="explain">Với 0, producer không chờ bất kỳ xác nhận nào.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. acks=all chờ điều gì?</p>
+  <button data-correct>Mọi in-sync replica</button>
+  <button>Chỉ riêng leader</button>
+  <button>Một follower bất kỳ</button>
+  <button>Không chờ xác nhận</button>
+  <p class="explain">Leader chờ toàn bộ tập in-sync replica.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. linger.ms dùng để làm gì?</p>
+  <button>Đặt số lần retry</button>
+  <button>Xoá record cũ</button>
+  <button>Mã hoá payload</button>
+  <button data-correct>Trễ gửi để gom batch</button>
+  <p class="explain">Nó thêm một độ trễ nhân tạo nhỏ để các lần gửi được gom thành batch.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Giá trị mặc định của enable.idempotence trong tài liệu 4.3?</p>
+  <button data-correct>True</button>
+  <button>False</button>
+  <button>Không đặt</button>
+  <button>Chỉ khi acks 0</button>
+  <p class="explain">Tài liệu ghi giá trị mặc định là true.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-choose-acks.vi.md">Bài tập 0002: chọn acks</a></p>
+<p>Ví dụ chạy được: <a href="../examples/reliable-producer.properties"><code>reliable-producer.properties</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a>. Đọc các mục acks, retries, delivery.timeout.ms, linger.ms, batch.size.</p>
+<p><a href="0001-events-topics-partitions.vi.html">← Event, topic và partition</a> &nbsp;|&nbsp; <a href="0011-java-producer-and-consumer.vi.html">Producer và consumer Java đầu tiên →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 4: Delivery semantics: at most, at least, exactly once</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Delivery semantics: at most, at least, exactly once</h1>
+<p class="meta">Kafka · Bài 0004 · bước 6/23 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-delivery-semantics.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> xác định được bạn nhận đảm bảo delivery nào dựa vào thứ tự giữa 'xử lý' và 'commit offset', và làm sao để consumer an toàn khi message bị giao lại.</div>
+
+<h2>Ba mức đảm bảo</h2>
+<ul>
+<li><strong>At most once:</strong> message có thể bị mất nhưng không bao giờ bị giao lại.</li>
+<li><strong>At least once:</strong> message không bao giờ bị mất nhưng có thể bị giao lại.</li>
+<li><strong>Exactly once:</strong> mỗi message chỉ được xử lý đúng một lần.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+</ul>
+<h2>Thứ tự quyết định tất cả</h2>
+<p>"Nếu consumer đọc message, rồi lưu vị trí của nó, và cuối cùng mới xử lý message" thì bạn có at-most-once: crash sau khi lưu nhưng trước khi xử lý sẽ làm mất message. Xử lý trước, rồi mới lưu vị trí, bạn có at-least-once.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> Javadoc của consumer cũng nói điều tương tự về <code>commitSync()</code>: nếu một tiến trình hỏng sau khi commit nhưng trước khi hoàn tất phần việc phía sau, một consumer khác sẽ đọc lại từ offset đã commit gần nhất (nguyên văn của nó nói về at-least-once khi commit sau khi làm xong việc).<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+<pre><code>while (true) {
+    var records = consumer.poll(Duration.ofMillis(500));
+    for (var r : records) process(r);   // 1. do the work
+    consumer.commitSync();              // 2. then commit: at-least-once
+}</code></pre>
+<h2>Điều đó có ý nghĩa gì với code của bạn</h2>
+<p>At-least-once nghĩa là chắc chắn sẽ có bản trùng, nên việc xử lý phải <em>idempotent</em> (lặp lại vẫn an toàn), ví dụ dùng một event id duy nhất làm key trong database. Các lựa chọn exactly-once bên trong Kafka (idempotent producer, transaction) là nội dung của bài tiếp theo.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Commit offset, rồi xử lý, rồi crash. Đảm bảo nào?</p>
+  <button data-correct>At most once</button>
+  <button>Exactly once</button>
+  <button>At least once</button>
+  <button>Không đảm bảo gì</button>
+  <p class="explain">Lưu vị trí trước khi xử lý cho bạn at-most-once.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Xử lý, rồi commit. Đảm bảo nào?</p>
+  <button>Không đảm bảo gì</button>
+  <button>Exactly once</button>
+  <button>At most once</button>
+  <button data-correct>At least once</button>
+  <p class="explain">Xử lý trước khi lưu vị trí cho bạn at-least-once.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. At-least-once đòi hỏi consumer phải...?</p>
+  <button data-correct>Idempotent</button>
+  <button>Chạy đơn luồng</button>
+  <button>Chỉ stateless</button>
+  <button>Được đồng bộ hoá</button>
+  <p class="explain">Message trùng có thể bị giao lại, nên làm lại công việc phải an toàn.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Crash sau khi commit, trước khi làm việc: ai xử lý lại?</p>
+  <button>Producer</button>
+  <button>Broker</button>
+  <button>Một consumer khác</button>
+  <button data-correct>Không ai, việc bị mất</button>
+  <p class="explain">Khi commit trước lúc xử lý, các record sẽ không được đọc lại, nên công việc bị mất (at most once).<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-crash-timeline.vi.md">Bài tập 0004: dòng thời gian khi crash</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design, Message Delivery Semantics</a>. Đọc trọn phần 'Message Delivery Semantics'.</p>
+<p><a href="0003-consumers-groups-and-offsets.vi.html">← Consumer, consumer group và offset</a> &nbsp;|&nbsp; <a href="0012-partitioning-and-partition-count.vi.html">Partitioning: key, partitioner và số partition →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: message delivery semantics</a> · [2] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

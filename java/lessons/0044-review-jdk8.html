@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 44: Review 5, JDK 8 features</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 5: lambdas, streams, java.time and CompletableFuture</h1>
+<p class="subtitle">Six lessons, mixed together, the way an interviewer will mix them.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0044 · step 29 of 46 · Review · ~30 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0044-review-jdk8.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> In a real interview nobody says "now a question about lesson 0022". One code snippet mixes a lambda, a collector and a timestamp, and you must spot what is wrong. This review brings no new facts: it makes you pull the six JDK 8 lessons out of memory, in mixed order, which is what makes them stick.</div>
+
+<div class="win"><b>Today's win:</b> score at least 10 of 12 on the mixed quiz, find the three bugs in the mixed task, and give all three 60-second answers out loud.</div>
+
+<dl class="words">
+  <dt>retrieval practice</dt><dd>Pulling an answer out of memory instead of re-reading. It feels harder, and that is why it works.</dd>
+  <dt>interleaving</dt><dd>Mixing questions from several topics, so you must first recognise <em>which</em> idea applies.</dd>
+  <dt>lambda</dt><dd>A short nameless function passed as a value (<a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a>).</dd>
+  <dt>pipeline</dt><dd>Source, intermediate operations, one terminal operation (<a href="0004-streams-and-optional.html">lesson 0004</a>).</dd>
+  <dt>stage</dt><dd>One step of a <code>CompletableFuture</code> chain (<a href="0010-completablefuture.html">lesson 0010</a>).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking anything up, say out loud one sentence for each lesson: 0008 lambdas, 0009 default methods, 0004 streams and Optional, 0022 collectors, 0011 java.time, 0010 CompletableFuture. Note which ones felt empty: those are the lessons to re-read after the quiz.</p>
+
+<h2>1. How the six lessons connect</h2>
+<p>These lessons are not six separate tools. Lambdas are the glue: streams, collectors and <code>CompletableFuture</code> all take lambdas as their steps. Default methods are how the JDK could add <code>stream()</code> to existing collection interfaces. <code>java.time</code> stands a little apart: it is about picking the right <em>value</em> type, not about passing behaviour.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Concept map. Lambdas (0008) feed streams (0004) and CompletableFuture (0010). Default methods (0009) let Collection get stream(). Streams end in collect, which leads to Collectors (0022). java.time (0011) stands apart: immutable value types.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="24" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="45" text-anchor="middle">0009 default methods</text>
+    <text x="120" y="63" text-anchor="middle" font-size="11" opacity=".75">interfaces can evolve</text>
+    <rect x="240" y="24" width="200" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="45" text-anchor="middle" fill="var(--accent)">0008 lambdas</text>
+    <text x="340" y="63" text-anchor="middle" font-size="11">behaviour as a value</text>
+    <rect x="460" y="24" width="200" height="50" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="560" y="45" text-anchor="middle">0011 java.time</text>
+    <text x="560" y="63" text-anchor="middle" font-size="11" opacity=".75">immutable value types</text>
+    <rect x="20" y="160" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="181" text-anchor="middle">0004 streams, Optional</text>
+    <text x="120" y="199" text-anchor="middle" font-size="11" opacity=".75">lazy, single-use</text>
+    <rect x="250" y="160" width="180" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="181" text-anchor="middle">0022 collectors</text>
+    <text x="340" y="199" text-anchor="middle" font-size="11" opacity=".75">group, partition, toMap</text>
+    <rect x="460" y="160" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="560" y="181" text-anchor="middle">0010 CompletableFuture</text>
+    <text x="560" y="199" text-anchor="middle" font-size="11" opacity=".75">async chain of stages</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M120 74v80M115 148l5 6 5-6"/>
+      <path d="M220 185h24M238 180l6 5-6 5"/>
+    </g>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M300 74L150 156M156 150l-6 6 9 0"/>
+      <path d="M380 74L530 156M524 150l6 6-9 0"/>
+    </g>
+    <text x="72" y="120" text-anchor="middle" font-size="10">Collection</text>
+    <text x="72" y="133" text-anchor="middle" font-size="10">.stream()</text>
+    <text x="232" y="110" text-anchor="middle" font-size="10" fill="var(--accent)">filter, map</text>
+    <text x="452" y="110" text-anchor="middle" font-size="10" fill="var(--accent)">thenApply, ...</text>
+    <text x="235" y="230" text-anchor="middle" font-size="10">collect(...)</text>
+  </g>
+</svg>
+<figcaption>Lambdas power three of the other lessons. If lambdas feel shaky, start your re-reading at lesson 0008.</figcaption>
+</figure>
+
+<h2>2. Mixed quiz</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>List.of(1, 2, 3).stream().peek(System.out::println).map(x -&gt; x * 2);</code> What is printed?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nothing at all</button>
+    <button class="opt">1, 2 and 3</button>
+    <button class="opt">2, 4 and 6</button>
+    <button class="opt">Only the first, 1</button>
+  </div>
+  <div class="why">No terminal operation, so the lazy pipeline never runs. See <a href="0004-streams-and-optional.html">lesson 0004</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Collectors.toMap(Emp::salary, Emp::name)</code> meets two employees with salary 4800. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>IllegalStateException</button>
+    <button class="opt">The first name is kept</button>
+    <button class="opt">The last name is kept</button>
+    <button class="opt">Both names are joined</button>
+  </div>
+  <div class="why">Duplicate keys throw unless you pass a merge function as the third argument. See <a href="0022-collectors-groupingby-tomap.html">lesson 0022</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which threads run <code>CompletableFuture.supplyAsync(task)</code> when no executor is given?</p>
+  <div class="options">
+    <button class="opt" data-correct>ForkJoinPool.commonPool()</button>
+    <button class="opt">The thread that called it</button>
+    <button class="opt">A brand-new thread each time</button>
+    <button class="opt">A virtual thread per task</button>
+  </div>
+  <div class="why">Async methods without an Executor use the common pool (unless its parallelism is below two). See <a href="0010-completablefuture.html">lesson 0010</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A lambda reads the local variable <code>total</code>; later in the same method <code>total = 0;</code> runs. Result?</p>
+  <div class="options">
+    <button class="opt" data-correct>It does not compile</button>
+    <button class="opt">It throws at runtime</button>
+    <button class="opt">The lambda sees 0</button>
+    <button class="opt">The lambda sees the old value</button>
+  </div>
+  <div class="why">Captured locals must be final or effectively final. See <a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which type should hold "when this payment was received", stored and sent between services?</p>
+  <div class="options">
+    <button class="opt" data-correct>Instant</button>
+    <button class="opt">LocalDateTime</button>
+    <button class="opt">LocalDate</button>
+    <button class="opt">Duration</button>
+  </div>
+  <div class="why">An event timestamp is a point on the timeline: <code>Instant</code>, in UTC. <code>LocalDateTime</code> has no zone. See <a href="0011-java-time.html">lesson 0011</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Robot extends Base implements Walker</code>; <code>Base.move()</code> returns "base", <code>Walker</code> has a default <code>move()</code> returning "walk". Output?</p>
+  <div class="options">
+    <button class="opt" data-correct>base</button>
+    <button class="opt">walk</button>
+    <button class="opt">walk and base</button>
+    <button class="opt">A compile error</button>
+  </div>
+  <div class="why">Class wins: a method from the class or superclass beats an interface default. See <a href="0009-default-methods-and-conflicts.html">lesson 0009</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The fallback for an empty <code>Optional</code> needs a slow remote call. Which line?</p>
+  <div class="options">
+    <button class="opt" data-correct>opt.orElseGet(() -&gt; remote.load())</button>
+    <button class="opt">opt.orElse(remote.load())</button>
+    <button class="opt">opt.get() after remote.load()</button>
+    <button class="opt">opt.orElse(null) then remote.load()</button>
+  </div>
+  <div class="why"><code>orElse</code> evaluates its argument even when a value is present; <code>orElseGet</code> calls the supplier only when empty. See <a href="0004-streams-and-optional.html">lesson 0004</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A future failed with <code>IllegalStateException</code>. What does <code>get()</code> throw?</p>
+  <div class="options">
+    <button class="opt" data-correct>A checked ExecutionException wrapping it</button>
+    <button class="opt">An unchecked CompletionException wrapping it</button>
+    <button class="opt">The IllegalStateException itself, unwrapped</button>
+    <button class="opt">Nothing: get() returns null when it failed</button>
+  </div>
+  <div class="why"><code>get()</code> throws the checked <code>ExecutionException</code>; <code>join()</code> the unchecked <code>CompletionException</code>. See <a href="0010-completablefuture.html">lesson 0010</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You split users by <code>u -&gt; u.isActive()</code> and must always get both a true and a false entry. Which collector?</p>
+  <div class="options">
+    <button class="opt" data-correct>partitioningBy</button>
+    <button class="opt">groupingBy</button>
+    <button class="opt">toMap</button>
+    <button class="opt">joining</button>
+  </div>
+  <div class="why"><code>partitioningBy</code>'s map always contains both <code>false</code> and <code>true</code> keys. See <a href="0022-collectors-groupingby-tomap.html">lesson 0022</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">At 18:00 the evening before a one-hour DST gap, you add <code>Period.ofDays(1)</code> to a <code>ZonedDateTime</code>. Local time?</p>
+  <div class="options">
+    <button class="opt" data-correct>18:00 the next day</button>
+    <button class="opt">19:00 the next day</button>
+    <button class="opt">17:00 the next day</button>
+    <button class="opt">It throws an exception</button>
+  </div>
+  <div class="why">A Period adds a conceptual day and keeps the wall-clock time; a Duration of one day would give 19:00. See <a href="0011-java-time.html">lesson 0011</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>class Duck implements Walker, Swimmer {}</code>, both with a default <code>move()</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compile error until Duck overrides move()</button>
+    <button class="opt">Walker wins because it is listed first</button>
+    <button class="opt">Swimmer wins because it is listed last</button>
+    <button class="opt">Both run, and their results are joined</button>
+  </div>
+  <div class="why">Two inherited defaults with the same signature must be resolved by overriding, e.g. with <code>Walker.super.move()</code>. See <a href="0009-default-methods-and-conflicts.html">lesson 0009</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which method turns a failed <code>CompletableFuture</code> into a fallback value?</p>
+  <div class="options">
+    <button class="opt" data-correct>exceptionally</button>
+    <button class="opt">thenApply</button>
+    <button class="opt">thenCombine</button>
+    <button class="opt">allOf</button>
+  </div>
+  <div class="why"><code>exceptionally(fn)</code> runs only on exceptional completion and its result replaces the error; <code>thenApply</code> is skipped. See <a href="0010-completablefuture.html">lesson 0010</a>.</div>
+</div>
+
+<h2>3. Mixed task: find three bugs</h2>
+<p>This method builds a daily report. It compiles in the author's head, but not in reality, and it has two more problems. Find <strong>three</strong> bugs, each from a different lesson. Write your answer to the teacher before you open the solution.</p>
+<pre><code>Report buildReport(List&lt;Order&gt; orders) {
+  int paid = 0;
+  orders.stream().filter(Order::isPaid).forEach(o -&gt; paid++);           <span class="c">// (A)</span>
+
+  Map&lt;String, Order&gt; lastByCustomer = orders.stream()
+      .collect(Collectors.toMap(Order::customerId, o -&gt; o));              <span class="c">// (B)</span>
+
+  LocalDateTime generatedAt = LocalDateTime.now();                       <span class="c">// (C)</span>
+  return new Report(paid, lastByCustomer, generatedAt);
+}</code></pre>
+<details>
+<summary>Show the solution</summary>
+<ol class="steps">
+  <li><strong>(A) Lesson 0008.</strong> <code>paid++</code> inside a lambda changes a captured local, so <code>paid</code> is not effectively final: compile error. Also a side effect (lesson 0004). Fix: <code>long paid = orders.stream().filter(Order::isPaid).count();</code></li>
+  <li><strong>(B) Lesson 0022.</strong> A customer usually has several orders, so <code>toMap</code> sees duplicate keys and throws <code>IllegalStateException</code>. Fix: add a merge function, e.g. <code>(a, b) -&gt; b</code> to keep the later one (or <code>groupingBy</code> to keep all).</li>
+  <li><strong>(C) Lesson 0011.</strong> A report timestamp is a moment, but <code>LocalDateTime</code> has no zone, so it cannot represent an instant. Fix: <code>Instant generatedAt = Instant.now();</code> and convert to a zone only for display.</li>
+</ol>
+</details>
+
+<h2>4. The final test: say it in 60 seconds (three times)</h2>
+<div class="recall">
+  <p class="prompt">Recall 1. An interviewer shows <code>orders.stream().filter(o -&gt; o.total() &gt; 100).collect(groupingBy(Order::customerId, counting()))</code> and asks: <strong>"Walk me through what happens when this runs."</strong> Start a timer, answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> The lambda <code>o -&gt; o.total() &gt; 100</code> becomes a <code>Predicate&lt;Order&gt;</code>, a functional interface.</label></li>
+      <li><label><input type="checkbox"> <code>Order::customerId</code> is a method reference, a shorter lambda.</label></li>
+      <li><label><input type="checkbox"> <code>filter</code> is lazy; nothing runs until the terminal <code>collect</code>.</label></li>
+      <li><label><input type="checkbox"> Elements flow one by one through filter into the collector.</label></li>
+      <li><label><input type="checkbox"> <code>groupingBy</code> makes one bin per customer; <code>counting()</code> is the downstream collector.</label></li>
+      <li><label><input type="checkbox"> The map type isn't guaranteed; the stream can't be reused afterwards.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"The lambda in <code>filter</code> becomes a <code>Predicate&lt;Order&gt;</code>, because <code>filter</code> expects that functional interface, and <code>Order::customerId</code> is a method reference used as a <code>Function</code>. Building the pipeline does nothing yet: <code>filter</code> is a lazy intermediate operation. When <code>collect</code>, the terminal operation, runs, it pulls orders through one at a time. Orders over 100 reach the collector. <code>groupingBy</code> puts each one into a bin by customer ID, and the downstream <code>counting()</code> turns each bin into a count, so I get a map from customer to number of big orders. The docs don't promise which map type I get, so if I need ordering I'd pass a map factory. And after <code>collect</code> the stream is consumed; I can't reuse it."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 2. <strong>"How do you store and compute dates and times in a backend?"</strong> Start a timer, answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>java.time</code>, JDK 8+; types are immutable and thread-safe.</label></li>
+      <li><label><input type="checkbox"> <code>Instant</code> (UTC) for event timestamps; store and transmit that.</label></li>
+      <li><label><input type="checkbox"> <code>LocalDate</code> for zone-less dates such as birthdays.</label></li>
+      <li><label><input type="checkbox"> <code>ZonedDateTime</code> when a zone matters; convert only for display.</label></li>
+      <li><label><input type="checkbox"> <code>Duration</code> = exact seconds, <code>Period</code> = calendar units; they differ across DST.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"I use <code>java.time</code>. Every type is immutable, so <code>plusDays</code> gives me a new object and I must keep the result. For things that happened at a moment, like a payment, I use <code>Instant</code>, which is a point on the UTC timeline, and that is what I store and send. For a date with no zone, like a birthday, I use <code>LocalDate</code>. If the time belongs to a place, like a meeting at 9 in Tokyo, I keep a <code>ZonedDateTime</code> with the zone ID, and I convert instants to the user's zone only for display. For amounts of time I keep <code>Duration</code> and <code>Period</code> apart: a Duration of one day is always 24 hours, while a Period of one day keeps the wall-clock time, which matters on DST days."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 3. <strong>"You must call a user service and an order service and combine the results. How, and what can go wrong?"</strong> Start a timer, answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Start both with <code>supplyAsync</code> before waiting on either.</label></li>
+      <li><label><input type="checkbox"> Combine with <code>thenCombine</code> (or <code>allOf</code> for many).</label></li>
+      <li><label><input type="checkbox"> Pass my own executor for blocking I/O, not the common pool.</label></li>
+      <li><label><input type="checkbox"> Handle errors with <code>exceptionally</code> / <code>handle</code>; add <code>orTimeout</code> (JDK 9+).</label></li>
+      <li><label><input type="checkbox"> <code>join</code> throws <code>CompletionException</code>, <code>get</code> <code>ExecutionException</code>; <code>cancel</code> doesn't stop running work.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"I'd start both calls with <code>supplyAsync</code> first, so they run at the same time; if I called <code>join</code> after each one, they would run one after the other. Then I combine them with <code>thenCombine</code>, which runs my lambda when both are done. These are blocking HTTP calls, so I pass my own executor instead of using the shared common pool, or on Java 21 virtual threads. Things that can go wrong: a call fails, so I add <code>exceptionally</code> or <code>handle</code> for a fallback; a call hangs, so I add <code>orTimeout</code>. When I finally wait, <code>join</code> wraps errors in an unchecked <code>CompletionException</code> and <code>get</code> in a checked <code>ExecutionException</code>. And cancelling the future doesn't stop the running call, so the timeout on the HTTP client itself still matters."</em></p>
+  </div>
+</div>
+
+<h2>5. Where to go back</h2>
+<table>
+<tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+<tr><td>lambdas, functional interfaces, method references, effectively final</td><td><a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a></td></tr>
+<tr><td>default methods, "class wins", <code>X.super.m()</code></td><td><a href="0009-default-methods-and-conflicts.html">lesson 0009</a></td></tr>
+<tr><td>laziness, single use, side effects, <code>orElse</code> vs <code>orElseGet</code></td><td><a href="0004-streams-and-optional.html">lesson 0004</a></td></tr>
+<tr><td><code>groupingBy</code>, <code>partitioningBy</code>, <code>toMap</code> duplicates</td><td><a href="0022-collectors-groupingby-tomap.html">lesson 0022</a></td></tr>
+<tr><td><code>Instant</code> vs <code>LocalDateTime</code>, <code>Duration</code> vs <code>Period</code></td><td><a href="0011-java-time.html">lesson 0011</a></td></tr>
+<tr><td>common pool, <code>join</code> vs <code>get</code>, <code>exceptionally</code>, timeouts</td><td><a href="0010-completablefuture.html">lesson 0010</a></td></tr>
+</table>
+
+<h2>What's next</h2>
+<p>Recall 3 ended with a question a senior interviewer will ask next: <em>"Why is the main thread guaranteed to see the value the worker wrote?"</em> That is the Java memory model: <a href="0005-visibility-and-happens-before.html">lesson 0005, visibility and happens-before</a>.</p>
+<p><strong>Read more:</strong> the primary sources of this section: <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda Expressions tutorial</a>, <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> and the <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Give me five more mixed questions"</em> or <em>"Please check my three 60-second answers"</em> (type what you said). Please also tell me your quiz score, which bugs you found and your checklist scores: they help me choose your next lesson.</div>
+
+<p><a href="0010-completablefuture.html">← CompletableFuture: a chain of steps that runs on other threads</a> &nbsp;|&nbsp; <a href="0005-visibility-and-happens-before.html">Why one thread may not see another thread&#x27;s write →</a></p>
+
+<footer>
+  <p>Facts checked against the source lessons 0008, 0009, 0004, 0022, 0011 and 0010 (Oracle Java Tutorials, the Java Language Specification and the Java 21 documentation), October 2026. This review adds no new facts.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a> · <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Collectors Javadoc</a> · <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Date-Time tutorial</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình Kubernetes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kubernetes: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình Kubernetes · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="kubernetes" data-total="15">15 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Từ Pod đến StatefulSet: Service, cấu hình, probe, rollout, storage, autoscaling. 15 bài theo thứ tự nên đọc, học xong bài nào thì đánh dấu bài đó (chỉ lưu trong trình duyệt này). Thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<p>Mọi manifest trong <code>examples/</code> đều đã được apply lên một cluster kind dùng xong bỏ (Kubernetes v1.37.0) trong lúc viết; các output trong bài lấy từ chính những lần chạy đó.</p><h2>Foundation</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0001-cluster-components"><a href="lessons/0001-cluster-components.vi.html">Các thành phần của cluster: ai làm việc gì</a></li>
+<li data-id="0002-pods"><a href="lessons/0002-pods.vi.html">Pod: đơn vị deploy nhỏ nhất</a></li>
+<li data-id="0008-namespaces"><a href="lessons/0008-namespaces.vi.html">Namespace: cô lập các nhóm tài nguyên</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0003-deployments-and-labels"><a href="lessons/0003-deployments-and-labels.vi.html">Deployment, ReplicaSet và label</a></li>
+<li data-id="0004-services"><a href="lessons/0004-services.vi.html">Service: địa chỉ ổn định cho các Pod luôn thay đổi</a></li>
+<li data-id="0009-configmaps"><a href="lessons/0009-configmaps.vi.html">ConfigMap: cấu hình nằm ngoài image</a></li>
+<li data-id="0010-secrets"><a href="lessons/0010-secrets.vi.html">Secret: bảo vệ được gì và không bảo vệ được gì</a></li>
+<li data-id="0011-jobs-and-cronjobs"><a href="lessons/0011-jobs-and-cronjobs.vi.html">Job và CronJob</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0005-requests-limits-and-the-jvm"><a href="lessons/0005-requests-limits-and-the-jvm.vi.html">Request, limit và JVM</a></li>
+<li data-id="0006-probes"><a href="lessons/0006-probes.vi.html">Liveness, readiness và startup probe</a></li>
+<li data-id="0007-rolling-updates-and-rollbacks"><a href="lessons/0007-rolling-updates-and-rollbacks.vi.html">Rolling update và rollback</a></li>
+<li data-id="0012-persistent-volumes-and-claims"><a href="lessons/0012-persistent-volumes-and-claims.vi.html">PersistentVolume, claim và StorageClass</a></li>
+<li data-id="0013-statefulsets"><a href="lessons/0013-statefulsets.vi.html">StatefulSet: định danh và storage ổn định</a></li>
+<li data-id="0014-ingress"><a href="lessons/0014-ingress.vi.html">Ingress: định tuyến HTTP vào cluster</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="kubernetes">
+<li data-id="0015-horizontal-pod-autoscaler"><a href="lessons/0015-horizontal-pod-autoscaler.vi.html">Horizontal Pod Autoscaler</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>RBAC và service account <span class="meta">(dự kiến)</span></li>
+<li>NetworkPolicy <span class="meta">(dự kiến)</span></li>
+<li>DaemonSet <span class="meta">(dự kiến)</span></li>
+<li>Helm và Kustomize <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> để thêm, sắp xếp lại hoặc bỏ qua bài, hoặc để chạy một buổi phỏng vấn thử từ <a href="interview.vi.html">trang Hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

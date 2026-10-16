@@ -1,5 +1,7 @@
 # Exercise 0006: two sessions
 
+[Tiếng Việt](0006-two-sessions.vi.md)
+
 Companion to [lesson 6](../lessons/0006-mvcc-and-isolation-levels.html).
 
 1. Run `./06-isolation.sh`. Read the script and explain each line of output.

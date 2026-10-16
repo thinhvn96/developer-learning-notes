@@ -1,5 +1,7 @@
 # Exercise 0001: inspect layers
 
+[Tiếng Việt](0001-inspect-layers.vi.md)
+
 Companion to [lesson 1](../lessons/0001-containers-images-layers.html).
 
 1. Run `docker pull eclipse-temurin:21-jre` then `docker history eclipse-temurin:21-jre`. How many layers? Which is largest?

@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 46: Review 7: what JDK 17 and 21 added</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 7: what JDK 17 and 21 added</h1>
+<p class="subtitle">Nine lessons, one timeline: the language features you write every day since 17, and the four big changes of 21.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0046 · step 46 of 46 · Review · ~30 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0046-review-jdk17-21.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Interviewers love <em>"What changed in Java since 8?"</em> and <em>"Why would we upgrade to 21?"</em> The answers jump between versions and topics: a record, then a virtual thread, then a GC flag. This review mixes lessons <a href="0012-var-and-text-blocks.html">0012</a>, <a href="0013-switch-expressions-and-instanceof-patterns.html">0013</a>, <a href="0003-records-and-immutability.html">0003</a>, <a href="0014-sealed-classes.html">0014</a>, <a href="0027-helpful-nullpointerexceptions.html">0027</a>, <a href="0015-pattern-matching-switch-and-record-patterns.html">0015</a>, <a href="0016-sequenced-collections.html">0016</a>, <a href="0006-virtual-threads.html">0006</a> and <a href="0017-generational-zgc.html">0017</a> the same way. There are no new facts here.</div>
+
+<div class="win"><b>Today's win:</b> answer 11 or more of the 13 mixed questions, find the three bugs in the mixed task, and say all three 60-second answers with at least 5 checklist points each.</div>
+
+<dl class="words">
+  <dt>LTS</dt><dd>"Long-term support": a release that vendors keep patching for years. JDK 8, 17 and 21 are the ones companies run in production.</dd>
+  <dt>final (feature)</dt><dd>A feature that is finished and permanent in a release, not a "preview" you must switch on.</dd>
+  <dt>record</dt><dd>A class that is just a carrier of values; Java writes the constructor, accessors, <code>equals</code>, <code>hashCode</code> and <code>toString</code> (lesson 0003).</dd>
+  <dt>sealed type</dt><dd>A class or interface that lists every allowed subtype with <code>permits</code> (lesson 0014).</dd>
+  <dt>pattern</dt><dd>A test in <code>instanceof</code> or <code>case</code> that checks a shape and names the parts, like <code>String s</code> or <code>Point(int x, int y)</code>.</dd>
+  <dt>virtual thread</dt><dd>A cheap Java thread that borrows a real OS thread only while it runs code (lesson 0006).</dd>
+  <dt>generation</dt><dd>A part of the heap for young or old objects; generational ZGC keeps them apart (lesson 0017).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking back, name <strong>one feature per release</strong>: 10, 14, 15, 16, 17 and 21. Then write down how sure you are (0 to 100%). At the end, compare with your score: the gap between "sure" and "right" is what a review fixes.</p>
+
+<h2>1. One timeline for everything</h2>
+<p>Think of a house that was renovated room by room. If you only visit on the opening days, you miss the work in between. Companies jump from one LTS to the next (8, then 17, then 21), so "JDK 17" means <em>every</em> feature finalized up to 17, not only what 17 itself added (lesson 0013).</p>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Timeline: JDK 10 var; JDK 14 switch expressions and helpful NullPointerExceptions; JDK 15 text blocks and production ZGC; JDK 16 records and instanceof patterns; JDK 17 sealed classes; JDK 21 pattern matching for switch, record patterns, sequenced collections, virtual threads and generational ZGC. Everything from 10 to 17 is included in JDK 17.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <path d="M30 80h620" stroke="currentColor" fill="none"/>
+    <g stroke="currentColor"><path d="M40 74v12M120 74v12M215 74v12M300 74v12M385 74v12"/></g>
+    <g stroke="var(--accent)" stroke-width="2"><path d="M470 70v20M600 70v20"/></g>
+    <path d="M120 44v-8h350v8" fill="none" stroke="var(--accent)"/>
+    <text x="295" y="28" text-anchor="middle" font-size="11" fill="var(--accent)">all of this is in JDK 17</text>
+    <g text-anchor="middle">
+      <text x="40" y="66">8</text>
+      <text x="120" y="66">10</text>
+      <text x="215" y="66">14</text>
+      <text x="300" y="66">15</text>
+      <text x="385" y="66">16</text>
+      <text x="470" y="62" fill="var(--accent)">17 LTS</text>
+      <text x="600" y="62" fill="var(--accent)">21 LTS</text>
+    </g>
+    <g text-anchor="middle" font-size="10">
+      <text x="40" y="104" opacity=".6">LTS</text>
+      <text x="120" y="104">var</text>
+      <text x="215" y="104">switch expr</text>
+      <text x="215" y="119">helpful NPE</text>
+      <text x="300" y="104">text blocks</text>
+      <text x="300" y="119">ZGC product</text>
+      <text x="385" y="104">records</text>
+      <text x="385" y="119">instanceof</text>
+      <text x="470" y="104">sealed</text>
+    </g>
+    <g text-anchor="middle" font-size="10" fill="var(--accent)">
+      <text x="600" y="104">pattern switch</text>
+      <text x="600" y="119">record patterns</text>
+      <text x="600" y="134">sequenced coll.</text>
+      <text x="600" y="149">virtual threads</text>
+      <text x="600" y="164">generational ZGC</text>
+    </g>
+    <text x="340" y="196" text-anchor="middle" font-size="11" opacity=".8">the release where each feature became final</text>
+  </g>
+</svg>
+<figcaption>JDK 17 collects five releases of language work; JDK 21 adds four big pieces on top.</figcaption>
+</figure>
+
+<p>Quick map of the nine lessons:</p>
+<table>
+<tr><th>Feature</th><th>Final in</th><th>One line to remember</th><th>Lesson</th></tr>
+<tr><td><code>var</code></td><td>10</td><td>locals with an initializer only; still statically typed</td><td><a href="0012-var-and-text-blocks.html">0012</a></td></tr>
+<tr><td>text blocks</td><td>15</td><td><code>"""</code> + newline; shared indentation stripped</td><td><a href="0012-var-and-text-blocks.html">0012</a></td></tr>
+<tr><td>switch expressions</td><td>14</td><td><code>-&gt;</code> never falls through; <code>yield</code> returns from a block; exhaustive</td><td><a href="0013-switch-expressions-and-instanceof-patterns.html">0013</a></td></tr>
+<tr><td><code>instanceof</code> patterns</td><td>16</td><td>test and cast in one step; variable in scope where it definitely matched</td><td><a href="0013-switch-expressions-and-instanceof-patterns.html">0013</a></td></tr>
+<tr><td>records</td><td>16</td><td>equals/hashCode from all components; <em>shallowly</em> immutable</td><td><a href="0003-records-and-immutability.html">0003</a></td></tr>
+<tr><td>sealed classes</td><td>17</td><td><code>permits</code>; each subtype is final, sealed or non-sealed</td><td><a href="0014-sealed-classes.html">0014</a></td></tr>
+<tr><td>helpful NPEs</td><td>14</td><td>the message names what was null; no flag needed on 21</td><td><a href="0027-helpful-nullpointerexceptions.html">0027</a></td></tr>
+<tr><td>pattern switch, record patterns</td><td>21</td><td>type and record patterns in <code>case</code>, <code>when</code>, <code>case null</code>, no default on sealed</td><td><a href="0015-pattern-matching-switch-and-record-patterns.html">0015</a></td></tr>
+<tr><td>sequenced collections</td><td>21</td><td><code>getFirst</code>, <code>getLast</code>, <code>reversed()</code> view</td><td><a href="0016-sequenced-collections.html">0016</a></td></tr>
+<tr><td>virtual threads</td><td>21</td><td>scale, not speed; never pool; Semaphore to limit</td><td><a href="0006-virtual-threads.html">0006</a></td></tr>
+<tr><td>generational ZGC</td><td>21</td><td><code>-XX:+UseZGC -XX:+ZGenerational</code>; young dies young</td><td><a href="0017-generational-zgc.html">0017</a></td></tr>
+</table>
+
+<h2>2. The modelling trio: record + sealed + pattern switch</h2>
+<p>Three lessons are really one idea. A <strong>record</strong> says <em>what data</em> a variant holds. A <strong>sealed</strong> interface says <em>which variants</em> exist. A <strong>pattern switch</strong> handles each variant, and the compiler checks you covered them all. Think of a menu with a fixed list of dishes, each with its own recipe card: the kitchen can check that every dish has a cook.</p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="A sealed interface Shape permits two records, Circle and Rect. A switch over Shape has one case per record and no default, because the compiler knows the complete list from permits.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="150" y="20" width="380" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="43" text-anchor="middle" fill="var(--accent)">sealed interface Shape permits Circle, Rect</text>
+    <text x="545" y="43" font-size="10" opacity=".7">0014</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="40" y="94" width="270" height="36" rx="6"/>
+      <rect x="370" y="94" width="270" height="36" rx="6"/>
+      <path d="M260 56L175 94M420 56L505 94"/>
+    </g>
+    <text x="175" y="117" text-anchor="middle">record Circle(Point c, double r)</text>
+    <text x="505" y="117" text-anchor="middle">record Rect(Point a, Point b)</text>
+    <text x="340" y="84" text-anchor="middle" font-size="10" opacity=".7">permits · records are final · 0003</text>
+    <rect x="40" y="166" width="600" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <g fill="none" stroke="currentColor"><path d="M175 130v30M170 154l5 6 5-6M505 130v30M500 154l5 6 5-6"/></g>
+    <text x="56" y="188" style="white-space:pre">switch (s) {  case Circle(var c, var r) -&gt; ...</text>
+    <text x="56" y="208" style="white-space:pre">              case Rect(var a, var b)   -&gt; ...  }</text>
+    <text x="630" y="198" text-anchor="end" font-size="11" fill="var(--accent)">no default · 0015</text>
+  </g>
+</svg>
+<figcaption>Sealed lists the variants, records hold the data, the pattern switch handles each one. Add a third record and every switch without <code>default</code> stops compiling.</figcaption>
+</figure>
+
+<p>Old way next to new way, for the same job:</p>
+<pre><code><span class="c">// JDK 8: open class hierarchy, test and cast, a default "just in case"</span>
+if (s instanceof Circle) { Circle c = (Circle) s; return Math.PI * c.r() * c.r(); }
+else if (s instanceof Rect) { Rect r = (Rect) s; return ...; }
+else throw new IllegalStateException("unknown shape");
+
+<span class="c">// JDK 17: sealed + records + instanceof patterns</span>
+<span class="c">//         (switching on types is not allowed yet)</span>
+if (s instanceof Circle c) return Math.PI * c.r() * c.r();
+
+<span class="c">// JDK 21: pattern switch, exhaustive, no default</span>
+return switch (s) {
+    case Circle(var c, var r) -&gt; Math.PI * r * r;
+    case Rect(var a, var b)   -&gt; ...;
+};</code></pre>
+<p>Two traps tie the lessons together. A record is only <em>shallowly</em> immutable, so a <code>List</code> component needs <code>List.copyOf</code> in a compact constructor (0003). And a <code>switch</code> without <code>case null</code> still throws <code>NullPointerException</code>; on 17 and 21 its message tells you which expression was null (0015, 0027).</p>
+
+<h2>3. The runtime pair: virtual threads and generational ZGC</h2>
+<p>The other two JDK 21 changes don't change your syntax; they change how the JVM runs your code. Both answer the same interview theme: <em>throughput and latency</em>.</p>
+<table>
+<tr><th></th><th>Virtual threads (0006)</th><th>Generational ZGC (0017)</th></tr>
+<tr><td>Improves</td><td>throughput of blocking, I/O-heavy code</td><td>GC overhead and allocation stalls, with pauses under 1 ms</td></tr>
+<tr><td>How</td><td>unmount from the carrier while blocked</td><td>collect the young generation often; most objects die young</td></tr>
+<tr><td>Turn on (JDK 21)</td><td><code>Executors.newVirtualThreadPerTaskExecutor()</code></td><td><code>-XX:+UseZGC -XX:+ZGenerational</code></td></tr>
+<tr><td>Does not help</td><td>CPU-bound work: not faster threads</td><td>small heaps with no headroom; pure batch throughput</td></tr>
+<tr><td>Trap</td><td>pooling them; long I/O inside <code>synchronized</code> pins the carrier</td><td><code>-XX:+UseZGC</code> alone is the non-generational mode on 21</td></tr>
+</table>
+
+<h2>4. Mixed task: find the three bugs</h2>
+<p>Read this JDK 21 code like a reviewer. There are three bugs, each from a different lesson. Find them, name the lesson, and say the fix <em>before</em> opening the answer.</p>
+<pre><code>sealed interface Payment permits Card, Transfer {}
+
+<span class="c">// (A) a card is a value object: nobody may change it after creation</span>
+record Card(String number, List&lt;String&gt; tags) implements Payment {}
+record Transfer(String iban) implements Payment {}
+
+<span class="c">// (B) label every payment</span>
+static String label(Payment p) {
+    return switch (p) {
+        case Payment x  -&gt; "payment";
+        case Card c     -&gt; "card " + c.number();
+        case Transfer t -&gt; "transfer " + t.iban();
+    };
+}
+
+<span class="c">// (C) the bank API allows at most 10 calls at once</span>
+ExecutorService calls = Executors.newFixedThreadPool(10, Thread.ofVirtual().factory());</code></pre>
+<details class="qa">
+<summary>Show the three bugs</summary>
+<div class="ans">
+<p><strong>(B) Lesson 0015.</strong> Cases are tried top to bottom, and <code>case Payment x</code> matches everything, so the next cases are dominated. It does not even compile; I checked on JDK 21: "this case label is dominated by a preceding case label". Fix: delete the general case. Because <code>Payment</code> is sealed, <code>Card</code> and <code>Transfer</code> already cover it, with no default.</p>
+<p><strong>(A) Lesson 0003.</strong> A record is only shallowly immutable. The caller still holds the <code>tags</code> list and can add to it, and the card "changes". Fix: a compact constructor <code>Card { tags = List.copyOf(tags); }</code>.</p>
+<p><strong>(C) Lesson 0006.</strong> That is a pool of virtual threads, used to limit concurrency. "Never pool virtual threads"; limit with a <code>Semaphore</code> instead: <code>new Semaphore(10)</code>, <code>acquire()</code> before the call, <code>release()</code> in <code>finally</code>, and run each task on <code>newVirtualThreadPerTaskExecutor()</code>.</p>
+</div>
+</details>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Where is <code>var</code> NOT allowed?</p>
+  <div class="options">
+    <button class="opt" data-correct>As a method parameter type</button>
+    <button class="opt">For a local with an initializer</button>
+    <button class="opt">For the index of a for loop</button>
+    <button class="opt">For a local in a lambda body</button>
+  </div>
+  <div class="why"><code>var</code> is only for local variables with an initializer and loop indexes; not parameters, fields, return types or catch parameters. See lesson 0012.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A <code>switch</code> on a sealed <code>Shape</code> has a case for every permitted record. On JDK 21, do you need <code>default</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No; the compiler knows the full list from permits</button>
+    <button class="opt">Yes; every switch on an object must have a default</button>
+    <button class="opt">Only if the records have more than one component</button>
+    <button class="opt">Only if the switch is a statement, not an expression</button>
+  </div>
+  <div class="why">Pattern switches must be exhaustive, and for sealed types the check uses the <code>permits</code> clause. See lessons 0015 and 0014.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>record Team(String name, List&lt;String&gt; members)</code>. The caller keeps the list it passed in and adds a name. What does the team see?</p>
+  <div class="options">
+    <button class="opt" data-correct>The new name, because records are only shallowly immutable</button>
+    <button class="opt">Nothing new, because record fields are private and final</button>
+    <button class="opt">An exception, because records forbid mutable components</button>
+    <button class="opt">Nothing new, because records copy their components</button>
+  </div>
+  <div class="why">The field is final, but it points to the same mutable list. Fix with <code>List.copyOf</code> in a compact constructor. See lesson 0003.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Your service runs 10,000 blocking HTTP calls on virtual threads, but the partner allows only 20 at once. What do you add?</p>
+  <div class="options">
+    <button class="opt" data-correct>A Semaphore with 20 permits</button>
+    <button class="opt">A fixed pool of 20 virtual threads</button>
+    <button class="opt">A synchronized block around the call</button>
+    <button class="opt">A switch to -XX:+ZGenerational</button>
+  </div>
+  <div class="why">Never pool virtual threads; limit concurrency with a <code>Semaphore</code>. A <code>synchronized</code> block would allow only one call and pin the carrier on 21. See lesson 0006.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which keyword reopens one branch of a sealed hierarchy so anyone may extend it?</p>
+  <div class="options">
+    <button class="opt" data-correct>non-sealed</button>
+    <button class="opt">permits</button>
+    <button class="opt">final</button>
+    <button class="opt">open</button>
+  </div>
+  <div class="why">Each permitted subtype must be <code>final</code>, <code>sealed</code> or <code>non-sealed</code>; <code>non-sealed</code> opens that branch again. See lesson 0014.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You start a JDK 21 service with <code>-XX:+UseZGC</code> only. Which collector runs?</p>
+  <div class="options">
+    <button class="opt" data-correct>Non-generational ZGC</button>
+    <button class="opt">Generational ZGC</button>
+    <button class="opt">G1, the default collector</button>
+    <button class="opt">The Serial collector</button>
+  </div>
+  <div class="why">On JDK 21 you need <code>-XX:+UseZGC -XX:+ZGenerational</code> for the generational mode. See lesson 0017.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does an arrow label <code>case 6, 7 -&gt; "weekend";</code> do after it runs?</p>
+  <div class="options">
+    <button class="opt" data-correct>It stops; arrow labels never fall through</button>
+    <button class="opt">It falls through to the next case label</button>
+    <button class="opt">It needs a break, or the next case runs</button>
+    <button class="opt">It returns only if you also write yield</button>
+  </div>
+  <div class="why">With <code>-&gt;</code> only the code to the right runs. <code>yield</code> is for returning a value from a block. See lesson 0013.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>rev = list.reversed()</code> on <code>[1, 2, 3]</code>, then <code>list.add(4)</code>. What is <code>rev</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>[4, 3, 2, 1]</button>
+    <button class="opt">[3, 2, 1]</button>
+    <button class="opt">[1, 2, 3, 4]</button>
+    <button class="opt">[3, 2, 1, 4]</button>
+  </div>
+  <div class="why"><code>reversed()</code> returns a view, not a copy, so it sees the new element. See lesson 0016.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">On JDK 21 you see <code>Cannot invoke "String.trim()" because "&lt;local2&gt;[0]" is null</code>. Why <code>&lt;local2&gt;</code> and not the variable name?</p>
+  <div class="options">
+    <button class="opt" data-correct>The class was compiled without debug info (-g)</button>
+    <button class="opt">Helpful NPE messages are switched off by default</button>
+    <button class="opt">Local variables can never be named by the JVM</button>
+    <button class="opt">The array was created on a different thread</button>
+  </div>
+  <div class="why">Local names need debug info; with <code>javac -g</code> the message reads <code>"names[0]"</code>. The messages themselves need no flag on 21. See lesson 0027.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which task gains the most from virtual threads?</p>
+  <div class="options">
+    <button class="opt" data-correct>A server where each request waits on a database</button>
+    <button class="opt">A job that resizes thousands of images in memory</button>
+    <button class="opt">A loop that computes prime numbers up to a billion</button>
+    <button class="opt">A program that sorts one very large array once</button>
+  </div>
+  <div class="why">Virtual threads give scale for blocking work, not speed for CPU work. See lesson 0006.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The selector of a JDK 21 <code>switch</code> is <code>null</code>; the switch has <code>default</code> but no <code>case null</code>. Result?</p>
+  <div class="options">
+    <button class="opt" data-correct>NullPointerException</button>
+    <button class="opt">The default branch runs</button>
+    <button class="opt">The switch is skipped</button>
+    <button class="opt">A compile-time error</button>
+  </div>
+  <div class="why">Without <code>case null</code> the switch throws NPE "as before"; <code>default</code> does not catch null. See lesson 0015.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">After <code>if (!(obj instanceof String s)) return;</code>, can you use <code>s</code> on the next line?</p>
+  <div class="options">
+    <button class="opt" data-correct>Yes; the match is certain there, so s is in scope</button>
+    <button class="opt">No; s exists only inside the if statement</button>
+    <button class="opt">No; a negated pattern never declares s at all</button>
+    <button class="opt">Yes, but only after an explicit cast to String</button>
+  </div>
+  <div class="why">Flow scoping: a pattern variable is in scope where it has definitely matched, including after a negated early return. See lesson 0013.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does generational ZGC collect the young generation more often?</p>
+  <div class="options">
+    <button class="opt" data-correct>Most objects die young, so that frees the most memory</button>
+    <button class="opt">Young objects are bigger, so they fill the heap first</button>
+    <button class="opt">The old generation cannot be collected while running</button>
+    <button class="opt">Young objects are never pointed to by old objects</button>
+  </div>
+  <div class="why">The weak generational hypothesis: young objects tend to die young. Old-to-young pointers exist; the remembered set tracks them. See lesson 0017.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">Recall 1. An interviewer asks: <strong>"What changed in Java between 8 and 17 that you use every day?"</strong> Start a timer. Answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>var</code> (10): local type inference, still statically typed, locals only.</label></li>
+      <li><label><input type="checkbox"> Text blocks (15): multi-line strings without escaping quotes.</label></li>
+      <li><label><input type="checkbox"> Switch expressions (14): arrows without fall-through, <code>yield</code>, exhaustive.</label></li>
+      <li><label><input type="checkbox"> <code>instanceof</code> patterns (16): test and cast in one step.</label></li>
+      <li><label><input type="checkbox"> Records (16): generated equals/hashCode/toString; shallowly immutable.</label></li>
+      <li><label><input type="checkbox"> Sealed classes (17): a closed set of subtypes with <code>permits</code>.</label></li>
+      <li><label><input type="checkbox"> Helpful NPE messages (14) that name what was null.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Moving from 8 to 17 mostly changed how much code I write. I use <code>var</code> for locals when the right side makes the type obvious; it's still static typing. Text blocks let me paste JSON or SQL without escaping. Switch became an expression with arrow labels, so no more forgotten <code>break</code>, and it must be exhaustive. <code>instanceof</code> now tests and casts in one step. Records replaced most of my DTO boilerplate, with equals and hashCode from all components, but they're only shallowly immutable, so I copy lists in the compact constructor. Sealed classes let me close a hierarchy with <code>permits</code>. And in production, NullPointerExceptions now say exactly which expression was null, which saves a lot of debugging time."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 2. An interviewer asks: <strong>"How do records, sealed types and pattern matching work together in Java 21?"</strong> Start a timer. Answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Sealed interface lists the variants with <code>permits</code>.</label></li>
+      <li><label><input type="checkbox"> Each variant is a record holding its data (records are implicitly final).</label></li>
+      <li><label><input type="checkbox"> A pattern switch handles each variant; record patterns unpack the fields, even nested.</label></li>
+      <li><label><input type="checkbox"> The switch is exhaustive: no default needed; a new variant breaks the compile where it must be handled.</label></li>
+      <li><label><input type="checkbox"> First match wins; dominated cases are compile errors; <code>when</code> adds guards.</label></li>
+      <li><label><input type="checkbox"> <code>case null</code> or an NPE; pattern switch and record patterns are 21, not 17.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Together they give Java algebraic data types. I declare a sealed interface, say <code>Payment permits Card, Transfer</code>, and each variant is a record that holds its own data. Then I process them with a pattern switch: <code>case Card(var number, var tags)</code> checks the type and unpacks the fields in one step, and patterns can nest. Because the interface is sealed, the compiler knows every variant, so the switch is exhaustive without a default, and if someone adds a third variant every switch that doesn't handle it stops compiling. Cases are tried top to bottom, a case that's dominated by an earlier one is a compile error, and I can add guards with <code>when</code>. Null still throws unless I write <code>case null</code>. Sealed types and records are in 17, but switching on patterns needs 21."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 3. An interviewer asks: <strong>"Why upgrade a backend from 17 to 21? What would you watch out for?"</strong> Start a timer. Answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Virtual threads: thread-per-request with blocking code at high throughput; scale, not speed.</label></li>
+      <li><label><input type="checkbox"> Don't pool them; use a Semaphore for limits; watch pinning in <code>synchronized</code> on 21.</label></li>
+      <li><label><input type="checkbox"> Generational ZGC: sub-millisecond pauses with less overhead; needs <code>-XX:+ZGenerational</code> on 21.</label></li>
+      <li><label><input type="checkbox"> Keep G1 as default; choose a GC by measuring GC logs against the SLA.</label></li>
+      <li><label><input type="checkbox"> Pattern switch and record patterns for cleaner domain code.</label></li>
+      <li><label><input type="checkbox"> Sequenced collections: <code>getFirst</code>, <code>getLast</code>, <code>reversed()</code> everywhere.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"21 is the next LTS and it brings four real wins. First, virtual threads: I can keep simple blocking code, one thread per request, and handle far more concurrent requests, because a virtual thread unmounts from its carrier while it waits. It's throughput, not speed. I'd watch three things: never pool them, use a Semaphore to protect downstream services, and look for pinning, since on 21 long I/O inside <code>synchronized</code> blocks the carrier. Second, generational ZGC gives sub-millisecond pauses with less overhead than the old ZGC, but on 21 you must add <code>-XX:+ZGenerational</code>, and I'd only switch from G1 after comparing GC logs. Third, pattern matching for switch and record patterns make domain code with sealed types much cleaner. And sequenced collections finally give one API for first, last and reversed."</em></p>
+  </div>
+</div>
+
+<h2>If you missed questions, re-read</h2>
+<table>
+<tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+<tr><td>where <code>var</code> is allowed, text block delimiters and indentation</td><td><a href="0012-var-and-text-blocks.html">Lesson 0012: var and text blocks</a></td></tr>
+<tr><td>arrow labels, <code>yield</code>, exhaustiveness, <code>instanceof</code> scope</td><td><a href="0013-switch-expressions-and-instanceof-patterns.html">Lesson 0013: switch expressions and instanceof patterns</a></td></tr>
+<tr><td>what a record generates, shallow immutability, compact constructors</td><td><a href="0003-records-and-immutability.html">Lesson 0003: Records and shallow immutability</a></td></tr>
+<tr><td><code>permits</code>, final / sealed / non-sealed</td><td><a href="0014-sealed-classes.html">Lesson 0014: Sealed classes and interfaces</a></td></tr>
+<tr><td>reading NPE messages, <code>&lt;local1&gt;</code> and <code>-g</code></td><td><a href="0027-helpful-nullpointerexceptions.html">Lesson 0027: Helpful NullPointerExceptions</a></td></tr>
+<tr><td><code>case null</code>, guards, dominance, record patterns, no default</td><td><a href="0015-pattern-matching-switch-and-record-patterns.html">Lesson 0015: Pattern matching for switch</a></td></tr>
+<tr><td><code>getFirst</code>, <code>reversed()</code> views, which types are sequenced</td><td><a href="0016-sequenced-collections.html">Lesson 0016: Sequenced collections</a></td></tr>
+<tr><td>carriers, pooling, Semaphore, pinning</td><td><a href="0006-virtual-threads.html">Lesson 0006: Virtual threads</a></td></tr>
+<tr><td>generations, ZGC flags on 21, reading the GC log</td><td><a href="0017-generational-zgc.html">Lesson 0017: Generational ZGC</a></td></tr>
+</table>
+
+<h2>Now do the exercise</h2>
+<p>If you skipped any of these, do it now; if you did them, redo the one with your lowest score from memory:</p>
+<ul>
+<li><a href="../exercises/0012-var-and-text-block-review.md">Exercise 0012: review with var and text blocks</a></li>
+<li><a href="../exercises/0013-modernize-a-visitor.md">Exercise 0013: modernize a cast chain</a></li>
+<li><a href="../exercises/0003-record-as-key.md">Exercise 0003: a record as a map key</a></li>
+<li><a href="../exercises/0014-model-payment-types.md">Exercise 0014: model payment types</a></li>
+<li><a href="../exercises/0027-read-the-npe.md">Exercise 0027: read the NPE</a></li>
+<li><a href="../exercises/0015-expression-evaluator.md">Exercise 0015: an expression evaluator</a></li>
+<li><a href="../exercises/0016-last-element-refactor.md">Exercise 0016: last-element refactor</a></li>
+<li><a href="../exercises/0006-pool-vs-virtual.md">Exercise 0006: pool vs virtual</a></li>
+<li><a href="../exercises/0017-compare-g1-and-zgc.md">Exercise 0017: compare G1 and ZGC</a></li>
+</ul>
+<p>Runnable examples: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a> · <a href="../examples/RecordDemo.java"><code>RecordDemo.java</code></a> · <a href="../examples/NpeDemo.java"><code>NpeDemo.java</code></a> · <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a> · <a href="../examples/VirtualThreadsDemo.java"><code>VirtualThreadsDemo.java</code></a> · <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
+
+<h2>What's next</h2>
+<p>You have finished the course ladder. A senior interviewer will now mix everything: <em>"Design an order service on JDK 21: which collections, which concurrency model, which GC?"</em> Practise with the full question bank in the <a href="../interview.html">Java interview Q&amp;A</a>, and say each answer out loud before you open it.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/projects/jdk/21/">OpenJDK: JDK 21</a>, the official list of every JEP in the release, with links to each one.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When should I still use a normal class instead of a record?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and your three checklist scores: they help me choose your next lesson.</div>
+
+<p><a href="0017-generational-zgc.html">← Generational ZGC: tiny pauses, now with young and old (JDK 21)</a> &nbsp;|&nbsp; <a href="../interview.html">Java interview Q&amp;A →</a></p>
+
+<footer>
+  <p>Facts checked against the JEPs and the Java 21 documentation, October 2026 (all facts come from lessons 0012, 0013, 0003, 0014, 0027, 0015, 0016, 0006 and 0017).</p>
+  <p>References: <a href="https://openjdk.org/jeps/286">JEP 286</a> · <a href="https://openjdk.org/jeps/378">JEP 378</a> · <a href="https://openjdk.org/jeps/361">JEP 361</a> · <a href="https://openjdk.org/jeps/394">JEP 394</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="https://openjdk.org/jeps/409">JEP 409</a> · <a href="https://openjdk.org/jeps/358">JEP 358</a> · <a href="https://openjdk.org/jeps/441">JEP 441</a> · <a href="https://openjdk.org/jeps/440">JEP 440</a> · <a href="https://openjdk.org/jeps/431">JEP 431</a> · <a href="https://openjdk.org/jeps/444">JEP 444</a> · <a href="https://openjdk.org/jeps/439">JEP 439</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 1: Các thành phần của cluster: ai làm việc gì</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Các thành phần của cluster: ai làm việc gì</h1>
+<p class="meta">Kubernetes · Bài 0001 · bước 1/15 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-cluster-components.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> kể tên sáu thành phần của cluster và nói được thành phần nào chạy trên control plane, thành phần nào chạy trên mọi node.</div>
+
+<h2>Kubernetes là gì</h2>
+<p>Kubernetes là "một nền tảng mã nguồn mở, portable, dễ mở rộng để quản lý các workload và service chạy trong container", với "cấu hình khai báo (declarative) và tự động hoá". Các khả năng của nó gồm service discovery và load balancing, tự động rollout và rollback, tự phục hồi (self-healing), quản lý secret và cấu hình, và mở rộng theo chiều ngang.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/">[1]</a></p>
+<h2>Các thành phần, mỗi cái một dòng</h2>
+<table>
+<tr><th>Thành phần</th><th>Vai trò (theo tài liệu)<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></th></tr>
+<tr><td>kube-apiserver</td><td>"Server thành phần lõi, cung cấp Kubernetes HTTP API."</td></tr>
+<tr><td>etcd</td><td>"Kho key value nhất quán và có tính sẵn sàng cao, chứa toàn bộ dữ liệu của API server."</td></tr>
+<tr><td>kube-scheduler</td><td>"Tìm các Pod chưa được gán vào node nào, và gán mỗi Pod vào một node phù hợp."</td></tr>
+<tr><td>kube-controller-manager</td><td>"Chạy các controller để hiện thực hoá hành vi của Kubernetes API."</td></tr>
+<tr><td>kubelet</td><td>"Đảm bảo các Pod đang chạy, bao gồm cả container của chúng."</td></tr>
+<tr><td>kube-proxy</td><td>"Duy trì các network rule trên node để hiện thực hoá Service." (tuỳ chọn)</td></tr>
+<tr><td>Container runtime</td><td>"Phần mềm chịu trách nhiệm chạy container."</td></tr>
+</table>
+<p>Bốn thành phần đầu tạo thành control plane, nơi quản lý trạng thái tổng thể của cluster; kubelet, kube-proxy và runtime chạy trên các node.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a> Mô hình tư duy: bạn khai báo trạng thái mong muốn (desired state) cho API server; các controller và kubelet làm việc để thực tế khớp với nó.</p>
+<div class="aside">Góc phỏng vấn: "Chuyện gì xảy ra khi bạn chạy <code>kubectl apply</code>?" Hãy lần theo từng bước: API server validate rồi lưu vào etcd, các controller tạo object, scheduler chọn node, kubelet khởi động container thông qua runtime.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Thành phần nào lưu toàn bộ dữ liệu API?</p>
+  <button data-correct>Kho key value etcd</button>
+  <button>kubelet</button>
+  <button>kube-proxy</button>
+  <button>kube-scheduler</button>
+  <p class="explain">etcd là kho key value nhất quán, có tính sẵn sàng cao, chứa toàn bộ dữ liệu của API server.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Thành phần nào chọn node cho một Pod mới?</p>
+  <button>container runtime</button>
+  <button>kube-apiserver</button>
+  <button>kube-controller-manager</button>
+  <button data-correct>kube-scheduler</button>
+  <p class="explain">Scheduler gán các Pod chưa có node vào node phù hợp.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thành phần nào đảm bảo Pod chạy trên một node?</p>
+  <button>kube-proxy</button>
+  <button data-correct>kubelet</button>
+  <button>etcd</button>
+  <button>scheduler</button>
+  <p class="explain">kubelet đảm bảo các Pod và container của chúng đang chạy.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Bạn gửi trạng thái mong muốn đến đâu?</p>
+  <button data-correct>API server</button>
+  <button>kube-proxy</button>
+  <button>Thẳng vào etcd</button>
+  <button>Container runtime</button>
+  <p class="explain">kube-apiserver cung cấp Kubernetes HTTP API.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-trace-kubectl-apply.vi.md">Bài tập 0001: lần theo kubectl apply</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/overview/components/">Kubernetes Docs: Components</a>. Sau đó đọc trang Cluster Architecture mà nó dẫn tới.</p>
+<p> &nbsp;|&nbsp; <a href="0002-pods.vi.html">Pod: đơn vị deploy nhỏ nhất →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/overview/">Kubernetes Docs: Overview</a> · [2] <a href="https://kubernetes.io/docs/concepts/overview/components/">Kubernetes Docs: Components</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

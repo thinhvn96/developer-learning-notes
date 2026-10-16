@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 12: Partitioning: keys, the partitioner and partition count</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Partitioning: keys, the partitioner and partition count</h1>
+<p class="meta">Kafka · Lesson 0012 · step 7 of 23 · Core · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0012-partitioning-and-partition-count.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> predict which partition a record goes to, choose a key, and explain why adding partitions later breaks per-key ordering.</div>
+
+<h2>Who picks the partition</h2>
+<p>"The client controls which partition it publishes messages to"; Kafka exposes "semantic partitioning by allowing the user to specify a key to partition by".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> The default partitioner in the 4.3 producer:<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+<ul>
+<li><strong>Record has a key:</strong> hash of the key, modulo the partition count. Same key, same partition, so same order.</li>
+<li><strong>No key:</strong> a "sticky" partition that changes after <code>batch.size</code> bytes are produced to it, so batches stay full. With <code>partitioner.adaptive.partitioning.enable=true</code> (default) it sends more to partitions on faster brokers.</li>
+<li><code>partitioner.class</code> lets you plug in your own; <code>partitioner.ignore.keys=true</code> stops using keys.</li>
+</ul>
+<h2>The trap: adding partitions</h2>
+<p>Because the mapping depends on the partition count, the operations guide warns that "the default partitioner's mapping logic changes when the partition count increases", and "Kafka will not attempt to automatically redistribute existing data".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a> You also cannot go back: "Kafka does not currently support reducing the number of partitions for a topic."<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+<pre><code>$ ./05-add-partitions.sh
+=== 3 partitions          === 6 partitions (same keys)
+  u1 -&gt; Partition:1         u1 -&gt; Partition:4
+  u2 -&gt; Partition:0         u2 -&gt; Partition:0
+  u3 -&gt; Partition:1         u3 -&gt; Partition:4
+  u5 -&gt; Partition:2         u5 -&gt; Partition:5
+=== try to shrink back to 3
+Error ... The topic users currently has 6 partition(s); 3 would not be an increase.</code></pre>
+<p>After the change, old <code>u1</code> events sit in partition 1 and new ones in partition 4. Two consumers can now process <code>u1</code> events in parallel, out of order.</p>
+<h2>Choosing a key and a partition count</h2>
+<ul>
+<li>Key by the entity whose events must stay ordered (<code>orderId</code>, <code>accountId</code>). A random UUID key gives no useful ordering; a key with few values (country) creates hot partitions.</li>
+<li>Partition count caps consumer parallelism in one group (one partition, one consumer). Size for the peak throughput you expect over the topic's life, because increasing later reshuffles keys.</li>
+<li>If you must grow a keyed topic, the safe path is a new topic with more partitions plus a controlled migration of producers and consumers.</li>
+</ul>
+<div class="aside">The sizing rule "plan for future peak" is engineering judgement built on the two documented facts above (mapping changes, no shrinking), not a formula from the docs.</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default partitioner, record with a key. Partition?</p>
+  <button>Always partition 0</button>
+  <button data-correct>Hash of the key</button>
+  <button>Round robin choice</button>
+  <button>Least loaded one</button>
+  <p class="explain">The default partitioner hashes the key when one is present.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default partitioner, record without key. Partition?</p>
+  <button>Random per record</button>
+  <button>Hash of the value</button>
+  <button>Always partition 0</button>
+  <button data-correct>Sticky until batch full</button>
+  <p class="explain">Keyless records use a sticky partition that switches after batch.size bytes.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. You add partitions to a keyed topic. Existing data?</p>
+  <button>Copied to all</button>
+  <button>Rehashed to new ones</button>
+  <button>Deleted by brokers</button>
+  <button data-correct>Stays where it is</button>
+  <p class="explain">Kafka will not redistribute existing data; only new records use the new mapping.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Can you reduce a topic's partition count?</p>
+  <button data-correct>No, not supported</button>
+  <button>Yes, with --alter</button>
+  <button>Only with KRaft</button>
+  <button>Only when empty</button>
+  <p class="explain">Reducing partitions is not supported.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0012-pick-keys-and-partitions.md">Exercise 0012: pick keys and a partition count</a></p>
+<p>Runnable example: <a href="../examples/05-add-partitions.sh"><code>05-add-partitions.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a>. Read 'Modifying topics' and 'Expanding your cluster'.</p>
+<p><a href="0004-delivery-semantics.html">← Delivery semantics: at most, at least, exactly once</a> &nbsp;|&nbsp; <a href="0013-spring-kafka.html">Spring Kafka: KafkaTemplate, @KafkaListener and commits →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · [3] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 6: Logstash: pipeline, grok và persistent queue</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Logstash: pipeline, grok và persistent queue</h1>
+<p class="meta">ELK Stack · Bài 0006 · bước 10/14 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-logstash-grok-and-persistent-queues.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết được một pipeline Logstash có grok filter, nhận ra lỗi parse, và giải thích persistent queue đảm bảo được điều gì.</div>
+
+<h2>Pipeline</h2>
+<p>Input (file, syslog, beats...), filter (grok, mutate, drop, geoip...) và output (elasticsearch, file...). Codec đóng vai trò bộ lọc luồng gắn vào input hoặc output, ví dụ <code>json</code> hay <code>multiline</code>.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">[1]</a></p>
+<h2>Grok</h2>
+<p>Grok là "một cách rất tốt để parse dữ liệu log phi cấu trúc thành thứ có cấu trúc và query được." Pattern dùng cú pháp <code>%{SYNTAX:SEMANTIC}</code>, ví dụ <code>%{NUMBER:duration}</code>. Khi không pattern nào khớp, mặc định event sẽ được gắn tag <code>_grokparsefailure</code>.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a></p>
+<pre><code>grok { match =&gt; { "message" =&gt; "%{IP:client} %{WORD:method} %{URIPATH:path} %{NUMBER:status:int} %{NUMBER:duration_ms:int}" } }</code></pre>
+<pre><code>cd elk/examples &amp;&amp; ./02-logstash-grok.sh
+"10.0.0.7 GET /orders/42 200 35"  -&gt; client=10.0.0.7 method=GET path=/orders/42 status=200 duration_ms=35
+"this is not an access log"       -&gt; tags: [ "_grokparsefailure" ]</code></pre>
+<p>File: <a href="../examples/logstash-grok.conf"><code>logstash-grok.conf</code></a>, <a href="../examples/02-logstash-grok.sh"><code>02-logstash-grok.sh</code></a>.</p>
+<h2>Persistent queue</h2>
+<p>Persistent queue "giúp chống mất dữ liệu khi tiến trình bị dừng bất thường bằng cách lưu hàng đợi message đang in-flight xuống đĩa." Sau khi restart, Logstash "cố gắng giao các message đã lưu trong persistent queue cho tới khi giao thành công ít nhất một lần." Nó có thể hấp thụ các đợt tăng đột biến mà không cần buffer bên ngoài như Redis hay Kafka, và tạo backpressure lên input khi đầy.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[3]</a></p>
+<div class="aside">Để ý chữ "ít nhất một lần": có thể xuất hiện bản trùng, nên hãy gán cho event một id ổn định nếu phía sau quan tâm tới chuyện trùng lặp.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Cú pháp pattern của grok?</p>
+  <button>Chỉ XPath</button>
+  <button data-correct>SYNTAX hai chấm SEMANTIC</button>
+  <button>Chỉ regex</button>
+  <button>key bằng value</button>
+  <p class="explain">Pattern được viết dạng %{SYNTAX:SEMANTIC}.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Grok không khớp. Chuyện gì xảy ra?</p>
+  <button>Logstash dừng lại</button>
+  <button>Event bị nhân bản</button>
+  <button data-correct>Thêm tag _grokparsefailure</button>
+  <button>Event bị bỏ đi</button>
+  <p class="explain">Mặc định tag _grokparsefailure sẽ được thêm vào.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Persistent queue đảm bảo giao nhận kiểu gì?</p>
+  <button>Không đảm bảo</button>
+  <button>At most once</button>
+  <button>Exactly once</button>
+  <button data-correct>At least once</button>
+  <p class="explain">Logstash giao các event đã lưu cho tới khi giao thành công ít nhất một lần.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Queue đầy. Logstash làm gì?</p>
+  <button>Bỏ hết event</button>
+  <button data-correct>Tạo backpressure</button>
+  <button>Tự restart</button>
+  <button>Xoá queue</button>
+  <p class="explain">Nó chặn input lại cho tới khi queue vơi bớt.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/persistent-queues">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-parse-a-java-stack-trace.vi.md">Bài tập 0006: parse một dòng log Java</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-logstash-grok.sh"><code>02-logstash-grok.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/reference/logstash/persistent-queues">Logstash Docs: Persistent queues</a>. Đọc phần 'Benefits of persistent queues'.</p>
+<p><a href="0011-aggregations.vi.html">← Aggregation: bucket và metric</a> &nbsp;|&nbsp; <a href="0007-filebeat-delivery-and-backpressure.vi.html">Filebeat: harvester, registry và đảm bảo giao nhận →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/reference/logstash/how-logstash-works">Logstash Docs: How Logstash works</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">Logstash Docs: Grok filter plugin</a> · [3] <a href="https://www.elastic.co/docs/reference/logstash/persistent-queues">Logstash Docs: Persistent queues</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

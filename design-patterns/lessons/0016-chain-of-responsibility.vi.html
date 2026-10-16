@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 16: Chain of Responsibility</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Chain of Responsibility</h1>
+<p class="meta">Design Patterns · Bài 0016 · bước 16/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0016-chain-of-responsibility.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> cho một request đi qua chuỗi handler, mỗi handler tự quyết định xử lý hay chuyển tiếp.</div>
+
+<h2>Mục đích</h2>
+<p>Chain of Responsibility là "một behavioral design pattern cho phép bạn chuyển request dọc theo một chuỗi handler." Hãy dùng nó khi request được xử lý theo nhiều cách khác nhau mà loại và thứ tự không biết trước, khi nhiều handler phải chạy theo một thứ tự nhất định, hoặc khi tập handler và thứ tự của chúng thay đổi lúc runtime.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/ChainDemo.java
+200 did buy for ann
+401 not authenticated
+429 too many requests
+unhandled</code></pre><p>Xác thực, rate limiting và business logic là các handler riêng biệt; mỗi handler hoặc trả về kết quả (kết thúc chuỗi) hoặc chuyển tiếp. Dòng cuối cho thấy nhược điểm: một chuỗi không có handler nào nhận request sẽ trả về "unhandled". Servlet filter và các middleware pipeline có đúng hình dạng này (đây là nhận xét chung của tôi; trang mô tả pattern chỉ nói về ý tưởng). Mã nguồn: <a href="../examples/ChainDemo.java"><code>ChainDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Kiểm soát được thứ tự xử lý</li><li>Tách bên gọi khỏi bên thực hiện (Single Responsibility)</li><li>Thêm handler mới mà không làm hỏng client (Open/Closed)</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Một số request có thể không được ai xử lý</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a> Chain of Responsibility, Command, Mediator và Observer là những cách khác nhau để nối bên gửi với bên nhận; nó đi cùng Composite rất tốt và có cấu trúc giống Decorator (Decorator thì không dừng chuỗi giữa chừng).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Chain of Responsibility chuyển request dọc theo...?</p>
+  <button>Một cache</button>
+  <button data-correct>Một chuỗi handler</button>
+  <button>Một hàng đợi thread</button>
+  <button>Một cây bản sao</button>
+  <p class="explain">Request được chuyển dọc theo một chuỗi handler.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Trong demo, handler trả về null nghĩa là...?</p>
+  <button>Dừng lại</button>
+  <button>Retry</button>
+  <button data-correct>Chuyển cho handler kế</button>
+  <button>Lỗi</button>
+  <p class="explain">check trả về null để chuyển tiếp.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Nhược điểm?</p>
+  <button>Không có thứ tự</button>
+  <button>Trạng thái toàn cục</button>
+  <button>Mất đa hình</button>
+  <button data-correct>Request không ai xử lý</button>
+  <p class="explain">Một số request có thể không được ai xử lý.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lợi ích?</p>
+  <button data-correct>Kiểm soát thứ tự xử lý</button>
+  <button>Ít class hơn</button>
+  <button>GC nhanh hơn</button>
+  <button>Không cần interface</button>
+  <p class="explain">Bạn kiểm soát được thứ tự xử lý request.<a class="cite" href="https://refactoring.guru/design-patterns/chain-of-responsibility">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0016-validation-chain.vi.md">Bài tập 16: một chuỗi validation</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ChainDemo.java"><code>ChainDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/chain-of-responsibility">Chain of Responsibility (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0015-proxy.vi.html">← Proxy</a> &nbsp;|&nbsp; <a href="0017-command.vi.html">Command →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/chain-of-responsibility">Chain of Responsibility (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

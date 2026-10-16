@@ -1,5 +1,7 @@
 # Exercise 0005: heap under limits
 
+[Tiếng Việt](0005-heap-under-limits.vi.md)
+
 Companion to [lesson 5](../lessons/0005-memory-cpu-limits-and-the-jvm.html).
 
 1. Run `hello-multi` with `--memory` at 128m, 256m, 512m, 1g. Tabulate the max heap. At which point does the heap stop being about half?

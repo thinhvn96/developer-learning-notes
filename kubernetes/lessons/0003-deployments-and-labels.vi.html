@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 3: Deployment, ReplicaSet và label</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Deployment, ReplicaSet và label</h1>
+<p class="meta">Kubernetes · Bài 0003 · bước 4/15 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-deployments-and-labels.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết được một Deployment, và giải thích label gắn kết Deployment, ReplicaSet của nó và các Pod lại với nhau như thế nào.</div>
+
+<h2>Deployment làm gì</h2>
+<p>Một Deployment "quản lý một tập Pod để chạy một workload ứng dụng, thường là loại không giữ trạng thái." Bạn mô tả trạng thái mong muốn, và Deployment controller "đưa trạng thái thực tế về trạng thái mong muốn với tốc độ được kiểm soát."<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a> Nó tạo và quản lý các ReplicaSet, là thứ giữ cho đúng số lượng Pod được yêu cầu luôn chạy.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+<h2>Giao ước label</h2>
+<pre><code>spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx          # must match...
+  template:
+    metadata:
+      labels:
+        app: nginx        # ...the Pod template labels
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2</code></pre>
+<p>"<code>.spec.selector.matchLabels</code> phải khớp với các label" trong Pod template.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a> File đầy đủ: <a href="../examples/deployment.yaml"><code>deployment.yaml</code></a>. Label cũng là thứ Service dùng để chọn Pod (bài tiếp theo); tài liệu xếp label và selector vào nhóm kiến thức nền tảng về quản lý object.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/">[2]</a></p>
+<div class="aside">Góc phỏng vấn: "Vì sao Pod của tôi không được tạo?" Selector không khớp với label của template là một câu trả lời kinh điển, và API server sẽ từ chối manifest đó.</div>
+<p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Deployment quản lý cái gì?</p>
+  <button>Snapshot của etcd</button>
+  <button data-correct>ReplicaSet và Pod</button>
+  <button>Chỉ quản lý node</button>
+  <button>Image registry</button>
+  <p class="explain">Nó cung cấp cơ chế cập nhật khai báo cho Pod và ReplicaSet.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Selector và label của Pod template phải...?</p>
+  <button data-correct>Khớp với nhau</button>
+  <button>Khác nhau</button>
+  <button>Cùng để trống</button>
+  <button>Ghi tên node</button>
+  <p class="explain">matchLabels của selector phải khớp với label của Pod template.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bạn khai báo <code>replicas: 3</code>. Đó là...?</p>
+  <button data-correct>Trạng thái mong muốn</button>
+  <button>Trạng thái thực tế</button>
+  <button>Một probe</button>
+  <button>Một lần rollback</button>
+  <p class="explain">Bạn mô tả trạng thái mong muốn; controller liên tục điều chỉnh (reconcile) để đạt tới nó.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Deployment phù hợp nhất với gì?</p>
+  <button data-correct>Một web app stateless</button>
+  <button>Một batch job chạy một lần</button>
+  <button>Một agent trên node</button>
+  <button>Một database có ổ đĩa</button>
+  <p class="explain">Deployment hợp với workload thường không giữ trạng thái; Job và StatefulSet dành cho các trường hợp còn lại.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-break-the-selector.vi.md">Bài tập 0003: làm hỏng selector</a></p>
+<p>Ví dụ chạy được: <a href="../examples/deployment.yaml"><code>deployment.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a>. Các phần 'Creating a Deployment' và 'Updating a Deployment'.</p>
+<p><a href="0008-namespaces.vi.html">← Namespace: cô lập các nhóm tài nguyên</a> &nbsp;|&nbsp; <a href="0004-services.vi.html">Service: địa chỉ ổn định cho các Pod luôn thay đổi →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a> · [2] <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/">Kubernetes Docs: Labels and selectors</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

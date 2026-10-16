@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 22: State</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>State</h1>
+<p class="meta">Design Patterns · Bài 0022 · bước 22/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0022-state.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> thay các câu điều kiện phụ thuộc trạng thái bằng các state object tự kích hoạt việc chuyển trạng thái của chính nó.</div>
+
+<h2>Mục đích</h2>
+<p>State là "một behavioral design pattern cho phép một object thay đổi hành vi khi trạng thái bên trong của nó thay đổi." Nó gắn liền với máy trạng thái hữu hạn (finite-state machine): đưa hành vi của từng trạng thái vào class riêng và để context ủy quyền cho state object hiện tại. Hãy dùng nó khi một object hành xử khác nhau ở nhiều trạng thái, hoặc khi một class bị ngập trong các khối điều kiện to đùng.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/StateDemo.java
+draft: sending to moderation
+  state -&gt; Moderation
+moderation: approved, publishing
+  state -&gt; Published
+published: already public, ignoring
+published: already public, ignoring
+published: cannot reject a public document</code></pre><p>Cùng một lời gọi <code>publish()</code> nhưng làm những việc khác nhau ở <code>Draft</code>, <code>Moderation</code> và <code>Published</code>, và mỗi trạng thái tự quyết định trạng thái kế tiếp. Mã nguồn: <a href="../examples/StateDemo.java"><code>StateDemo.java</code></a>. Khác biệt then chốt so với Strategy: "các trạng thái cụ thể có thể biết về nhau và tự khởi phát việc chuyển từ trạng thái này sang trạng thái khác, trong khi các strategy hầu như không bao giờ biết về nhau."<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a> Với một tập trạng thái nhỏ và cố định, một <a href="../../oop/lessons/0013-enums-as-classes.vi.html">enum có hành vi riêng cho từng hằng</a> là lựa chọn nhẹ nhàng hơn.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Single Responsibility và Open/Closed</li><li>Loại bỏ các khối điều kiện cồng kềnh</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Quá tay khi chỉ có vài trạng thái hoặc hiếm khi thay đổi</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a> State, Strategy và Bridge có chung cấu trúc dựa trên composition nhưng giải quyết các vấn đề khác nhau.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. State thay đổi cái gì?</p>
+  <button>Thread</button>
+  <button data-correct>Hành vi theo trạng thái bên trong</button>
+  <button>Interface</button>
+  <button>Tên class</button>
+  <p class="explain">Object thay đổi hành vi khi trạng thái của nó thay đổi.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. State so với Strategy?</p>
+  <button>Không cái nào</button>
+  <button>Như nhau</button>
+  <button>Các strategy biết nhau</button>
+  <button data-correct>Các state biết nhau</button>
+  <p class="explain">State có thể tự khởi phát việc chuyển trạng thái; các strategy hầu như không biết về nhau.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thay thế cho...?</p>
+  <button>Thread</button>
+  <button>Interface</button>
+  <button>Chỉ kế thừa</button>
+  <button data-correct>Khối điều kiện cồng kềnh</button>
+  <p class="explain">Nó loại bỏ if/switch phụ thuộc trạng thái.<a class="cite" href="https://refactoring.guru/design-patterns/state">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Gọi publish() trên document đã Published trong demo?</p>
+  <button>Quay về Draft</button>
+  <button data-correct>Bị bỏ qua</button>
+  <button>Xóa nó đi</button>
+  <button>Ném exception</button>
+  <p class="explain">Demo in ra 'already public, ignoring'.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0022-order-lifecycle.vi.md">Bài tập 22: vòng đời một đơn hàng</a></p>
+<p>Ví dụ chạy được: <a href="../examples/StateDemo.java"><code>StateDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/state">State (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0021-observer.vi.html">← Observer</a> &nbsp;|&nbsp; <a href="0023-strategy.vi.html">Strategy →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/state">State (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

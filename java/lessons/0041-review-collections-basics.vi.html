@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 41: Ôn tập 2: collection cơ bản và HashMap</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ôn tập 2: collection cơ bản và HashMap</h1>
+<p class="subtitle">Bốn bài học trộn lẫn với nhau: cây phả hệ collection, chọn list, xóa trong lúc lặp, và cách HashMap tìm ra value.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0041 · bước 10/46 · Review · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0041-review-collections-basics.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Trong interview, câu hỏi về collection đến dồn dập: "Bạn dùng list nào?", rồi "Vì sao vòng lặp này crash?", rồi "HashMap hoạt động thế nào?". Bài ôn tập này trộn các bài <a href="0028-collections-framework-map.vi.html">0028</a>, <a href="0002-choosing-a-list.vi.html">0002</a>, <a href="0029-iterators-and-fail-fast.vi.html">0029</a> và <a href="0001-hashmap-equals-hashcode.vi.html">0001</a> theo đúng cách đó, để bạn luyện chuyển qua lại giữa chúng. Ở đây không có kiến thức mới.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> trả lời đúng từ 10 trên 12 câu hỏi trộn trở lên, tìm ra ba bug trong bài tập trộn, và nói được cả ba câu trả lời 60 giây với ít nhất 5 ý trong checklist mỗi câu.</div>
+
+<dl class="words">
+  <dt>interface</dt><dd>Danh sách các method mà một kiểu hứa sẽ có, không chứa dữ liệu, như <code>List</code> hay <code>Map</code>. Bạn viết code dựa trên nó (bài 0028).</dd>
+  <dt>implementation</dt><dd>Một class thật giữ lời hứa đó bằng một cấu trúc dữ liệu thật, như <code>ArrayList</code> hay <code>HashMap</code>.</dd>
+  <dt>amortized O(1)</dt><dd>Thường là tức thì, đôi khi chậm (mảng được chép sang mảng lớn hơn), nhưng tính trung bình qua nhiều lần gọi thì nhanh (bài 0002).</dd>
+  <dt>fail-fast</dt><dd>Iterator ném <code>ConcurrentModificationException</code> khi phát hiện collection bị đổi sau lưng nó (bài 0029).</dd>
+  <dt>bucket</dt><dd>Một "hộp thư" bên trong HashMap. Hash code của key chọn bucket (bài 0001).</dd>
+  <dt>contract</dt><dd>Một quy tắc mà method phải tuân theo. Ở đây: object bằng nhau phải có cùng hash code.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Không nhìn lại bài cũ, hãy nói thành lời <strong>ba câu hỏi</strong> để chọn một collection, và <strong>hai method</strong> mà key của HashMap cần có. Ghi lại bạn chắc chắn đến mức nào (0 đến 100%). Cuối bài, so với điểm quiz: người ta thường tự tin hơn mức nên có, và khoảng cách đó chính là thứ bài ôn tập sửa lại.</p>
+
+<h2>1. Cây phả hệ (bài 0028)</h2>
+<p>Hãy nghĩ đến sơ đồ tổ chức của một công ty. Chức danh (interface) nói một người phải làm gì; con người cụ thể (implementation) làm việc đó theo cách riêng. Bạn tuyển theo chức danh: bạn khai báo <code>List&lt;Order&gt;</code>, không phải <code>ArrayList&lt;Order&gt;</code>, để sau này có thể đổi người mà không phải sửa code ở chỗ gọi.</p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="Iterable ở trên cùng, rồi Collection, tách thành List, Set và Queue. Set dẫn tới NavigableSet, Queue dẫn tới Deque. Map đứng riêng, không phải Collection, với NavigableMap bên dưới.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="150" y="16" width="150" height="34" rx="6"/>
+      <rect x="150" y="76" width="150" height="34" rx="6"/>
+      <path d="M225 50v26M225 110v18M95 128h340M95 128v18M265 128v18M435 128v18"/>
+      <rect x="20" y="146" width="150" height="50" rx="6"/>
+      <rect x="190" y="146" width="150" height="50" rx="6"/>
+      <rect x="360" y="146" width="150" height="50" rx="6"/>
+      <path d="M265 196v30M435 196v30"/>
+      <rect x="190" y="226" width="150" height="50" rx="6"/>
+      <rect x="360" y="226" width="150" height="50" rx="6"/>
+      <path d="M590 138v38"/>
+      <rect x="520" y="176" width="140" height="50" rx="6"/>
+    </g>
+    <path d="M500 16v270" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".4"/>
+    <rect x="520" y="76" width="140" height="62" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="225" y="38" text-anchor="middle">Iterable</text>
+    <text x="225" y="98" text-anchor="middle">Collection</text>
+    <text x="310" y="38" font-size="11" opacity=".75">for-each chạy được trên chúng</text>
+    <text x="95" y="166" text-anchor="middle">List</text>
+    <text x="95" y="184" text-anchor="middle" font-size="10" opacity=".75">ArrayList, LinkedList</text>
+    <text x="265" y="166" text-anchor="middle">Set</text>
+    <text x="265" y="184" text-anchor="middle" font-size="10" opacity=".75">HashSet, LinkedHashSet</text>
+    <text x="435" y="166" text-anchor="middle">Queue</text>
+    <text x="435" y="184" text-anchor="middle" font-size="10" opacity=".75">PriorityQueue</text>
+    <text x="265" y="246" text-anchor="middle">NavigableSet</text>
+    <text x="265" y="264" text-anchor="middle" font-size="10" opacity=".75">TreeSet</text>
+    <text x="435" y="246" text-anchor="middle">Deque</text>
+    <text x="435" y="264" text-anchor="middle" font-size="10" opacity=".75">ArrayDeque, LinkedList</text>
+    <text x="590" y="96" text-anchor="middle" fill="var(--accent)">Map</text>
+    <text x="590" y="113" text-anchor="middle" font-size="10">HashMap,</text>
+    <text x="590" y="127" text-anchor="middle" font-size="10">LinkedHashMap</text>
+    <text x="590" y="196" text-anchor="middle">NavigableMap</text>
+    <text x="590" y="214" text-anchor="middle" font-size="10" opacity=".75">TreeMap</text>
+    <text x="520" y="248" font-size="10" fill="var(--accent)">không phải Collection</text>
+    <text x="520" y="264" font-size="10" opacity=".75">view: keySet(),</text>
+    <text x="520" y="280" font-size="10" opacity=".75">values(), entrySet()</text>
+  </g>
+</svg>
+<figcaption>Interface nằm trong khung, implementation tiêu biểu ghi bằng chữ nhỏ. <code>Map</code> chứa các cặp, nên nó đứng ngoài <code>Collection</code> và cung cấp các <em>view</em> (khung nhìn) collection thay vào đó.</figcaption>
+</figure>
+
+<p>Ba điều cần giữ lại từ bài 0028:</p>
+<ol class="steps">
+  <li><strong><code>Map</code> không phải là <code>Collection</code>.</strong> Nó cung cấp <code>keySet()</code>, <code>values()</code> và <code>entrySet()</code> dưới dạng view.</li>
+  <li><strong>Cái tên cho biết thứ tự.</strong> <code>Hash*</code>: không hứa thứ tự nào. <code>Linked*</code>: thứ tự thêm vào. <code>Tree*</code>: thứ tự đã sắp xếp.</li>
+  <li><strong>Một số thao tác là tùy chọn (optional).</strong> Một implementation có thể ném <code>UnsupportedOperationException</code> thay vì hỗ trợ chúng; đó là cách list không sửa được vẫn khớp với cùng interface <code>List</code>.</li>
+</ol>
+
+<h2>2. Chọn cấu trúc dữ liệu (bài 0028 và 0002)</h2>
+<p>Bài 0028 chọn cấu trúc bằng ba câu hỏi: tra theo key? trùng lặp? thứ tự? Sau đó bài 0002 chọn giữa các loại list. Đây là toàn bộ quyết định gom vào một luồng:</p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Luồng quyết định: tra theo key, có thì HashMap. Không trùng lặp, có thì HashSet. Queue hay stack, có thì ArrayDeque. Còn lại là ArrayList, lựa chọn mặc định.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="30" width="150" height="44" rx="6"/>
+      <rect x="190" y="30" width="150" height="44" rx="6"/>
+      <rect x="360" y="30" width="150" height="44" rx="6"/>
+      <path d="M170 52h14M178 47l6 5-6 5M340 52h14M348 47l6 5-6 5M510 52h14M518 47l6 5-6 5"/>
+      <path d="M95 74v50M90 118l5 6 5-6M265 74v50M260 118l5 6 5-6M435 74v50M430 118l5 6 5-6"/>
+      <rect x="20" y="124" width="150" height="74" rx="6"/>
+      <rect x="190" y="124" width="150" height="74" rx="6"/>
+      <rect x="360" y="124" width="150" height="74" rx="6"/>
+    </g>
+    <rect x="530" y="30" width="130" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="95" y="57" text-anchor="middle">tra theo key?</text>
+    <text x="265" y="57" text-anchor="middle">không trùng?</text>
+    <text x="435" y="57" text-anchor="middle">queue/stack?</text>
+    <text x="595" y="50" text-anchor="middle" fill="var(--accent)">ArrayList</text>
+    <text x="595" y="66" text-anchor="middle" font-size="10" fill="var(--accent)">mặc định</text>
+    <g font-size="10" opacity=".75">
+      <text x="177" y="44" text-anchor="middle">ko</text><text x="347" y="44" text-anchor="middle">ko</text><text x="517" y="44" text-anchor="middle">ko</text>
+      <text x="103" y="102">có</text><text x="273" y="102">có</text><text x="443" y="102">có</text>
+    </g>
+    <text x="95" y="146" text-anchor="middle">HashMap</text>
+    <text x="95" y="166" text-anchor="middle" font-size="10" opacity=".8">sắp xếp: TreeMap</text>
+    <text x="95" y="182" text-anchor="middle" font-size="10" opacity=".8">thứ tự: LinkedHashMap</text>
+    <text x="265" y="146" text-anchor="middle">HashSet</text>
+    <text x="265" y="166" text-anchor="middle" font-size="10" opacity=".8">sắp xếp: TreeSet</text>
+    <text x="265" y="182" text-anchor="middle" font-size="10" opacity=".8">thứ tự: LinkedHashSet</text>
+    <text x="435" y="146" text-anchor="middle">ArrayDeque</text>
+    <text x="435" y="166" text-anchor="middle" font-size="10" opacity=".8">không Stack, không</text>
+    <text x="435" y="182" text-anchor="middle" font-size="10" opacity=".8">LinkedList; cấm null</text>
+    <text x="340" y="226" text-anchor="middle" font-size="11" opacity=".8">dùng chung giữa các thread? → concurrent collection (bài 0039)</text>
+  </g>
+</svg>
+<figcaption>Hỏi lần lượt từ trái sang phải. Muốn chọn <code>LinkedList</code> thì cần một lý do cụ thể.</figcaption>
+</figure>
+
+<p>Các sự thật đằng sau bài 0002, lấy từ Javadoc:</p>
+<table>
+<tr><th>Class</th><th>Nó là gì</th><th>Cần nhớ</th></tr>
+<tr><td><code>ArrayList</code></td><td>một mảng tự lớn lên</td><td><code>get</code>/<code>set</code> thời gian hằng số, <code>add</code> hằng số amortized, hệ số hằng thấp; là class duy nhất có <code>RandomAccess</code></td></tr>
+<tr><td><code>LinkedList</code></td><td>một chuỗi các node</td><td><code>get(i)</code> đi bộ từ đầu gần hơn: đi từng bước, không nhảy thẳng</td></tr>
+<tr><td><code>ArrayDeque</code></td><td>một mảng có thể đổi kích thước</td><td>nhanh hơn <code>Stack</code> khi làm stack và nhanh hơn <code>LinkedList</code> khi làm queue; <strong>không nhận null</strong></td></tr>
+</table>
+<p>Cả ba đều không synchronized. <a href="0002-choosing-a-list.vi.html">Bài 0002</a> có đầy đủ trích dẫn.</p>
+
+<h2>3. Xóa trong lúc lặp (bài 0029)</h2>
+<p>Nhớ lại cô giáo đọc tờ điểm danh có số phiên bản trên đầu. List đếm structural change trong <code>modCount</code>; iterator nhớ giá trị đó dưới tên <code>expectedModCount</code> và so sánh ở mỗi lần <code>next()</code>. Vòng for-each là một iterator, nên <code>list.remove(x)</code> bên trong nó làm hai con số lệch nhau:</p>
+<pre><code>$ java java/examples/collections/IteratorsAndFailFast.java
+1. for-each + list.remove        -&gt; ConcurrentModificationException
+2. remove 2nd-to-last in for-each -&gt; no exception, list=[ann, cid]  (loop silently skipped 'cid')
+3. Iterator.remove()              -&gt; [ann, cid, dan]
+4. removeIf (JDK 8)               -&gt; [ann, cid, dan]
+5. ListIterator set + add         -&gt; [ANN, ann!, BOB, bob!]
+6. entry.setValue while iterating -&gt; {a=10, b=20}
+7. map.put new key while iterating -&gt; ConcurrentModificationException</code></pre>
+<p>Dòng 2 là dòng cần giải thích được trong interview: xóa phần tử áp chót làm <code>cursor == size</code>, nên <code>hasNext()</code> là false trước khi có phép kiểm tra nào chạy. Đây là best-effort, không phải đảm bảo. Cách sửa: <code>removeIf</code>, <code>Iterator.remove()</code>, <code>ListIterator</code>.</p>
+
+<h2>4. HashMap tìm value của bạn như thế nào (bài 0001)</h2>
+<p>Bức tường 16 hộp thư: <code>hashCode()</code> chọn hộp thư, <code>equals()</code> chọn lá thư bên trong. Object bằng nhau phải có cùng hash code; chiều ngược lại không bắt buộc (<code>"Aa"</code> và <code>"BB"</code> chung số 2112). Phá quy tắc này thì map lặng lẽ trả về <code>null</code>:</p>
+<pre><code>$ java java/examples/LostKey.java
+BadKey  lookup: null
+GoodKey lookup: value</code></pre>
+<p>Và key không được thay đổi sau <code>put</code>: địa chỉ trên lá thư đã đổi, nên Java tìm ở một hộp thư khác. Hãy dùng key immutable hoặc một <code>record</code>.</p>
+
+<h2>5. Bài tập trộn: tìm ba bug</h2>
+<p>Đọc đoạn code này như một reviewer. Có ba bug, mỗi bug từ một bài khác nhau. Tìm ra chúng, gọi tên bài học, và nói cách sửa <em>trước khi</em> mở đáp án.</p>
+<pre><code>class Visit {
+    final String user, page;
+    Visit(String user, String page) {
+        this.user = user;
+        this.page = page;
+    }
+    @Override public boolean equals(Object o) {
+        return o instanceof Visit v
+            &amp;&amp; v.user.equals(user) &amp;&amp; v.page.equals(page);
+    }
+}
+
+class Tracker {
+    private final Map&lt;Visit, Integer&gt; counts = new HashMap&lt;&gt;();
+    private final Deque&lt;String&gt; recentPages = new ArrayDeque&lt;&gt;();
+    private final List&lt;String&gt; users = new ArrayList&lt;&gt;();
+
+    <span class="c">// page is null for the home page</span>
+    void record(String user, String page) {
+        Visit v = new Visit(user, page);
+        Integer c = counts.get(v);
+        counts.put(v, c == null ? 1 : c + 1);    <span class="c">// (A)</span>
+        recentPages.push(page);                  <span class="c">// (B)</span>
+        users.add(user);
+    }
+
+    void ban(String user) {
+        for (String u : users)                   <span class="c">// (C)</span>
+            if (u.equals(user)) users.remove(u);
+    }
+}</code></pre>
+<details class="qa">
+<summary>Hiện ba bug</summary>
+<div class="ans">
+<p><strong>(A) Bài 0001.</strong> <code>Visit</code> override <code>equals()</code> nhưng không override <code>hashCode()</code>. Mỗi <code>Visit</code> mới có hash code mặc định riêng, nên <code>counts.get(v)</code> gần như luôn tìm sai bucket và mọi bộ đếm đều đứng ở 1. Cách sửa: <code>record Visit(String user, String page) {}</code>, hoặc thêm <code>hashCode()</code> với <code>Objects.hash(user, page)</code>. (Một <code>page</code> null cũng làm hỏng <code>equals</code> này; <code>Objects.equals</code> xử lý được null.)</p>
+<p><strong>(B) Bài 0002.</strong> <code>ArrayDeque</code> không nhận null, nên <code>push(null)</code> cho trang chủ sẽ ném <code>NullPointerException</code>. Cách sửa: lưu một giá trị thật như <code>"/"</code>, hoặc bỏ qua các trang null.</p>
+<p><strong>(C) Bài 0029.</strong> <code>users.remove(u)</code> trong vòng for-each ném <code>ConcurrentModificationException</code>, hoặc, khi phần tử khớp nằm ở vị trí áp chót, lặng lẽ bỏ qua user cuối cùng. Cách sửa: <code>users.removeIf(user::equals)</code>.</p>
+</div>
+</details>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>map.get(key)</code> không phải xem qua mọi entry?</p>
+  <div class="options">
+    <button class="opt" data-correct>Hash code đưa nó thẳng tới một bucket duy nhất</button>
+    <button class="opt">Các key được giữ đã sắp xếp nên nó tìm nhị phân</button>
+    <button class="opt">Nó quét mọi bucket, nhưng dùng nhiều thread cùng lúc</button>
+    <button class="opt">Nó nhớ vài câu trả lời gần nhất trong một cache nhỏ</button>
+  </div>
+  <div class="why">Cùng key → cùng số → cùng bucket. Chỉ bucket đó được tìm. Xem <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Câu nào về <code>Map</code> là đúng?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó không phải Collection; nó có các view như keySet()</button>
+    <button class="opt">Nó kế thừa Collection, nên có add() và iterator()</button>
+    <button class="opt">Nó kế thừa List, với key được dùng làm chỉ số</button>
+    <button class="opt">Nó kế thừa Set, vì các key không bao giờ lặp lại</button>
+  </div>
+  <div class="why"><code>Map</code> chứa các cặp, nên nó đứng ngoài <code>Collection</code> và cung cấp <code>keySet()</code>, <code>values()</code>, <code>entrySet()</code>. Xem <a href="0028-collections-framework-map.vi.html">bài 0028</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một vòng for-each trên <code>[ann, bob, cid, dan]</code> gọi <code>list.remove("bob")</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>ConcurrentModificationException ở lần next() kế tiếp</button>
+    <button class="opt">bob bị xóa và vòng lặp vẫn chạy tiếp bình thường</button>
+    <button class="opt">Không có gì bị xóa cho đến khi vòng lặp kết thúc</button>
+    <button class="opt">Không compile được: không được gọi remove ở đây</button>
+  </div>
+  <div class="why"><code>modCount</code> tăng lên, còn <code>expectedModCount</code> của iterator thì không, và <code>next()</code> kiểm tra hai số đó. Xem <a href="0029-iterators-and-fail-fast.vi.html">bài 0029</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn cần một stack (push và pop). Javadoc khuyên dùng class nào?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>ArrayDeque</code></button>
+    <button class="opt"><code>Stack</code></button>
+    <button class="opt"><code>LinkedList</code></button>
+    <button class="opt"><code>ArrayList</code></button>
+  </div>
+  <div class="why">Theo tài liệu, <code>ArrayDeque</code> "có khả năng nhanh hơn <code>Stack</code> khi dùng làm stack". Nó không nhận phần tử null. Xem <a href="0002-choosing-a-list.vi.html">bài 0002</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Point</code> override <code>equals()</code> nhưng không override <code>hashCode()</code>. Sau <code>map.put(new Point(1, 2), "A")</code>, <code>map.get(new Point(1, 2))</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Gần như luôn là null</button>
+    <button class="opt">Luôn luôn là "A"</button>
+    <button class="opt">Một lỗi compile</button>
+    <button class="opt">Một exception</button>
+  </div>
+  <div class="why">Hash code mặc định khác nhau, nên Java tìm sai bucket. Không lỗi gì, chỉ là <code>null</code>. Xem <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao nên viết <code>List&lt;Order&gt; orders = new ArrayList&lt;&gt;()</code> thay vì khai báo kiểu là <code>ArrayList&lt;Order&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Bạn đổi được implementation mà không sửa chỗ gọi</button>
+    <button class="opt">Kiểu List làm mọi lời gọi get() chạy nhanh hơn nhiều</button>
+    <button class="opt">Java không cho dùng ArrayList làm kiểu của field</button>
+    <button class="opt">Kiểu List làm collection an toàn khi dùng nhiều thread</button>
+  </div>
+  <div class="why">Viết code dựa trên interface; cấu trúc bên dưới có thể đổi sau. Xem <a href="0028-collections-framework-map.vi.html">bài 0028</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">List là <code>[ann, bob, cid]</code>. Một vòng for-each xóa <code>bob</code>. Kết quả là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không có exception, nhưng cid không được duyệt</button>
+    <button class="opt">Một exception ngay khi tới cid</button>
+    <button class="opt">bob bị xóa và cid vẫn được duyệt bình thường</button>
+    <button class="opt">Vòng lặp duyệt ann hai lần rồi dừng</button>
+  </div>
+  <div class="why">Size giảm còn 2 và cursor là 2, nên <code>hasNext()</code> là false và không có phép kiểm tra nào chạy. Fail-fast chỉ là best-effort. Xem <a href="0029-iterators-and-fail-fast.vi.html">bài 0029</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>linkedList.get(i)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đi qua từng node bắt đầu từ đầu gần hơn</button>
+    <button class="opt">Nhảy thẳng tới ô i trong một mảng ẩn</button>
+    <button class="opt">Luôn đi từ node đầu tiên tới vị trí i</button>
+    <button class="opt">Dùng hash code của i để tìm ra node</button>
+  </div>
+  <div class="why">Theo tài liệu, "các thao tác truy cập theo chỉ số sẽ duyệt list từ đầu hoặc từ cuối, tùy phía nào gần hơn". Đi từng bước, không nhảy thẳng. Xem <a href="0002-choosing-a-list.vi.html">bài 0002</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Câu nào là equals/hashCode contract?</p>
+  <div class="options">
+    <button class="opt" data-correct>Object bằng nhau phải có cùng hash code</button>
+    <button class="opt">Cùng hash code nghĩa là các object bằng nhau</button>
+    <button class="opt">Object khác nhau cần hash code khác nhau</button>
+    <button class="opt">Hash code phải là duy nhất trong một map</button>
+  </div>
+  <div class="why">Chỉ một chiều. <code>"Aa"</code> và <code>"BB"</code> chung số 2112 mà vẫn khác nhau. Xem <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn cần <code>contains</code> nhanh, không trùng lặp, và giữ phần tử theo thứ tự thêm vào. Dùng class nào?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>LinkedHashSet</code></button>
+    <button class="opt"><code>HashSet</code></button>
+    <button class="opt"><code>TreeSet</code></button>
+    <button class="opt"><code>ArrayList</code></button>
+  </div>
+  <div class="why"><code>Hash*</code> không hứa thứ tự, <code>Tree*</code> sắp xếp, <code>Linked*</code> giữ thứ tự thêm vào. Xem <a href="0028-collections-framework-map.vi.html">bài 0028</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bên trong vòng lặp qua <code>map.entrySet()</code>, lời gọi nào được phép?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>entry.setValue(v * 10)</code></button>
+    <button class="opt"><code>map.put(newKey, 0)</code></button>
+    <button class="opt"><code>map.remove(entry.getKey())</code></button>
+    <button class="opt"><code>map.clear()</code></button>
+  </div>
+  <div class="why">Đổi value không phải structural change; thêm hoặc xóa key thì có. Xem <a href="0029-iterators-and-fail-fast.vi.html">bài 0029</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn put một key vào HashMap rồi sửa một field của nó. Vì sao <code>get()</code> không tìm thấy nó nữa?</p>
+  <div class="options">
+    <button class="opt" data-correct>Hash code của nó đã đổi, nên Java tìm ở bucket khác</button>
+    <button class="opt">Map tạo một bản sao của key và so sánh với bản sao đó</button>
+    <button class="opt">Sửa key sẽ ném exception, rồi entry đó bị xóa đi</button>
+    <button class="opt">Map sắp xếp lại các key, và giờ thứ tự đã bị sai</button>
+  </div>
+  <div class="why">Entry vẫn nằm ở bucket cũ, nhưng lần tra cứu đi tới bucket mới. Hãy dùng key immutable. Xem <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<p>Ba câu hỏi mà người phỏng vấn có thể hỏi liền nhau. Làm từng câu một, nói thành lời, có bấm giờ.</p>
+
+<div class="recall">
+  <p class="prompt">Câu 1: <strong>"HashMap hoạt động thế nào?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Một mảng bucket; <code>hashCode()</code> của key chọn bucket.</label></li>
+      <li><label><input type="checkbox"> <code>get</code> lặp lại đúng phép tính đó, nên <code>get</code>/<code>put</code> là O(1) trung bình.</label></li>
+      <li><label><input type="checkbox"> Collision là bình thường; <code>equals()</code> tìm đúng key trong bucket.</label></li>
+      <li><label><input type="checkbox"> Contract: object bằng nhau phải có cùng hash code.</label></li>
+      <li><label><input type="checkbox"> Override cả hai method, hoặc dùng record.</label></li>
+      <li><label><input type="checkbox"> Key phải immutable, nếu không map sẽ không tìm ra.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"HashMap là một mảng bucket. Khi <code>put</code>, Java gọi <code>hashCode()</code> trên key và dùng nó để chọn bucket; <code>get</code> làm lại đúng phép tính đó và đi thẳng tới đó, nên cả hai là O(1) trung bình. Hai key có thể rơi vào cùng bucket, khi đó <code>equals()</code> chọn ra key đúng. Vì vậy object bằng nhau phải có cùng hash code, nên em override cả hai hoặc dùng luôn record. Và em giữ key immutable, vì key bị sửa sẽ khiến lần tra cứu đi sai bucket."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 2: <strong>"ArrayList hay LinkedList? Còn queue thì bạn dùng gì?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>ArrayList</code> là mặc định: một mảng tự lớn lên.</label></li>
+      <li><label><input type="checkbox"> <code>get</code>/<code>set</code> là hằng số; <code>add</code> là hằng số amortized.</label></li>
+      <li><label><input type="checkbox"> <code>LinkedList.get(i)</code> đi bộ từ đầu gần hơn.</label></li>
+      <li><label><input type="checkbox"> Cho queue hoặc stack: <code>ArrayDeque</code>, nhanh hơn <code>Stack</code> và <code>LinkedList</code>.</label></li>
+      <li><label><input type="checkbox"> <code>ArrayDeque</code> không nhận null.</label></li>
+      <li><label><input type="checkbox"> Không cái nào synchronized; khai báo biến bằng interface.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Mặc định em dùng <code>ArrayList</code>. Nó là mảng tự lớn lên, nên <code>get</code> và <code>set</code> là hằng số, còn <code>add</code> là hằng số amortized: thỉnh thoảng phải chép mảng, nhưng tính trung bình thì rẻ. <code>LinkedList.get(i)</code> phải đi từng node từ đầu gần hơn, nên em cần lý do cụ thể mới chọn nó. Cho queue hay stack thì em dùng <code>ArrayDeque</code>; Javadoc nói nó có khả năng nhanh hơn <code>Stack</code> và <code>LinkedList</code>. Một điểm cần nhớ: nó không nhận null. Không cái nào thread safe cả, và em khai báo bằng <code>List</code> hay <code>Deque</code> để sau này đổi implementation được."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 3: <strong>"Một thread có bị ConcurrentModificationException không? Tránh nó thế nào?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Có: sửa collection trong lúc đang duyệt nó, chỉ với một thread.</label></li>
+      <li><label><input type="checkbox"> for-each dùng iterator.</label></li>
+      <li><label><input type="checkbox"> <code>modCount</code> so với <code>expectedModCount</code>, kiểm tra ở <code>next()</code>.</label></li>
+      <li><label><input type="checkbox"> Best-effort: xóa phần tử áp chót sẽ lặng lẽ bỏ qua phần tử cuối.</label></li>
+      <li><label><input type="checkbox"> Cách sửa: <code>removeIf</code>, <code>Iterator.remove()</code>, <code>ListIterator</code>.</label></li>
+      <li><label><input type="checkbox"> <code>setValue</code> trên entry của map thì được; thêm key thì không.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Có ạ. Tên thì nói concurrent, nhưng một thread là đủ: nếu em gọi <code>list.remove</code> trong vòng for-each, iterator ẩn của vòng lặp sẽ phát hiện. List đếm structural change trong <code>modCount</code>, iterator nhớ giá trị cũ, và ở <code>next()</code> nó so sánh rồi ném exception. Nhưng đó chỉ là best-effort: xóa phần tử áp chót làm <code>hasNext()</code> thành false, nên phần tử cuối bị bỏ qua mà không báo gì. Em dùng <code>removeIf</code>, hoặc <code>Iterator.remove()</code>, hoặc <code>ListIterator</code>. Còn đổi value của map bằng <code>setValue</code> thì không sao vì đó không phải structural change."</em></p>
+  </div>
+</div>
+
+<h2>Nếu bạn trả lời sai, hãy đọc lại</h2>
+<table>
+<tr><th>Nếu bạn sai các câu về…</th><th>Đọc lại</th></tr>
+<tr><td><code>Map</code> và <code>Collection</code>, interface, thứ tự Hash/Linked/Tree, thao tác optional</td><td><a href="0028-collections-framework-map.vi.html">Bài 0028: bản đồ Collections Framework</a></td></tr>
+<tr><td><code>ArrayList</code> và <code>LinkedList</code>, add amortized, <code>ArrayDeque</code> và null</td><td><a href="0002-choosing-a-list.vi.html">Bài 0002: chọn list</a></td></tr>
+<tr><td><code>ConcurrentModificationException</code>, <code>modCount</code>, bẫy phần tử áp chót, <code>removeIf</code></td><td><a href="0029-iterators-and-fail-fast.vi.html">Bài 0029: iterator và fail-fast</a></td></tr>
+<tr><td>bucket, collision, equals/hashCode contract, key mutable</td><td><a href="0001-hashmap-equals-hashcode.vi.html">Bài 0001: HashMap tìm value của bạn như thế nào</a></td></tr>
+</table>
+
+<h2>Bây giờ làm bài tập</h2>
+<p>Nếu bạn đã bỏ qua bài nào trong số này, làm ngay bây giờ; nếu đã làm hết, hãy làm lại từ trí nhớ bài có điểm thấp nhất:</p>
+<ul>
+<li><a href="../exercises/0028-pick-the-structure.vi.md">Bài tập 0028: chọn cấu trúc dữ liệu</a></li>
+<li><a href="../exercises/0002-list-choice.vi.md">Bài tập 0002: chọn collection</a></li>
+<li><a href="../exercises/0029-fix-the-loops.vi.md">Bài tập 0029: sửa các vòng lặp</a></li>
+<li><a href="../exercises/0001-mutable-key.vi.md">Bài tập 0001: cái key đã bị thay đổi</a></li>
+</ul>
+<p>Ví dụ chạy được: <a href="../examples/collections/FrameworkMap.java"><code>FrameworkMap.java</code></a> · <a href="../examples/ListPitfalls.java"><code>ListPitfalls.java</code></a> · <a href="../examples/collections/IteratorsAndFailFast.java"><code>IteratorsAndFailFast.java</code></a> · <a href="../examples/LostKey.java"><code>LostKey.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Giờ bạn đã giải thích được HashMap ở mức mid-level. Người phỏng vấn senior sẽ hỏi sâu hơn: <em>"Hash code biến thành số bucket chính xác bằng cách nào? Chuyện gì xảy ra ở entry thứ 13? Nếu một bucket trở nên rất dài thì sao?"</em> <a href="0030-hashmap-internals.vi.html">Bài 0030</a> mở bức tường hộp thư ra và trả lời cả ba.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Oracle: tổng quan Java Collections Framework (JDK 21)</a>, một chuyến tham quan ngắn, chính thức, qua cả gia đình collection.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao Map không phải là Collection?"</em> hoặc <em>"Kiểm tra giúp mình ba câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và các điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0001-hashmap-equals-hashcode.vi.html">← HashMap tìm value của bạn như thế nào</a> &nbsp;|&nbsp; <a href="0030-hashmap-internals.vi.html">Bên trong HashMap: bucket, resize và tree →</a></p>
+
+<footer>
+  <p>Bài ôn tập: không có kiến thức mới. Mọi thông tin đều lấy từ các bài 0028, 0002, 0029 và 0001, vốn đã được kiểm tra với tài liệu Java 21 và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Tổng quan Collections Framework</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">ConcurrentModificationException Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

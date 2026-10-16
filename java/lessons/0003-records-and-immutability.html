@@ -8,74 +8,293 @@
 </head>
 <body>
 <main>
-<h1>Records and shallow immutability</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0003 · step 21 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Records: one line instead of forty</h1>
+<p class="subtitle">What a <code>record</code> writes for you, and the one word, <em>shallow</em>, that can still bite you.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0003 · step 39 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0003-records-and-immutability.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> say what a record generates, and why <code>record</code> does not automatically mean immutable data.</div>
+<div class="mission"><strong>Why this lesson?</strong> Modern Java services use records for DTOs, events, map keys and query results. Interviewers ask <em>"What is a record? Is it immutable?"</em> The expected answer is "yes, but only shallowly", and you should be able to show the fix.</div>
 
-<h2>What a record is</h2>
-<p>Per the Javadoc: "A <em>record class</em> is a shallowly immutable, transparent carrier for a fixed set of values, called the <em>record components</em>."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a> A record has a canonical constructor, a private final field per component, and a public accessor per component. Its <code>equals</code>, <code>hashCode</code> and <code>toString</code> "are derived from all of the component fields."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
-<p>That connects to <a href="0001-hashmap-equals-hashcode.html">lesson 1</a>: a record honours the equals/hashCode contract<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">[2]</a> for free, which makes it a good <code>HashMap</code> key, as long as its components are themselves safe.</p>
-<h2>The word that matters: shallow</h2>
-<p>The fields are final, but a final field pointing at an <code>ArrayList</code> still points at a mutable list. Fix it in a compact constructor with a defensive copy:</p>
+<div class="win"><b>Today's win:</b> list what a record generates, explain why a record holding an <code>ArrayList</code> is not really immutable, and fix it with a compact constructor and <code>List.copyOf</code>.</div>
+
+<dl class="words">
+  <dt>field</dt><dd>A variable that belongs to an object, like <code>x</code> inside a <code>Point</code>.</dd>
+  <dt>final</dt><dd>On a field: it can be set only once, in the constructor. On a class: nobody can extend (subclass) it.</dd>
+  <dt>immutable</dt><dd>Cannot change after it is created. <code>String</code> is immutable; <code>ArrayList</code> is not.</dd>
+  <dt>reference</dt><dd>A field of object type does not hold the object itself, only an arrow pointing to it in memory.</dd>
+  <dt>constructor</dt><dd>The special method that runs when you write <code>new Point(1, 2)</code>. It sets the fields.</dd>
+  <dt>accessor</dt><dd>A method that returns a field's value. JDK 8 code calls it a getter: <code>getX()</code>.</dd>
+  <dt>record component</dt><dd>One of the values listed in a record's header, like <code>x</code> and <code>y</code> in <code>record Point(int x, int y)</code>.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"If every field of a class is <code>final</code>, is the object immutable?"</em> Yes or no, and why? You will check in section 4.</p>
+
+<h2>1. The JDK 8 way: a lot of typing for two numbers</h2>
+<p>Think of a parcel label. It holds a few values (name, street, city) and you only read them. You never "do" anything with a label. Many classes in a backend are like that: an order event, a price, a coordinate. They just <em>carry data</em>.</p>
+<p>In JDK 8, even a two-number label needs all this code:</p>
+<pre><code><span class="c">// JDK 8: a correct immutable value class</span>
+public final class Point {
+    private final int x;
+    private final int y;
+
+    public Point(int x, int y) { this.x = x; this.y = y; }
+
+    public int getX() { return x; }
+    public int getY() { return y; }
+
+    @Override public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x &amp;&amp; y == p.y;
+    }
+    @Override public int hashCode() { return Objects.hash(x, y); }
+    @Override public String toString() { return "Point[x=" + x + ", y=" + y + "]"; }
+}
+
+<span class="c">// JDK 16+: the same thing</span>
+record Point(int x, int y) {}</code></pre>
+<p>The JDK 8 version is easy to get wrong. Add a field <code>z</code> later and forget to update <code>equals</code> or <code>hashCode</code>, and you get the silent <code>HashMap</code> bug from <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a>. Records were finalized in JDK 16, so you have them on 17 and 21.<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a></p>
+
+<h2>2. What a record generates</h2>
+<p>The Javadoc defines it: "A record class is a shallowly immutable, transparent carrier for a fixed set of values, called the record components."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> From the header <code>record Point(int x, int y)</code> the compiler creates:</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="The one-line record Point with int x and int y goes into javac. Out comes a final class extending Record with two private final fields, a canonical constructor, accessors x and y, and equals, hashCode and toString built from x and y.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="110" y="22" text-anchor="middle" font-size="11" opacity=".75">you write</text>
+    <text x="460" y="22" text-anchor="middle" font-size="11" opacity=".75">the compiler creates</text>
+    <rect x="20" y="78" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="34" y="100">record Point(</text>
+    <text x="34" y="120">&#160;&#160;&#160;&#160;int x, int y) {}</text>
+    <g fill="none" stroke="currentColor"><path d="M200 106h54M248 101l6 5-6 5"/></g>
+    <text x="228" y="96" text-anchor="middle" font-size="11" opacity=".75">javac</text>
+    <rect x="260" y="32" width="400" height="160" rx="6" fill="none" stroke="currentColor"/>
+    <text x="276" y="56">final class Point extends Record</text>
+    <text x="276" y="84">private final int x, y;</text>
+    <text x="276" y="112">Point(int x, int y)</text>
+    <text x="276" y="140">int x(), int y()</text>
+    <rect x="268" y="152" width="384" height="28" rx="4" fill="var(--accent-soft)"/>
+    <text x="276" y="170" fill="var(--accent)">equals hashCode toString</text>
+    <g font-size="11" opacity=".75">
+      <text x="480" y="84">// one field per component</text>
+      <text x="480" y="112">// canonical constructor</text>
+      <text x="480" y="140">// accessors, no "get"</text>
+    </g>
+    <text x="480" y="170" font-size="11" fill="var(--accent)">// from all components</text>
+    <text x="340" y="218" text-anchor="middle" font-size="11" opacity=".8">one line in, the whole JDK 8 class out, and it stays correct when you add a component</text>
+  </g>
+</svg>
+<figcaption>Everything in the right box is generated. You can still write any of it yourself if you need different behavior.</figcaption>
+</figure>
+
+<p>The Javadoc lists these "mandated members": a <em>canonical constructor</em>, "a private final field corresponding to each component", and "a public accessor method corresponding to each component, whose name and return type are the same as that of the component".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> And the implicit <code>equals</code>, <code>hashCode</code> and <code>toString</code> "are derived from all of the component fields".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a></p>
+<p>Run the course example and follow each line:</p>
+<pre><code>$ java java/examples/RecordDemo.java
+Point[x=1, y=2]             <span class="c">← toString: name and every component</span>
+true                        <span class="c">← equals: same class, every component equal</span>
+true                        <span class="c">← hashCode: equal points, equal hash codes</span>
+LeakyTeam sees outside change: [ann, bob]
+Team (copyOf) is protected:    [ann]</code></pre>
+<p>That connects to <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a>: a record honours the equals/hashCode contract<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html">Object javadoc</a> for free, which makes it a good <code>HashMap</code> key, as long as its components are themselves safe. (The last two lines are for section 4.)</p>
+<p class="muted">Note the accessor names: <code>p.x()</code>, not <code>p.getX()</code>. Code that expects JDK 8 style <code>getX()</code> names will not find them on a record.</p>
+
+<h2>3. The rules: what a record cannot do</h2>
+<p>A record only carries data, so JEP 395 gives it a few hard limits:<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a></p>
+<ol class="steps">
+  <li>"A record class is implicitly <code>final</code>, and cannot be <code>abstract</code>." Nobody can extend it.</li>
+  <li>"The superclass of a record class is always <code>java.lang.Record</code>." You cannot write <code>extends</code>.</li>
+  <li>"A record class cannot explicitly declare instance fields". All state lives in the header.</li>
+  <li>But "A record class can implement interfaces", and it "can declare <code>static</code> methods, fields, and initializers".</li>
+</ol>
+<p>I tried the forbidden ones with <code>javac</code> 21:</p>
+<pre><code>record P(int x) { int y; }
+<span class="c">error: field declaration must be static</span>
+
+System.out.println(P.class.getSuperclass() + " final=" + Modifier.isFinal(P.class.getModifiers()));
+<span class="hl">class java.lang.Record final=true</span></code></pre>
+<p>You may write an accessor yourself (for example to return a copy). JEP 395 allows it, as long as the return type matches exactly.<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a></p>
+
+<h2>4. The word that matters: shallow</h2>
+<p>Imagine a locked glass case in a museum. Inside is a card with the address of a house. Nobody can change the card: it is locked. But the <em>house</em> at that address can still be repainted. The case protects the card, not the house.</p>
+<p>A <code>final</code> field is that locked card. If the field is a <span class="term">reference</span> to an <code>ArrayList</code>, the field will always point to the <em>same</em> list, but anybody holding that list can still add to it. That is what "shallowly immutable" means.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record javadoc</a> So the answer to "Before you start" is <strong>no</strong>: all-final fields are not enough when a field points to something mutable.</p>
+<pre><code>record LeakyTeam(String name, List&lt;String&gt; members) {}
+
+List&lt;String&gt; shared = new ArrayList&lt;&gt;(List.of("ann"));
+LeakyTeam leaky = new LeakyTeam("a", shared);
+shared.add("bob");                         <span class="c">// change the list from outside</span>
+leaky.members();                           <span class="hl">// [ann, bob]: the record changed!</span></code></pre>
+<pre><code><span class="c">Step 1  shared points to a list [ann]</span>
+<span class="c">Step 2  the record's members field gets a copy of the ARROW, not of the list</span>
+<span class="c">Step 3  shared.add("bob") changes the one list both arrows point to</span>
+<span class="c">Step 4  leaky.members() follows its arrow and finds [ann, bob]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Left: LeakyTeam's members field and the outside variable shared both point to one list containing ann and bob. Right: Team's members field points to its own unmodifiable copy containing ann, while shared2 points to a separate list containing ann and bob.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="22" text-anchor="middle" font-size="11" opacity=".75">LeakyTeam (no copy)</text>
+    <text x="510" y="22" text-anchor="middle" font-size="11" opacity=".75">Team (List.copyOf)</text>
+    <rect x="30" y="40" width="130" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="44" y="60" font-size="11" opacity=".75">leaky</text>
+    <text x="44" y="86">members ●</text>
+    <rect x="30" y="140" width="130" height="40" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="44" y="165">shared&#160;&#160;●</text>
+    <rect x="210" y="90" width="110" height="44" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="265" y="117" text-anchor="middle" fill="var(--accent)">[ann, bob]</text>
+    <g fill="none" stroke="currentColor"><path d="M128 82L204 106M197 100l7 6-9 2"/><path d="M128 160L204 122M195 120l9 2-6 7"/></g>
+    <rect x="360" y="40" width="130" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="374" y="60" font-size="11" opacity=".75">safe</text>
+    <text x="374" y="86">members ●</text>
+    <rect x="540" y="58" width="110" height="44" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="595" y="85" text-anchor="middle" fill="var(--accent)">[ann]</text>
+    <text x="595" y="118" text-anchor="middle" font-size="11" fill="var(--accent)">unmodifiable copy</text>
+    <rect x="360" y="140" width="130" height="40" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="374" y="165">shared2 ●</text>
+    <rect x="540" y="138" width="110" height="44" rx="4" fill="none" stroke="currentColor"/>
+    <text x="595" y="165" text-anchor="middle">[ann, bob]</text>
+    <g fill="none" stroke="currentColor"><path d="M458 82h76M528 77l6 5-6 5M458 160h76M528 155l6 5-6 5"/></g>
+    <text x="170" y="212" text-anchor="middle" font-size="11" fill="var(--accent)">one list, two arrows: the change leaks in</text>
+    <text x="510" y="212" text-anchor="middle" font-size="11" fill="var(--accent)">two lists: the record owns its own</text>
+    <text x="340" y="238" text-anchor="middle" font-size="11" opacity=".8">dashed box = a variable outside the record; then shared.add("bob") is called</text>
+  </g>
+</svg>
+<figcaption>The <code>final</code> field fixes the arrow, not the list. Copying in the constructor gives the record a list nobody else can reach.</figcaption>
+</figure>
+
+<h3>The fix: a compact constructor with a defensive copy</h3>
+<p>A record can have a <em>compact</em> constructor: you write the record name and a body, without repeating the parameter list. JEP 395 says the parameters are declared for you, and the fields are assigned automatically at the end.<a class="src" href="https://openjdk.org/jeps/395">JEP 395</a> It is the perfect place to validate and copy:</p>
 <pre><code>record Team(String name, List&lt;String&gt; members) {
     Team {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("name");
-        members = List.copyOf(members);
-    }
+        members = List.copyOf(members);    <span class="c">// replace the parameter with a copy</span>
+    }                                      <span class="c">// fields are assigned here, from the parameters</span>
 }</code></pre>
-<pre><code>java java/examples/RecordDemo.java
+<pre><code>$ java java/examples/RecordDemo.java
+...
 LeakyTeam sees outside change: [ann, bob]
-Team (copyOf) is protected:    [ann]</code></pre>
-<p class="aside">The <code>Record</code> Javadoc is the source for what is generated. The compact-constructor pattern is standard practice; the demo above shows it working rather than citing it.</p>
+<span class="hl">Team (copyOf) is protected:    [ann]</span></code></pre>
+<p>Why <code>List.copyOf</code> and not <code>new ArrayList&lt;&gt;(members)</code>? <code>List.copyOf</code> returns an "unmodifiable List", and "If the given Collection is subsequently modified, the returned List will not reflect such modifications".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> Because it is unmodifiable, a caller who does <code>team.members().add("x")</code> also fails. I ran it: <code>UnsupportedOperationException</code>. A plain <code>ArrayList</code> copy would block the outside change, but not this one.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. What is a record's equals based on?</p>
-  <button>The first component</button>
-  <button data-correct>All component values</button>
-  <button>The memory address only</button>
-  <button>The hash code alone</button>
-  <p class="explain">equals is derived from all components: same record class and each component equal.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Fields of a record are which of these?</p>
-  <button>Public and volatile</button>
-  <button data-correct>Private and final</button>
-  <button>Public and mutable</button>
-  <button>Private and mutable</button>
-  <p class="explain">Mandated members include a private final field for each component.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Record holds an <code>ArrayList</code> component. Immutable?</p>
-  <button>Yes, after first use</button>
-  <button>Yes, fully immutable</button>
-  <button>No, it cannot compile</button>
-  <button data-correct>No, only shallowly so</button>
-  <p class="explain">Records are shallowly immutable; the referenced list can still change unless you copy it.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Best fix for the leaky list component?</p>
-  <button>Override toString only</button>
-  <button data-correct>Copy it in constructor</button>
-  <button>Mark the list static</button>
-  <button>Make the record abstract</button>
-  <p class="explain">A compact constructor with <code>List.copyOf</code> stores an unmodifiable copy.</p>
-</div>
+<h3>Trap: nulls inside the list</h3>
+<p><code>List.copyOf</code> throws <code>NullPointerException</code> "if coll is null, or if it contains any nulls".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> Usually that is what you want for a value object (fail early). If nulls are legal in your data, decide that explicitly and document it.</p>
+<p class="muted">The <code>Record</code> Javadoc is the source for what is generated. The compact-constructor pattern is standard practice; the demo above shows it working rather than citing it.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">What is the implicit <code>equals()</code> of a record based on?</p>
+  <div class="options">
+    <button class="opt" data-correct>All of its component values</button>
+    <button class="opt">Only the first component</button>
+    <button class="opt">The memory address only</button>
+    <button class="opt">The hash code alone</button>
+  </div>
+  <div class="why">equals, hashCode and toString are derived from all the component fields: same record class and every component equal.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">For <code>record Point(int x, int y)</code>, what fields does the compiler create?</p>
+  <div class="options">
+    <button class="opt" data-correct>private final int x and y</button>
+    <button class="opt">public final int x and y</button>
+    <button class="opt">private int x and y, not final</button>
+    <button class="opt">public static int x and y</button>
+  </div>
+  <div class="why">The Javadoc mandates a private final field for each component, plus a public accessor with the same name.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">How do you read <code>x</code> from <code>Point p</code> when <code>Point</code> is a record?</p>
+  <div class="options">
+    <button class="opt" data-correct>p.x()</button>
+    <button class="opt">p.getX()</button>
+    <button class="opt">p.get("x")</button>
+    <button class="opt">p.x</button>
+  </div>
+  <div class="why">The accessor has the same name as the component, with no <code>get</code> prefix. The field itself is private.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What happens with <code>record P(int x) { int y; }</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compile error: the field must be static</button>
+    <button class="opt">It compiles; y is a private final field</button>
+    <button class="opt">It compiles; y is left out of equals</button>
+    <button class="opt">It compiles but y is always zero</button>
+  </div>
+  <div class="why">A record cannot declare instance fields; all state lives in the header. Only static fields are allowed in the body.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A record has an <code>ArrayList</code> component that the caller still holds. Is the record immutable?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, it is only shallowly immutable</button>
+    <button class="opt">Yes, records are always fully immutable</button>
+    <button class="opt">Yes, the list is frozen when stored</button>
+    <button class="opt">No, records cannot hold lists at all</button>
+  </div>
+  <div class="why">The final field always points to the same list, but the list itself can still change from outside.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the best fix for that leaky list component?</p>
+  <div class="options">
+    <button class="opt" data-correct>List.copyOf in a compact constructor</button>
+    <button class="opt">Override toString to hide the list</button>
+    <button class="opt">Mark the list component as static</button>
+    <button class="opt">Add the final keyword to the record</button>
+  </div>
+  <div class="why"><code>List.copyOf</code> stores an unmodifiable copy, so neither the outside caller nor <code>members().add()</code> can change it.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Can a record extend another class, like <code>record P(int x) extends Base</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, its superclass is always Record</button>
+    <button class="opt">Yes, if Base is an abstract class</button>
+    <button class="opt">Yes, but only one level deep</button>
+    <button class="opt">No, but another class can extend it</button>
+  </div>
+  <div class="why">A record always extends <code>java.lang.Record</code> and is implicitly final. It can implement interfaces, though.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is a Java record, and is it immutable?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A record (final in JDK 16) is a transparent carrier for a fixed set of values.</label></li>
+      <li><label><input type="checkbox"> It generates private final fields, a canonical constructor and accessors like <code>x()</code>.</label></li>
+      <li><label><input type="checkbox"> <code>equals</code>, <code>hashCode</code>, <code>toString</code> come from all components, so it is a safe <code>HashMap</code> key.</label></li>
+      <li><label><input type="checkbox"> Limits: implicitly final, extends <code>Record</code>, no extra instance fields; can implement interfaces.</label></li>
+      <li><label><input type="checkbox"> Only <em>shallowly</em> immutable: a final field can point to a mutable list.</label></li>
+      <li><label><input type="checkbox"> Fix: compact constructor that validates and uses <code>List.copyOf</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A record, final since JDK 16, is a class whose job is to carry data. I write <code>record Point(int x, int y)</code> and the compiler generates private final fields, a canonical constructor, accessors <code>x()</code> and <code>y()</code>, and <code>equals</code>, <code>hashCode</code> and <code>toString</code> based on all components. So it replaces about forty lines of JDK 8 code and it's a safe map key. It's implicitly final, extends <code>java.lang.Record</code>, and can't declare extra instance fields, but it can implement interfaces. Is it immutable? Only shallowly. The fields are final, but if a component is an <code>ArrayList</code>, the caller can still change that list. So in the compact constructor I validate the input and do <code>members = List.copyOf(members)</code>; that gives the record its own unmodifiable list."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0003-record-as-key.md">Exercise 0003: a record as a map key</a></p>
+<p><a href="../exercises/0003-record-as-key.md">Exercise 0003: a record as a map key</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/RecordDemo.java"><code>RecordDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record class Javadoc</a>. Read the class description only.</p>
-<p><a href="0013-switch-expressions-and-instanceof-patterns.html">← JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</a> &nbsp;|&nbsp; <a href="0014-sealed-classes.html">JDK 17: sealed classes and interfaces →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Records hold data. How do you model 'a payment is a card, a bank transfer or a voucher, and nothing else'?"</em> That needs a closed set of types: <a href="0014-sealed-classes.html">sealed classes, lesson 0014</a>. Records plus sealed interfaces are the base of pattern matching in <a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 0015</a>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/395">JEP 395: Records</a> (the Description section explains every rule with code), and the <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record class Javadoc</a>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Can I use a record as a JPA entity?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0013-switch-expressions-and-instanceof-patterns.html">← switch that returns a value, instanceof that casts for you</a> &nbsp;|&nbsp; <a href="0014-sealed-classes.html">Sealed classes: a guest list for subclasses →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Object.html">Object Javadoc (equals/hashCode)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation and the OpenJDK JEPs, and run on JDK 21, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html">Object Javadoc (equals/hashCode)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc</a> · <a href="https://openjdk.org/jeps/395">JEP 395: Records</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

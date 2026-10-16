@@ -9,71 +9,317 @@
 <body>
 <main>
 <h1>Virtual threads: scale, not speed</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0006 · step 26 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<p class="subtitle">How JDK 21 runs ten thousand waiting tasks on a handful of real threads, and the two rules that keep it working.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0006 · step 44 of 46 · Advanced · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0006-virtual-threads.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> A typical backend service spends most of its time <em>waiting</em>: for the database, for another HTTP service, for a queue. Virtual threads, final in JDK 21, change how many of those waits one server can handle. It is now one of the most common senior Java questions: <em>"What are virtual threads, when do they help, and what can go wrong?"</em></div>
 
 <div class="win"><b>Today's win:</b> explain what a virtual thread is, when it helps, and the two rules: don't pool them, and use a Semaphore to limit concurrency.</div>
 
-<h2>What they are</h2>
-<p>"Like a platform thread, a virtual thread is also an instance of <code>java.lang.Thread</code>. However, a virtual thread isn't tied to a specific OS thread." When code in a virtual thread calls a blocking I/O operation, the runtime suspends it and frees the OS thread for other virtual threads.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
-<h2>Scale, not speed</h2>
-<p>"Virtual threads are not faster threads; they do not run code any faster than platform threads. They exist to provide scale (higher throughput), not speed (lower latency)."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a> They suit thread-per-request servers with lots of blocking I/O; write simple blocking code.</p>
-<h2>Two rules</h2>
-<ul>
-<li>"Never pool virtual threads." One virtual thread per task: <code>Executors.newVirtualThreadPerTaskExecutor()</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></li>
-<li>To limit concurrency (say, calls to a downstream service), use a <code>Semaphore</code>, not a pool.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></li>
-</ul>
-<p>Caveat: virtual threads can be <em>pinned</em> to their carrier, for example in native calls, which hurts scalability but not correctness.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
-<pre><code>java java/examples/VirtualThreadsDemo.java
-10,000 one-second tasks finished in 1041 ms</code></pre>
-<p>Ten thousand one-second sleeps finish in about one second. With a fixed pool of 200 platform threads the same job would take about 50 seconds (10,000 / 200 x 1 s); try it in the exercise.</p>
+<dl class="words">
+  <dt>thread</dt><dd>One line of work running inside your program. Several threads can run at the same time, each with its own steps.</dd>
+  <dt>OS thread</dt><dd>A thread managed by the operating system. It is expensive: the OS gives each one its own memory, so you can only have a few thousand.</dd>
+  <dt>platform thread</dt><dd>The classic Java thread. Each one is "a thin wrapper around an operating system (OS) thread".</dd>
+  <dt>virtual thread</dt><dd>A lightweight Java thread that borrows an OS thread only while it is actually running code.</dd>
+  <dt>carrier thread</dt><dd>The platform thread a virtual thread is currently running on.</dd>
+  <dt>blocking I/O</dt><dd>A call that waits for the outside world: a database query, an HTTP call, reading a file, <code>Thread.sleep</code>.</dd>
+  <dt>throughput</dt><dd>How many tasks finish per second. <em>Latency</em> is how long one task takes.</dd>
+</dl>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Main benefit of virtual threads?</p>
-  <button>Faster CPU-bound loops</button>
-  <button>Smaller compiled bytecode</button>
-  <button>Lower latency per call</button>
-  <button data-correct>Higher overall throughput</button>
-  <p class="explain">They provide scale (throughput), not speed.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. How should you manage virtual threads?</p>
-  <button>Reuse a single one</button>
-  <button>Share one per core</button>
-  <button data-correct>Create one per task</button>
-  <button>Pool them in 200</button>
-  <p class="explain">Represent every task as a virtual thread; never pool them.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. How do you cap concurrent downstream calls?</p>
-  <button>Disable blocking I/O</button>
-  <button data-correct>Use a Semaphore</button>
-  <button>Use daemon threads</button>
-  <button>Shrink the thread pool</button>
-  <p class="explain">The docs recommend a Semaphore to limit concurrency.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Which workload gains least from virtual threads?</p>
-  <button>Waiting on queues</button>
-  <button data-correct>Pure CPU number crunching</button>
-  <button>Blocking HTTP calls</button>
-  <button>Blocking JDBC calls</button>
-  <p class="explain">CPU-bound work does not block, so unmounting brings no benefit; they run code no faster.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">[1]</a></p>
-</div>
+<h2>Before you start</h2>
+<p>Say out loud: <em>"My server has a pool of 200 threads. Each request calls a database that answers in 1 second. How many requests per second can it handle at most?"</em> Keep your number; you will check it in section 3.</p>
+
+<h2>1. The old way: one waiter per table</h2>
+<p>Imagine a restaurant where each waiter takes an order, walks to the kitchen and then <strong>stands there</strong> until the food is ready. With 200 waiters you can serve 200 tables at once. Table 201 waits at the door, even though most waiters are doing nothing but standing.</p>
+<p>That is a classic Java server. Each request gets a <span class="term">platform thread</span>, and "A platform thread is implemented as a thin wrapper around an operating system (OS) thread."<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a> OS threads are costly, so we keep a fixed pool of them (lesson 0023):</p>
+<pre><code><span class="c">// JDK 8 / 17 style: a fixed pool of 200 platform threads</span>
+<span class="c">// (try-with-resources on an executor needs JDK 19+;</span>
+<span class="c">//  on 8 and 17 call shutdown() instead)</span>
+try (var pool = Executors.newFixedThreadPool(200)) {
+    for (int i = 0; i &lt; 10_000; i++) {
+        pool.submit(() -&gt; {
+            Thread.sleep(Duration.ofSeconds(1));   <span class="c">// holds its OS thread</span>
+            return null;
+        });
+    }
+}</code></pre>
+<p>While a thread waits for the database, it holds its OS thread and does nothing. Only 200 tasks run at a time, so 10,000 one-second tasks need about 10,000 / 200 × 1 s = <strong>50 seconds</strong>. That was your answer to "Before you start": at most 200 requests per second.</p>
+
+<h2>2. The new way: waiters who don't stand around</h2>
+<p>Now the waiters take an order, hand it to the kitchen, and go serve another table. When the food is ready, any free waiter picks it up. A few waiters can serve hundreds of tables, because nobody stands still.</p>
+<p>That is a <span class="term">virtual thread</span>. "Like a platform thread, a virtual thread is also an instance of <code>java.lang.Thread</code>. However, a virtual thread isn't tied to a specific OS thread." When code in a virtual thread calls a blocking I/O operation, the runtime suspends it and frees the OS thread for other virtual threads.<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a></p>
+<p>JEP 444 names the parts. The JDK runs a virtual thread "by mounting the virtual thread on a platform thread", and "The platform thread to which the scheduler assigns a virtual thread is called the virtual thread's carrier." When the virtual thread blocks, it "can unmount from its carrier".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a></p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Left: three platform threads, each tied to its own OS thread. Right: six virtual threads share two carrier threads. Two virtual threads are mounted and running; the other four are waiting and use no OS thread.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="24" text-anchor="middle" font-size="13">platform threads</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="50" width="110" height="34" rx="4"/>
+      <rect x="30" y="100" width="110" height="34" rx="4"/>
+      <rect x="30" y="150" width="110" height="34" rx="4"/>
+      <rect x="200" y="50" width="110" height="34" rx="4"/>
+      <rect x="200" y="100" width="110" height="34" rx="4"/>
+      <rect x="200" y="150" width="110" height="34" rx="4"/>
+      <path d="M140 67h60M140 117h60M140 167h60"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="85" y="72">Thread 1</text><text x="85" y="122">Thread 2</text><text x="85" y="172">Thread 3</text>
+      <text x="255" y="72">OS thread</text><text x="255" y="122">OS thread</text><text x="255" y="172">OS thread</text>
+    </g>
+    <text x="170" y="220" text-anchor="middle" font-size="11" opacity=".8">1 Java thread = 1 OS thread, always</text>
+    <text x="170" y="238" text-anchor="middle" font-size="11" opacity=".8">costly, so you keep a small pool</text>
+    <path d="M340 20v220" stroke="currentColor" opacity=".3"/>
+    <text x="510" y="24" text-anchor="middle" font-size="13" fill="var(--accent)">virtual threads</text>
+    <rect x="370" y="50" width="40" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="530" y="50" width="40" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7">
+      <rect x="418" y="50" width="40" height="30" rx="4"/>
+      <rect x="466" y="50" width="40" height="30" rx="4"/>
+      <rect x="578" y="50" width="40" height="30" rx="4"/>
+      <rect x="610" y="96" width="40" height="30" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="390" y="70" fill="var(--accent)">v1</text>
+      <text x="438" y="70" opacity=".7">v2</text>
+      <text x="486" y="70" opacity=".7">v3</text>
+      <text x="550" y="70" fill="var(--accent)">v4</text>
+      <text x="598" y="70" opacity=".7">v5</text>
+      <text x="630" y="116" opacity=".7">v6</text>
+    </g>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M390 80v60M385 134l5 6 5-6"/>
+      <path d="M550 80v60M545 134l5 6 5-6"/>
+    </g>
+    <text x="398" y="112" font-size="11" fill="var(--accent)">mounted</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="360" y="142" width="120" height="40" rx="4"/>
+      <rect x="490" y="142" width="120" height="40" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="420" y="159">carrier 1</text><text x="420" y="174" opacity=".7">(an OS thread)</text>
+      <text x="550" y="159">carrier 2</text><text x="550" y="174" opacity=".7">(an OS thread)</text>
+    </g>
+    <text x="510" y="220" text-anchor="middle" font-size="11" opacity=".8">dashed: waiting for I/O, holding no OS thread</text>
+    <text x="510" y="238" text-anchor="middle" font-size="11" opacity=".8">many virtual threads share a few carriers</text>
+  </g>
+</svg>
+<figcaption>A platform thread owns its OS thread for life. A virtual thread borrows a carrier only while it runs code.</figcaption>
+</figure>
+
+<p>Who decides which virtual thread runs on which carrier? A scheduler: "The JDK's virtual thread scheduler is a work-stealing <code>ForkJoinPool</code> that operates in FIFO mode." Its parallelism, the number of carriers, is "By default ... equal to the number of available processors".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> On an 8-core machine you get about 8 carriers, however many virtual threads you create.</p>
+
+<h2>3. Ten thousand sleeps in one second</h2>
+<p>Here is the course example. Compare it with the pool code in section 1: only one line changed.</p>
+<pre><code>try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i &lt; 10_000; i++) {
+        executor.submit(() -&gt; {
+            Thread.sleep(Duration.ofSeconds(1)); <span class="c">// blocks: v-thread unmounts</span>
+            return null;
+        });
+    }
+} <span class="c">// close() waits for all tasks</span></code></pre>
+<pre><code>$ java java/examples/VirtualThreadsDemo.java
+<span class="hl">10,000 one-second tasks finished in 1065 ms</span></code></pre>
+<p>Ten thousand one-second sleeps finish in about one second. With a fixed pool of 200 platform threads the same job would take about 50 seconds (10,000 / 200 × 1 s); try it in the exercise. Follow one task:</p>
+<pre><code><span class="c">Step 1  submit() creates a new virtual thread v1 for the task</span>
+<span class="c">Step 2  the scheduler mounts v1 on a free carrier; v1 starts running</span>
+<span class="c">Step 3  v1 calls Thread.sleep(1 s): it unmounts, the carrier is free again</span>
+<span class="c">Step 4  the carrier runs v2, v3, ... which also sleep and unmount</span>
+<span class="c">Step 5  after 1 s, v1 is ready: it mounts on any free carrier and returns</span>
+<span class="hl">        all 10,000 wait at the same time, so the whole job takes ~1 s</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Timeline of one carrier thread. It runs v1, then v1 blocks on I/O and unmounts, the carrier runs v2 and v3, then v1 becomes ready and mounts again.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="72">carrier</text>
+    <rect x="110" y="52" width="120" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="230" y="52" width="140" height="30" fill="none" stroke="currentColor"/>
+    <rect x="370" y="52" width="130" height="30" fill="none" stroke="currentColor"/>
+    <rect x="500" y="52" width="140" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="170" y="72" fill="var(--accent)">v1 runs</text>
+      <text x="300" y="72">v2 runs</text>
+      <text x="435" y="72">v3 runs</text>
+      <text x="570" y="72" fill="var(--accent)">v1 runs</text>
+    </g>
+    <text x="20" y="152">v1</text>
+    <rect x="110" y="132" width="120" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="230" y="132" width="270" height="30" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7"/>
+    <rect x="500" y="132" width="140" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="170" y="152" fill="var(--accent)">running</text>
+      <text x="365" y="152" opacity=".8">waiting, unmounted</text>
+      <text x="570" y="152" fill="var(--accent)">running</text>
+    </g>
+    <g font-size="11" text-anchor="middle">
+      <text x="230" y="108">sleep() / read()</text>
+      <text x="230" y="122">→ unmount</text>
+      <text x="500" y="108">I/O ready</text>
+      <text x="500" y="122">→ mount again</text>
+    </g>
+    <path d="M110 194h530M634 189l6 5-6 5" fill="none" stroke="currentColor" opacity=".6"/>
+    <text x="110" y="212" font-size="11" opacity=".7">time →</text>
+  </g>
+</svg>
+<figcaption>While v1 waits, its carrier is not wasted: it runs other virtual threads.</figcaption>
+</figure>
+
+<p>You can also create virtual threads directly. JEP 444: "<code>Thread.Builder</code>, <code>Thread.ofVirtual()</code>, and <code>Thread.ofPlatform()</code> are new APIs to create virtual and platform threads", and "<code>Thread.startVirtualThread(Runnable)</code> is a convenient way to create and then start a virtual thread."<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> Also, "Virtual threads are always daemon threads", so they do not keep the JVM alive on their own.<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a></p>
+
+<h2>4. Scale, not speed</h2>
+<p>"Virtual threads are not faster threads; they do not run code any faster than platform threads. They exist to provide scale (higher throughput), not speed (lower latency)."<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> They suit thread-per-request servers with lots of blocking I/O; write simple blocking code.</p>
+<p>Back to the restaurant: smart waiters don't make the kitchen cook faster. One dish still takes ten minutes. What changes is how many tables you serve at once. JEP 444 puts it formally: "The scalability of server applications is governed by Little's Law".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> In simple words, requests per second ≈ requests in progress ÷ time per request. With 1-second waits, 200 threads give 200 per second; 10,000 virtual threads give about 10,000 per second.</p>
+<h3>Trap: CPU-heavy work</h3>
+<p>If each task computes for 1 second (hashing, image resizing) instead of waiting, it never blocks, so it never unmounts. You still have only as many carriers as CPU cores, and the job takes just as long as with a platform pool. Virtual threads help with <strong>waiting</strong>, not with computing.</p>
+
+<h2>5. Two rules: don't pool them, limit with a Semaphore</h2>
+<p><strong>Rule 1: "Never pool virtual threads."</strong> Use one virtual thread per task: <code>Executors.newVirtualThreadPerTaskExecutor()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> The guide explains why: "Pools are designed to share scarce resources, and virtual threads aren’t scarce and therefore should never be pooled!"<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a> Creating one is cheap; JEP 444 shows a program that creates 10,000 and talks about being able to "create 1,000,000 virtual threads that run concurrently".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a></p>
+<p><strong>Rule 2: limit concurrency with a <code>Semaphore</code>, not a pool.</strong><a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> Old code often used a pool of 10 threads <em>also</em> to protect a slow service from more than 10 calls at once. Without the pool you still need that limit. A semaphore is a bowl of 10 tickets: take one before the call, give it back after. The guide's example:<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a></p>
+<pre><code>Semaphore sem = new Semaphore(10);
+...
+Result foo() {
+    sem.acquire();      <span class="c">// wait for a ticket (an 11th caller waits here)</span>
+    try {
+        return callLimitedService();
+    } finally {
+        sem.release();  <span class="c">// always give the ticket back</span>
+    }
+}</code></pre>
+<p class="muted">One more caution from JEP 444: since you may have millions of virtual threads, "use thread locals only after careful consideration".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> A big object cached in a <code>ThreadLocal</code> used to exist 200 times; now it may exist once per task.</p>
+
+<h2>6. The catch: pinning</h2>
+<p>Sometimes a virtual thread cannot unmount while it waits. It is then <span class="term">pinned</span> to its carrier, for example in native calls, which hurts scalability but not correctness.<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> On JDK 21 the guide lists two cases: "The virtual thread runs code inside a <code>synchronized</code> block or method" and "The virtual thread runs a <code>native</code> method or a foreign function".<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a></p>
+<p>In the restaurant: a waiter who holds the only key to the wine cellar while waiting at the kitchen can't hand the key over, so he must stand there. That waiter is pinned.</p>
+<p>You can see it. "The system property <code>jdk.tracePinnedThreads</code> triggers a stack trace when a thread blocks while pinned."<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> I ran a virtual thread that sleeps inside <code>synchronized (lock)</code> on JDK 21:</p>
+<pre><code>$ java -Djdk.tracePinnedThreads=short Pin.java
+VirtualThread[#20]/runnable@ForkJoinPool-1-worker-1 reason:MONITOR
+    Pin.lambda$main$0(Pin.java:6) <span class="hl">&lt;== monitors:1</span>
+virtual? true, daemon? true</code></pre>
+<p>Read it: virtual thread #20, running on carrier <code>ForkJoinPool-1-worker-1</code>, blocked while holding a monitor (a <code>synchronized</code> lock) at line 6. The last line confirms it was virtual and a daemon.</p>
+<p><strong>The fix on JDK 21:</strong> for <code>synchronized</code> blocks that run often and wrap long I/O, use a <code>ReentrantLock</code> (lesson 0024).<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a></p>
+<pre><code><span class="c">// Before: pins the carrier thread during frequentIO()</span>
+synchronized(lockObj) {
+    frequentIO();
+}
+
+<span class="c">// After</span>
+lock.lock();
+try {
+    frequentIO();
+} finally {
+    lock.unlock();
+}</code></pre>
+<p class="muted">After 21: JEP 491, delivered in JDK 24, lets virtual threads unmount inside <code>synchronized</code>, which "will eliminate nearly all cases of virtual threads being pinned". Native calls can still pin.<a class="src" href="https://openjdk.org/jeps/491">JEP 491</a> This course targets 21, so the <code>ReentrantLock</code> advice still applies to you.</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<p>Virtual threads are final in JDK 21 (JEP 444). JDK 8 and 17 have only platform threads, so you size a pool (lesson 0023) or go asynchronous with <code>CompletableFuture</code> (lesson 0010). On 21 you can write plain blocking code again and still scale.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">What is the main benefit of virtual threads?</p>
+  <div class="options">
+    <button class="opt" data-correct>Higher overall throughput</button>
+    <button class="opt">Faster CPU-bound loops</button>
+    <button class="opt">Lower latency per call</button>
+    <button class="opt">Smaller compiled bytecode</button>
+  </div>
+  <div class="why">They provide scale (throughput), not speed. One task takes as long as before; many more run at once.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">How should you manage virtual threads?</p>
+  <div class="options">
+    <button class="opt" data-correct>Create a new one for every task</button>
+    <button class="opt">Keep a pool of about 200 of them</button>
+    <button class="opt">Create one for each CPU core</button>
+    <button class="opt">Reuse a single one for everything</button>
+  </div>
+  <div class="why">Represent every task as a virtual thread; never pool them. They are cheap, and pools exist to share scarce resources.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Your service may call a partner API at most 10 times at once. With virtual threads, how do you enforce it?</p>
+  <div class="options">
+    <button class="opt" data-correct>A Semaphore with 10 permits</button>
+    <button class="opt">A fixed pool of 10 virtual threads</button>
+    <button class="opt">Mark the threads as daemon threads</button>
+    <button class="opt">Turn off blocking I/O in the client</button>
+  </div>
+  <div class="why">The docs recommend a <code>Semaphore</code> to limit concurrency, not a pool.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which workload gains the least from virtual threads?</p>
+  <div class="options">
+    <button class="opt" data-correct>Pure CPU number crunching</button>
+    <button class="opt">Blocking HTTP calls to services</button>
+    <button class="opt">Blocking JDBC database queries</button>
+    <button class="opt">Waiting for messages on a queue</button>
+  </div>
+  <div class="why">CPU-bound work does not block, so unmounting brings no benefit; virtual threads run code no faster.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">On JDK 21, a virtual thread calls a slow HTTP API inside a <code>synchronized</code> block. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is pinned: its carrier is blocked too</button>
+    <button class="opt">It unmounts as usual and frees its carrier</button>
+    <button class="opt">The JVM throws an exception at that line</button>
+    <button class="opt">The block runs on a new platform thread</button>
+  </div>
+  <div class="why">In JDK 21, code inside <code>synchronized</code> pins the virtual thread. The result is still correct, but the carrier can't serve others. Use <code>ReentrantLock</code> for long I/O there.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A pool of 200 platform threads runs 10,000 tasks that each sleep 1 second. About how long does it take?</p>
+  <div class="options">
+    <button class="opt" data-correct>About 50 seconds</button>
+    <button class="opt">About 1 second</button>
+    <button class="opt">About 200 seconds</button>
+    <button class="opt">About 10,000 seconds</button>
+  </div>
+  <div class="why">200 tasks at a time, 1 second each: 10,000 / 200 × 1 s = 50 s. With virtual threads it took about 1 s.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What are virtual threads, and when would you use them?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> A virtual thread is a <code>java.lang.Thread</code> that is not tied to one OS thread (final in JDK 21).</label></li>
+      <li><label><input type="checkbox"> It runs mounted on a carrier (platform) thread and unmounts when it blocks on I/O.</label></li>
+      <li><label><input type="checkbox"> It gives scale (throughput), not speed; it helps I/O-bound work, not CPU-bound work.</label></li>
+      <li><label><input type="checkbox"> Never pool them: one virtual thread per task (<code>newVirtualThreadPerTaskExecutor</code>).</label></li>
+      <li><label><input type="checkbox"> Limit access to a scarce resource with a <code>Semaphore</code>.</label></li>
+      <li><label><input type="checkbox"> Pinning: on JDK 21, <code>synchronized</code> and native calls pin the carrier; use <code>ReentrantLock</code> around long I/O, find it with <code>jdk.tracePinnedThreads</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A virtual thread is a normal <code>java.lang.Thread</code>, but it isn't tied to an OS thread. The JDK mounts it on a carrier thread from a small ForkJoinPool, and when it blocks on I/O, like a database call, it unmounts and the carrier runs another virtual thread. So I can have one thread per request, even tens of thousands, and write simple blocking code. It's about throughput, not speed: one request is not faster, and CPU-heavy work gains nothing. Two rules: I never pool them, I use <code>newVirtualThreadPerTaskExecutor</code>, and if I need to limit calls to a downstream service I use a Semaphore instead of a small pool. The main pitfall on JDK 21 is pinning: inside <code>synchronized</code> or native code the virtual thread can't unmount, so for frequent long I/O under a lock I switch to <code>ReentrantLock</code>, and I find those spots with <code>-Djdk.tracePinnedThreads</code>."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0006-pool-vs-virtual.md">Exercise 0006: pool vs virtual</a></p>
+<p><a href="../exercises/0006-pool-vs-virtual.md">Exercise 0006: pool vs virtual</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/VirtualThreadsDemo.java"><code>VirtualThreadsDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Virtual Threads (Oracle Java core libraries guide)</a>. Read the whole page; it is short.</p>
-<p><a href="0016-sequenced-collections.html">← JDK 21: sequenced collections</a> &nbsp;|&nbsp; <a href="0017-generational-zgc.html">JDK 21: generational ZGC →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will go further: <em>"Would you switch a Spring service to virtual threads? What about the connection pool? What happens to ThreadLocal-heavy code?"</em> Hint: the database pool still has, say, 20 connections, so 10,000 virtual threads will queue for them; virtual threads move the bottleneck, they don't remove it. Review pool sizing in <a href="0023-thread-pools-executors.html">lesson 0023</a> and locks in <a href="0024-atomics-and-locks.html">lesson 0024</a>. Next: how JDK 21 changed garbage collection with <a href="0017-generational-zgc.html">generational ZGC</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual Threads (Oracle Java core libraries guide)</a>. Read the whole page; it is short. Then <a href="https://openjdk.org/jeps/444">JEP 444</a> for the design.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What exactly is a carrier thread?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0016-sequenced-collections.html">← First, last and reversed: sequenced collections (JDK 21)</a> &nbsp;|&nbsp; <a href="0017-generational-zgc.html">Generational ZGC: tiny pauses, now with young and old (JDK 21) →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Java core libraries: Virtual Threads</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Oracle core libraries guide, JEP 444, JEP 491 and runs on JDK 21.0.12, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Java core libraries: Virtual Threads</a> · <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual Threads (JDK 21 guide)</a> · <a href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a> · <a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

@@ -1,5 +1,7 @@
 # Exercise 0003: a record as a map key
 
+[Tiếng Việt](0003-record-as-key.vi.md)
+
 Companion to [lesson 3](../lessons/0003-records-and-immutability.html) and [lesson 1](../lessons/0001-hashmap-equals-hashcode.html).
 
 1. Write `record Coord(int row, int col)`. Put `new Coord(1, 2)` in a `HashMap<Coord,String>`, then look it up with a different `new Coord(1, 2)`. Predict the result first.

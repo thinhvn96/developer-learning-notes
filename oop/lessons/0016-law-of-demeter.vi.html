@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 16: Law of Demeter</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Law of Demeter</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0016 · bước 16/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0016-law-of-demeter.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> áp dụng Law of Demeter: thay một chuỗi lời gọi xuyên qua phần bên trong của object bằng một method theo kiểu 'tell, don't ask' (ra lệnh, đừng hỏi).</div>
+
+<h2>Định luật</h2>
+<p>Còn được gọi là nguyên lý hiểu biết tối thiểu (principle of least knowledge): "Mỗi đơn vị chỉ nên nói chuyện với bạn bè của nó; đừng nói chuyện với người lạ." Một method <code>m</code> của object <code>a</code> chỉ được gọi method trên: chính <code>a</code>, các tham số của <code>m</code>, các object được tạo bên trong <code>m</code>, các thuộc tính trực tiếp của <code>a</code>, và các biến toàn cục truy cập được. Nó khuyên bạn đừng "thò tay xuyên qua" một object để chạm vào phần bên trong của object khác.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[1]</a></p>
+<pre><code>java oop/examples/LawOfDemeter.java
+after reaching through: 70
+after c.pay(20)       : 50</code></pre>
+<p><code>c.getWallet().setMoney(c.getWallet().getMoney() - 30)</code> khiến phía gọi phụ thuộc vào việc khách hàng có một cái ví chứa tiền: đổi cấu trúc đó là mọi chỗ gọi đều vỡ. <code>c.pay(20)</code> nói ra điều bạn muốn; còn làm thế nào thì khách hàng tự quyết. Mã nguồn: <a href="../examples/LawOfDemeter.java"><code>LawOfDemeter.java</code></a>. Lưu ý: định luật này là một hướng dẫn, không phải lệnh cấm các fluent API như builder hay stream (đây là ghi chú của tôi).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Law of Demeter còn được gọi là...?</p>
+  <button>Inversion</button>
+  <button>Liskov</button>
+  <button>Open/Closed</button>
+  <button data-correct>Principle of least knowledge</button>
+  <p class="explain">Còn được biết đến là principle of least knowledge.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lời gọi nào vi phạm nó?</p>
+  <button>new B().act()</button>
+  <button data-correct>a.getB().getC().act()</button>
+  <button>this.act()</button>
+  <button>a.act()</button>
+  <p class="explain">Nó thò tay xuyên qua phần bên trong của a để tới một người lạ.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thiết kế tốt hơn nói rằng...?</p>
+  <button>Hỏi xin các bộ phận của nó</button>
+  <button>Cho field là public</button>
+  <button>Dùng static</button>
+  <button data-correct>Bảo object phải làm gì</button>
+  <p class="explain">c.pay(20) giữ cấu trúc bên trong ở dạng private.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một method được gọi method trên...?</p>
+  <button>Phần trong của người lạ</button>
+  <button data-correct>Các tham số của nó</button>
+  <button>Bất kỳ chuỗi toàn cục nào</button>
+  <button>Field private của object khác</button>
+  <p class="explain">Tham số nằm trong danh sách đối tượng được phép.<a class="cite" href="https://en.wikipedia.org/wiki/Law_of_Demeter">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0016-remove-the-chain.vi.md">Bài tập 16: bỏ chuỗi lời gọi</a></p>
+<p>Ví dụ chạy được: <a href="../examples/LawOfDemeter.java"><code>LawOfDemeter.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/Law_of_Demeter">Wikipedia: Law of Demeter</a>. Phần các quy tắc hình thức.</p>
+<p><a href="0015-coupling-and-cohesion.vi.html">← Coupling và cohesion</a> &nbsp;|&nbsp; <a href="0017-single-responsibility-principle.vi.html">SOLID 1: Single Responsibility Principle →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/Law_of_Demeter">Wikipedia: Law of Demeter</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

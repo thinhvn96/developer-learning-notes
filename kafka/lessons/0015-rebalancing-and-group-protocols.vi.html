@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 15: Rebalance: giao thức classic và giao thức consumer mới</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Rebalance: giao thức classic và giao thức consumer mới</h1>
+<p class="meta">Kafka · Bài 0015 · bước 12/23 · Advanced · ~14 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0015-rebalancing-and-group-protocols.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được một lần rebalance tốn kém ra sao, cooperative rebalancing và static membership giảm chi phí đó thế nào, và giao thức consumer group mới (KIP-848, GA từ 4.0) thay đổi những gì.</div>
+
+<h2>Vì sao rebalance gây đau</h2>
+<p>Khi một consumer tham gia, rời đi hoặc trễ hạn, các partition của group được chia lại. Trong giao thức <strong>classic</strong>, chính các client tự làm việc này: một consumer leader chạy assignor và cả group phải đi qua một rào đồng bộ (synchronization barrier). Với eager assignment, mọi consumer phải trả lại partition của mình trước, nên cả group dừng lại. Rolling một deployment 20 instance có thể đồng nghĩa với 20 lần dừng.</p>
+<h2>Giao thức classic: các cách giảm nhẹ</h2>
+<ul>
+<li><strong>Cooperative rebalancing.</strong> <code>partition.assignment.strategy</code> mặc định là <code>[RangeAssignor, CooperativeStickyAssignor]</code>; nó dùng Range theo mặc định và cho phép bạn chuyển sang cooperative sticky bằng một lượt rolling bounce gỡ Range khỏi danh sách.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a> Cooperative sticky chỉ di chuyển những partition buộc phải di chuyển, nên các partition còn lại vẫn tiếp tục được xử lý.</li>
+<li><strong>Static membership.</strong> Đặt <code>group.instance.id</code> thì "consumer được coi là static member": nếu restart trong vòng <code>session.timeout.ms</code> (mặc định 45 s) thì nó giữ nguyên partition, không có rebalance.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a> Rất hợp với Kubernetes StatefulSet có tên ổn định.</li>
+<li><strong>Liveness.</strong> Heartbeat mỗi <code>heartbeat.interval.ms</code> (3 s), bị coi là chết sau <code>session.timeout.ms</code>, và riêng biệt là <code>max.poll.interval.ms</code> (5 phút) giữa hai lần poll.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a></li>
+</ul>
+<h2>Giao thức mới (KIP-848)</h2>
+<p>Giao thức thế hệ mới "cải thiện khả năng mở rộng của consumer group đồng thời đơn giản hoá consumer", dùng "thiết kế hoàn toàn incremental" và "không còn dựa vào rào đồng bộ toàn cục".<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a> Việc phân công partition chuyển sang group coordinator trên broker. Giao thức này đã GA và được bật sẵn trên server từ 4.0; client chủ động dùng bằng <code>group.protocol=consumer</code>.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+<ul>
+<li>Assignor phía server: <code>uniform</code> (mặc định) và <code>range</code>, chọn bằng <code>group.remote.assignor</code>. CooperativeSticky, Sticky và RoundRobin đều được ánh xạ sang <code>uniform</code>.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></li>
+<li>Không được hỗ trợ khi dùng giao thức này: <code>heartbeat.interval.ms</code>, <code>session.timeout.ms</code>, <code>partition.assignment.strategy</code>, <code>enforceRebalance()</code>.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a> Các thông số thời gian chuyển sang group config (<code>consumer.session.timeout.ms</code> 45 s, <code>consumer.heartbeat.interval.ms</code> 5 s).<a class="cite" href="https://kafka.apache.org/43/configuration/group-configs/">[3]</a></li>
+<li>Lộ trình mặc định: ở 5.0, <code>KafkaConsumer</code> mặc định dùng giao thức mới; ở 6.0, client chỉ còn hỗ trợ giao thức này.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></li>
+<li>Migration: làm online, bằng cách rollout config, nếu group classic đang dùng assignor không có custom metadata.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></li>
+</ul>
+<p>Consumer ví dụ của chúng ta đã chạy với cả hai giao thức; <code>--describe --state</code> cho thấy assignor phía server:</p>
+<pre><code>GROUP            COORDINATOR (ID)  ASSIGNMENT-STRATEGY STATE #MEMBERS
+billing-consumer localhost:9092 (1) uniform            Empty 0
+billing-classic  localhost:9092 (1) -                  Empty 0</code></pre>
+<div class="aside">Câu trả lời khi phỏng vấn: "Rebalance kiểu classic do client điều khiển và có thể làm cả group đứng hình; tôi sẽ dùng CooperativeSticky cộng với static membership. Trên 4.x tôi sẽ chuyển sang <code>group.protocol=consumer</code>: incremental, phân công ở phía broker, không có rào đồng bộ toàn cục."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Config nào biến một consumer thành static member?</p>
+  <button>group.remote.assignor</button>
+  <button data-correct>group.instance.id</button>
+  <button>isolation.level</button>
+  <button>client.rack</button>
+  <p class="explain">Nếu đặt group.instance.id, consumer được coi là static member.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Client bật giao thức KIP-848 bằng cách nào?</p>
+  <button>protocol.version=2</button>
+  <button data-correct>group.protocol=consumer</button>
+  <button>enable.kip848=true</button>
+  <button>assignor=uniform</button>
+  <p class="explain">Phải đặt group.protocol thành consumer.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. KIP-848 tính toán việc phân công partition ở đâu?</p>
+  <button data-correct>Trên group coordinator</button>
+  <button>Trên client leader của group</button>
+  <button>Trên mọi consumer</button>
+  <button>Trên các node ZooKeeper</button>
+  <p class="explain">Việc phân công chuyển lên server; assignor phía client không còn được dùng.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Config client nào không được hỗ trợ với KIP-848?</p>
+  <button>group.id</button>
+  <button data-correct>session.timeout.ms</button>
+  <button>bootstrap.servers</button>
+  <button>max.poll.records</button>
+  <p class="explain">heartbeat.interval.ms, session.timeout.ms và partition.assignment.strategy không được hỗ trợ.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0015-stop-the-rebalance-storm.vi.md">Bài tập 0015: dập tắt cơn bão rebalance</a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-clients/run.sh"><code>run.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">Kafka Operations: Consumer Rebalance Protocol</a>. Đọc hết trang, sau đó đọc mục group.instance.id trong consumer configs.</p>
+<p><a href="0014-producer-throughput-batching-compression.vi.html">← Throughput của producer: batching và nén</a> &nbsp;|&nbsp; <a href="0016-error-handling-and-dead-letter-topics.vi.html">Xử lý lỗi: retry, poison pill, dead letter topic →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka Consumer Configs</a> · [2] <a href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">Kafka Operations: Consumer Rebalance Protocol</a> · [3] <a href="https://kafka.apache.org/43/configuration/group-configs/">Kafka Group Configs</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

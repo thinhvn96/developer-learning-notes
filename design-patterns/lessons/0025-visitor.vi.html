@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 25: Visitor</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Visitor</h1>
+<p class="meta">Design Patterns · Bài 0025 · bước 25/30 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0025-visitor.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> thêm thao tác vào một hệ phân cấp class mà không phải sửa nó, và so sánh double dispatch kinh điển với pattern matching của JDK 21.</div>
+
+<h2>Mục đích</h2>
+<p>Visitor là "một behavioral design pattern cho phép bạn tách thuật toán khỏi các object mà nó thao tác." Nó dùng double dispatch để chạy thao tác trên các object thuộc nhiều class khác nhau mà không phải sửa chúng. Hãy dùng nó cho các thao tác trên cấu trúc object phức tạp, để tách các hành vi phụ ra ngoài, hoặc cho hành vi chỉ áp dụng với một số class.<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/VisitorDemo.java
+Circle area=3.14 perimeter=6.28
+Rect area=6.00 perimeter=10.00
+switch: Circle area=3.14
+switch: Rect area=6.00</code></pre><p><code>accept(visitor)</code> gọi đúng overload <code>visit</code> (double dispatch); <code>AreaVisitor</code> và <code>PerimeterVisitor</code> thêm thao tác mà không sửa các shape. Hai dòng cuối làm điều tương tự bằng một sealed interface và một <code>switch</code> dùng pattern matching (JDK 21), trong đó compiler kiểm tra rằng mọi trường hợp đều được xử lý ("Pattern switch phải exhaustive" với sealed type: <a href="../../java/lessons/0015-pattern-matching-switch-and-record-patterns.vi.html">bài JDK 21</a>). Trong JDK, <code>FileVisitor</code> là "một visitor duyệt file ... được truyền vào các method <code>Files.walkFileTree</code>" với <code>preVisitDirectory</code>, <code>visitFile</code>, <code>visitFileFailed</code> và <code>postVisitDirectory</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">[2]</a> Mã nguồn: <a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Open/Closed: thêm hành vi mà không sửa các class phần tử</li><li>Single Responsibility: các thao tác liên quan nằm chung một visitor</li><li>Visitor có thể tích lũy trạng thái trong lúc duyệt</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Mọi visitor đều phải cập nhật khi các kiểu phần tử thay đổi</li><li>Visitor có thể không truy cập được các thành viên private</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a> Visitor đi cùng Composite (thao tác trên cả cây), Iterator (điều hướng) và Command.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Visitor tách...?</p>
+  <button>Dữ liệu khỏi code</button>
+  <button>Thread khỏi task</button>
+  <button data-correct>Thuật toán khỏi object</button>
+  <button>Class khỏi file</button>
+  <p class="explain">Thuật toán được tách khỏi các object mà nó thao tác.<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Double dispatch nghĩa là...?</p>
+  <button>Hai class</button>
+  <button data-correct>Lời gọi phụ thuộc cả hai kiểu</button>
+  <button>Hai file</button>
+  <button>Hai thread</button>
+  <p class="explain">accept chọn overload visit dựa trên kiểu của phần tử.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Nhược điểm?</p>
+  <button>Mất đa hình</button>
+  <button>Không có interface</button>
+  <button data-correct>Sửa mọi visitor khi phần tử thay đổi</button>
+  <button>Trạng thái static</button>
+  <p class="explain">Thêm kiểu phần tử buộc phải cập nhật các visitor.<a class="cite" href="https://refactoring.guru/design-patterns/visitor">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lựa chọn thay thế trong Java hiện đại?</p>
+  <button data-correct>Sealed type cùng pattern switch</button>
+  <button>Static method</button>
+  <button>Chỉ reflection</button>
+  <button>Thread</button>
+  <p class="explain">Chính là switch trên sealed interface trong demo.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0025-expression-visitor.vi.md">Bài tập 25: một visitor cho biểu thức</a></p>
+<p>Ví dụ chạy được: <a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/visitor">Visitor (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0024-template-method.vi.html">← Template Method</a> &nbsp;|&nbsp; <a href="0026-choosing-between-similar-patterns.vi.html">Chọn giữa các pattern giống nhau →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/visitor">Visitor (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/FileVisitor.html">FileVisitor Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

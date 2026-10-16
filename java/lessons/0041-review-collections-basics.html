@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 41: Review 2: collection basics and HashMap</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 2: collection basics and HashMap</h1>
+<p class="subtitle">Four lessons, mixed together: the family tree, picking a list, removing while looping, and how HashMap finds a value.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0041 · step 10 of 46 · Review · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0041-review-collections-basics.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> In an interview, collection questions come one after another: "Which list would you use?", then "Why did this loop crash?", then "How does HashMap work?". This review mixes lessons <a href="0028-collections-framework-map.html">0028</a>, <a href="0002-choosing-a-list.html">0002</a>, <a href="0029-iterators-and-fail-fast.html">0029</a> and <a href="0001-hashmap-equals-hashcode.html">0001</a> the same way, so you practise switching between them. There are no new facts here.</div>
+
+<div class="win"><b>Today's win:</b> answer 10 or more of the 12 mixed questions, find the three bugs in the mixed task, and say all three 60-second answers with at least 5 checklist points each.</div>
+
+<dl class="words">
+  <dt>interface</dt><dd>A list of methods a type promises to have, with no data inside, like <code>List</code> or <code>Map</code>. You write your code against it (lesson 0028).</dd>
+  <dt>implementation</dt><dd>A real class that keeps that promise with a real data structure, like <code>ArrayList</code> or <code>HashMap</code>.</dd>
+  <dt>amortized O(1)</dt><dd>Usually instant, sometimes slow (the array is copied to a bigger one), but fast on average over many calls (lesson 0002).</dd>
+  <dt>fail-fast</dt><dd>An iterator that throws <code>ConcurrentModificationException</code> when it notices the collection changed under it (lesson 0029).</dd>
+  <dt>bucket</dt><dd>One "mailbox" inside a HashMap. The key's hash code chooses the bucket (lesson 0001).</dd>
+  <dt>contract</dt><dd>A rule a method must follow. Here: equal objects must have the same hash code.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking back, say out loud the <strong>three questions</strong> that pick a collection, and the <strong>two methods</strong> a HashMap key needs. Write down how sure you are (0 to 100%). At the end, compare with your quiz score: people are often more sure than they should be, and that gap is what a review fixes.</p>
+
+<h2>1. The family tree (lesson 0028)</h2>
+<p>Think of a company chart. The job titles (interfaces) say what someone must do; the people (implementations) do it in their own way. You hire by title: you declare <code>List&lt;Order&gt;</code>, not <code>ArrayList&lt;Order&gt;</code>, so you can change the person later without touching callers.</p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="Iterable on top, then Collection, which splits into List, Set and Queue. Set leads to NavigableSet, Queue leads to Deque. Map stands apart, not a Collection, with NavigableMap below it.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="150" y="16" width="150" height="34" rx="6"/>
+      <rect x="150" y="76" width="150" height="34" rx="6"/>
+      <path d="M225 50v26M225 110v18M95 128h340M95 128v18M265 128v18M435 128v18"/>
+      <rect x="20" y="146" width="150" height="50" rx="6"/>
+      <rect x="190" y="146" width="150" height="50" rx="6"/>
+      <rect x="360" y="146" width="150" height="50" rx="6"/>
+      <path d="M265 196v30M435 196v30"/>
+      <rect x="190" y="226" width="150" height="50" rx="6"/>
+      <rect x="360" y="226" width="150" height="50" rx="6"/>
+      <path d="M590 138v38"/>
+      <rect x="520" y="176" width="140" height="50" rx="6"/>
+    </g>
+    <path d="M500 16v270" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".4"/>
+    <rect x="520" y="76" width="140" height="62" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="225" y="38" text-anchor="middle">Iterable</text>
+    <text x="225" y="98" text-anchor="middle">Collection</text>
+    <text x="310" y="38" font-size="11" opacity=".75">for-each works on these</text>
+    <text x="95" y="166" text-anchor="middle">List</text>
+    <text x="95" y="184" text-anchor="middle" font-size="10" opacity=".75">ArrayList, LinkedList</text>
+    <text x="265" y="166" text-anchor="middle">Set</text>
+    <text x="265" y="184" text-anchor="middle" font-size="10" opacity=".75">HashSet, LinkedHashSet</text>
+    <text x="435" y="166" text-anchor="middle">Queue</text>
+    <text x="435" y="184" text-anchor="middle" font-size="10" opacity=".75">PriorityQueue</text>
+    <text x="265" y="246" text-anchor="middle">NavigableSet</text>
+    <text x="265" y="264" text-anchor="middle" font-size="10" opacity=".75">TreeSet</text>
+    <text x="435" y="246" text-anchor="middle">Deque</text>
+    <text x="435" y="264" text-anchor="middle" font-size="10" opacity=".75">ArrayDeque, LinkedList</text>
+    <text x="590" y="96" text-anchor="middle" fill="var(--accent)">Map</text>
+    <text x="590" y="113" text-anchor="middle" font-size="10">HashMap,</text>
+    <text x="590" y="127" text-anchor="middle" font-size="10">LinkedHashMap</text>
+    <text x="590" y="196" text-anchor="middle">NavigableMap</text>
+    <text x="590" y="214" text-anchor="middle" font-size="10" opacity=".75">TreeMap</text>
+    <text x="520" y="248" font-size="10" fill="var(--accent)">not a Collection</text>
+    <text x="520" y="264" font-size="10" opacity=".75">views: keySet(),</text>
+    <text x="520" y="280" font-size="10" opacity=".75">values(), entrySet()</text>
+  </g>
+</svg>
+<figcaption>Interfaces in boxes, typical implementations in small text. <code>Map</code> holds pairs, so it lives outside <code>Collection</code> and offers collection <em>views</em> instead.</figcaption>
+</figure>
+
+<p>Three things to keep from lesson 0028:</p>
+<ol class="steps">
+  <li><strong><code>Map</code> is not a <code>Collection</code>.</strong> It exposes <code>keySet()</code>, <code>values()</code> and <code>entrySet()</code> as views.</li>
+  <li><strong>The name tells the order.</strong> <code>Hash*</code>: no order promised. <code>Linked*</code>: insertion order. <code>Tree*</code>: sorted order.</li>
+  <li><strong>Some operations are optional.</strong> An implementation may throw <code>UnsupportedOperationException</code> instead; that is how unmodifiable lists fit the same <code>List</code> interface.</li>
+</ol>
+
+<h2>2. Picking a structure (lessons 0028 and 0002)</h2>
+<p>Lesson 0028 picked a structure with three questions: keyed lookup? duplicates? order? Lesson 0002 then chose between the lists. Here is the whole decision as one flow:</p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Decision flow: lookup by key, yes gives HashMap. No duplicates, yes gives HashSet. Queue or stack, yes gives ArrayDeque. Otherwise ArrayList, the default.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="30" width="150" height="44" rx="6"/>
+      <rect x="190" y="30" width="150" height="44" rx="6"/>
+      <rect x="360" y="30" width="150" height="44" rx="6"/>
+      <path d="M170 52h14M178 47l6 5-6 5M340 52h14M348 47l6 5-6 5M510 52h14M518 47l6 5-6 5"/>
+      <path d="M95 74v50M90 118l5 6 5-6M265 74v50M260 118l5 6 5-6M435 74v50M430 118l5 6 5-6"/>
+      <rect x="20" y="124" width="150" height="74" rx="6"/>
+      <rect x="190" y="124" width="150" height="74" rx="6"/>
+      <rect x="360" y="124" width="150" height="74" rx="6"/>
+    </g>
+    <rect x="530" y="30" width="130" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="95" y="57" text-anchor="middle">lookup by key?</text>
+    <text x="265" y="57" text-anchor="middle">no duplicates?</text>
+    <text x="435" y="57" text-anchor="middle">queue or stack?</text>
+    <text x="595" y="50" text-anchor="middle" fill="var(--accent)">ArrayList</text>
+    <text x="595" y="66" text-anchor="middle" font-size="10" fill="var(--accent)">the default</text>
+    <g font-size="10" opacity=".75">
+      <text x="177" y="44" text-anchor="middle">no</text><text x="347" y="44" text-anchor="middle">no</text><text x="517" y="44" text-anchor="middle">no</text>
+      <text x="103" y="102">yes</text><text x="273" y="102">yes</text><text x="443" y="102">yes</text>
+    </g>
+    <text x="95" y="146" text-anchor="middle">HashMap</text>
+    <text x="95" y="166" text-anchor="middle" font-size="10" opacity=".8">sorted: TreeMap</text>
+    <text x="95" y="182" text-anchor="middle" font-size="10" opacity=".8">order: LinkedHashMap</text>
+    <text x="265" y="146" text-anchor="middle">HashSet</text>
+    <text x="265" y="166" text-anchor="middle" font-size="10" opacity=".8">sorted: TreeSet</text>
+    <text x="265" y="182" text-anchor="middle" font-size="10" opacity=".8">order: LinkedHashSet</text>
+    <text x="435" y="146" text-anchor="middle">ArrayDeque</text>
+    <text x="435" y="166" text-anchor="middle" font-size="10" opacity=".8">not Stack, not</text>
+    <text x="435" y="182" text-anchor="middle" font-size="10" opacity=".8">LinkedList; no nulls</text>
+    <text x="340" y="226" text-anchor="middle" font-size="11" opacity=".8">shared between threads? → concurrent collections (lesson 0039)</text>
+  </g>
+</svg>
+<figcaption>Ask the questions left to right. A <code>LinkedList</code> answer needs a specific reason.</figcaption>
+</figure>
+
+<p>The facts behind lesson 0002, from the Javadoc:</p>
+<table>
+<tr><th>Class</th><th>What it is</th><th>Remember</th></tr>
+<tr><td><code>ArrayList</code></td><td>a growing array</td><td><code>get</code>/<code>set</code> constant time, <code>add</code> amortized constant, low constant factor; the only one with <code>RandomAccess</code></td></tr>
+<tr><td><code>LinkedList</code></td><td>a chain of nodes</td><td><code>get(i)</code> walks from the closer end: a walk, not a jump</td></tr>
+<tr><td><code>ArrayDeque</code></td><td>a resizable array</td><td>faster than <code>Stack</code> as a stack and than <code>LinkedList</code> as a queue; <strong>rejects null</strong></td></tr>
+</table>
+<p>None of the three is synchronized. <a href="0002-choosing-a-list.html">Lesson 0002</a> has the quotes.</p>
+
+<h2>3. Removing while looping (lesson 0029)</h2>
+<p>Remember the teacher reading the attendance sheet with a version number on top. The list counts structural changes in <code>modCount</code>; the iterator remembers the value as <code>expectedModCount</code> and compares them on every <code>next()</code>. A for-each loop is an iterator, so <code>list.remove(x)</code> inside it makes the numbers differ:</p>
+<pre><code>$ java java/examples/collections/IteratorsAndFailFast.java
+1. for-each + list.remove        -&gt; ConcurrentModificationException
+2. remove 2nd-to-last in for-each -&gt; no exception, list=[ann, cid]  (loop silently skipped 'cid')
+3. Iterator.remove()              -&gt; [ann, cid, dan]
+4. removeIf (JDK 8)               -&gt; [ann, cid, dan]
+5. ListIterator set + add         -&gt; [ANN, ann!, BOB, bob!]
+6. entry.setValue while iterating -&gt; {a=10, b=20}
+7. map.put new key while iterating -&gt; ConcurrentModificationException</code></pre>
+<p>Line 2 is the one to explain in an interview: removing the second-to-last element makes <code>cursor == size</code>, so <code>hasNext()</code> is false before any check runs. It is best-effort, not a guarantee. Fixes: <code>removeIf</code>, <code>Iterator.remove()</code>, <code>ListIterator</code>.</p>
+
+<h2>4. How HashMap finds your value (lesson 0001)</h2>
+<p>The wall of 16 mailboxes: <code>hashCode()</code> picks the mailbox, <code>equals()</code> picks the letter inside it. Equal objects must have the same hash code; the opposite is not required (<code>"Aa"</code> and <code>"BB"</code> share 2112). Break the rule and the map quietly returns <code>null</code>:</p>
+<pre><code>$ java java/examples/LostKey.java
+BadKey  lookup: null
+GoodKey lookup: value</code></pre>
+<p>And keys must not change after <code>put</code>: the letter's address changed, so Java looks in a different mailbox. Use immutable keys or a <code>record</code>.</p>
+
+<h2>5. Mixed task: find the three bugs</h2>
+<p>Read this code like a reviewer. There are three bugs, each from a different lesson. Find them, name the lesson, and say the fix <em>before</em> opening the answer.</p>
+<pre><code>class Visit {
+    final String user, page;
+    Visit(String user, String page) {
+        this.user = user;
+        this.page = page;
+    }
+    @Override public boolean equals(Object o) {
+        return o instanceof Visit v
+            &amp;&amp; v.user.equals(user) &amp;&amp; v.page.equals(page);
+    }
+}
+
+class Tracker {
+    private final Map&lt;Visit, Integer&gt; counts = new HashMap&lt;&gt;();
+    private final Deque&lt;String&gt; recentPages = new ArrayDeque&lt;&gt;();
+    private final List&lt;String&gt; users = new ArrayList&lt;&gt;();
+
+    <span class="c">// page is null for the home page</span>
+    void record(String user, String page) {
+        Visit v = new Visit(user, page);
+        Integer c = counts.get(v);
+        counts.put(v, c == null ? 1 : c + 1);    <span class="c">// (A)</span>
+        recentPages.push(page);                  <span class="c">// (B)</span>
+        users.add(user);
+    }
+
+    void ban(String user) {
+        for (String u : users)                   <span class="c">// (C)</span>
+            if (u.equals(user)) users.remove(u);
+    }
+}</code></pre>
+<details class="qa">
+<summary>Show the three bugs</summary>
+<div class="ans">
+<p><strong>(A) Lesson 0001.</strong> <code>Visit</code> overrides <code>equals()</code> but not <code>hashCode()</code>. Each new <code>Visit</code> gets its own default hash code, so <code>counts.get(v)</code> almost always looks in the wrong bucket and every count stays 1. Fix: <code>record Visit(String user, String page) {}</code>, or add <code>hashCode()</code> with <code>Objects.hash(user, page)</code>. (A null <code>page</code> would also break this <code>equals</code>; <code>Objects.equals</code> handles null.)</p>
+<p><strong>(B) Lesson 0002.</strong> <code>ArrayDeque</code> rejects null, so <code>push(null)</code> for the home page throws <code>NullPointerException</code>. Fix: store a real value such as <code>"/"</code>, or skip null pages.</p>
+<p><strong>(C) Lesson 0029.</strong> <code>users.remove(u)</code> inside a for-each throws <code>ConcurrentModificationException</code>, or, when the match is second-to-last, silently skips the last user. Fix: <code>users.removeIf(user::equals)</code>.</p>
+</div>
+</details>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Why does <code>map.get(key)</code> not have to look through every entry?</p>
+  <div class="options">
+    <button class="opt" data-correct>The hash code sends it straight to one bucket</button>
+    <button class="opt">The keys are kept sorted, so it can binary search</button>
+    <button class="opt">It scans all buckets, but in several threads at once</button>
+    <button class="opt">It remembers the last few answers in a small cache</button>
+  </div>
+  <div class="why">Same key → same number → same bucket. Only that bucket is searched. See <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which statement about <code>Map</code> is true?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is not a Collection; it offers views like keySet()</button>
+    <button class="opt">It extends Collection, so it has add() and iterator()</button>
+    <button class="opt">It extends List, with the keys used as the indexes</button>
+    <button class="opt">It extends Set, because its keys can never repeat</button>
+  </div>
+  <div class="why"><code>Map</code> holds pairs, so it stands outside <code>Collection</code> and exposes <code>keySet()</code>, <code>values()</code>, <code>entrySet()</code>. See <a href="0028-collections-framework-map.html">lesson 0028</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A for-each loop over <code>[ann, bob, cid, dan]</code> calls <code>list.remove("bob")</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>ConcurrentModificationException on the next next()</button>
+    <button class="opt">bob is removed and the loop goes on normally</button>
+    <button class="opt">Nothing is removed until the loop has finished</button>
+    <button class="opt">It does not compile: remove is not allowed here</button>
+  </div>
+  <div class="why"><code>modCount</code> went up, the iterator's <code>expectedModCount</code> did not, and <code>next()</code> checks them. See <a href="0029-iterators-and-fail-fast.html">lesson 0029</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You need a stack (push and pop). Which class does the Javadoc point you to?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>ArrayDeque</code></button>
+    <button class="opt"><code>Stack</code></button>
+    <button class="opt"><code>LinkedList</code></button>
+    <button class="opt"><code>ArrayList</code></button>
+  </div>
+  <div class="why"><code>ArrayDeque</code> is "likely to be faster than <code>Stack</code> when used as a stack". It rejects null elements. See <a href="0002-choosing-a-list.html">lesson 0002</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Point</code> overrides <code>equals()</code> but not <code>hashCode()</code>. What does <code>map.get(new Point(1, 2))</code> return after <code>map.put(new Point(1, 2), "A")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Almost always null</button>
+    <button class="opt">Always "A"</button>
+    <button class="opt">A compile error</button>
+    <button class="opt">An exception</button>
+  </div>
+  <div class="why">The default hash codes differ, so Java searches the wrong bucket. No error, just <code>null</code>. See <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why should you write <code>List&lt;Order&gt; orders = new ArrayList&lt;&gt;()</code> rather than declaring the type as <code>ArrayList&lt;Order&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>You can swap the implementation without touching callers</button>
+    <button class="opt">The List type makes every get() call run much faster</button>
+    <button class="opt">ArrayList cannot be used as a field type in Java</button>
+    <button class="opt">The List type makes the collection safe for threads</button>
+  </div>
+  <div class="why">Program against the interface; the structure can change later. See <a href="0028-collections-framework-map.html">lesson 0028</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The list is <code>[ann, bob, cid]</code>. A for-each loop removes <code>bob</code>. What is the result?</p>
+  <div class="options">
+    <button class="opt" data-correct>No exception, but cid is never visited</button>
+    <button class="opt">An exception as soon as cid is reached</button>
+    <button class="opt">bob is removed and cid is visited normally</button>
+    <button class="opt">The loop visits ann twice and then stops</button>
+  </div>
+  <div class="why">Size shrinks to 2 and the cursor is 2, so <code>hasNext()</code> is false and no check runs. Fail-fast is best-effort. See <a href="0029-iterators-and-fail-fast.html">lesson 0029</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>linkedList.get(i)</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Walks node by node from the closer end</button>
+    <button class="opt">Jumps straight to slot i in a hidden array</button>
+    <button class="opt">Always walks from the first node to slot i</button>
+    <button class="opt">Uses the hash code of i to find the node</button>
+  </div>
+  <div class="why">"Operations that index into the list will traverse the list from the beginning or the end, whichever is closer." A walk, not a jump. See <a href="0002-choosing-a-list.html">lesson 0002</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which sentence is the equals/hashCode contract?</p>
+  <div class="options">
+    <button class="opt" data-correct>Equal objects must have the same hash code</button>
+    <button class="opt">Same hash code means the objects are equal</button>
+    <button class="opt">Different objects need different hash codes</button>
+    <button class="opt">A hash code must be unique within one map</button>
+  </div>
+  <div class="why">One direction only. <code>"Aa"</code> and <code>"BB"</code> share 2112 and are still different. See <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You need fast <code>contains</code>, no duplicates, and the elements kept in the order you added them. Which class?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>LinkedHashSet</code></button>
+    <button class="opt"><code>HashSet</code></button>
+    <button class="opt"><code>TreeSet</code></button>
+    <button class="opt"><code>ArrayList</code></button>
+  </div>
+  <div class="why"><code>Hash*</code> promises no order, <code>Tree*</code> sorts, <code>Linked*</code> keeps insertion order. See <a href="0028-collections-framework-map.html">lesson 0028</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Inside a loop over <code>map.entrySet()</code>, which call is allowed?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>entry.setValue(v * 10)</code></button>
+    <button class="opt"><code>map.put(newKey, 0)</code></button>
+    <button class="opt"><code>map.remove(entry.getKey())</code></button>
+    <button class="opt"><code>map.clear()</code></button>
+  </div>
+  <div class="why">Changing a value is not structural; adding or removing keys is. See <a href="0029-iterators-and-fail-fast.html">lesson 0029</a>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You put a key in a HashMap and then change one of its fields. Why can <code>get()</code> no longer find it?</p>
+  <div class="options">
+    <button class="opt" data-correct>Its hash code changed, so Java checks another bucket</button>
+    <button class="opt">The map makes a copy of the key and compares the copy</button>
+    <button class="opt">Changing the key throws, and the entry is then removed</button>
+    <button class="opt">The map sorts its keys again, and the order is now wrong</button>
+  </div>
+  <div class="why">The entry still sits in the old bucket, but the lookup goes to the new one. Use immutable keys. See <a href="0001-hashmap-equals-hashcode.html">lesson 0001</a>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<p>Three questions an interviewer could ask back to back. Do them one by one, out loud, with a timer.</p>
+
+<div class="recall">
+  <p class="prompt">Question 1: <strong>"How does a HashMap work?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> An array of buckets; <code>hashCode()</code> of the key chooses the bucket.</label></li>
+      <li><label><input type="checkbox"> <code>get</code> repeats the same calculation, so <code>get</code>/<code>put</code> are O(1) on average.</label></li>
+      <li><label><input type="checkbox"> Collisions are normal; <code>equals()</code> finds the right key inside the bucket.</label></li>
+      <li><label><input type="checkbox"> Contract: equal objects must have the same hash code.</label></li>
+      <li><label><input type="checkbox"> Override both methods, or use a record.</label></li>
+      <li><label><input type="checkbox"> Keys must be immutable, or the map can't find them.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A HashMap is an array of buckets. On <code>put</code>, Java calls <code>hashCode()</code> on the key and uses it to choose a bucket; <code>get</code> does the same calculation and goes straight there, so both are O(1) on average. Two keys can land in the same bucket, and then <code>equals()</code> picks the right one. That's why equal objects must have the same hash code, so I override both or just use a record. And I keep keys immutable, because a changed key sends the lookup to the wrong bucket."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Question 2: <strong>"ArrayList or LinkedList? And what would you use for a queue?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>ArrayList</code> is the default: a growing array.</label></li>
+      <li><label><input type="checkbox"> <code>get</code>/<code>set</code> are constant time; <code>add</code> is amortized constant.</label></li>
+      <li><label><input type="checkbox"> <code>LinkedList.get(i)</code> walks from the closer end.</label></li>
+      <li><label><input type="checkbox"> For a queue or stack: <code>ArrayDeque</code>, faster than <code>Stack</code> and <code>LinkedList</code>.</label></li>
+      <li><label><input type="checkbox"> <code>ArrayDeque</code> rejects null.</label></li>
+      <li><label><input type="checkbox"> None of them is synchronized; declare the variable as the interface.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"I default to <code>ArrayList</code>. It's a growing array, so <code>get</code> and <code>set</code> are constant time, and <code>add</code> is amortized constant: sometimes it copies the array, but on average it's cheap. <code>LinkedList.get(i)</code> has to walk node by node from the closer end, so I need a specific reason to choose it. For a queue or a stack I use <code>ArrayDeque</code>; the Javadoc says it's likely faster than <code>Stack</code> and <code>LinkedList</code>. One thing to remember: it doesn't accept null. None of these is thread safe, and I declare them as <code>List</code> or <code>Deque</code> so I can change the implementation later."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Question 3: <strong>"Can you get a ConcurrentModificationException with one thread? How do you avoid it?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Yes: changing a collection while iterating it, in one thread.</label></li>
+      <li><label><input type="checkbox"> for-each uses an iterator.</label></li>
+      <li><label><input type="checkbox"> <code>modCount</code> vs <code>expectedModCount</code>, checked on <code>next()</code>.</label></li>
+      <li><label><input type="checkbox"> Best-effort: removing the second-to-last element silently skips the last.</label></li>
+      <li><label><input type="checkbox"> Fixes: <code>removeIf</code>, <code>Iterator.remove()</code>, <code>ListIterator</code>.</label></li>
+      <li><label><input type="checkbox"> <code>setValue</code> on a map entry is fine; adding keys is not.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Yes. The name says concurrent, but one thread is enough: if I call <code>list.remove</code> inside a for-each loop, the loop's hidden iterator notices. The list counts structural changes in <code>modCount</code>, the iterator remembers the old value, and on <code>next()</code> it compares them and throws. It's only best-effort, though: removing the second-to-last element makes <code>hasNext()</code> false, so the last element is silently skipped. I use <code>removeIf</code>, or <code>Iterator.remove()</code>, or a <code>ListIterator</code>. Changing a map value with <code>setValue</code> is fine because it's not structural."</em></p>
+  </div>
+</div>
+
+<h2>If you missed questions, re-read</h2>
+<table>
+<tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+<tr><td><code>Map</code> vs <code>Collection</code>, interfaces, Hash/Linked/Tree order, optional operations</td><td><a href="0028-collections-framework-map.html">Lesson 0028: the Collections Framework map</a></td></tr>
+<tr><td><code>ArrayList</code> vs <code>LinkedList</code>, amortized add, <code>ArrayDeque</code> and null</td><td><a href="0002-choosing-a-list.html">Lesson 0002: choosing a list</a></td></tr>
+<tr><td><code>ConcurrentModificationException</code>, <code>modCount</code>, the second-to-last trap, <code>removeIf</code></td><td><a href="0029-iterators-and-fail-fast.html">Lesson 0029: iterators and fail-fast</a></td></tr>
+<tr><td>buckets, collisions, the equals/hashCode contract, mutable keys</td><td><a href="0001-hashmap-equals-hashcode.html">Lesson 0001: how HashMap finds your value</a></td></tr>
+</table>
+
+<h2>Now do the exercise</h2>
+<p>If you skipped any of these, do it now; if you did them, redo the one with your lowest score from memory:</p>
+<ul>
+<li><a href="../exercises/0028-pick-the-structure.md">Exercise 0028: pick the structure</a></li>
+<li><a href="../exercises/0002-list-choice.md">Exercise 0002: pick the collection</a></li>
+<li><a href="../exercises/0029-fix-the-loops.md">Exercise 0029: fix the loops</a></li>
+<li><a href="../exercises/0001-mutable-key.md">Exercise 0001: the key that changed</a></li>
+</ul>
+<p>Runnable examples: <a href="../examples/collections/FrameworkMap.java"><code>FrameworkMap.java</code></a> · <a href="../examples/ListPitfalls.java"><code>ListPitfalls.java</code></a> · <a href="../examples/collections/IteratorsAndFailFast.java"><code>IteratorsAndFailFast.java</code></a> · <a href="../examples/LostKey.java"><code>LostKey.java</code></a></p>
+
+<h2>What's next</h2>
+<p>You can now explain HashMap at a mid-level depth. A senior interviewer pushes further: <em>"How exactly does the hash code become a bucket number? What happens at the 13th entry? What if one bucket gets very long?"</em> <a href="0030-hashmap-internals.html">Lesson 0030</a> opens the mailbox wall and answers all three.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Oracle: Java Collections Framework overview (JDK 21)</a>, a short official tour of the whole family.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why is Map not a Collection?"</em> or <em>"Please check my three 60-second answers"</em> (type what you said). Please also tell me your quiz score and checklist scores: they help me choose your next lesson.</div>
+
+<p><a href="0001-hashmap-equals-hashcode.html">← How HashMap finds your value</a> &nbsp;|&nbsp; <a href="0030-hashmap-internals.html">Inside HashMap: buckets, resize and trees →</a></p>
+
+<footer>
+  <p>Review lesson: no new facts. Every fact comes from lessons 0028, 0002, 0029 and 0001, which were checked against the Java 21 documentation and the OpenJDK 21 source, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Collections Framework overview</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">ConcurrentModificationException Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

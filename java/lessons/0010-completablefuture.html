@@ -3,80 +3,272 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 10: JDK 8: CompletableFuture and async pipelines</title>
+<title>Java 10: CompletableFuture</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 8: CompletableFuture and async pipelines</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0010 · step 12 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>CompletableFuture: a chain of steps that runs on other threads</h1>
+<p class="subtitle">Start work in the background, say what to do when it finishes, and handle the failure, without blocking your own thread.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0010 · step 28 of 46 · Advanced · ~30 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0010-completablefuture.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> chain async steps with CompletableFuture, recover from failure, and say which thread pool runs them by default and how join and get report errors differently.</div>
+<div class="mission"><strong>Why this lesson?</strong> A backend often has to call two or three services and combine the answers. Doing them one after another is slow; <code>CompletableFuture</code> lets them run at the same time. Interviewers ask <em>"Which thread runs <code>supplyAsync</code>?"</em>, <em>"What is the difference between <code>join</code> and <code>get</code>?"</em> and <em>"How do you handle an error in the chain?"</em></div>
 
-<h2>What it is (JDK 8)</h2>
-<p>A <code>CompletableFuture</code> is a <code>Future</code> "that may be explicitly completed" and can act as a <code>CompletionStage</code>, supporting dependent functions and actions triggered on completion.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a> If several threads try to <code>complete</code>, <code>completeExceptionally</code> or <code>cancel</code> it, only one succeeds.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
-<h2>Which threads run it</h2>
-<p>"All async methods without an explicit Executor argument ... are performed using the <code>ForkJoinPool.commonPool()</code>."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a> Interview consequence: blocking work in the common pool starves other tasks; pass your own <code>Executor</code> for blocking calls (or, on JDK 21, consider virtual threads, see <a href="0006-virtual-threads.html">lesson 6</a>).</p>
-<h2>Errors</h2>
+<div class="win"><b>Today's win:</b> build a chain with <code>supplyAsync</code> and <code>thenApply</code>, recover from a failure with <code>exceptionally</code>, and say which thread pool runs async steps by default and how <code>join</code> and <code>get</code> report errors differently.</div>
+
+<dl class="words">
+  <dt>thread</dt><dd>One line of work the computer runs. Several threads can run at the same time.</dd>
+  <dt>thread pool</dt><dd>A team of ready threads that take tasks from a queue, so you don't create a new thread per task.</dd>
+  <dt>executor</dt><dd>Java's word for "something that runs tasks", usually a thread pool.</dd>
+  <dt>Future</dt><dd>A receipt for a result that is not ready yet. You can wait for it later.</dd>
+  <dt>async</dt><dd>"Asynchronous": started now, finished later, while the caller does something else.</dd>
+  <dt>block</dt><dd>A thread blocks when it stops and waits, for example for a network answer or for <code>join()</code>.</dd>
+  <dt>checked exception</dt><dd>An exception the compiler forces you to catch or declare (like <code>ExecutionException</code>). Unchecked ones (like <code>CompletionException</code>) are not forced.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"I call <code>CompletableFuture.supplyAsync(() -&gt; callService())</code>. Which thread runs <code>callService()</code>? And what happens to an exception it throws?"</em></p>
+
+<h2>1. The picture: a café buzzer with instructions</h2>
+<p>At a café you order, and the cashier gives you a buzzer. You don't stand at the counter; you sit down and read. That buzzer is a <span class="term">Future</span>: a promise of a coffee later.</p>
+<p>Now imagine a smarter buzzer. You can attach instructions to it: "when the coffee is ready, add sugar, then bring it to table 5; if the machine breaks, bring tea instead". You never wait at the counter. That is a <code>CompletableFuture</code>: a <code>Future</code> "that may be explicitly completed" and that also acts as a <code>CompletionStage</code>, supporting dependent functions and actions triggered on its completion.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a></p>
+<pre><code>CompletableFuture&lt;String&gt; ok = CompletableFuture
+    .supplyAsync(() -&gt; "hello")       <span class="c">// order the coffee: runs on another thread</span>
+    .thenApply(String::toUpperCase);  <span class="c">// instruction: when ready, transform it</span>
+System.out.println(ok.join());        <span class="c">// wait here for the final result</span>
+<span class="hl">// HELLO</span></code></pre>
+
+<h2>2. Which threads do the work?</h2>
+<p>This is the question interviewers care most about. The Javadoc gives two rules:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a></p>
 <ul>
-<li><code>exceptionally(fn)</code> recovers from an exception; <code>handle(fn)</code> sees both result and exception.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></li>
-<li><code>join()</code> throws the unchecked <code>CompletionException</code>; <code>get()</code> throws the checked <code>ExecutionException</code>; both carry the original cause.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></li>
-<li>Cancellation is exceptional completion: <code>cancel()</code> acts like <code>completeExceptionally(new CancellationException())</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></li>
+  <li>"All <em>async</em> methods without an explicit Executor argument are performed using the <code>ForkJoinPool.commonPool()</code>" (unless that pool's parallelism is below two, in which case a new thread is created per task).</li>
+  <li>Non-async steps like <code>thenApply</code> "may be performed by the thread that completes the current CompletableFuture, or by any other caller of a completion method".</li>
 </ul>
-<pre><code>java java/examples/jdk8/CompletableFutureDemo.java
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Two thread lanes. The main thread calls supplyAsync and later join, which waits. A common pool worker runs the supplier returning hello, then thenApply toUpperCase, then completes the future with HELLO, which wakes the main thread.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="74">main</text>
+    <text x="20" y="174">pool</text>
+    <text x="20" y="190" font-size="10" opacity=".75">worker</text>
+    <path d="M80 70h10M240 70h20M540 70h12M80 170h100M520 170h140" stroke="currentColor" opacity=".25"/>
+    <text x="370" y="142" text-anchor="middle" font-size="11" opacity=".75">ForkJoinPool.commonPool()</text>
+    <rect x="90" y="52" width="150" height="36" rx="6" fill="none" stroke="currentColor"/>
+    <text x="165" y="75" text-anchor="middle">supplyAsync(...)</text>
+    <g fill="none" stroke="currentColor"><path d="M165 88L230 150M222 147l8 5-1-9"/></g>
+    <rect x="180" y="152" width="150" height="36" rx="6" fill="none" stroke="currentColor"/>
+    <text x="255" y="175" text-anchor="middle">() -&gt; "hello"</text>
+    <g fill="none" stroke="currentColor"><path d="M330 170h20M344 165l6 5-6 5"/></g>
+    <rect x="350" y="152" width="170" height="36" rx="6" fill="none" stroke="currentColor"/>
+    <text x="435" y="175" text-anchor="middle">thenApply(upper)</text>
+    <rect x="260" y="56" width="280" height="28" rx="4" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="400" y="75" text-anchor="middle" font-size="11">join(): main is blocked, waiting</text>
+    <g fill="none" stroke="var(--accent)"><path d="M520 170L572 92M564 95l8-3 0 9"/></g>
+    <text x="580" y="140" font-size="11" fill="var(--accent)">complete</text>
+    <rect x="552" y="52" width="108" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="606" y="75" text-anchor="middle" fill="var(--accent)">"HELLO"</text>
+    <text x="340" y="226" text-anchor="middle" font-size="11">thenApply runs on the thread that completes the stage,</text>
+    <text x="340" y="244" text-anchor="middle" font-size="11">or on the caller if the stage was already complete</text>
+  </g>
+</svg>
+<figcaption>The supplier runs on a common-pool worker, not on <code>main</code>. <code>main</code> is free until it calls <code>join()</code>, which blocks until the chain completes.</figcaption>
+</figure>
+
+<h3>Trace it step by step</h3>
+<pre><code><span class="c">Step 1  main: supplyAsync hands () -&gt; "hello" to the common pool, returns a future at once</span>
+<span class="c">Step 2  main: thenApply attaches an instruction to that future, returns a new future</span>
+<span class="c">Step 3  worker: runs the supplier → "hello" → completes the first future</span>
+<span class="c">Step 4  worker (or main): runs toUpperCase → "HELLO" → completes the second future</span>
+<span class="c">Step 5  main: join() was waiting → wakes up with </span><span class="hl">"HELLO"</span></code></pre>
+
+<h3>The trap: blocking work in the common pool</h3>
+<p>The common pool is shared: it "is used by any ForkJoinTask that is not explicitly submitted to a specified pool", and its docs warn that its thread adjustments are not "guaranteed in the face of blocked I/O".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinPool.html">ForkJoinPool javadoc</a> So if your async steps make slow blocking calls (HTTP, JDBC), they hold the pool's threads and can starve every other task that uses it. <strong>The fix:</strong> pass your own <code>Executor</code> for blocking calls, using the overloads that take one, e.g. <code>supplyAsync(supplier, ioExecutor)</code>. On JDK 21, consider virtual threads (see <a href="0006-virtual-threads.html">lesson 0006</a>).</p>
+
+<h2>3. Combining several futures</h2>
+<p>Back at the café: you ordered coffee and a sandwich from two counters. You want to eat when <em>both</em> are ready. The Javadoc describes the main tools:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a></p>
+<table>
+<tr><th>Method</th><th>What it does</th><th>Café version</th></tr>
+<tr><td><code>thenApply(fn)</code></td><td>Transform the result</td><td>add sugar</td></tr>
+<tr><td><code>thenCompose(fn)</code></td><td>Next step is itself async: "completed with the same value as the CompletionStage returned by the given function"</td><td>with the receipt, order a refill</td></tr>
+<tr><td><code>thenCombine(other, fn)</code></td><td>"when this and the other given stage both complete normally", call fn with both results</td><td>coffee + sandwich → meal</td></tr>
+<tr><td><code>allOf(cf...)</code></td><td>"completed when all of the given CompletableFutures complete"</td><td>wait for the whole order</td></tr>
+<tr><td><code>orTimeout(t, unit)</code></td><td>Completes exceptionally with a <code>TimeoutException</code> if not done in time (JDK 9+)</td><td>give up after 5 minutes</td></tr>
+<tr><td><code>completeOnTimeout(v, t, unit)</code></td><td>Completes with a fallback value if not done in time (JDK 9+)</td><td>take a water instead</td></tr>
+</table>
+<pre><code>CompletableFuture&lt;User&gt;  user  = CompletableFuture.supplyAsync(() -&gt; userApi.get(id), io);
+CompletableFuture&lt;Order&gt; order = CompletableFuture.supplyAsync(() -&gt; orderApi.last(id), io);
+
+CompletableFuture&lt;Page&gt; page = user
+    .thenCombine(order, (u, o) -&gt; new Page(u, o))   <span class="c">// both calls run at the same time</span>
+    .orTimeout(2, TimeUnit.SECONDS);                <span class="c">// JDK 9+: fail instead of hanging</span></code></pre>
+<p class="muted">On JDK 8 there is no <code>orTimeout</code>; people used <code>get(timeout, unit)</code> on the caller side instead. Exercise 0010 practises exactly this pattern.</p>
+
+<h2>4. When something goes wrong</h2>
+<p>An exception inside a step doesn't crash your program. It travels down the chain, like a "machine broken" note passed from station to station. The <code>CompletionStage</code> docs: if a stage's computation throws, "all dependent stages requiring its completion complete exceptionally as well, with a <code>CompletionException</code> holding the exception as its cause".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletionStage.html">CompletionStage javadoc</a> So normal steps such as <code>thenApply</code> are skipped, until a step that handles errors picks it up:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a></p>
+<ul>
+  <li><code>exceptionally(fn)</code> runs only when the stage "completes exceptionally", with the exception as argument. It lets you recover with a fallback value.</li>
+  <li><code>handle(fn)</code> runs in both cases and receives "this stage's result and exception".</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="A failing future that threw IllegalStateException boom. exceptionally maps it to -1. join throws unchecked CompletionException with boom as cause. get throws checked ExecutionException with boom as cause.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="86" width="190" height="60" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="115" y="110" text-anchor="middle" fill="var(--accent)">failing</text>
+    <text x="115" y="130" text-anchor="middle" font-size="11">threw "boom"</text>
+    <g fill="none" stroke="currentColor"><path d="M210 106L258 46h12M264 41l6 5-6 5"/><path d="M210 116h54M258 111l6 5-6 5"/><path d="M210 126L258 186h12M264 181l6 5-6 5"/></g>
+    <rect x="270" y="24" width="390" height="44" rx="6" fill="none" stroke="var(--accent)"/>
+    <text x="465" y="43" text-anchor="middle" fill="var(--accent)">exceptionally(ex -&gt; -1).join()</text>
+    <text x="465" y="60" text-anchor="middle" font-size="11" fill="var(--accent)">recovered: -1</text>
+    <rect x="270" y="94" width="390" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="465" y="113" text-anchor="middle">join()</text>
+    <text x="465" y="130" text-anchor="middle" font-size="11">throws CompletionException (unchecked), cause boom</text>
+    <rect x="270" y="164" width="390" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="465" y="183" text-anchor="middle">get()</text>
+    <text x="465" y="200" text-anchor="middle" font-size="11">throws ExecutionException (checked), cause boom</text>
+  </g>
+</svg>
+<figcaption>One failed future, three ways to read it. Both <code>join</code> and <code>get</code> wrap the original exception; <code>getCause()</code> gives it back.</figcaption>
+</figure>
+
+<p><code>join()</code> throws the unchecked <code>CompletionException</code>; <code>get()</code> throws the checked <code>ExecutionException</code>; both carry the original cause.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a> Use <code>join()</code> inside lambdas and streams, where a checked exception would not compile.</p>
+<pre><code>$ java java/examples/jdk8/CompletableFutureDemo.java
 HELLO
 recovered: -1
 join() throws CompletionException, cause: java.lang.IllegalStateException: boom
 get()  throws ExecutionException,  cause: java.lang.IllegalStateException: boom</code></pre>
-<p>Source: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>CompletableFutureDemo.java</code></a>.</p>
+<p>Source: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>CompletableFutureDemo.java</code></a> (compiles with <code>javac --release 8</code>).</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Default executor for async methods?</p>
-  <button>A virtual thread pool</button>
-  <button data-correct>ForkJoinPool common pool</button>
-  <button>The caller's thread</button>
-  <button>A new thread each</button>
-  <p class="explain">Async methods without an executor use ForkJoinPool.commonPool().<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Which method throws the unchecked CompletionException?</p>
-  <button>cancel</button>
-  <button>get</button>
-  <button>complete</button>
-  <button data-correct>join</button>
-  <p class="explain">join() throws CompletionException; get() throws ExecutionException.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Which method recovers from an exception?</p>
-  <button>thenApply</button>
-  <button data-correct>exceptionally</button>
-  <button>allOf</button>
-  <button>supplyAsync</button>
-  <p class="explain">exceptionally(Function) allows recovery from exceptions.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Two threads call complete on one future. Outcome?</p>
-  <button>Last write wins</button>
-  <button data-correct>Only one succeeds</button>
-  <button>Exception is thrown</button>
-  <button>Both values stored</button>
-  <p class="explain">Only one of the competing completions succeeds.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">[1]</a></p>
-</div>
+<h3>Two more facts interviewers like</h3>
+<ul>
+  <li><strong>Only one completion wins.</strong> If several threads try to <code>complete</code>, <code>completeExceptionally</code> or <code>cancel</code> the same future, only one of them succeeds.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a></li>
+  <li><strong>Cancel does not stop the work.</strong> Cancellation "is treated as just another form of exceptional completion": <code>cancel()</code> has the same effect as <code>completeExceptionally(new CancellationException())</code>. The class "has no direct control over the computation", and the <code>mayInterruptIfRunning</code> flag "has no effect in this implementation because interrupts are not used to control processing". So a task that is already running keeps running.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture javadoc</a></li>
+</ul>
+
+<h3>Common mistakes</h3>
+<ul>
+  <li><strong>Calling <code>join()</code> right after every <code>supplyAsync</code>.</strong> Then the calls run one after another and you gained nothing. Start all of them first, then combine.</li>
+  <li><strong>Forgetting to handle errors.</strong> Nobody sees the exception until someone calls <code>join</code>. Add <code>exceptionally</code> or <code>handle</code>, and a timeout.</li>
+  <li><strong>Slow I/O on the common pool.</strong> Pass your own executor.</li>
+</ul>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Which executor runs <code>supplyAsync(supplier)</code> when you don't pass one?</p>
+  <div class="options">
+    <button class="opt" data-correct>ForkJoinPool.commonPool()</button>
+    <button class="opt">The caller's own thread</button>
+    <button class="opt">A new virtual thread each</button>
+    <button class="opt">A fixed pool of ten threads</button>
+  </div>
+  <div class="why">"All async methods without an explicit Executor argument are performed using the ForkJoinPool.commonPool()" (unless its parallelism is below two).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A future failed with <code>IllegalStateException("boom")</code>. What does <code>join()</code> throw?</p>
+  <div class="options">
+    <button class="opt" data-correct>CompletionException with boom as its cause</button>
+    <button class="opt">ExecutionException with boom as its cause</button>
+    <button class="opt">IllegalStateException boom, not wrapped at all</button>
+    <button class="opt">Nothing: join returns null for a failed future</button>
+  </div>
+  <div class="why"><code>join()</code> throws the unchecked <code>CompletionException</code>; <code>get()</code> throws the checked <code>ExecutionException</code>. Both wrap the original cause.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which method lets you replace a failure with a fallback value?</p>
+  <div class="options">
+    <button class="opt" data-correct>exceptionally</button>
+    <button class="opt">thenApply</button>
+    <button class="opt">supplyAsync</button>
+    <button class="opt">allOf</button>
+  </div>
+  <div class="why"><code>exceptionally(fn)</code> runs when the stage completes exceptionally and its result replaces the error. <code>thenApply</code> is skipped on failure.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Two threads call <code>complete(...)</code> on the same future with different values. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>Only one of the completions succeeds</button>
+    <button class="opt">The last call overwrites the first value</button>
+    <button class="opt">The second call throws an exception</button>
+    <button class="opt">The future keeps both values in a list</button>
+  </div>
+  <div class="why">Of competing <code>complete</code>, <code>completeExceptionally</code> or <code>cancel</code> calls, only one succeeds. The others return <code>false</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is wrong with this? <code>var a = supplyAsync(callA).join(); var b = supplyAsync(callB).join();</code></p>
+  <div class="options">
+    <button class="opt" data-correct>The calls run one after the other, so nothing is gained</button>
+    <button class="opt">join() can't be used outside a try/catch block at all</button>
+    <button class="opt">The second supplyAsync is never run by the common pool</button>
+    <button class="opt">Each join() creates a new thread pool, which leaks threads</button>
+  </div>
+  <div class="why"><code>join()</code> blocks until that future is done. Start both futures first, then combine with <code>thenCombine</code> or <code>allOf</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Each async step makes a slow JDBC call. Why is the default pool a bad choice?</p>
+  <div class="options">
+    <button class="opt" data-correct>Blocked calls hold the shared common pool's few threads</button>
+    <button class="opt">The common pool doesn't allow any I/O, so the call fails</button>
+    <button class="opt">The common pool runs everything on main, one at a time</button>
+    <button class="opt">JDBC needs a checked exception, which supplyAsync forbids</button>
+  </div>
+  <div class="why">The common pool is shared by the JVM; blocking it starves other tasks. Pass your own <code>Executor</code> (or use virtual threads on JDK 21).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You call <code>cancel(true)</code> on a <code>CompletableFuture</code> whose supplier is running. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It completes with CancellationException; the task may keep running</button>
+    <button class="opt">The worker thread is interrupted and the task always stops at once</button>
+    <button class="opt">Nothing: you can't cancel a future that has already started</button>
+    <button class="opt">The future restarts the supplier from the beginning on main</button>
+  </div>
+  <div class="why">Cancellation is just exceptional completion with a <code>CancellationException</code>; the class "has no direct control over the computation".</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How does CompletableFuture work, and what do you watch out for in production?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> It is a Future you can complete and chain (a <code>CompletionStage</code>), since JDK 8.</label></li>
+      <li><label><input type="checkbox"> <code>supplyAsync</code> starts work; <code>thenApply</code> / <code>thenCompose</code> / <code>thenCombine</code> chain or combine.</label></li>
+      <li><label><input type="checkbox"> Async methods without an executor use <code>ForkJoinPool.commonPool()</code>.</label></li>
+      <li><label><input type="checkbox"> Don't block the common pool; pass your own executor for I/O (or virtual threads on 21).</label></li>
+      <li><label><input type="checkbox"> Errors flow down the chain; <code>exceptionally</code> / <code>handle</code> recover.</label></li>
+      <li><label><input type="checkbox"> <code>join</code> throws unchecked <code>CompletionException</code>, <code>get</code> checked <code>ExecutionException</code>.</label></li>
+      <li><label><input type="checkbox"> Add timeouts (<code>orTimeout</code>, JDK 9+); <code>cancel</code> doesn't stop the running task.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"<code>CompletableFuture</code>, from JDK 8, is a Future that I can complete and also chain, because it implements <code>CompletionStage</code>. I start work with <code>supplyAsync</code>, transform results with <code>thenApply</code>, chain another async call with <code>thenCompose</code>, and run two calls in parallel and merge them with <code>thenCombine</code> or <code>allOf</code>. If I don't pass an executor, async steps run on <code>ForkJoinPool.commonPool()</code>, which is shared, so for blocking I/O I pass my own executor, or on Java 21 I'd consider virtual threads. Exceptions travel down the chain and skip normal steps; I recover with <code>exceptionally</code> or <code>handle</code>. When I wait, <code>join</code> throws an unchecked <code>CompletionException</code> and <code>get</code> a checked <code>ExecutionException</code>, both with the real cause inside. And in production I always add a timeout with <code>orTimeout</code>, because <code>cancel</code> only completes the future; it doesn't stop the running work."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0010-parallel-calls.md">Exercise 0010: parallel calls with a timeout</a></p>
+<p><a href="../exercises/0010-parallel-calls.md">Exercise 0010: parallel calls with a timeout</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>jdk8/CompletableFutureDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a>. The class description only.</p>
-<p><a href="0011-java-time.html">← JDK 8: java.time, the date and time API</a> &nbsp;|&nbsp; <a href="0005-visibility-and-happens-before.html">Visibility and happens-before →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will dig into the memory model: <em>"The worker thread wrote a result; why is main guaranteed to see it after <code>join()</code>?"</em> That is about visibility and happens-before, the next lesson: <a href="0005-visibility-and-happens-before.html">lesson 0005</a>. For thread pools in depth, see <a href="0023-thread-pools-executors.html">lesson 0023</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a>, the class description.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When do I need thenCompose instead of thenApply?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0011-java-time.html">← java.time: which clock do you need?</a> &nbsp;|&nbsp; <a href="0044-review-jdk8.html">Review 5: lambdas, streams, java.time and CompletableFuture →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">CompletableFuture Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletionStage.html">CompletionStage Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinPool.html">ForkJoinPool Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 3: Những lời chỉ trích pattern, và anti-pattern</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Những lời chỉ trích pattern, và anti-pattern</h1>
+<p class="meta">Design Patterns · Bài 0003 · bước 3/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-criticism-and-anti-patterns.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nêu được ba lời chỉ trích chính nhắm vào pattern, kể tên vài anti-pattern, và biết tránh dùng pattern khi một thiết kế đơn giản hơn đã đủ.</div>
+
+<h2>Ba lời chỉ trích có cơ sở</h2>
+<ol><li><strong>Chữa cháy cho ngôn ngữ yếu:</strong> "nhu cầu dùng pattern xuất hiện khi người ta chọn một ngôn ngữ lập trình hoặc công nghệ thiếu mức trừu tượng cần thiết." (Lambda khiến nhiều pattern trong Java gần như miễn phí: xem bài <a href="0028-patterns-in-modern-java.vi.html">Java hiện đại</a>.)</li>
+<li><strong>Giải pháp kém hiệu quả:</strong> người ta cài đặt pattern "đúng từng chữ, không điều chỉnh cho phù hợp với bối cảnh dự án của mình."</li>
+<li><strong>Dùng không có lý do:</strong> "Khi trong tay chỉ có cái búa, nhìn đâu cũng thấy đinh": người mới thêm pattern và độ phức tạp vào chỗ mà code đơn giản hơn là đủ.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li></ol>
+<h2>Anti-pattern</h2>
+<p>Anti-pattern là "bất kỳ giải pháp phổ biến nhưng phản tác dụng nào cho một lớp vấn đề"; thuật ngữ này do Andrew Koenig đặt ra năm 1995, lấy cảm hứng từ cuốn <em>Design Patterns</em>. Các ví dụ trên trang: God object, magic number, poltergeist, Big Ball of Mud.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a> Một God object "tham chiếu tới rất nhiều kiểu khác nhau, có quá nhiều method không liên quan hoặc không phân loại được", vi phạm Single Responsibility Principle và khiến cả codebase bị dính chặt vào nó.<a class="cite" href="https://en.wikipedia.org/wiki/God_object">[3]</a> Xem bài OOP <a href="../../oop/lessons/0022-god-objects-and-refactoring.vi.html">God object và refactoring</a>.</p>
+<div class="aside">Quy tắc: gọi tên vấn đề trước ("tôi cần thay đổi thuật toán lúc runtime"), rồi mới chọn pattern. Chính trang mô tả của nhiều pattern cũng ghi "có thể là quá tay với trường hợp đơn giản" trong phần nhược điểm.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một lời chỉ trích nhắm vào pattern?</p>
+  <button data-correct>Bị dùng mà không có lý do</button>
+  <button>Quá nhiều màu sắc</button>
+  <button>Quá nhỏ</button>
+  <button>Quá nhanh</button>
+  <p class="explain">Người mới áp dụng chúng một cách tràn lan.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Anti-pattern là...?</p>
+  <button data-correct>Giải pháp phổ biến nhưng phản tác dụng</button>
+  <button>Một framework</button>
+  <button>Một pattern hiếm gặp</button>
+  <button>Một bài test</button>
+  <p class="explain">Bất kỳ giải pháp phổ biến nhưng phản tác dụng nào cho một lớp vấn đề.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Đâu là một ví dụ anti-pattern?</p>
+  <button>Iterator</button>
+  <button>Builder</button>
+  <button>Strategy</button>
+  <button data-correct>God object</button>
+  <p class="explain">God object nằm trong danh sách anti-pattern.<a class="cite" href="https://en.wikipedia.org/wiki/Anti-pattern">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Bước đầu tiên tốt nhất trước khi chọn pattern?</p>
+  <button>Thêm một interface</button>
+  <button>Chọn cái mới nhất</button>
+  <button data-correct>Gọi tên vấn đề</button>
+  <button>Copy từ một library</button>
+  <p class="explain">Chọn dựa trên vấn đề, không phải dựa trên danh sách pattern.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-overengineered.vi.md">Bài tập 3: thiết kế quá tay</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a>. Trang ngắn.</p>
+<p><a href="0002-classification-and-catalog.vi.html">← Danh mục: creational, structural, behavioral</a> &nbsp;|&nbsp; <a href="0004-factory-method.vi.html">Factory Method →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a> · [2] <a href="https://en.wikipedia.org/wiki/Anti-pattern">Wikipedia: Anti-pattern</a> · [3] <a href="https://en.wikipedia.org/wiki/God_object">Wikipedia: God object</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

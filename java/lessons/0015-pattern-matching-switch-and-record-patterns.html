@@ -3,87 +3,336 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 15: JDK 21: pattern matching for switch and record patterns</title>
+<title>Java 15: How switch takes objects apart (JDK 21)</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 21: pattern matching for switch and record patterns</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0015 · step 24 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>How switch takes objects apart (JDK 21)</h1>
+<p class="subtitle">Pattern matching for <code>switch</code> and record patterns: test the type, unpack the fields, and let the compiler check you forgot nothing.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0015 · step 42 of 46 · Advanced · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0015-pattern-matching-switch-and-record-patterns.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Real code often receives "one of several kinds of thing": a payment that is a card or a bank transfer, an event that is created, paid or cancelled. Before JDK 21 you handled that with long <code>if / else if / instanceof</code> chains. Interviewers ask <em>"What did JDK 21 add to switch, and why does it matter with sealed types and records?"</em> This lesson answers it.</div>
 
 <div class="win"><b>Today's win:</b> write a JDK 21 <code>switch</code> that destructures records, uses <code>when</code> guards and <code>case null</code>, and needs no <code>default</code> on a sealed type.</div>
 
-<h2>Pattern matching for switch (final in JDK 21)</h2>
-<ul>
-<li><strong>Type patterns in case labels</strong> test the selector against several patterns with an action for each.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
-<li><strong>Guards:</strong> <code>case String s when s.equalsIgnoreCase("YES") -&gt; ...</code> refines a pattern with <code>when</code>.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
-<li><strong>Null:</strong> "If the selector expression evaluates to null then any null case label is said to match." Without <code>case null</code> the switch still throws <code>NullPointerException</code>, as before.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
-<li><strong>Exhaustive:</strong> pattern switches must cover all cases; for sealed types the compiler checks coverage from the permitted subtypes, sometimes removing the need for <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
-<li><strong>Dominance:</strong> a label may not be dominated by an earlier one, so put more specific patterns first (like ordering <code>catch</code> clauses).<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></li>
-</ul>
-<h2>Record patterns (final in JDK 21)</h2>
-<p>They "deconstruct record values", and can nest: <code>Rectangle(ColoredPoint(Point(var x, var y), var c), var lr)</code>.<a class="cite" href="https://openjdk.org/jeps/440">[2]</a></p>
-<pre><code>static String describe(Shape s) {
-    return switch (s) {
-        case Circle(Point(var x, var y), var r) when r &gt; 100 -&gt; "huge circle at " + x + "," + y;
-        case Circle(Point(var x, var y), var r)              -&gt; "circle r=" + r;
-        case Rect(Point(var x1, var y1), Point(var x2, var y2)) -&gt; "rect " + (x2 - x1) + "x" + (y2 - y1);
+<dl class="words">
+  <dt>selector</dt><dd>The value you put in the brackets of <code>switch (...)</code>. Java compares it with each <code>case</code>.</dd>
+  <dt>pattern</dt><dd>A small "shape test" in a <code>case</code>, such as <code>String s</code>. If the value has that shape, the test succeeds and Java fills in the variable.</dd>
+  <dt>type pattern</dt><dd>A pattern that tests the type: <code>case Integer i</code> means "if it is an Integer, call it <code>i</code>".</dd>
+  <dt>record pattern</dt><dd>A pattern that tests for a record type and unpacks its fields in one go: <code>case Point(int x, int y)</code>.</dd>
+  <dt>guard</dt><dd>An extra condition after <code>when</code>. The case matches only if the pattern matches <em>and</em> the condition is true.</dd>
+  <dt>exhaustive</dt><dd>"Covers every possible value." The compiler refuses a pattern switch that could fall through without any case matching.</dd>
+  <dt>sealed type</dt><dd>A class or interface that lists all its allowed subtypes with <code>permits</code> (lesson 0014), so the compiler knows the full list.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"I have an <code>Object</code>. It can be an <code>Integer</code>, a <code>String</code> or <code>null</code>. How do I print a different message for each one in Java 8?"</em> Don't look anything up. You will compare with the JDK 21 way at the end.</p>
+
+<h2>1. The old way: a chain of questions</h2>
+<p>Picture a post office worker sorting parcels. For each parcel she asks: "Is it a letter? No. Is it a small box? No. Is it a big box? Yes, put it there." Every question is written separately, and if she forgets a kind of parcel, nobody warns her.</p>
+<p>That is the old Java code. JEP 441 shows it with a comment "Prior to Java 21":<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<pre><code>static String formatter(Object obj) {
+    String formatted = "unknown";
+    if (obj instanceof Integer i) {
+        formatted = String.format("int %d", i);
+    } else if (obj instanceof Long l) {
+        formatted = String.format("long %d", l);
+    } else if (obj instanceof String s) {
+        formatted = String.format("String %s", s);
+    }
+    return formatted;
+}</code></pre>
+<p>This already uses the JDK 16 <code>instanceof</code> pattern from <a href="0013-switch-expressions-and-instanceof-patterns.html">lesson 0013</a>. In JDK 8 it is even longer: <code>if (obj instanceof Integer) { Integer i = (Integer) obj; ... }</code>, a test and then a cast for every branch.</p>
+<p>Three problems: the code repeats itself, the order of the <code>if</code>s is easy to get wrong, and the compiler cannot tell you that you forgot a kind.</p>
+
+<h2>2. The new way: patterns inside <code>case</code></h2>
+<p>JDK 21 lets you put <strong>type patterns in case labels</strong>, so the selector is tested against several patterns with an action for each.<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> The same method becomes:</p>
+<pre><code>static String formatter(Object obj) {
+    return switch (obj) {
+        case Integer i -&gt; String.format("int %d", i);
+        case Long l    -&gt; String.format("long %d", l);
+        case String s  -&gt; String.format("String %s", s);
+        default        -&gt; "unknown";   <span class="c">// needed: Object has endless subtypes</span>
     };
 }</code></pre>
-<pre><code>java java/examples/jdk21/Jdk21Features.java
+<p>Read <code>case Integer i -&gt;</code> as: "if <code>obj</code> is an <code>Integer</code>, call it <code>i</code> and run the code on the right." The <code>-&gt;</code> arrow means no fall-through, exactly like the switch expressions of lesson 0013.</p>
+<p>How does Java pick a case? "The first <code>case</code> label appearing in a switch block that applies to a value is chosen."<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> Let's trace <code>formatter(42L)</code>:</p>
+<pre><code>formatter(42L);
+<span class="c">Step 1  Is 42L an Integer?  no  → try the next case</span>
+<span class="c">Step 2  Is 42L a Long?      yes → bind l = 42L</span>
+<span class="c">Step 3  Run the right side  → String.format("long %d", 42L)</span>
+<span class="hl">        returns "long 42"</span></code></pre>
+
+<h2>3. Guards with <code>when</code>, and why order matters</h2>
+<p>Sometimes the type is not enough. You want "a String, <em>but only if it is blank</em>". Add a <span class="term">guard</span> with <code>when</code>: it refines a pattern.<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<pre><code>static String nullSafe(Object o) {
+    return switch (o) {
+        case null -&gt; "null handled inside the switch";
+        case String str when str.isBlank() -&gt; "blank string";
+        case String str -&gt; "string " + str;
+        case Integer i  -&gt; "int " + i;
+        default         -&gt; "other";
+    };
+}</code></pre>
+<p>Order matters, like <code>catch</code> blocks. A case may not be <span class="term">dominated</span> by an earlier one: "It is a compile-time error for a <code>case</code> label in a switch block to be dominated by any preceding <code>case</code> label".<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> So put more specific patterns first.</p>
+<h3>Trap: the general case first</h3>
+<p>A <code>String</code> is also a <code>CharSequence</code>. If the <code>CharSequence</code> case comes first, the <code>String</code> case can never be reached. I compiled this on JDK 21:</p>
+<pre><code>return switch (o) {
+    case CharSequence cs -&gt; "cs";
+    case String s        -&gt; "s";      <span class="c">// can never be reached</span>
+    default              -&gt; "o";
+};
+
+$ javac Dom.java
+<span class="hl">error: this case label is dominated by a preceding case label</span></code></pre>
+<p><strong>The fix:</strong> swap them. Specific (<code>String</code>, or a guarded case) first, general (<code>CharSequence</code>, <code>default</code>) last.</p>
+
+<h2>4. What about <code>null</code>?</h2>
+<p>In every Java version before 21, <code>switch (null)</code> throws <code>NullPointerException</code>. JDK 21 adds <code>case null</code>: "If the selector expression evaluates to null then any null case label is said to match."<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<p>But the old behaviour stays when you don't write it: "If there is no such label associated with the switch block then the <code>switch</code> throws <code>NullPointerException</code>, as before."<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> A <code>default</code> does <strong>not</strong> catch <code>null</code>. If you want both, you can write them together as <code>case null, default -&gt; ...</code>; the JEP allows "<code>null</code> case labels to have an optional <code>default</code>".<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+<pre><code>switch (o) { case String s -&gt; ...; default -&gt; ...; }
+<span class="c">// o == null → NullPointerException</span>
+
+switch (o) { case null -&gt; ...; case String s -&gt; ...; default -&gt; ...; }
+<span class="hl">// o == null → the null case runs</span></code></pre>
+
+<h2>5. Record patterns: open the box in the <code>case</code></h2>
+<p>Think of a parcel with a packing list on the front: "contains: one point, one radius". A <span class="term">record pattern</span> reads that list and hands you each item by name. Record patterns "deconstruct record values".<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a></p>
+<p>Old way and new way, both from JEP 440:<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a></p>
+<pre><code>record Point(int x, int y) {}
+
+<span class="c">// As of Java 16: test the type, then call the accessors yourself</span>
+if (obj instanceof Point p) {
+    int x = p.x();
+    int y = p.y();
+    System.out.println(x + y);
+}
+
+<span class="c">// As of Java 21: the pattern declares x and y for you</span>
+if (obj instanceof Point(int x, int y)) {
+    System.out.println(x + y);
+}</code></pre>
+<p>Patterns can be <strong>nested</strong>: a record inside a record, unpacked in one line, for example <code>Rectangle(ColoredPoint(Point(var x, var y), var c), var lr)</code>.<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a> You may write <code>var</code> instead of the component type: "A record pattern can use <code>var</code> to match against a record component without stating the type of the component."<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a></p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="A Circle object holds a Point center with x 0 and y 0 and a radius 500. The pattern case Circle(Point(var x, var y), var r) calls the accessors and fills three variables x, y and r.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="160" y="24" text-anchor="middle" font-size="11" opacity=".75">the object (a record)</text>
+    <rect x="30" y="36" width="260" height="160" rx="6" fill="none" stroke="currentColor"/>
+    <text x="44" y="58">Circle</text>
+    <rect x="50" y="72" width="220" height="74" rx="4" fill="none" stroke="currentColor" opacity=".8"/>
+    <text x="62" y="92" font-size="11" opacity=".75">center: Point</text>
+    <text x="80" y="114">x = 0</text>
+    <text x="80" y="134">y = 0</text>
+    <text x="62" y="178">r = 500.0</text>
+    <text x="510" y="24" text-anchor="middle" font-size="11" fill="var(--accent)">case Circle(Point(var x, var y), var r)</text>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="450" y="96" width="130" height="28" rx="4"/>
+      <rect x="450" y="132" width="130" height="28" rx="4"/>
+      <rect x="450" y="168" width="130" height="28" rx="4"/>
+    </g>
+    <g fill="var(--accent)" text-anchor="middle">
+      <text x="515" y="115">int x = 0</text>
+      <text x="515" y="151">int y = 0</text>
+      <text x="515" y="187">double r = 500.0</text>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <path d="M130 110h314M438 105l6 5-6 5"/>
+      <path d="M130 130L444 146M437 140l7 6-9 3"/>
+      <path d="M150 174L444 182M436 176l8 6-8 5"/>
+    </g>
+    <g font-size="11" opacity=".75" text-anchor="middle">
+      <text x="360" y="102">center().x()</text>
+      <text x="360" y="133">center().y()</text>
+      <text x="360" y="173">r()</text>
+    </g>
+    <text x="340" y="228" text-anchor="middle" font-size="11" opacity=".8">the pattern checks the types, then reads each component with its accessor</text>
+  </g>
+</svg>
+<figcaption>A nested record pattern unpacks a <code>Circle</code> and the <code>Point</code> inside it in one step.</figcaption>
+</figure>
+
+<p>One detail: "The <code>null</code> value does not match any record pattern."<a class="src" href="https://openjdk.org/jeps/440">JEP 440</a> So <code>case Circle(var c, var r)</code> never runs for <code>null</code>; you need <code>case null</code> for that.</p>
+
+<h2>6. Sealed types: no <code>default</code>, and the compiler checks you</h2>
+<p>Back to the post office. If the post office says "we only accept three parcel sizes, full stop", a worker with three slots has covered everything. A <span class="term">sealed type</span> (lesson 0014) is that promise in Java.</p>
+<p>A pattern switch must be <span class="term">exhaustive</span>. For a sealed type, "the type coverage check can take into account the <code>permits</code> clause of the sealed class", and "As a result, no <code>default</code> label is needed."<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a> Here is the full example from this course:</p>
+<pre><code>sealed interface Shape permits Circle, Rect {}
+record Point(int x, int y) {}
+record Circle(Point center, double r) implements Shape {}
+record Rect(Point topLeft, Point bottomRight) implements Shape {}
+
+static String describe(Shape s) {
+    return switch (s) {   <span class="c">// no default: Circle and Rect are the only Shapes</span>
+        case Circle(Point(var x, var y), var r) when r &gt; 100
+            -&gt; "huge circle at " + x + "," + y;
+        case Circle(Point(var x, var y), var r)
+            -&gt; "circle r=" + r + " at " + x + "," + y;
+        case Rect(Point(var x1, var y1), Point(var x2, var y2))
+            -&gt; "rect width " + (x2 - x1) + " height " + (y2 - y1);
+    };
+}</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="describe(new Circle(new Point(1,2), 5)) tries the cases from top to bottom. The first case matches the type but the guard r greater than 100 is false. The second case matches and returns. The Rect case is never tried.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="16" width="300" height="34" rx="6" fill="none" stroke="currentColor"/>
+    <text x="170" y="38" text-anchor="middle">Circle(Point(1,2), 5.0)</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M40 50v168M35 212l5 6 5-6"/>
+    </g>
+    <text x="52" y="236" font-size="11" opacity=".75">tried top to bottom</text>
+    <rect x="70" y="66" width="290" height="40" rx="4" fill="none" stroke="currentColor" opacity=".8"/>
+    <text x="82" y="84" font-size="11">case Circle(...) when r &gt; 100</text>
+    <text x="82" y="99" font-size="11" opacity=".7">type: yes · guard: 5 &gt; 100? no</text>
+    <rect x="70" y="118" width="290" height="40" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="82" y="136" font-size="11" fill="var(--accent)">case Circle(...)</text>
+    <text x="82" y="151" font-size="11" fill="var(--accent)">type: yes · x=1, y=2, r=5.0</text>
+    <rect x="70" y="170" width="290" height="40" rx="4" fill="none" stroke="currentColor" opacity=".45"/>
+    <text x="82" y="194" font-size="11" opacity=".55">case Rect(...)</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M360 86h40" opacity=".8"/>
+      <path d="M360 138h40M394 133l6 5-6 5" stroke="var(--accent)"/>
+      <path d="M360 190h40" opacity=".45"/>
+    </g>
+    <text x="410" y="90" font-size="11" opacity=".8">no → next case</text>
+    <text x="410" y="132" font-size="11" fill="var(--accent)">match → return</text>
+    <text x="410" y="148" font-size="11" fill="var(--accent)">"circle r=5.0 at 1,2"</text>
+    <text x="410" y="194" font-size="11" opacity=".55">never tried</text>
+  </g>
+</svg>
+<figcaption>The first case that matches (type and guard) wins; the rest are skipped.</figcaption>
+</figure>
+
+<p>Run it on JDK 21:</p>
+<pre><code>$ java java/examples/jdk21/Jdk21Features.java
 circle r=5.0 at 1,2
 huge circle at 0,0
 rect width 4 height 3
-null handled inside the switch | blank string | string x | int 7</code></pre>
-<p>Source: <a href="../examples/jdk21/Jdk21Features.java"><code>Jdk21Features.java</code></a>. Compiling it with <code>--release 17</code> fails with "patterns in switch statements are not supported in -source 17", which is a handy interview fact: this is a 21 feature.</p>
+null handled inside the switch | blank string | string x | int 7
+a c [c, b, a]
+one=1 two=2 {two=2, one=1}</code></pre>
+<p class="muted">The first four lines belong to this lesson. The last two are sequenced collections, the next lesson.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Selector is null and there is no <code>case null</code>. Result?</p>
-  <button>Silent no-op</button>
-  <button data-correct>NullPointerException</button>
-  <button>Default branch runs</button>
-  <button>Compile error</button>
-  <p class="explain">Without a null case the switch throws NPE as before.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. What does a <code>when</code> clause add?</p>
-  <button>A default branch</button>
-  <button>A yield statement</button>
-  <button>A loop over cases</button>
-  <button data-correct>A guard on a pattern</button>
-  <p class="explain">Guards refine a pattern case label.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Sealed selector, all subtypes covered. Default needed?</p>
-  <button>Yes, always</button>
-  <button>Only for records</button>
-  <button>Only with null</button>
-  <button data-correct>No, not needed</button>
-  <p class="explain">The compiler checks coverage for sealed types, sometimes removing default.<a class="cite" href="https://openjdk.org/jeps/441">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Which patterns can be nested?</p>
-  <button>Only literals</button>
-  <button>Only enums</button>
-  <button data-correct>Record patterns</button>
-  <button>Only strings</button>
-  <p class="explain">Record patterns and type patterns can be nested.<a class="cite" href="https://openjdk.org/jeps/440">[2]</a></p>
-</div>
+<h3>Why "no default" is a feature, not laziness</h3>
+<p>Imagine someone adds <code>record Triangle(...) implements Shape</code> and the <code>permits</code> list. Every switch over <code>Shape</code> without a <code>default</code> now fails to compile, so the compiler shows you every place to update. I removed the <code>Rect</code> case to see the message:</p>
+<pre><code>$ javac Miss.java
+<span class="hl">error: the switch expression does not cover all possible input values</span></code></pre>
+<p>If you write <code>default</code>, the new <code>Triangle</code> silently goes to <code>default</code> and you lose that warning. And if a class file changes after compiling, "the compiler will in this case insert a synthetic <code>default</code> clause that throws", so the program fails loudly instead of doing nothing.<a class="src" href="https://openjdk.org/jeps/441">JEP 441</a></p>
+
+<h3>JDK 17 vs 21</h3>
+<p>JDK 17 has sealed classes, records, switch expressions and <code>instanceof</code> patterns, but <strong>not</strong> patterns in <code>switch</code> and not record patterns. I compiled the example with <code>--release 17</code>:</p>
+<pre><code>$ javac --release 17 java/examples/jdk21/Jdk21Features.java
+<span class="hl">error: patterns in switch statements are not supported in -source 17</span></code></pre>
+<p>That is a handy interview fact: this is a 21 feature (final in JDK 21 through JEP 441 and JEP 440). On JDK 8 you have none of it: you write <code>instanceof</code> plus a cast, or the Visitor pattern.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">The selector is <code>null</code>, and the switch has a <code>default</code> but no <code>case null</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It throws a NullPointerException</button>
+    <button class="opt">The default branch runs as usual</button>
+    <button class="opt">Nothing runs and it returns null</button>
+    <button class="opt">The code does not even compile</button>
+  </div>
+  <div class="why">Without a <code>case null</code> the switch "throws NullPointerException, as before". <code>default</code> does not catch null.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does a <code>when</code> clause add to a <code>case</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>An extra condition: a guard on the pattern</button>
+    <button class="opt">A default branch for the missing types</button>
+    <button class="opt">A way to fall through to the next case</button>
+    <button class="opt">A loop that tries the case several times</button>
+  </div>
+  <div class="why">A guard refines a pattern: the case matches only if the pattern matches and the <code>when</code> condition is true.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the bug? <code>case CharSequence cs -&gt; ...; case String s -&gt; ...;</code></p>
+  <div class="options">
+    <button class="opt" data-correct>The String case is dominated; it is a compile error</button>
+    <button class="opt">Nothing; Java picks the most specific case itself</button>
+    <button class="opt">It compiles, but String values throw at runtime</button>
+    <button class="opt">A String case is not allowed inside any switch</button>
+  </div>
+  <div class="why">Java picks the first case that applies, so the String case could never run. The compiler reports "this case label is dominated by a preceding case label". Specific first.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The selector is a sealed interface and every permitted subtype has a case. Do you need <code>default</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No; the compiler knows the full list from permits</button>
+    <button class="opt">Yes; every switch on an object needs a default</button>
+    <button class="opt">Only when the subtypes are records, not classes</button>
+    <button class="opt">Only when a case null is also in the switch</button>
+  </div>
+  <div class="why">The coverage check uses the <code>permits</code> clause, so "no default label is needed". Leaving it out also makes the compiler warn you when a new subtype appears.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">With <code>record Point(int x, int y)</code>, what does <code>obj instanceof Point(int x, int y)</code> do when it matches?</p>
+  <div class="options">
+    <button class="opt" data-correct>Declares x and y, filled from the record's accessors</button>
+    <button class="opt">Creates a new Point with the values x and y</button>
+    <button class="opt">Compares obj with the point at x and y by equals</button>
+    <button class="opt">Casts obj to Point but leaves the fields unread</button>
+  </div>
+  <div class="why">A record pattern deconstructs the record: it tests the type and binds each component to a new variable.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Code with <code>case Circle(Point(var x, var y), var r)</code> is compiled with <code>javac --release 17</code>. Result?</p>
+  <div class="options">
+    <button class="opt" data-correct>A compile error: patterns in switch need JDK 21</button>
+    <button class="opt">It compiles, because records exist in JDK 17</button>
+    <button class="opt">It compiles, but only with a warning about var</button>
+    <button class="opt">It compiles, but throws MatchException when run</button>
+  </div>
+  <div class="why">Pattern matching for switch and record patterns are final in JDK 21. javac says "patterns in switch statements are not supported in -source 17".</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What did JDK 21 add to switch, and how does it work with sealed types and records?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>case</code> labels can hold type patterns (<code>case String s</code>), replacing <code>if / instanceof</code> chains.</label></li>
+      <li><label><input type="checkbox"> The first matching case wins; a dominated case is a compile error, so specific cases go first.</label></li>
+      <li><label><input type="checkbox"> <code>when</code> adds a guard condition to a pattern.</label></li>
+      <li><label><input type="checkbox"> <code>case null</code> handles null; without it the switch still throws NPE (default does not catch null).</label></li>
+      <li><label><input type="checkbox"> Record patterns unpack record components, and they can nest (<code>Circle(Point(var x, var y), var r)</code>).</label></li>
+      <li><label><input type="checkbox"> Pattern switches must be exhaustive; with a sealed type no default is needed, and a new subtype breaks the compile where it must be handled.</label></li>
+      <li><label><input type="checkbox"> It is final in JDK 21 (JEP 441, JEP 440); JDK 17 rejects it.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"In JDK 21, switch can match on types, not just constants. I write <code>case Circle c</code> or even a record pattern like <code>case Circle(Point(var x, var y), var r)</code>, which checks the type and unpacks the fields in one step. Cases are tried from top to bottom and the first match wins, so I put specific ones first; the compiler rejects a case that is dominated by an earlier one. I can add a guard with <code>when</code>, and I can write <code>case null</code>; without it the switch still throws a NullPointerException. The big win is with sealed types: the switch must be exhaustive, and because the compiler knows all permitted subtypes I don't need a default. If someone adds a new subtype later, every switch that doesn't handle it stops compiling, which is exactly what I want. That combination, sealed interface plus records plus pattern switch, gives Java real algebraic data types, and it's final in 21, not available in 17."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0015-expression-evaluator.md">Exercise 0015: an expression evaluator</a></p>
+<p><a href="../exercises/0015-expression-evaluator.md">Exercise 0015: an expression evaluator</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a>. Then JEP 440.</p>
-<p><a href="0027-helpful-nullpointerexceptions.html">← Helpful NullPointerExceptions (JDK 14+, in 17 and 21)</a> &nbsp;|&nbsp; <a href="0016-sequenced-collections.html">JDK 21: sequenced collections →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Would you still use the Visitor pattern? What happens to old switches when you add a subtype? Why not just put a method on each class?"</em> A good answer: a method on each class is best when the behaviour belongs to the type; a pattern switch is best when the operation lives outside the types (formatting, pricing, serialising), and sealing makes it safe. Review sealed types in <a href="0014-sealed-classes.html">lesson 0014</a> and records in <a href="0003-records-and-immutability.html">lesson 0003</a>, then continue with <a href="0016-sequenced-collections.html">sequenced collections</a>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a>, then <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a>. Both start with clear before-and-after examples.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What does dominated mean exactly?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0027-helpful-nullpointerexceptions.html">← Which part was null? Helpful NullPointerExceptions</a> &nbsp;|&nbsp; <a href="0016-sequenced-collections.html">First, last and reversed: sequenced collections (JDK 21) →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a> · [2] <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against JEP 441, JEP 440 and runs of the examples on JDK 21.0.12, October 2026.</p>
+  <p>References: <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a> · <a href="https://openjdk.org/jeps/440">JEP 440: Record Patterns</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

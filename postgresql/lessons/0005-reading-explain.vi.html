@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 5: Đọc EXPLAIN và EXPLAIN ANALYZE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Đọc EXPLAIN và EXPLAIN ANALYZE</h1>
+<p class="meta">PostgreSQL · Bài 0005 · bước 10/13 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-reading-explain.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> đọc được một node trong plan (loại node, cost, rows), phân biệt số ước tính với số thực tế, và dùng <code>EXPLAIN ANALYZE</code> an toàn với các câu lệnh ghi.</div>
+
+<h2>EXPLAIN in ra gì</h2>
+<p>Plan là một cây gồm các node. Mỗi node cho biết loại node (Seq Scan, Index Scan...), startup cost, total cost, số dòng ước tính và độ rộng dòng ước tính.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a> Cost được đo bằng "đơn vị tùy ý"; theo quy ước, một lần đọc page tuần tự có cost là 1.0. Cost của node cha bao gồm cả cost của các node con.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+<pre><code>Seq Scan on tenk1  (cost=0.00..445.00 rows=10000 width=244)</code></pre>
+<h2>EXPLAIN ANALYZE chạy thật query</h2>
+<p><code>EXPLAIN ANALYZE</code> "thực sự thực thi query" và bổ sung các con số thật: <code>actual time</code>, <code>loops</code>, thống kê buffer, thời gian lập plan và thời gian thực thi.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a> Với các câu lệnh thay đổi dữ liệu, hãy bọc nó trong một transaction rồi rollback:</p>
+<pre><code>BEGIN;
+EXPLAIN ANALYZE UPDATE test1 SET content = 'changed' WHERE id &lt; 100;
+ROLLBACK;</code></pre>
+<p>Script ví dụ làm đúng như vậy, sau đó đếm số dòng vẫn còn bằng 'changed': không có dòng nào.</p>
+<h2>Cách đọc plan khi phỏng vấn</h2>
+<ol>
+<li>Tìm node tốn kém nhất (cost cộng dồn từ dưới lên).</li>
+<li>So sánh <code>rows=</code> ước tính với <code>rows=</code> thực tế; chênh lệch lớn nghĩa là thống kê đã cũ hoặc ước tính kém.</li>
+<li>Xem loại scan: Seq Scan trên một table lớn với điều kiện lọc có tính chọn lọc cao gợi ý là thiếu index; tài liệu lưu ý sequential scan vẫn ổn với table nhỏ hoặc khi tập kết quả lớn.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></li>
+</ol>
+<p class="aside">Lưu ý từ tài liệu: plan trên một table test nhỏ không nhất thiết suy rộng ra được cho quy mô production.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Cost trong plan được đo bằng đơn vị gì?</p>
+  <button>Giây trên mỗi node</button>
+  <button>Byte trên mỗi page</button>
+  <button data-correct>Đơn vị cost tùy ý</button>
+  <button>Mili giây trên mỗi dòng</button>
+  <p class="explain">Cost tính bằng đơn vị tùy ý, do các tham số cost của planner quy định.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. <code>EXPLAIN ANALYZE</code> có chạy câu lệnh không?</p>
+  <button>Không, chỉ lập plan</button>
+  <button>Chỉ với SELECT</button>
+  <button data-correct>Có, nó thực thi thật</button>
+  <button>Chỉ trên replica</button>
+  <p class="explain">Nó thực sự thực thi query, kể cả INSERT/UPDATE/DELETE.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cách an toàn để analyze một câu UPDATE?</p>
+  <button>Bỏ mệnh đề WHERE</button>
+  <button data-correct>Bọc trong ROLLBACK</button>
+  <button>Thêm LIMIT</button>
+  <button>Chạy thẳng trên prod</button>
+  <p class="explain">Dùng BEGIN, EXPLAIN ANALYZE, ROLLBACK.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Ước tính 10 dòng, thực tế 100000 dòng. Nghi ngờ gì?</p>
+  <button>Network chậm</button>
+  <button>Thiếu dấu chấm phẩy</button>
+  <button>Quá nhiều index</button>
+  <button data-correct>Thống kê đã cũ</button>
+  <p class="explain">Chênh lệch ước tính lớn cho thấy thống kê hoặc ước tính sai (thói quen đọc plan của senior; thử chạy ANALYZE).</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-explain-three-queries.vi.md">Bài tập 0005: EXPLAIN ba query</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-index-explain.sql"><code>04-index-explain.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL Docs: Using EXPLAIN</a>. Các mục 14.1.1 và 14.1.2.</p>
+<p><a href="0011-multicolumn-and-partial-indexes.vi.html">← Index nhiều cột và partial index</a> &nbsp;|&nbsp; <a href="0006-mvcc-and-isolation-levels.vi.html">MVCC và isolation level →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL Docs: Using EXPLAIN</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

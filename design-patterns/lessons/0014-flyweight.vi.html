@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 14: Flyweight</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Flyweight</h1>
+<p class="meta">Design Patterns · Bài 0014 · bước 14/30 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0014-flyweight.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tách trạng thái intrinsic (dùng chung) khỏi trạng thái extrinsic (theo ngữ cảnh) để tiết kiệm bộ nhớ, và giải thích được Integer cache.</div>
+
+<h2>Mục đích</h2>
+<p>Flyweight là "một structural design pattern cho phép bạn nhét được nhiều object hơn vào lượng RAM sẵn có, bằng cách chia sẻ các phần trạng thái chung giữa nhiều object thay vì giữ toàn bộ dữ liệu trong từng object." Trạng thái <em>intrinsic</em> là dữ liệu bất biến nằm trong flyweight; trạng thái <em>extrinsic</em> phụ thuộc ngữ cảnh và được lưu bên ngoài. Chỉ áp dụng khi bạn có một số lượng khổng lồ object giống nhau đang chiếm nhiều RAM.<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/FlyweightDemo.java
+Integer cache: valueOf(127)==valueOf(127) is true, valueOf(1000)==valueOf(1000) is false
+characters placed: 11, distinct glyph objects created: 8</code></pre><p>Mười một ký tự dùng chung tám object <code>Glyph</code> khác nhau; vị trí (trạng thái extrinsic) nằm trong <code>Placed</code>. Theo tài liệu JDK, <code>Integer.valueOf</code> "sẽ luôn cache các giá trị trong khoảng -128 đến 127, tính cả hai đầu": vì vậy <code>valueOf(127) == valueOf(127)</code> nhưng <code>valueOf(1000) != valueOf(1000)</code>, và constructor <code>Integer(int)</code> đã bị deprecate để nhường chỗ cho nó.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a> Bài học: so sánh giá trị boxed bằng <code>equals</code> (<a href="../../java/lessons/0001-hashmap-equals-hashcode.vi.html">equals/hashCode</a>). Mã nguồn: <a href="../examples/FlyweightDemo.java"><code>FlyweightDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Tiết kiệm đáng kể RAM khi có nhiều object giống nhau</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Đổi bộ nhớ lấy CPU (phải tính lại ngữ cảnh)</li><li>Code phức tạp hơn</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a> Flyweight là immutable và có thể có nhiều instance, khác với Singleton; nó bổ trợ cho Composite (dùng chung các node lá).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Trạng thái intrinsic là...?</p>
+  <button data-correct>Dùng chung và bất biến</button>
+  <button>Ngẫu nhiên</button>
+  <button>Riêng từng object và thay đổi</button>
+  <button>Lưu bên ngoài</button>
+  <p class="explain">Nó nằm trong flyweight và có thể dùng chung.<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Khoảng giá trị của Integer cache?</p>
+  <button>Bất kỳ</button>
+  <button data-correct>-128 đến 127</button>
+  <button>0 đến 255</button>
+  <button>-1000 đến 1000</button>
+  <p class="explain">valueOf luôn cache từ -128 đến 127.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cái giá của Flyweight?</p>
+  <button>Không đọc được</button>
+  <button>Không có object</button>
+  <button data-correct>Tốn CPU hơn và phức tạp hơn</button>
+  <button>Tốn RAM hơn</button>
+  <p class="explain">Nó đổi hiệu quả bộ nhớ lấy chu kỳ CPU.<a class="cite" href="https://refactoring.guru/design-patterns/flyweight">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. valueOf(1000) == valueOf(1000)?</p>
+  <button>Null</button>
+  <button data-correct>False trong lần chạy</button>
+  <button>Lỗi biên dịch</button>
+  <button>True</button>
+  <p class="explain">Demo in ra false: nằm ngoài khoảng cache được đảm bảo.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0014-cache-tile-objects.vi.md">Bài tập 14: các object tile</a></p>
+<p>Ví dụ chạy được: <a href="../examples/FlyweightDemo.java"><code>FlyweightDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/flyweight">Flyweight (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0013-facade.vi.html">← Facade</a> &nbsp;|&nbsp; <a href="0015-proxy.vi.html">Proxy →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/flyweight">Flyweight (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Integer.html">Integer Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

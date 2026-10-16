@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 42: Ôn tập 3: HashMap bên trong, thứ tự và tính bất biến</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ôn tập 3: HashMap bên trong, thứ tự và tính bất biến</h1>
+<p class="subtitle">Bốn bài, một bức tranh trong đầu: key tìm bucket thế nào, ai quyết định "bằng nhau", ai được sửa list, và map nào nhớ thứ tự.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0042 · bước 15/46 · Review · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0042-review-collections-core.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Trong interview thật, câu hỏi đến lẫn lộn: "HashMap resize thế nào?" rồi ngay sau đó "Vì sao TreeSet của tôi mất phần tử?" và "Làm sao trả về một list không ai sửa được?". Bài ôn tập này trộn các bài <a href="0030-hashmap-internals.vi.html">0030</a>, <a href="0031-comparable-comparator-and-ordering.vi.html">0031</a>, <a href="0032-unmodifiable-vs-immutable.vi.html">0032</a> và <a href="0033-hashset-linkedhashmap-and-lru.vi.html">0033</a> theo đúng cách đó, để bạn luyện chuyển qua lại giữa chúng. Ở đây không có kiến thức mới.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> trả lời đúng ít nhất 10 trên 12 câu hỏi trộn, tìm ra ba bug trong bài tập trộn, và nói được cả ba câu trả lời 60 giây với ít nhất 5 ý trong checklist mỗi câu.</div>
+
+<dl class="words">
+  <dt>bucket (bin)</dt><dd>Một ô của mảng bên trong HashMap. Hash code của key chọn ô đó (bài 0030).</dd>
+  <dt>load factor</dt><dd>Map được đầy đến mức nào trước khi lớn lên. Mặc định là 0.75, nên 16 bucket chứa 12 entry rồi mới resize.</dd>
+  <dt>treeify</dt><dd>Biến một chuỗi dài trong bucket thành một cây nhỏ có thứ tự, để tra cứu vẫn nhanh dù có nhiều collision.</dd>
+  <dt>comparator</dt><dd>Một object so sánh hai giá trị và nói cái nào đứng trước. Collection có thứ tự dùng nó để quyết định thứ tự <em>và</em> việc hai phần tử có "giống nhau" không (bài 0031).</dd>
+  <dt>view</dt><dd>Một collection không giữ bản sao riêng; nó đọc xuyên qua collection khác, nên thấy mọi thay đổi của collection đó (bài 0032).</dd>
+  <dt>access order</dt><dd>Một chế độ của <code>LinkedHashMap</code> trong đó mỗi lần đọc sẽ đưa entry về cuối, nên entry đầu tiên là entry lâu nhất chưa dùng (bài 0033).</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Không xem lại bài, hãy nói to <strong>bốn bước</strong> của <code>map.put("apple", 1)</code> trong HashMap JDK 8+, rồi nêu <strong>một</strong> cách tạo list mà không ai sửa được. Ghi lại bạn chắc chắn bao nhiêu (0 đến 100%). Cuối bài, so với điểm của bạn: người ta thường tự tin hơn mức nên có, và ôn tập là để sửa khoảng cách đó.</p>
+
+<h2>1. Toàn bộ hành trình của một key</h2>
+<p>Lại nghĩ về bưu điện. Mã bưu chính (hash code) chọn đúng hộp thư (bucket); tên trên lá thư (<code>equals</code>) chọn đúng lá thư trong hộp. Khi bức tường hộp thư quá đầy, bưu điện xây một bức tường to gấp đôi. Khi một hộp thư đầy quá mức, họ ngừng chồng thư lên nhau mà cất vào một tủ hồ sơ nhỏ có thứ tự (một cây). Đây là toàn bộ hành trình của bài 0030 trong một hình.</p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="Hành trình của put: hashCode, trộn bit, chọn bucket bằng (n-1) and hash, duyệt bucket bằng equals, rồi resize khi size vượt 0.75 nhân n, hoặc treeify một bin 8 node khi bảng có ít nhất 64 bucket">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <rect x="20" y="30" width="140" height="50" rx="6"/>
+      <rect x="190" y="30" width="140" height="50" rx="6"/>
+      <rect x="360" y="30" width="140" height="50" rx="6"/>
+      <path d="M160 55h24M178 50l6 5-6 5"/>
+      <path d="M330 55h24M348 50l6 5-6 5"/>
+      <path d="M500 55h24M518 50l6 5-6 5"/>
+    </g>
+    <rect x="530" y="30" width="130" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="90" y="52" text-anchor="middle">hashCode()</text>
+    <text x="90" y="70" text-anchor="middle" font-size="11" opacity=".75">từ key</text>
+    <text x="260" y="52" text-anchor="middle">h ^ (h &gt;&gt;&gt; 16)</text>
+    <text x="260" y="70" text-anchor="middle" font-size="11" opacity=".75">trộn bit cao</text>
+    <text x="430" y="52" text-anchor="middle">(n - 1) &amp; hash</text>
+    <text x="430" y="70" text-anchor="middle" font-size="11" opacity=".75">chỉ số bucket</text>
+    <text x="595" y="52" text-anchor="middle" fill="var(--accent)">duyệt bucket</text>
+    <text x="595" y="70" text-anchor="middle" font-size="11" fill="var(--accent)">hash, rồi equals</text>
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <path d="M595 80v40H175v34M170 148l5 6 5-6"/>
+      <path d="M595 120h0v34M590 148l5 6 5-6"/>
+    </g>
+    <rect x="30" y="160" width="290" height="110" rx="6" fill="none" stroke="currentColor"/>
+    <text x="175" y="184" text-anchor="middle">size &gt; n × 0.75 ?  → resize</text>
+    <text x="175" y="206" text-anchor="middle" font-size="11" opacity=".8">n gấp đôi: 16 → 32</text>
+    <text x="175" y="226" text-anchor="middle" font-size="11" opacity=".8">mỗi entry ở lại i</text>
+    <text x="175" y="244" text-anchor="middle" font-size="11" opacity=".8">hoặc chuyển sang i + n cũ</text>
+    <rect x="360" y="160" width="300" height="110" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="510" y="184" text-anchor="middle" fill="var(--accent)">bin có 8 node ?  → treeify</text>
+    <text x="510" y="206" text-anchor="middle" font-size="11">chỉ khi bảng ≥ 64 bucket,</text>
+    <text x="510" y="226" text-anchor="middle" font-size="11">nếu không thì resize;</text>
+    <text x="510" y="244" text-anchor="middle" font-size="11">về lại list khi dưới 6 node</text>
+  </g>
+</svg>
+<figcaption>Một lần <code>put</code> trong HashMap JDK 8+ (bài 0030). Các số 8, 64 và 6 là hằng số của OpenJDK, không phải lời hứa của Javadoc.</figcaption>
+</figure>
+
+<p>Ba câu cần nhớ từ hình này:</p>
+<ol class="steps">
+  <li><strong>Chỉ các bit thấp chọn bucket</strong>, nên Java trộn bit cao xuống bit thấp trước. Với <code>n</code> là lũy thừa của 2, <code>(n - 1) &amp; hash</code> bằng <code>hash % n</code> nhưng rẻ hơn.</li>
+  <li><strong>Resize làm bảng gấp đôi</strong> và mỗi entry hoặc ở lại chỉ số <code>i</code>, hoặc chuyển sang <code>i + n cũ</code>: một bit thêm quyết định.</li>
+  <li><strong>Cây là phương án khẩn cấp</strong>, không phải trường hợp bình thường: với hash code tốt, bucket luôn nhỏ. Nếu key là <code>Comparable</code>, cây có thể dùng <code>compareTo</code> để phân xử, nhờ đó 20.000 key trùng hash đi từ khoảng 3.658 ms xuống 69 ms trong một lần chạy của bài đó.</li>
+</ol>
+<p class="muted">Cần xem lại chi tiết? <a href="0030-hashmap-internals.vi.html">Bài 0030</a> lần theo từng bước với output thật.</p>
+
+<h2>2. Ai quyết định "bằng nhau"? Tùy collection</h2>
+<p>Đây là ý nối các bài 0001, 0030, 0031 và 0033. <code>HashMap</code> và <code>HashSet</code> hỏi <code>hashCode()</code> và <code>equals()</code>. <code>TreeMap</code> và <code>TreeSet</code> không bao giờ gọi <code>equals()</code>: chúng hỏi <code>compareTo()</code> hoặc comparator của bạn, và kết quả 0 nghĩa là "cùng key".</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Collection kiểu hash hỏi hashCode và equals. Collection có thứ tự hỏi compare và coi 0 là trùng. Collection kiểu linked là collection hash cộng một danh sách liên kết nhớ thứ tự.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="20" width="200" height="190" rx="6"/>
+      <rect x="240" y="20" width="200" height="190" rx="6"/>
+    </g>
+    <rect x="460" y="20" width="200" height="190" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="44" text-anchor="middle" font-size="13">HashMap / HashSet</text>
+    <text x="340" y="44" text-anchor="middle" font-size="13">LinkedHashMap/Set</text>
+    <text x="560" y="44" text-anchor="middle" font-size="13" fill="var(--accent)">TreeMap / TreeSet</text>
+    <g font-size="11">
+      <text x="34" y="78">cùng key?</text>
+      <text x="34" y="96">hashCode + equals</text>
+      <text x="34" y="132">thứ tự?</text>
+      <text x="34" y="150">không hứa gì;</text>
+      <text x="34" y="168">có thể đổi theo thời gian</text>
+      <text x="254" y="78">cùng key?</text>
+      <text x="254" y="96">hashCode + equals</text>
+      <text x="254" y="132">thứ tự?</text>
+      <text x="254" y="150">thứ tự chèn, hoặc</text>
+      <text x="254" y="168">thứ tự truy cập (LRU)</text>
+      <text x="474" y="78" fill="var(--accent)">cùng key?</text>
+      <text x="474" y="96" fill="var(--accent)">compare(a, b) == 0</text>
+      <text x="474" y="132">thứ tự?</text>
+      <text x="474" y="150">sắp theo comparator</text>
+      <text x="474" y="168">hoặc thứ tự tự nhiên</text>
+    </g>
+    <text x="340" y="196" text-anchor="middle" font-size="10" opacity=".7">một HashMap + một linked list</text>
+    <text x="560" y="196" text-anchor="middle" font-size="10" fill="var(--accent)">equals() không bao giờ được gọi</text>
+  </g>
+</svg>
+<figcaption>Cùng hai nhân viên có thể "khác nhau" trong HashSet nhưng "giống nhau" trong TreeSet nếu comparator chỉ so lương (bài 0031).</figcaption>
+</figure>
+
+<p>Vì thế một comparator phải kết thúc bằng một <strong>tiêu chí phụ duy nhất</strong> (ví dụ <code>.thenComparing(Employee::name)</code>), và vì thế <code>new BigDecimal("4.0")</code> và <code>new BigDecimal("4.00")</code> cho HashSet kích thước 2 nhưng TreeSet kích thước 1. Và đừng bao giờ viết <code>(a, b) -&gt; a - b</code>: với <code>Integer.MIN_VALUE</code> nó bị tràn số; hãy dùng <code>Integer.compare</code> hoặc <code>Comparator.comparingInt</code>. Đọc lại <a href="0031-comparable-comparator-and-ordering.vi.html">bài 0031</a> nếu phần này còn lạ.</p>
+
+<h2>3. Ai được sửa list?</h2>
+<p>Bài 0032 trong một bảng. Hãy hình dung một tủ kính bày hàng: <code>Arrays.asList</code> là tủ bạn được sắp xếp lại nhưng không được nới rộng; <code>unmodifiableList</code> là tấm kính chắn trước kệ của người khác (họ vẫn dời đồ được); <code>List.of</code> / <code>List.copyOf</code> là một tấm ảnh: đóng băng, là bản sao của riêng bạn.</p>
+<table>
+<tr><th></th><th>add / remove</th><th>set</th><th>thấy thay đổi sau này của nguồn</th><th>null</th></tr>
+<tr><td><code>Arrays.asList(arr)</code></td><td>không (UOE)</td><td>có, ghi vào mảng</td><td>có (nó chính là mảng)</td><td>có</td></tr>
+<tr><td><code>Collections.unmodifiableList(l)</code></td><td>không (UOE)</td><td>không</td><td>có, nó là view</td><td>như nguồn</td></tr>
+<tr><td><code>List.of(...)</code>, <code>List.copyOf(c)</code></td><td>không (UOE)</td><td>không</td><td>không, bản sao riêng</td><td>không (NPE)</td></tr>
+</table>
+<p>Hai điều câu trả lời senior thêm vào: <strong>unmodifiable chỉ là nông (shallow)</strong> (một <code>List.of(new StringBuilder("hi"))</code> vẫn cho ta nối thêm " there"), và <strong>phiên bản JDK quan trọng</strong>: <code>List.of</code> từ JDK 9, <code>copyOf</code> JDK 10, <code>Stream.toList()</code> JDK 16. Trên JDK 8, bản sao phòng thủ là <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code>. Xem <a href="0032-unmodifiable-vs-immutable.vi.html">bài 0032</a>.</p>
+
+<h2>4. Map nào nhớ thứ tự, và mẹo LRU</h2>
+<p>Từ bài 0033: <code>HashSet</code> là một <code>HashMap</code> mà value là một object giả dùng chung, nên nó thừa hưởng mọi thứ ở phần 1. <code>LinkedHashMap</code> luồn một danh sách liên kết đôi qua các entry. Ở chế độ mặc định danh sách giữ <strong>thứ tự chèn</strong>, và put lại một key không làm nó đổi chỗ. Với cờ <code>accessOrder = true</code> trong constructor, mỗi lần <code>get</code> đưa entry về cuối, và override <code>removeEldestEntry</code> sẽ biến nó thành LRU cache:</p>
+<pre><code>class LruCache&lt;K, V&gt; extends LinkedHashMap&lt;K, V&gt; {
+    private final int capacity;
+    LruCache(int capacity) { super(16, 0.75f, <span class="hl">true</span>); this.capacity = capacity; }
+    @Override protected boolean removeEldestEntry(Map.Entry&lt;K, V&gt; eldest) {
+        return size() &gt; capacity;   <span class="c">// called by put/putAll after inserting</span>
+    }
+}</code></pre>
+<pre><code>$ java java/examples/collections/LruCache.java
+insertion order (re-put 'a' keeps its place): {c=3, a=10, b=2}
+HashSet: [java, kafka, redis, docker, sql]   LinkedHashSet: [kafka, java, docker, sql, redis]
+LRU after get(a), put(d): [c, a, d]     <span class="c">// b was least recently used</span>
+LRU after put(e):         [a, d, e]</code></pre>
+<p>Cái bẫy: ở chế độ access order, ngay cả <code>get</code> cũng là thay đổi cấu trúc, nên các thread dùng chung phải có lock (hoặc dùng thư viện cache như Caffeine). Xem <a href="0033-hashset-linkedhashmap-and-lru.vi.html">bài 0033</a>.</p>
+
+<h2>5. Bài tập trộn: tìm ba bug</h2>
+<p>Đọc đoạn code này như một reviewer. Có ba bug, mỗi bug từ một bài khác nhau. Tìm chúng, nêu tên bài, và nói cách sửa <em>trước khi</em> mở đáp án.</p>
+<pre><code>record Order(String id, int cents) {}
+
+class OrderBook {
+    <span class="c">// (A) we expect about 1,000 orders and never want a resize</span>
+    private final Map&lt;String, Order&gt; byId = new HashMap&lt;&gt;(1000);
+
+    <span class="c">// (B) cheapest first</span>
+    private final Set&lt;Order&gt; byPrice =
+        new TreeSet&lt;&gt;((a, b) -&gt; a.cents() - b.cents());
+
+    private final List&lt;Order&gt; all = new ArrayList&lt;&gt;();
+
+    void add(Order o) { byId.put(o.id(), o); byPrice.add(o); all.add(o); }
+
+    <span class="c">// (C) callers must get a snapshot that never changes</span>
+    List&lt;Order&gt; snapshot() { return Collections.unmodifiableList(all); }
+}</code></pre>
+<details class="qa">
+<summary>Hiện ba bug</summary>
+<div class="ans">
+<p><strong>(B) Bài 0031, bug tệ nhất.</strong> TreeSet quyết định trùng lặp bằng comparator. Hai order khác nhau nhưng cùng giá sẽ so sánh ra 0, nên order thứ hai bị bỏ mất một cách âm thầm. Thêm nữa, <code>a - b</code> có thể tràn số. Sửa: <code>Comparator.comparingInt(Order::cents).thenComparing(Order::id)</code>.</p>
+<p><strong>(C) Bài 0032.</strong> <code>unmodifiableList</code> là một <em>view</em>: caller không sửa được, nhưng thấy mọi lần <code>add</code> sau đó. Đó không phải snapshot. Sửa: <code>List.copyOf(all)</code> (JDK 10+) hoặc <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(all))</code> trên JDK 8.</p>
+<p><strong>(A) Bài 0030.</strong> Kích thước bảng phải là lũy thừa của 2, nên capacity 1000 thành 1024 bucket, và 1024 × 0.75 = 768, vậy map vẫn resize khi vượt 768 entry. Sửa: <code>HashMap.newHashMap(1000)</code> trên JDK 19+ (tức 21), hoặc <code>new HashMap&lt;&gt;((int) (1000 / 0.75f) + 1)</code> trên 8/17.</p>
+</div>
+</details>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Một HashMap có 16 bucket. Biểu thức nào chọn bucket cho hash đã trộn <code>h</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>(16 - 1) &amp; h</code></button>
+    <button class="opt"><code>h &gt;&gt;&gt; 16</code></button>
+    <button class="opt"><code>16 % h</code></button>
+    <button class="opt"><code>h / 16</code></button>
+  </div>
+  <div class="why">Chỉ số là <code>(n - 1) &amp; hash</code>, bằng <code>hash % n</code> khi n là lũy thừa của 2. Xem bài 0030.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một <code>TreeSet</code> dùng comparator chỉ so lương nhân viên. Bạn thêm Lan (3000) và Minh (3000). Kích thước là bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>1, vì compare trả về 0 cho hai người</button>
+    <button class="opt">2, vì tên của hai người khác nhau</button>
+    <button class="opt">2, vì equals trả về false cho hai người</button>
+    <button class="opt">Ném exception ở lần add thứ hai</button>
+  </div>
+  <div class="why">Set có thứ tự quyết định trùng lặp bằng <code>compare</code>, không bao giờ bằng <code>equals</code>. Hãy thêm tiêu chí phụ duy nhất. Xem bài 0031.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Arrays.asList(arr).set(0, "X")</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chạy được và đổi luôn <code>arr[0]</code></button>
+    <button class="opt">Ném UnsupportedOperationException</button>
+    <button class="opt">Chạy được nhưng mảng giữ nguyên</button>
+    <button class="opt">Thêm "X" vào cuối danh sách</button>
+  </div>
+  <div class="why"><code>Arrays.asList</code> là list kích thước cố định dựa trên mảng: <code>set</code> ghi xuyên vào mảng, <code>add</code> thì ném lỗi. Xem bài 0032.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong một <code>LinkedHashMap</code> mặc định (thứ tự chèn), bạn <code>put("a", 1)</code>, <code>put("b", 2)</code>, rồi <code>put("a", 10)</code>. Thứ tự là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>{a=10, b=2}</code></button>
+    <button class="opt"><code>{b=2, a=10}</code></button>
+    <button class="opt"><code>{a=1, b=2, a=10}</code></button>
+    <button class="opt"><code>{b=2, a=1}</code></button>
+  </div>
+  <div class="why">Chèn lại một key đã có không làm đổi vị trí của nó trong thứ tự chèn. Xem bài 0033.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Khi nào OpenJDK biến một bucket của HashMap thành cây đỏ-đen?</p>
+  <div class="options">
+    <button class="opt" data-correct>Khi có 8 node, nếu bảng có ít nhất 64 bucket</button>
+    <button class="opt">Khi có 2 node, bảng lớn hay nhỏ đều như nhau</button>
+    <button class="opt">Khi có 8 node, kể cả khi bảng chỉ có 16 bucket</button>
+    <button class="opt">Mỗi lần toàn bộ bảng được resize lại</button>
+  </div>
+  <div class="why"><code>TREEIFY_THRESHOLD = 8</code> và <code>MIN_TREEIFY_CAPACITY = 64</code>; bảng nhỏ hơn thì resize thay vì treeify. Xem bài 0030.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bug trong <code>list.sort((a, b) -&gt; a - b)</code> với <code>List&lt;Integer&gt;</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Phép trừ có thể tràn số và cho sai dấu</button>
+    <button class="opt">Nó sắp xếp giảm dần thay vì tăng dần</button>
+    <button class="opt">Lambda box mọi int và làm hết bộ nhớ</button>
+    <button class="opt">List.sort không ổn định khi truyền lambda</button>
+  </div>
+  <div class="why"><code>MIN_VALUE - 1</code> thành một số dương lớn. Dùng <code>Integer.compare</code> hoặc <code>Comparator.comparingInt</code>. Xem bài 0031.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn trả về <code>Collections.unmodifiableList(items)</code>, sau đó class của bạn thêm vào <code>items</code>. Caller thấy gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Phần tử mới, vì đó là view đọc xuyên qua</button>
+    <button class="opt">List cũ, vì view đã sao chép lúc được tạo</button>
+    <button class="opt">Một exception ở lần đọc tiếp theo của caller</button>
+    <button class="opt">Một list rỗng, vì nguồn đã bị thay đổi</button>
+  </div>
+  <div class="why">View unmodifiable chặn caller ghi nhưng đọc xuyên qua nguồn. Dùng <code>List.copyOf</code> để có snapshot. Xem bài 0032.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bên dưới một <code>HashSet</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một HashMap với value là một object giả</button>
+    <button class="opt">Một mảng đã sắp xếp, tìm bằng binary search</button>
+    <button class="opt">Một cây đỏ-đen sắp theo hash code</button>
+    <button class="opt">Một linked list được duyệt từ đầu</button>
+  </div>
+  <div class="why">Javadoc nói nó dựa trên một hash table, thực chất là một instance HashMap. Xem bài 0033.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một HashMap 16 bucket resize lên 32. Một entry đang ở chỉ số 1. Giờ nó có thể ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ở chỉ số 1 hoặc chỉ số 17</button>
+    <button class="opt">Ở chỉ số 2, luôn gấp đôi chỉ số cũ</button>
+    <button class="opt">Ở bất kỳ đâu, mọi key được hash lại</button>
+    <button class="opt">Ở chỉ số 0, bảng bắt đầu lại từ đầu</button>
+  </div>
+  <div class="why">Một bit hash thêm quyết định: ở lại i hoặc chuyển sang i + n cũ. Ví dụ cho thấy apple đi 1 → 17. Xem bài 0030.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List.of("a", null)</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ném NullPointerException</button>
+    <button class="opt">Trả về list kích thước 2</button>
+    <button class="opt">Trả về list kích thước 1</button>
+    <button class="opt">Ném UnsupportedOperation</button>
+  </div>
+  <div class="why"><code>List.of</code> và <code>List.copyOf</code> không cho phép phần tử null; ngay cả <code>contains(null)</code> cũng ném lỗi. Xem bài 0032.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn muốn LRU cache bằng <code>LinkedHashMap</code>. Cần hai thứ nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>accessOrder = true và override removeEldestEntry</button>
+    <button class="opt">accessOrder = false và override removeEldestEntry</button>
+    <button class="opt">accessOrder = true và override phương thức get</button>
+    <button class="opt">Một comparator TreeMap và capacity cố định 16</button>
+  </div>
+  <div class="why">Access order đưa entry vừa đọc về cuối; <code>removeEldestEntry</code> được gọi sau khi <code>put</code> chèn. Xem bài 0033.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">20.000 key đều trả về <code>hashCode() == 42</code>. Điều gì làm tra cứu nhanh hơn nhiều trong lần chạy của bài 0030?</p>
+  <div class="options">
+    <button class="opt" data-correct>Key implement Comparable, nên cây sắp xếp được chúng</button>
+    <button class="opt">Map được tạo với capacity ban đầu lớn hơn là 1024</button>
+    <button class="opt">Key override toString, nên cây in được chúng ra</button>
+    <button class="opt">Load factor đặt là 1.0 để không bao giờ resize</button>
+  </div>
+  <div class="why">Khi mọi hash bằng nhau, chỉ <code>compareTo</code> mới phân xử được trong bin dạng cây (khoảng 3.658 ms so với 69 ms trong một lần chạy). Xem bài 0030.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Câu 1. Người phỏng vấn hỏi: <strong>"Hãy mô tả một lần put trong HashMap, gồm cả resize và treeification."</strong> Bấm giờ. Trả lời thành tiếng, rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Một mảng bucket; mặc định 16 bucket, load factor 0.75.</label></li>
+      <li><label><input type="checkbox"> Hash được trộn: <code>h ^ (h &gt;&gt;&gt; 16)</code>, vì chỉ bit thấp chọn bucket.</label></li>
+      <li><label><input type="checkbox"> Chỉ số = <code>(n - 1) &amp; hash</code>; n là lũy thừa của 2.</label></li>
+      <li><label><input type="checkbox"> Trong bucket: so hash, rồi <code>equals</code>; thay value hoặc thêm node.</label></li>
+      <li><label><input type="checkbox"> Vượt capacity × 0.75 thì gấp đôi; mỗi entry ở lại i hoặc sang i + n cũ.</label></li>
+      <li><label><input type="checkbox"> Trong OpenJDK, bin 8 node thành cây đỏ-đen nếu bảng ≥ 64 bucket; tệ nhất O(log n).</label></li>
+      <li><label><input type="checkbox"> Biết trước kích thước thì presize: <code>HashMap.newHashMap(n)</code> trên JDK 19+.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"HashMap là một mảng bucket, mặc định 16 bucket với load factor 0.75. Khi put, nó lấy hashCode của key rồi XOR 16 bit cao xuống bit thấp, vì chỉ bit thấp chọn bucket. Chỉ số là (n trừ 1) AND hash, tức là một phép modulo rẻ vì n là lũy thừa của 2. Trong bucket nó so hash trước, rồi equals: nếu key đã có thì thay value, không thì thêm node mới. Khi size vượt capacity nhân 0.75, bảng gấp đôi, và mỗi entry hoặc ở lại chỉ số cũ hoặc dời đi đúng bằng kích thước cũ. Nếu một bucket đạt 8 node và bảng có ít nhất 64 bucket, OpenJDK biến nó thành cây đỏ-đen, nên trường hợp xấu nhất là O(log n) thay vì tuyến tính. Còn nếu em biết trước kích thước, em presize bằng HashMap.newHashMap để nó không bao giờ phải resize."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 2. <strong>"Comparable khác Comparator thế nào, và 'consistent with equals' nghĩa là gì?"</strong></p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Comparable = một thứ tự tự nhiên duy nhất của class, <code>compareTo</code> nằm trong class.</label></li>
+      <li><label><input type="checkbox"> Comparator = thứ tự từ bên ngoài; có thể có nhiều (theo giá, theo ngày, đảo ngược).</label></li>
+      <li><label><input type="checkbox"> Consistent with equals: compare bằng 0 đúng khi equals là true.</label></li>
+      <li><label><input type="checkbox"> TreeSet/TreeMap dùng compare, không dùng equals, để xét trùng; BigDecimal 4.0 và 4.00 là ví dụ của JDK.</label></li>
+      <li><label><input type="checkbox"> Xây bằng <code>Comparator.comparing(...).thenComparing(...)</code> và kết thúc bằng tiêu chí phụ duy nhất.</label></li>
+      <li><label><input type="checkbox"> Không bao giờ <code>a - b</code> (tràn số); dùng <code>Integer.compare</code>; <code>nullsFirst</code> cho field có thể null.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Comparable là thứ tự tự nhiên mà class tự định nghĩa, như String hay LocalDate. Comparator là thứ tự từ bên ngoài, nên em có thể có nhiều cái: theo giá, theo ngày, đảo ngược. Một thứ tự gọi là consistent with equals khi compare trả về 0 đúng lúc equals trả về true. Điều này được khuyến nghị mạnh vì TreeSet và TreeMap dùng compare chứ không dùng equals để xét trùng: BigDecimal 4.0 và 4.00 không equals nhưng compare ra 0, nên TreeSet chỉ giữ một cái. Thực tế em viết comparator bằng Comparator.comparing và thenComparing, và luôn kết thúc bằng một field duy nhất làm tiêu chí phụ. Và em không bao giờ viết a trừ b vì nó tràn số; em dùng Integer.compare hoặc comparingInt."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Câu 3. <strong>"Làm sao trả về một collection mà caller không sửa được? Và bạn xây LRU cache thế nào?"</strong></p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>List.copyOf(items)</code> trên 17/21; trên 8 dùng <code>unmodifiableList(new ArrayList&lt;&gt;(items))</code>.</label></li>
+      <li><label><input type="checkbox"> Chỉ <code>unmodifiableList</code> thôi là một view: vẫn thấy thay đổi của chủ sở hữu.</label></li>
+      <li><label><input type="checkbox"> <code>Arrays.asList</code> có kích thước cố định và ghi xuyên vào mảng.</label></li>
+      <li><label><input type="checkbox"> Unmodifiable chỉ là nông: phần tử cũng phải bất biến.</label></li>
+      <li><label><input type="checkbox"> LRU: <code>LinkedHashMap(16, 0.75f, true)</code> + <code>removeEldestEntry</code> trả về <code>size() &gt; capacity</code>.</label></li>
+      <li><label><input type="checkbox"> Ở access order, <code>get</code> là thay đổi cấu trúc: cần lock, hoặc dùng Caffeine.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Để trả về state bên trong một cách an toàn, em trả về List.copyOf, là một bản sao unmodifiable thật và không nhận null. Trên Java 8 em copy sang một ArrayList mới rồi bọc bằng Collections.unmodifiableList. Bọc mà không copy thì chỉ là view: caller không ghi được nhưng vẫn thấy các thay đổi sau này của em. Arrays.asList lại khác: kích thước cố định, nhưng set thì ghi vào mảng. Và tất cả đều nông, nên phần tử cũng nên bất biến, như record hay String. Với LRU cache, em extend LinkedHashMap với accessOrder là true, để mỗi lần get đưa entry về cuối, và override removeEldestEntry trả về size lớn hơn capacity. Lưu ý: ở access order ngay cả get cũng thay đổi cấu trúc, nên nhiều thread thì cần lock, còn production thì em dùng thư viện như Caffeine."</em></p>
+  </div>
+</div>
+
+<h2>Nếu bạn sai, hãy đọc lại</h2>
+<table>
+<tr><th>Nếu bạn sai câu về…</th><th>Đọc lại</th></tr>
+<tr><td>chỉ số bucket, resize, treeify, presize</td><td><a href="0030-hashmap-internals.vi.html">Bài 0030: HashMap bên trong</a></td></tr>
+<tr><td>TreeSet mất phần tử, chuỗi comparator, <code>a - b</code>, sort ổn định</td><td><a href="0031-comparable-comparator-and-ordering.vi.html">Bài 0031: Comparable và Comparator</a></td></tr>
+<tr><td><code>Arrays.asList</code>, view, null trong <code>List.of</code>, key trùng trong <code>Map.of</code></td><td><a href="0032-unmodifiable-vs-immutable.vi.html">Bài 0032: Unmodifiable và immutable</a></td></tr>
+<tr><td>HashSet bên trong, thứ tự chèn và thứ tự truy cập, LRU</td><td><a href="0033-hashset-linkedhashmap-and-lru.vi.html">Bài 0033: HashSet, LinkedHashMap và LRU</a></td></tr>
+</table>
+
+<h2>Bây giờ làm bài tập</h2>
+<p>Nếu bạn đã bỏ qua bài nào, hãy làm ngay; nếu đã làm rồi, làm lại theo trí nhớ bài có điểm thấp nhất:</p>
+<ul>
+<li><a href="../exercises/0030-trace-a-put.vi.md">Bài tập 0030: lần theo một lần put</a></li>
+<li><a href="../exercises/0031-sort-the-orders.vi.md">Bài tập 0031: sắp xếp các order</a></li>
+<li><a href="../exercises/0032-defend-the-state.vi.md">Bài tập 0032: bảo vệ state</a></li>
+<li><a href="../exercises/0033-build-an-lru.vi.md">Bài tập 0033: xây LRU cache</a></li>
+</ul>
+<p>Ví dụ chạy được: <a href="../examples/collections/HashMapInternals.java"><code>HashMapInternals.java</code></a> · <a href="../examples/collections/OrderingAndComparators.java"><code>OrderingAndComparators.java</code></a> · <a href="../examples/collections/UnmodifiableVsImmutable.java"><code>UnmodifiableVsImmutable.java</code></a> · <a href="../examples/collections/LruCache.java"><code>LruCache.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Khối tiếp theo rời khỏi hash table. Người phỏng vấn senior sẽ hỏi: <em>"Làm sao tìm bậc phí cho một số tiền? Làm sao giữ top 10 trong một triệu số? Collection nào dùng chung giữa các thread?"</em> <a href="0034-treemap-and-navigable-maps.vi.html">Bài 0034</a> bắt đầu với TreeMap và truy vấn key gần nhất.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://dev.java/learn/api/collections-framework/">dev.java: The Collections Framework</a>, tutorial chính thức của Oracle, để nhìn bốn bài này từ góc độ các interface.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao chỉ phần thấp của hash chọn bucket?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và ba điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0033-hashset-linkedhashmap-and-lru.vi.html">← Collection nào nhớ thứ tự, và một LRU cache trong mười dòng</a> &nbsp;|&nbsp; <a href="0034-treemap-and-navigable-maps.vi.html">TreeMap và NavigableMap: truy vấn khoảng và key gần nhất →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và mã nguồn OpenJDK 21, tháng 10/2026 (mọi kiến thức lấy từ bài 0030 đến 0033).</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">OpenJDK HashMap.java</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedHashMap.html">LinkedHashMap Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

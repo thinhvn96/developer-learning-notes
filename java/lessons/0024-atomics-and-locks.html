@@ -8,73 +8,288 @@
 </head>
 <body>
 <main>
-<h1>Atomics and ReentrantLock: fixing lost updates</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0024 · step 14 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Why <code>count++</code> loses updates, and how to fix it</h1>
+<p class="subtitle">One line of Java, three steps for the CPU. Atomics and locks glue them back together.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0024 · step 31 of 46 · Advanced · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0024-atomics-and-locks.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Counters, balances, stock levels, rate limits: real services update shared numbers from many threads all the time. Interviewers ask <em>"Is <code>volatile int count; count++</code> thread-safe?"</em> right after the happens-before question. This lesson shows why the answer is no, and how to choose between an atomic and a lock.</div>
 
 <div class="win"><b>Today's win:</b> show that <code>volatile</code> <code>count++</code> loses updates and fix it with an atomic or a lock.</div>
 
-<h2>The bug</h2>
-<p>Lesson 5 said <code>volatile</code> gives visibility and ordering,<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[3]</a> not atomic read-modify-write. Four threads doing 200,000 increments each:</p>
-<pre><code>java java/examples/AtomicDemo.java
+<dl class="words">
+  <dt>atomic</dt><dd>"All or nothing, in one go": no other thread can see the operation half done or squeeze in between its steps.</dd>
+  <dt>read-modify-write</dt><dd>An operation in three steps: read the old value, compute a new one, write it back. <code>count++</code> is one.</dd>
+  <dt>lost update</dt><dd>Two threads both write a result, and one result overwrites the other, so one change disappears.</dd>
+  <dt>compare-and-set (CAS)</dt><dd>"Set the value to 6, but only if it is still 5." It succeeds or fails as one atomic step.</dd>
+  <dt>lock</dt><dd>An object that only one thread can hold at a time. Other threads that want it wait.</dd>
+  <dt>reentrant</dt><dd>A thread that already holds the lock can take it again without blocking itself.</dd>
+  <dt>contention</dt><dd>Many threads trying to use the same lock or variable at the same moment.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Four threads each run <code>count++</code> 200,000 times on a <code>volatile int</code>. What is the final value?"</em> Pick a number, and say why. The real result is in section 2.</p>
+
+<h2>1. One line, three steps</h2>
+<p>Imagine a shared tally sheet on a wall. To add one, a person (1) reads the number, (2) adds one in their head, (3) erases and writes the new number. If two people do this at the same time, both may read 5, both think "6", and both write 6. Two people counted, but the sheet only went up by one.</p>
+<p>That is exactly <code>count++</code>. The Oracle tutorial splits <code>c++</code> into three steps: "Retrieve the current value of <code>c</code>", "Increment the retrieved value by 1", "Store the incremented value back in <code>c</code>".<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interfere.html">Java tutorial: thread interference</a> Another thread can run between any two of them.</p>
+
+<figure>
+<svg viewBox="0 0 680 320" role="img" aria-label="Thread A and thread B both read count 5, both add 1, both write 6. The shared count ends at 6 instead of 7: one update is lost.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="140" y="26" text-anchor="middle" font-size="13">thread A</text>
+    <text x="340" y="26" text-anchor="middle" font-size="13">shared count</text>
+    <text x="540" y="26" text-anchor="middle" font-size="13">thread B</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="44" width="220" height="30" rx="4"/>
+      <rect x="430" y="84" width="220" height="30" rx="4"/>
+      <rect x="30" y="124" width="220" height="30" rx="4"/>
+      <rect x="430" y="164" width="220" height="30" rx="4"/>
+      <rect x="30" y="204" width="220" height="30" rx="4"/>
+      <rect x="290" y="44" width="100" height="30" rx="4"/>
+      <rect x="290" y="84" width="100" height="30" rx="4"/>
+      <rect x="290" y="124" width="100" height="30" rx="4"/>
+      <rect x="290" y="164" width="100" height="30" rx="4"/>
+      <rect x="290" y="204" width="100" height="30" rx="4"/>
+      <path d="M290 59h-34M262 54l-6 5 6 5"/>
+      <path d="M390 99h34M418 94l6 5-6 5"/>
+      <path d="M250 219h34M278 214l6 5-6 5"/>
+      <path d="M430 259h-34M402 254l-6 5 6 5" stroke="var(--accent)"/>
+    </g>
+    <rect x="430" y="244" width="220" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="290" y="244" width="100" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="140" y="64" text-anchor="middle">1. read count → 5</text>
+    <text x="540" y="104" text-anchor="middle">2. read count → 5</text>
+    <text x="140" y="144" text-anchor="middle">3. 5 + 1 = 6 (local)</text>
+    <text x="540" y="184" text-anchor="middle">4. 5 + 1 = 6 (local)</text>
+    <text x="140" y="224" text-anchor="middle">5. write 6</text>
+    <text x="540" y="264" text-anchor="middle" fill="var(--accent)">6. write 6</text>
+    <text x="340" y="64" text-anchor="middle">5</text>
+    <text x="340" y="104" text-anchor="middle">5</text>
+    <text x="340" y="144" text-anchor="middle">5</text>
+    <text x="340" y="184" text-anchor="middle">5</text>
+    <text x="340" y="224" text-anchor="middle">6</text>
+    <text x="340" y="264" text-anchor="middle" fill="var(--accent)">6 (not 7)</text>
+    <text x="340" y="304" text-anchor="middle" font-size="12" fill="var(--accent)">two increments, the count went up by one: A's update is lost</text>
+  </g>
+</svg>
+<figcaption>A lost update. Each thread's read, add and write are fine on their own; the problem is that B squeezed in between A's read and A's write.</figcaption>
+</figure>
+
+<p>Now you can see why <code>volatile</code> does not help. <a href="0005-visibility-and-happens-before.html">Lesson 0005</a> said <code>volatile</code> gives visibility and ordering,<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17</a> not atomic read-modify-write. In the picture every read <em>is</em> fresh: both threads really saw 5. Visibility was never the problem. The problem is the gap between steps 1 and 5.</p>
+
+<h2>2. See it happen</h2>
+<p>The example <code>AtomicDemo.java</code> starts four threads. Each one does 200,000 increments on three counters: a <code>volatile int</code>, an <code>AtomicInteger</code>, and an <code>int</code> guarded by a <code>ReentrantLock</code>.</p>
+<pre><code>volatileCount++;                    <span class="c">// read-modify-write: NOT atomic</span>
+atomicCount.incrementAndGet();      <span class="c">// atomic</span>
+lock.lock();
+try { lockedCount++; } finally { lock.unlock(); }   <span class="c">// one thread at a time</span></code></pre>
+<pre><code>$ java java/examples/AtomicDemo.java
 expected       : 800000
-volatile int   : 798358  (lost updates: 1642)   # varies run to run
+volatile int   : <span class="hl">797349  (lost updates: 2651)</span>
 AtomicInteger  : 800000
 ReentrantLock  : 800000</code></pre>
-<h2>Atomics</h2>
-<p>The atomic package is "a small toolkit of classes that support lock-free thread-safe programming on single variables", with <code>compareAndSet</code> and higher-level methods like <code>getAndUpdate</code>; operations have volatile access semantics. For heavy contention on counters there are <code>LongAdder</code> and friends.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">[1]</a></p>
-<h2>ReentrantLock</h2>
-<p>A reentrant mutual-exclusion lock with the same basic semantics as <code>synchronized</code> but extended: fairness option, <code>tryLock</code>, <code>lockInterruptibly</code>, conditions. Idiom: <code>lock()</code> right before <code>try</code>, <code>unlock()</code> first in <code>finally</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[2]</a></p>
-<pre><code>lock.lock();
-try { count++; } finally { lock.unlock(); }</code></pre>
-<p>Source: <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a>.</p>
+<p class="muted">The volatile number changes on every run (an earlier run lost 1642 updates). That is normal for a race: the result depends on how the threads happen to interleave. Sometimes it may even come out right, which is why tests rarely catch this bug.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. What does volatile int count++ risk?</p>
-  <button>Compile errors</button>
-  <button>Deadlocks</button>
-  <button>Stale class files</button>
-  <button data-correct>Lost updates</button>
-  <p class="explain">count++ is read-modify-write, not atomic; the demo lost updates.</p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Which class gives lock-free atomic increments?</p>
-  <button>Thread</button>
-  <button>ReentrantLock</button>
-  <button data-correct>AtomicInteger</button>
-  <button>Semaphore</button>
-  <p class="explain">Atomic classes support lock-free thread-safe updates on single variables.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Where should unlock() go?</p>
-  <button>Anywhere at all</button>
-  <button>After the try</button>
-  <button>In the catch</button>
-  <button data-correct>First in finally</button>
-  <p class="explain">The documented idiom puts unlock as the first statement in finally.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Which method tries the lock without blocking?</p>
-  <button>newCondition</button>
-  <button>lock</button>
-  <button>getOwner</button>
-  <button data-correct>tryLock</button>
-  <p class="explain">tryLock is a non-blocking attempt to acquire.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">[2]</a></p>
-</div>
+<h2>3. Fix 1: atomics and compare-and-set</h2>
+<p>Back to the tally sheet. A smarter rule: "Read the number. Work out the new one. Before you write, check the sheet <em>still</em> shows what you read. If yes, write. If someone changed it, start over." The check-and-write is one single action, and nobody can squeeze in. That rule is <span class="term">compare-and-set</span>.</p>
+<p><code>AtomicInteger</code> is "An <code>int</code> value that may be updated atomically", used "in applications such as atomically incremented counters".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a> Its <code>compareAndSet(expected, newValue)</code> "Atomically sets the value to <code>newValue</code> if the current value <code>== expectedValue</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Compare-and-set loop: read current value 5, compute 6, compareAndSet 5 to 6. If true, done. If false because another thread changed it, go back and read again.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="50" width="180" height="44" rx="6"/>
+      <rect x="250" y="50" width="180" height="44" rx="6"/>
+      <path d="M200 72h44M238 67l6 5-6 5"/>
+      <path d="M430 72h44M468 67l6 5-6 5"/>
+      <path d="M570 94v40M565 128l5 6 5-6"/>
+    </g>
+    <rect x="480" y="50" width="180" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="480" y="136" width="180" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <path d="M570 50V30H110v14M105 38l5 6 5-6" fill="none" stroke="var(--accent)"/>
+    <text x="110" y="77" text-anchor="middle">cur = get() → 5</text>
+    <text x="340" y="77" text-anchor="middle">next = cur + 1</text>
+    <text x="570" y="77" text-anchor="middle" fill="var(--accent)">CAS(5, 6)</text>
+    <text x="580" y="118" font-size="11">true</text>
+    <text x="570" y="163" text-anchor="middle">count is 6, done</text>
+    <text x="340" y="22" text-anchor="middle" font-size="11" fill="var(--accent)">false: another thread changed it → read again</text>
+  </g>
+</svg>
+<figcaption>The compare-and-set loop. If thread B wrote first, A's CAS fails (the value is no longer 5), so A simply retries with the new value. No update is lost and no thread ever waits on a lock.</figcaption>
+</figure>
+
+<p>Trace the bad interleaving from section 1 again, now with CAS:</p>
+<pre><code><span class="c">Step 1  A reads 5            B reads 5</span>
+<span class="c">Step 2  A: CAS(5, 6) → true  count is 6</span>
+<span class="c">Step 3  B: CAS(5, 6) → <span class="hl">false</span>  (count is 6, not 5)</span>
+<span class="c">Step 4  B reads again → 6, CAS(6, 7) → true   count is 7 ✓</span></code></pre>
+<p>You rarely write that loop yourself. The atomic package is "a small toolkit of classes that support lock-free thread-safe programming on single variables", with low-level <code>compareAndSet</code> and higher-level methods like <code>getAndUpdate</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">atomic package</a> Their reads and writes publish values like a volatile field: <code>get()</code> has "memory effects as specified by <code>VarHandle.getVolatile</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a></p>
+<pre><code>AtomicInteger count = new AtomicInteger();
+count.incrementAndGet();               <span class="c">// ++count, atomically</span>
+count.updateAndGet(x -&gt; x * 2);        <span class="c">// any function, atomically</span>
+count.compareAndSet(10, 0);            <span class="c">// reset only if it is still 10</span></code></pre>
+<p><strong>Trap:</strong> the function you pass to <code>updateAndGet</code> "should be side-effect-free, since it may be re-applied when attempted updates fail due to contention among threads".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger javadoc</a> Don't send an email or log a payment inside it: it may run twice.</p>
+<h3>Many threads, one counter: <code>LongAdder</code></h3>
+<p>With very heavy contention, many CAS attempts fail and retry. For counters there are <code>LongAdder</code> and friends. <code>LongAdder</code> is "usually preferable to <code>AtomicLong</code> when multiple threads update a common sum that is used for purposes such as collecting statistics"; under high contention its throughput is "significantly higher, at the expense of higher space consumption".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html">LongAdder javadoc</a> You will meet it again in <a href="0025-concurrenthashmap.html">lesson 0025</a>.</p>
+
+<h2>4. Fix 2: a lock</h2>
+<p>Think of a shop's single bathroom key. Whoever holds the key goes in; everyone else waits in line. When you come out, you hand back the key. A <span class="term">lock</span> works the same way: the code between <code>lock()</code> and <code>unlock()</code> runs in one thread at a time, so the three steps of <code>count++</code> can no longer be split.</p>
+<p>Java has two kinds. The built-in one is <code>synchronized</code>. The library one is <code>ReentrantLock</code>: "A reentrant mutual exclusion <code>Lock</code> with the same basic behavior and semantics as the implicit monitor lock accessed using <code>synchronized</code> methods and statements, but with extended capabilities."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a></p>
+<pre><code><span class="c">// built-in lock</span>
+synchronized (this) { count++; }
+
+<span class="c">// ReentrantLock: the documented idiom</span>
+lock.lock();
+try { count++; } finally { lock.unlock(); }</code></pre>
+<p>Line by line:</p>
+<ol class="steps">
+  <li><code>lock.lock()</code> waits until no other thread holds the lock, then takes it. Put it right before <code>try</code>.</li>
+  <li>The <code>try</code> block is the protected work.</li>
+  <li><code>unlock()</code> goes first in <code>finally</code>, so the lock is released even if the work throws an exception. The Javadoc recommends to "<em>always</em> immediately follow a call to <code>lock</code> with a <code>try</code> block".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a></li>
+</ol>
+<p>A lock also creates the happens-before edge from lesson 0005: an <code>unlock</code> happens-before the next successful <code>lock</code> of the same lock.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent: memory consistency</a> So the next thread sees the updated count.</p>
+<h3>What "reentrant" means</h3>
+<p>If a thread already holds the lock and calls <code>lock()</code> again (for example, one locked method calls another), it does not block itself: "If the current thread already holds the lock then the hold count is incremented by one and the method returns immediately."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a> It must call <code>unlock()</code> the same number of times.</p>
+<h3>What ReentrantLock adds over synchronized</h3>
+<ul>
+  <li><strong><code>tryLock()</code>:</strong> take the lock only if it is free right now; otherwise return <code>false</code> immediately. <code>tryLock(time, unit)</code> waits at most that long. Useful against deadlock (<a href="0026-deadlock-and-lock-ordering.html">lesson 0026</a>).</li>
+  <li><strong><code>lockInterruptibly()</code>:</strong> a waiting thread can be interrupted instead of waiting forever.</li>
+  <li><strong>Fairness:</strong> with <code>new ReentrantLock(true)</code>, "under contention, locks favor granting access to the longest-waiting thread"; otherwise there is no particular order.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a></li>
+  <li><strong>Conditions:</strong> <code>newCondition()</code> gives wait/notify-style queues.</li>
+</ul>
+
+<h2>5. Which one should you use?</h2>
+<table>
+  <tr><th>Situation</th><th>Use</th><th>Why</th></tr>
+  <tr><td>One counter or one value, simple update</td><td><code>AtomicInteger</code> / <code>AtomicLong</code></td><td>Lock-free, short, no unlock to forget</td></tr>
+  <tr><td>A statistics counter hit by many threads</td><td><code>LongAdder</code></td><td>Higher throughput under contention</td></tr>
+  <tr><td>Several variables that must change together</td><td><code>synchronized</code> or a lock</td><td>An atomic protects one variable only</td></tr>
+  <tr><td>Need a timeout, interruptible wait or fairness</td><td><code>ReentrantLock</code></td><td><code>synchronized</code> has none of these</td></tr>
+</table>
+<h3>Common mistakes</h3>
+<ul>
+  <li><strong>Check-then-act on an atomic:</strong> <code>if (a.get() == 0) a.set(1);</code> is two separate atomic steps, so another thread can act in between. Use <code>a.compareAndSet(0, 1)</code>.</li>
+  <li><strong>Two atomics, one rule:</strong> keeping <code>min</code> and <code>max</code> in two <code>AtomicInteger</code>s does not make "min ≤ max" safe. Use one lock for both.</li>
+  <li><strong>unlock() not in finally:</strong> one exception and the lock is held forever; every other thread waits.</li>
+  <li><strong>Different locks:</strong> two threads that lock <em>different</em> objects do not exclude each other at all.</li>
+</ul>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Four threads run <code>count++</code> on a <code>volatile int</code>. What can go wrong?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lost updates: the total ends up too low</button>
+    <button class="opt">A deadlock between the four threads</button>
+    <button class="opt">A compile error about volatile fields</button>
+    <button class="opt">Nothing, volatile makes it thread safe</button>
+  </div>
+  <div class="why"><code>count++</code> is read-modify-write. <code>volatile</code> makes each read fresh but does not stop another thread from writing between the read and the write.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why did the lost update in the diagram happen, even though both reads were fresh?</p>
+  <div class="options">
+    <button class="opt" data-correct>B ran between A's read and A's write</button>
+    <button class="opt">A read an old value from its CPU cache</button>
+    <button class="opt">The compiler removed one of the writes</button>
+    <button class="opt">The int overflowed past its maximum</button>
+  </div>
+  <div class="why">The problem is atomicity, not visibility: the three steps were split, and B's write replaced A's.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The value is 6. Thread B calls <code>compareAndSet(5, 6)</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It returns false and changes nothing</button>
+    <button class="opt">It sets the value to 6 and returns true</button>
+    <button class="opt">It blocks until the value becomes 5</button>
+    <button class="opt">It throws IllegalStateException</button>
+  </div>
+  <div class="why">CAS only writes if the current value equals the expected one. It failed, so B must read again and retry.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Where should <code>unlock()</code> go when you use a <code>ReentrantLock</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>As the first statement in finally</button>
+    <button class="opt">As the last statement inside try</button>
+    <button class="opt">Inside the catch block only</button>
+    <button class="opt">Right before calling lock()</button>
+  </div>
+  <div class="why">The documented idiom: <code>lock()</code> right before <code>try</code>, <code>unlock()</code> in <code>finally</code>, so an exception cannot leave the lock held.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which method tries to take the lock without blocking?</p>
+  <div class="options">
+    <button class="opt" data-correct>tryLock()</button>
+    <button class="opt">lock()</button>
+    <button class="opt">newCondition()</button>
+    <button class="opt">getHoldCount()</button>
+  </div>
+  <div class="why"><code>tryLock()</code> takes the lock only if no other thread holds it at that moment; otherwise it returns <code>false</code> at once.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You must update <code>balance</code> and <code>history</code> together so they always agree. Best tool?</p>
+  <div class="options">
+    <button class="opt" data-correct>One lock around both updates</button>
+    <button class="opt">One AtomicInteger for each field</button>
+    <button class="opt">Mark both fields as volatile</button>
+    <button class="opt">A LongAdder for the balance</button>
+  </div>
+  <div class="why">Atomics protect a single variable. A rule that spans two variables needs one lock (or <code>synchronized</code>) around both.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Many threads increment one statistics counter, and it is slow. What does the Javadoc suggest?</p>
+  <div class="options">
+    <button class="opt" data-correct>LongAdder, trading memory for throughput</button>
+    <button class="opt">A fair ReentrantLock around the counter</button>
+    <button class="opt">A volatile long with count++ in a loop</button>
+    <button class="opt">AtomicLong with a busy retry loop</button>
+  </div>
+  <div class="why">Under high contention <code>LongAdder</code>'s expected throughput is significantly higher, at the cost of more space.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Is <code>volatile int count; count++</code> thread-safe? How would you fix it?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> No: count++ is read, add, write, three separate steps.</label></li>
+      <li><label><input type="checkbox"> Two threads can read the same value and one write overwrites the other (lost update).</label></li>
+      <li><label><input type="checkbox"> volatile fixes visibility, not atomicity.</label></li>
+      <li><label><input type="checkbox"> Fix 1: AtomicInteger, which uses compare-and-set and retries; lock-free.</label></li>
+      <li><label><input type="checkbox"> Fix 2: synchronized or ReentrantLock, with unlock() in finally.</label></li>
+      <li><label><input type="checkbox"> Choice: atomic for one variable, lock for several together; LongAdder for hot counters.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"No. count++ looks like one statement but it's a read, an add and a write. Two threads can both read 5 and both write 6, so one increment is lost. volatile doesn't help, because it only guarantees visibility and ordering, not that the three steps run as one. I'd fix it with an AtomicInteger and incrementAndGet: it uses compare-and-set, so if another thread changed the value in between, the CAS fails and it retries, with no lock. If I need to update several fields together, I use synchronized or a ReentrantLock, with lock before try and unlock in finally; ReentrantLock also gives me tryLock with a timeout and fairness. For a very hot statistics counter I'd use LongAdder, which scales better under contention at the cost of some memory."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0024-fix-the-counter.md">Exercise 0024: fix the counter</a></p>
+<p><a href="../exercises/0024-fix-the-counter.md">Exercise 0024: fix the counter</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/AtomicDemo.java"><code>AtomicDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a>. Package description.</p>
-<p><a href="0005-visibility-and-happens-before.html">← Visibility and happens-before</a> &nbsp;|&nbsp; <a href="0025-concurrenthashmap.html">ConcurrentHashMap: atomic updates and weak consistency →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will move from one counter to a whole map: <em>"Many threads count words in a shared map. Is <code>ConcurrentHashMap</code> enough, or can you still lose updates?"</em> <a href="0025-concurrenthashmap.html">Lesson 0025</a> shows that a check-then-put still races, and which methods are atomic.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a>, then the class description of <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock</a>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When is synchronized better than ReentrantLock?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0005-visibility-and-happens-before.html">← Why one thread may not see another thread&#x27;s write</a> &nbsp;|&nbsp; <a href="0025-concurrenthashmap.html">Sharing a map between threads: ConcurrentHashMap →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock Javadoc</a> · [3] <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">JLS chapter 17</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, the Java Language Specification (Java SE 21) and the Oracle Java Tutorials, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/package-summary.html">java.util.concurrent.atomic package</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">AtomicInteger Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/atomic/LongAdder.html">LongAdder Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock Javadoc</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS chapter 17</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interfere.html">Java Tutorials: Thread Interference</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

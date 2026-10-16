@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 19: KRaft: controllers and the metadata quorum</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>KRaft: controllers and the metadata quorum</h1>
+<p class="meta">Kafka · Lesson 0019 · step 19 of 23 · Senior · ~11 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0019-kraft-and-controllers.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> explain how a Kafka 4.x cluster stores its metadata without ZooKeeper, why controllers come in 3s or 5s, and how to check quorum health.</div>
+
+<h2>From ZooKeeper to KRaft</h2>
+<p>Older Kafka kept cluster metadata (topics, partitions, leaders, configs) in ZooKeeper. Kafka 4.x runs in KRaft mode only: metadata is a Raft-replicated log inside Kafka, in the <code>__cluster_metadata</code> partition. Migration from ZooKeeper needs a bridge release; "The last bridge release is Kafka 3.9."<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a></p>
+<h2>Roles</h2>
+<p>"In KRaft mode each Kafka server can be configured as a controller, a broker, or both" via <code>process.roles</code>: <code>broker</code>, <code>controller</code>, or <code>broker,controller</code> (combined).<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a> "Combined mode is not recommended in critical deployment environments": a busy broker should not starve the controller.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a></p>
+<h2>Why 3 or 5 controllers</h2>
+<p>Admins "will typically select 3 or 5 servers for this role", because "A majority of the controllers must be alive in order to maintain availability": 3 survive 1 failure, 5 survive 2.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a> Four is no better than three (a majority of 4 is 3). One controller is the active leader; the rest are hot standbys that follow the metadata log, which makes controller failover fast.</p>
+<h2>Look at it</h2>
+<pre><code>$ ./07-kraft-quorum.sh
+process.roles=broker,controller
+controller.quorum.voters=1@localhost:9093
+LeaderId:               1
+HighWatermark:          18
+MaxFollowerLag:         0
+CurrentVoters:          [{"id": 1, "endpoints": ["CONTROLLER://localhost:9093"]}]
+Feature: group.version     ... FinalizedVersionLevel: 1
+Feature: kraft.version     ... FinalizedVersionLevel: 0
+Feature: share.version     ... FinalizedVersionLevel: 1</code></pre>
+<p>Our learning container is a single combined node with a static voter list. <code>kraft.version</code> 0 means a static quorum; 1 or above means a dynamic quorum where you can <code>add-controller</code> / <code>remove-controller</code> with <code>kafka-metadata-quorum.sh</code>.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a> <code>group.version 1</code> is what enables the new consumer protocol on the server. Alert on <code>ActiveControllerCount</code>: exactly one node in the cluster should report 1.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[2]</a></p>
+<div class="aside">Interview answer: "Kafka 4 has no ZooKeeper. Three dedicated controllers form a Raft quorum over the metadata log; a majority must be up. Brokers fetch metadata from the active controller. I'd use dedicated controllers in production and watch ActiveControllerCount."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Five controllers. How many can fail?</p>
+  <button>Four of them</button>
+  <button data-correct>Two of them</button>
+  <button>None of them</button>
+  <button>One of them</button>
+  <p class="explain">A majority must be alive: 5 tolerate 2 failures.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. process.roles for a combined node?</p>
+  <button>leader,follower</button>
+  <button>voter,observer</button>
+  <button>active,standby</button>
+  <button data-correct>broker,controller</button>
+  <p class="explain">broker,controller makes the server act as both.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Is combined mode recommended for critical prod?</p>
+  <button>Only with 5 nodes</button>
+  <button>Yes, always best</button>
+  <button data-correct>No, not recommended</button>
+  <button>Only with TLS</button>
+  <p class="explain">Combined mode is not recommended in critical deployment environments.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Healthy ActiveControllerCount across the cluster?</p>
+  <button data-correct>Exactly one node at 1</button>
+  <button>Every node at 1</button>
+  <button>All nodes at 0</button>
+  <button>Half the nodes at 1</button>
+  <p class="explain">Only one node in the cluster should report 1.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0019-size-a-controller-quorum.md">Exercise 0019: size a controller quorum</a></p>
+<p>Runnable example: <a href="../examples/07-kraft-quorum.sh"><code>07-kraft-quorum.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/operations/kraft/">Kafka Operations: KRaft</a>. Read 'Process Roles', 'Controllers' and 'Provisioning Nodes'.</p>
+<p><a href="0010-kafka-connect.html">← Kafka Connect: moving data in and out</a> &nbsp;|&nbsp; <a href="0020-monitoring-and-operations.html">Monitoring and operating a cluster →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/operations/kraft/">Kafka Operations: KRaft</a> · [2] <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka Operations: Monitoring</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # Exercise 0004: add a table on startup
 
+[Tiếng Việt](0004-add-a-table.vi.md)
+
 Companion to [lesson 4](../lessons/0004-compose-app-and-database.html).
 
 1. Run the Compose example, then change the client command to `create table t(id int); insert into t values (1); select * from t;` (use a `psql -c` per statement or `-f`).

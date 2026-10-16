@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 10: CompletableFuture</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>CompletableFuture: một chuỗi bước chạy trên thread khác</h1>
+<p class="subtitle">Khởi động công việc ở background, nói trước phải làm gì khi nó xong, và xử lý lỗi, mà không chặn thread của chính bạn.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0010 · bước 28/46 · Advanced · ~30 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-completablefuture.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Backend thường phải gọi hai ba service rồi ghép kết quả. Gọi lần lượt từng cái thì chậm; <code>CompletableFuture</code> cho chúng chạy cùng lúc. Interviewer hỏi <em>"Thread nào chạy <code>supplyAsync</code>?"</em>, <em>"<code>join</code> khác <code>get</code> ở đâu?"</em> và <em>"Bạn xử lý lỗi trong chuỗi thế nào?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> dựng một chuỗi với <code>supplyAsync</code> và <code>thenApply</code>, phục hồi sau lỗi bằng <code>exceptionally</code>, và nói được thread pool nào mặc định chạy các bước async, và <code>join</code> với <code>get</code> báo lỗi khác nhau ra sao.</div>
+
+<dl class="words">
+  <dt>thread</dt><dd>Một luồng công việc mà máy tính chạy. Nhiều thread có thể chạy cùng lúc.</dd>
+  <dt>thread pool</dt><dd>Một đội thread sẵn sàng lấy task từ hàng đợi, để bạn không phải tạo thread mới cho mỗi task.</dd>
+  <dt>executor</dt><dd>Từ Java dùng cho "thứ chạy task", thường là một thread pool.</dd>
+  <dt>Future</dt><dd>Một tờ biên nhận cho kết quả chưa sẵn sàng. Bạn có thể chờ nó sau.</dd>
+  <dt>async</dt><dd>"Bất đồng bộ": bắt đầu bây giờ, xong sau, trong khi bên gọi làm việc khác.</dd>
+  <dt>block</dt><dd>Một thread bị block khi nó dừng lại và chờ, ví dụ chờ phản hồi mạng hoặc chờ <code>join()</code>.</dd>
+  <dt>checked exception</dt><dd>Exception mà compiler bắt bạn phải catch hoặc khai báo (như <code>ExecutionException</code>). Loại unchecked (như <code>CompletionException</code>) thì không bắt buộc.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Mình gọi <code>CompletableFuture.supplyAsync(() -&gt; callService())</code>. Thread nào chạy <code>callService()</code>? Và exception nó ném ra sẽ đi đâu?"</em></p>
+
+<h2>1. Hình dung: chiếc thẻ rung ở quán cà phê, kèm lời dặn</h2>
+<p>Ở quán cà phê, bạn gọi món và thu ngân đưa bạn một thẻ rung. Bạn không đứng chờ ở quầy; bạn ngồi xuống đọc sách. Thẻ rung đó là một <span class="term">Future</span>: lời hứa về một ly cà phê sau này.</p>
+<p>Giờ hãy tưởng tượng một thẻ rung thông minh hơn. Bạn gắn lời dặn vào nó: "khi cà phê xong, cho thêm đường, rồi mang ra bàn 5; nếu máy hỏng, mang trà thay thế". Bạn không bao giờ phải chờ ở quầy. Đó là <code>CompletableFuture</code>: một <code>Future</code> "có thể được hoàn thành một cách tường minh" và đồng thời là một <code>CompletionStage</code>, hỗ trợ các hàm và hành động phụ thuộc được kích hoạt khi nó hoàn thành.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a></p>
+<pre><code>CompletableFuture&lt;String&gt; ok = CompletableFuture
+    .supplyAsync(() -&gt; "hello")       <span class="c">// order the coffee: runs on another thread</span>
+    .thenApply(String::toUpperCase);  <span class="c">// instruction: when ready, transform it</span>
+System.out.println(ok.join());        <span class="c">// wait here for the final result</span>
+<span class="hl">// HELLO</span></code></pre>
+
+<h2>2. Thread nào làm việc?</h2>
+<p>Đây là câu hỏi interviewer quan tâm nhất. Javadoc đưa ra hai quy tắc:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a></p>
+<ul>
+  <li>"Mọi method <em>async</em> không có tham số Executor tường minh đều được chạy bằng <code>ForkJoinPool.commonPool()</code>" (trừ khi parallelism của pool đó dưới hai, khi đó mỗi task được chạy bằng một thread mới).</li>
+  <li>Các bước không async như <code>thenApply</code> "có thể được thực hiện bởi thread hoàn thành CompletableFuture hiện tại, hoặc bởi bất kỳ bên nào khác gọi một method hoàn thành".</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Hai làn thread. Thread main gọi supplyAsync rồi sau đó join và phải chờ. Một worker của common pool chạy supplier trả về hello, rồi thenApply toUpperCase, rồi hoàn thành future với HELLO, đánh thức thread main.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="74">main</text>
+    <text x="20" y="174">pool</text>
+    <text x="20" y="190" font-size="10" opacity=".75">worker</text>
+    <path d="M80 70h10M240 70h20M540 70h12M80 170h100M520 170h140" stroke="currentColor" opacity=".25"/>
+    <text x="370" y="142" text-anchor="middle" font-size="11" opacity=".75">ForkJoinPool.commonPool()</text>
+    <rect x="90" y="52" width="150" height="36" rx="6" fill="none" stroke="currentColor"/>
+    <text x="165" y="75" text-anchor="middle">supplyAsync(...)</text>
+    <g fill="none" stroke="currentColor"><path d="M165 88L230 150M222 147l8 5-1-9"/></g>
+    <rect x="180" y="152" width="150" height="36" rx="6" fill="none" stroke="currentColor"/>
+    <text x="255" y="175" text-anchor="middle">() -&gt; "hello"</text>
+    <g fill="none" stroke="currentColor"><path d="M330 170h20M344 165l6 5-6 5"/></g>
+    <rect x="350" y="152" width="170" height="36" rx="6" fill="none" stroke="currentColor"/>
+    <text x="435" y="175" text-anchor="middle">thenApply(upper)</text>
+    <rect x="260" y="56" width="280" height="28" rx="4" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+    <text x="400" y="75" text-anchor="middle" font-size="11">join(): main bị block, đang chờ</text>
+    <g fill="none" stroke="var(--accent)"><path d="M520 170L572 92M564 95l8-3 0 9"/></g>
+    <text x="580" y="140" font-size="11" fill="var(--accent)">complete</text>
+    <rect x="552" y="52" width="108" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="606" y="75" text-anchor="middle" fill="var(--accent)">"HELLO"</text>
+    <text x="340" y="226" text-anchor="middle" font-size="11">thenApply chạy trên thread hoàn thành stage,</text>
+    <text x="340" y="244" text-anchor="middle" font-size="11">hoặc trên bên gọi nếu stage đã xong từ trước</text>
+  </g>
+</svg>
+<figcaption>Supplier chạy trên một worker của common pool, không phải trên <code>main</code>. <code>main</code> rảnh tay cho tới khi gọi <code>join()</code>, lúc đó nó bị block tới khi chuỗi hoàn thành.</figcaption>
+</figure>
+
+<h3>Lần theo từng bước</h3>
+<pre><code><span class="c">Step 1  main: supplyAsync hands () -&gt; "hello" to the common pool, returns a future at once</span>
+<span class="c">Step 2  main: thenApply attaches an instruction to that future, returns a new future</span>
+<span class="c">Step 3  worker: runs the supplier → "hello" → completes the first future</span>
+<span class="c">Step 4  worker (or main): runs toUpperCase → "HELLO" → completes the second future</span>
+<span class="c">Step 5  main: join() was waiting → wakes up with </span><span class="hl">"HELLO"</span></code></pre>
+
+<h3>Cái bẫy: việc blocking trong common pool</h3>
+<p>Common pool là dùng chung: nó "được dùng bởi mọi ForkJoinTask không được submit tường minh vào một pool cụ thể", và tài liệu của nó cảnh báo việc tự điều chỉnh số thread "không được đảm bảo khi có I/O bị block".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinPool.html">Javadoc ForkJoinPool</a> Vì vậy nếu các bước async của bạn gọi blocking chậm (HTTP, JDBC), chúng giữ thread của pool và có thể làm đói mọi task khác dùng pool. <strong>Cách sửa:</strong> truyền <code>Executor</code> riêng cho các lời gọi blocking, dùng các overload nhận executor, ví dụ <code>supplyAsync(supplier, ioExecutor)</code>. Trên JDK 21, cân nhắc virtual thread (xem <a href="0006-virtual-threads.vi.html">bài 0006</a>).</p>
+
+<h2>3. Kết hợp nhiều future</h2>
+<p>Quay lại quán cà phê: bạn gọi cà phê và bánh mì ở hai quầy. Bạn muốn ăn khi <em>cả hai</em> đều xong. Javadoc mô tả các công cụ chính:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a></p>
+<table>
+<tr><th>Method</th><th>Nó làm gì</th><th>Phiên bản quán cà phê</th></tr>
+<tr><td><code>thenApply(fn)</code></td><td>Biến đổi kết quả</td><td>thêm đường</td></tr>
+<tr><td><code>thenCompose(fn)</code></td><td>Bước tiếp theo cũng async: "hoàn thành với cùng giá trị như CompletionStage do hàm trả về"</td><td>cầm biên nhận, gọi thêm ly nữa</td></tr>
+<tr><td><code>thenCombine(other, fn)</code></td><td>"khi stage này và stage kia đều hoàn thành bình thường", gọi fn với cả hai kết quả</td><td>cà phê + bánh mì → bữa ăn</td></tr>
+<tr><td><code>allOf(cf...)</code></td><td>"hoàn thành khi mọi CompletableFuture được đưa vào đều hoàn thành"</td><td>chờ đủ cả đơn</td></tr>
+<tr><td><code>orTimeout(t, unit)</code></td><td>Hoàn thành với lỗi <code>TimeoutException</code> nếu chưa xong kịp (JDK 9+)</td><td>bỏ cuộc sau 5 phút</td></tr>
+<tr><td><code>completeOnTimeout(v, t, unit)</code></td><td>Hoàn thành với giá trị dự phòng nếu chưa xong kịp (JDK 9+)</td><td>lấy ly nước thay thế</td></tr>
+</table>
+<pre><code>CompletableFuture&lt;User&gt;  user  = CompletableFuture.supplyAsync(() -&gt; userApi.get(id), io);
+CompletableFuture&lt;Order&gt; order = CompletableFuture.supplyAsync(() -&gt; orderApi.last(id), io);
+
+CompletableFuture&lt;Page&gt; page = user
+    .thenCombine(order, (u, o) -&gt; new Page(u, o))   <span class="c">// both calls run at the same time</span>
+    .orTimeout(2, TimeUnit.SECONDS);                <span class="c">// JDK 9+: fail instead of hanging</span></code></pre>
+<p class="muted">Trên JDK 8 chưa có <code>orTimeout</code>; người ta dùng <code>get(timeout, unit)</code> ở phía bên gọi. Bài tập 0010 luyện đúng pattern này.</p>
+
+<h2>4. Khi có gì đó hỏng</h2>
+<p>Exception bên trong một bước không làm sập chương trình. Nó đi xuôi theo chuỗi, như mảnh giấy "máy hỏng" được chuyển từ trạm này sang trạm khác. Tài liệu <code>CompletionStage</code>: nếu một stage ném lỗi, "mọi stage phụ thuộc cần nó hoàn thành cũng hoàn thành với lỗi, với một <code>CompletionException</code> giữ exception đó làm cause".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletionStage.html">Javadoc CompletionStage</a> Vì vậy các bước bình thường như <code>thenApply</code> bị bỏ qua, cho tới khi gặp một bước xử lý lỗi:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a></p>
+<ul>
+  <li><code>exceptionally(fn)</code> chỉ chạy khi stage "hoàn thành với lỗi", nhận exception làm đối số. Nó cho phép phục hồi bằng một giá trị dự phòng.</li>
+  <li><code>handle(fn)</code> chạy trong cả hai trường hợp và nhận "kết quả và exception của stage này".</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Một future thất bại đã ném IllegalStateException boom. exceptionally biến nó thành -1. join ném CompletionException unchecked với cause là boom. get ném ExecutionException checked với cause là boom.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="86" width="190" height="60" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="115" y="110" text-anchor="middle" fill="var(--accent)">failing</text>
+    <text x="115" y="130" text-anchor="middle" font-size="11">đã ném "boom"</text>
+    <g fill="none" stroke="currentColor"><path d="M210 106L258 46h12M264 41l6 5-6 5"/><path d="M210 116h54M258 111l6 5-6 5"/><path d="M210 126L258 186h12M264 181l6 5-6 5"/></g>
+    <rect x="270" y="24" width="390" height="44" rx="6" fill="none" stroke="var(--accent)"/>
+    <text x="465" y="43" text-anchor="middle" fill="var(--accent)">exceptionally(ex -&gt; -1).join()</text>
+    <text x="465" y="60" text-anchor="middle" font-size="11" fill="var(--accent)">recovered: -1</text>
+    <rect x="270" y="94" width="390" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="465" y="113" text-anchor="middle">join()</text>
+    <text x="465" y="130" text-anchor="middle" font-size="11">ném CompletionException (unchecked), cause boom</text>
+    <rect x="270" y="164" width="390" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="465" y="183" text-anchor="middle">get()</text>
+    <text x="465" y="200" text-anchor="middle" font-size="11">ném ExecutionException (checked), cause boom</text>
+  </g>
+</svg>
+<figcaption>Một future thất bại, ba cách đọc nó. Cả <code>join</code> và <code>get</code> đều bọc exception gốc; <code>getCause()</code> trả nó lại cho bạn.</figcaption>
+</figure>
+
+<p><code>join()</code> ném <code>CompletionException</code> unchecked; <code>get()</code> ném <code>ExecutionException</code> checked; cả hai đều mang cause gốc.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a> Hãy dùng <code>join()</code> trong lambda và stream, nơi checked exception sẽ không compile được.</p>
+<pre><code>$ java java/examples/jdk8/CompletableFutureDemo.java
+HELLO
+recovered: -1
+join() throws CompletionException, cause: java.lang.IllegalStateException: boom
+get()  throws ExecutionException,  cause: java.lang.IllegalStateException: boom</code></pre>
+<p>Mã nguồn: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>CompletableFutureDemo.java</code></a> (compile được với <code>javac --release 8</code>).</p>
+
+<h3>Thêm hai điều interviewer thích hỏi</h3>
+<ul>
+  <li><strong>Chỉ một lần hoàn thành thắng.</strong> Nếu nhiều thread cùng cố <code>complete</code>, <code>completeExceptionally</code> hay <code>cancel</code> một future, chỉ một trong số đó thành công.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a></li>
+  <li><strong>Cancel không dừng công việc.</strong> Việc hủy "được coi chỉ là một dạng khác của hoàn thành với lỗi": <code>cancel()</code> có cùng tác dụng như <code>completeExceptionally(new CancellationException())</code>. Class này "không kiểm soát trực tiếp phép tính", và cờ <code>mayInterruptIfRunning</code> "không có tác dụng trong cài đặt này vì interrupt không được dùng để điều khiển xử lý". Nên task đang chạy vẫn tiếp tục chạy.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a></li>
+</ul>
+
+<h3>Lỗi hay gặp</h3>
+<ul>
+  <li><strong>Gọi <code>join()</code> ngay sau mỗi <code>supplyAsync</code>.</strong> Khi đó các lời gọi chạy lần lượt và bạn chẳng được gì. Hãy khởi động tất cả trước, rồi mới kết hợp.</li>
+  <li><strong>Quên xử lý lỗi.</strong> Không ai thấy exception cho tới khi có người gọi <code>join</code>. Thêm <code>exceptionally</code> hoặc <code>handle</code>, và một timeout.</li>
+  <li><strong>I/O chậm trên common pool.</strong> Hãy truyền executor riêng.</li>
+</ul>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Executor nào chạy <code>supplyAsync(supplier)</code> khi bạn không truyền vào?</p>
+  <div class="options">
+    <button class="opt" data-correct>ForkJoinPool.commonPool()</button>
+    <button class="opt">Chính thread của bên gọi</button>
+    <button class="opt">Mỗi lần một virtual thread mới</button>
+    <button class="opt">Một pool cố định mười thread</button>
+  </div>
+  <div class="why">"Mọi method async không có tham số Executor tường minh đều được chạy bằng ForkJoinPool.commonPool()" (trừ khi parallelism dưới hai).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một future thất bại với <code>IllegalStateException("boom")</code>. <code>join()</code> ném gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>CompletionException với cause là boom</button>
+    <button class="opt">ExecutionException với cause là boom</button>
+    <button class="opt">IllegalStateException boom, không hề bọc</button>
+    <button class="opt">Không ném gì: join trả về null khi lỗi</button>
+  </div>
+  <div class="why"><code>join()</code> ném <code>CompletionException</code> unchecked; <code>get()</code> ném <code>ExecutionException</code> checked. Cả hai đều bọc cause gốc.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Method nào cho phép thay một lỗi bằng giá trị dự phòng?</p>
+  <div class="options">
+    <button class="opt" data-correct>exceptionally</button>
+    <button class="opt">thenApply</button>
+    <button class="opt">supplyAsync</button>
+    <button class="opt">allOf</button>
+  </div>
+  <div class="why"><code>exceptionally(fn)</code> chạy khi stage hoàn thành với lỗi và kết quả của nó thay cho lỗi. <code>thenApply</code> bị bỏ qua khi có lỗi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Hai thread cùng gọi <code>complete(...)</code> trên một future với hai giá trị khác nhau. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chỉ một trong hai lần complete thành công</button>
+    <button class="opt">Lần gọi sau ghi đè giá trị của lần gọi trước</button>
+    <button class="opt">Lần gọi thứ hai sẽ ném ra một exception</button>
+    <button class="opt">Future giữ cả hai giá trị trong một list</button>
+  </div>
+  <div class="why">Trong các lời gọi <code>complete</code>, <code>completeExceptionally</code> hay <code>cancel</code> tranh nhau, chỉ một thành công. Các lời gọi còn lại trả về <code>false</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Đoạn này sai ở đâu? <code>var a = supplyAsync(callA).join(); var b = supplyAsync(callB).join();</code></p>
+  <div class="options">
+    <button class="opt" data-correct>Các lời gọi chạy lần lượt, nên chẳng được lợi gì</button>
+    <button class="opt">join() không dùng được nếu nằm ngoài khối try/catch</button>
+    <button class="opt">supplyAsync thứ hai không bao giờ được common pool chạy</button>
+    <button class="opt">Mỗi join() tạo một thread pool mới, gây rò rỉ thread</button>
+  </div>
+  <div class="why"><code>join()</code> block tới khi future đó xong. Hãy khởi động cả hai future trước, rồi kết hợp bằng <code>thenCombine</code> hoặc <code>allOf</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Mỗi bước async gọi JDBC chậm. Vì sao pool mặc định là lựa chọn tồi?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lời gọi bị block giữ chặt thread của common pool dùng chung</button>
+    <button class="opt">Common pool không cho phép I/O nào, nên lời gọi bị lỗi</button>
+    <button class="opt">Common pool chạy mọi thứ trên main, lần lượt từng cái một</button>
+    <button class="opt">JDBC cần checked exception, mà supplyAsync thì cấm điều đó</button>
+  </div>
+  <div class="why">Common pool dùng chung cho cả JVM; block nó sẽ làm đói các task khác. Hãy truyền <code>Executor</code> riêng (hoặc dùng virtual thread trên JDK 21).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn gọi <code>cancel(true)</code> trên một <code>CompletableFuture</code> có supplier đang chạy. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó hoàn thành với CancellationException; task có thể vẫn chạy</button>
+    <button class="opt">Worker thread bị interrupt và task luôn dừng lại ngay lập tức</button>
+    <button class="opt">Không gì cả: không thể hủy một future đã bắt đầu chạy rồi</button>
+    <button class="opt">Future chạy lại supplier từ đầu, lần này chạy trên thread main</button>
+  </div>
+  <div class="why">Hủy chỉ là hoàn thành với lỗi <code>CancellationException</code>; class này "không kiểm soát trực tiếp phép tính".</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"CompletableFuture hoạt động thế nào, và bạn cần để ý gì khi chạy production?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Nó là một Future có thể hoàn thành và nối chuỗi (một <code>CompletionStage</code>), có từ JDK 8.</label></li>
+      <li><label><input type="checkbox"> <code>supplyAsync</code> khởi động việc; <code>thenApply</code> / <code>thenCompose</code> / <code>thenCombine</code> nối hoặc kết hợp.</label></li>
+      <li><label><input type="checkbox"> Method async không có executor dùng <code>ForkJoinPool.commonPool()</code>.</label></li>
+      <li><label><input type="checkbox"> Đừng block common pool; truyền executor riêng cho I/O (hoặc virtual thread trên 21).</label></li>
+      <li><label><input type="checkbox"> Lỗi đi xuôi theo chuỗi; <code>exceptionally</code> / <code>handle</code> phục hồi.</label></li>
+      <li><label><input type="checkbox"> <code>join</code> ném <code>CompletionException</code> unchecked, <code>get</code> ném <code>ExecutionException</code> checked.</label></li>
+      <li><label><input type="checkbox"> Thêm timeout (<code>orTimeout</code>, JDK 9+); <code>cancel</code> không dừng task đang chạy.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"<code>CompletableFuture</code>, có từ JDK 8, là một Future mà em có thể tự complete và nối chuỗi, vì nó implement <code>CompletionStage</code>. Em khởi động việc bằng <code>supplyAsync</code>, biến đổi kết quả bằng <code>thenApply</code>, nối thêm một lời gọi async bằng <code>thenCompose</code>, và chạy song song hai lời gọi rồi ghép lại bằng <code>thenCombine</code> hoặc <code>allOf</code>. Nếu không truyền executor, các bước async chạy trên <code>ForkJoinPool.commonPool()</code>, vốn dùng chung, nên với blocking I/O em truyền executor riêng, hoặc trên Java 21 thì cân nhắc virtual thread. Exception đi xuôi theo chuỗi và bỏ qua các bước bình thường; em phục hồi bằng <code>exceptionally</code> hoặc <code>handle</code>. Khi chờ kết quả, <code>join</code> ném <code>CompletionException</code> unchecked còn <code>get</code> ném <code>ExecutionException</code> checked, cả hai đều chứa cause thật bên trong. Và trên production em luôn thêm timeout bằng <code>orTimeout</code>, vì <code>cancel</code> chỉ complete future thôi, nó không dừng công việc đang chạy."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-parallel-calls.vi.md">Bài tập 0010: gọi song song có timeout</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk8/CompletableFutureDemo.java"><code>jdk8/CompletableFutureDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp Senior sẽ đào sâu vào memory model: <em>"Worker thread đã ghi kết quả; vì sao main chắc chắn thấy nó sau <code>join()</code>?"</em> Đó là chuyện visibility và happens-before, bài tiếp theo: <a href="0005-visibility-and-happens-before.vi.html">bài 0005</a>. Về thread pool chi tiết hơn, xem <a href="0023-thread-pools-executors.vi.html">bài 0023</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a>, phần mô tả class.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào cần thenCompose thay vì thenApply?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0011-java-time.vi.html">← java.time: bạn cần loại đồng hồ nào?</a> &nbsp;|&nbsp; <a href="0044-review-jdk8.vi.html">Ôn tập 5: lambda, stream, java.time và CompletableFuture →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html">Javadoc CompletableFuture</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletionStage.html">Javadoc CompletionStage</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinPool.html">Javadoc ForkJoinPool</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

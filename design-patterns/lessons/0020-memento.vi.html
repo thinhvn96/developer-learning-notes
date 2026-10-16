@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 20: Memento</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Memento</h1>
+<p class="meta">Design Patterns · Bài 0020 · bước 20/30 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0020-memento.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> lưu và khôi phục trạng thái của một object mà không để lộ phần bên trong của nó.</div>
+
+<h2>Mục đích</h2>
+<p>Memento là "một behavioral design pattern cho phép bạn lưu và khôi phục trạng thái trước đó của một object mà không để lộ chi tiết cài đặt của nó." Hãy dùng nó để tạo snapshot phục vụ khôi phục, để rollback khi có lỗi, và để bảo vệ tính đóng gói.<a class="cite" href="https://refactoring.guru/design-patterns/memento">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/MementoDemo.java
+now      : Hello, world!!!
+restore 1: Hello, world
+restore 2: Hello</code></pre><p>Editor (originator) tạo ra các object <code>Snapshot</code> kín; stack lịch sử (caretaker) lưu chúng nhưng không đọc được trạng thái bên trong. Mã nguồn: <a href="../examples/MementoDemo.java"><code>MementoDemo.java</code></a>. Kết hợp với <a href="0017-command.vi.html">Command</a> để làm undo.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Tạo snapshot mà không vi phạm tính đóng gói</li><li>Code của originator gọn hơn: caretaker giữ lịch sử</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Chụp snapshot thường xuyên sẽ tốn bộ nhớ</li><li>Caretaker phải theo dõi và hủy các memento đã lỗi thời</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/memento">[1]</a> Memento đi cùng Command (undo) và Iterator (lưu trạng thái duyệt); Prototype có thể là lựa chọn đơn giản hơn cho các object đơn giản.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Memento lưu...?</p>
+  <button data-correct>Snapshot trạng thái</button>
+  <button>Interface</button>
+  <button>Thread</button>
+  <button>Class</button>
+  <p class="explain">Nó lưu và khôi phục trạng thái trước đó.<a class="cite" href="https://refactoring.guru/design-patterns/memento">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Ai lưu giữ các snapshot?</p>
+  <button>Database</button>
+  <button>Compiler</button>
+  <button>GC</button>
+  <button data-correct>Caretaker</button>
+  <p class="explain">Chính là stack lịch sử trong demo.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao không để lộ field?</p>
+  <button>Nhanh hơn</button>
+  <button>Tiết kiệm bộ nhớ</button>
+  <button>Java bắt buộc</button>
+  <button data-correct>Giữ tính đóng gói</button>
+  <p class="explain">Snapshot được tạo mà không vi phạm tính đóng gói.<a class="cite" href="https://refactoring.guru/design-patterns/memento">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái giá phải trả?</p>
+  <button data-correct>Bộ nhớ cho snapshot</button>
+  <button>Không có class</button>
+  <button>Chỉ đọc chậm</button>
+  <button>Không undo được</button>
+  <p class="explain">Tạo memento thường xuyên có thể tốn đáng kể bộ nhớ.<a class="cite" href="https://refactoring.guru/design-patterns/memento">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0020-undo-redo.vi.md">Bài tập 20: undo và redo</a></p>
+<p>Ví dụ chạy được: <a href="../examples/MementoDemo.java"><code>MementoDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/memento">Memento (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0019-mediator.vi.html">← Mediator</a> &nbsp;|&nbsp; <a href="0021-observer.vi.html">Observer →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/memento">Memento (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

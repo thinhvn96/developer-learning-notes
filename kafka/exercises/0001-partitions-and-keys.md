@@ -1,5 +1,7 @@
 # Exercise 0001: partitions and keys
 
+[Tiếng Việt](0001-partitions-and-keys.vi.md)
+
 Companion to [lesson 1](../lessons/0001-events-topics-partitions.html).
 
 1. Run `./01-topics-keys-groups.sh`. Which partition did each key land on?

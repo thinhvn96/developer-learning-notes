@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 23: Strategy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Strategy</h1>
+<p class="meta">Design Patterns · Bài 0023 · bước 23/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0023-strategy.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> định nghĩa các thuật toán có thể hoán đổi sau một interface, đổi chúng lúc runtime, và biết khi nào một lambda là đủ.</div>
+
+<h2>Mục đích</h2>
+<p>Strategy là "một behavioral design pattern cho phép bạn định nghĩa một họ thuật toán, đặt mỗi thuật toán vào một class riêng, và làm cho các object của chúng có thể hoán đổi cho nhau." Hãy dùng nó để chuyển đổi giữa các biến thể thuật toán lúc runtime, tách business logic khỏi chi tiết thuật toán, và thay thế các khối điều kiện lớn.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/StrategyDemo.java
+by length     : [fig, pear, kiwi, banana]
+reverse alpha : [pear, kiwi, fig, banana]
+no discount   : 200
+10% off       : 180
+lambda -25    : 175</code></pre><p><code>Comparator</code> là strategy nổi tiếng nhất của JDK: theo tài liệu, đó là "một hàm so sánh, áp đặt một thứ tự toàn phần", được truyền vào các method sort "để kiểm soát chính xác thứ tự sắp xếp", kèm các factory method và combinator như <code>comparing</code>, <code>thenComparing</code> và <code>reversed</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[2]</a> <code>Cart</code> đổi strategy tính giá lúc runtime, kể cả một lambda. Mã nguồn: <a href="../examples/StrategyDemo.java"><code>StrategyDemo.java</code></a>. Đây chính là bài Open/Closed (<a href="../../oop/lessons/0018-open-closed-principle.vi.html">OOP</a>) dưới dạng một pattern.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Đổi thuật toán lúc runtime</li><li>Cô lập chi tiết cài đặt</li><li>Composition thay cho kế thừa</li><li>Open/Closed</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Phức tạp không cần thiết với thuật toán đơn giản, ít thay đổi</li><li>Client phải hiểu sự khác nhau thì mới chọn được</li><li>Ngôn ngữ hàm có thể khiến nó trở nên thừa</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a> Strategy so với State: cả hai đều dùng composition, nhưng các state có thể biết về nhau; Strategy so với Template Method: composition (lúc runtime) so với kế thừa (tĩnh); Strategy so với Decorator: thay phần bên trong so với thay hành vi bên ngoài.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Strategy đóng gói...?</p>
+  <button>Một data model</button>
+  <button>Một package</button>
+  <button data-correct>Một họ thuật toán</button>
+  <button>Một thread</button>
+  <p class="explain">Một họ thuật toán đặt trong các class riêng.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Strategy trong JDK?</p>
+  <button data-correct>Comparator</button>
+  <button>Object</button>
+  <button>Integer</button>
+  <button>Thread</button>
+  <p class="explain">Comparator truyền vào sort quyết định thứ tự sắp xếp.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Strategy so với Template Method?</p>
+  <button data-correct>Composition vs kế thừa</button>
+  <button>Như nhau</button>
+  <button>Không cái nào</button>
+  <button>Kế thừa vs composition</button>
+  <p class="explain">Strategy dùng composition; Template Method dùng kế thừa.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một lambda có thể làm strategy khi...?</p>
+  <button>Luôn luôn</button>
+  <button data-correct>Interface chỉ có một method</button>
+  <button>Không bao giờ</button>
+  <button>Chỉ với enum</button>
+  <p class="explain">Demo truyền price -> price - 25 làm một Pricing.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0023-shipping-strategies.vi.md">Bài tập 23: các strategy tính phí vận chuyển</a></p>
+<p>Ví dụ chạy được: <a href="../examples/StrategyDemo.java"><code>StrategyDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0022-state.vi.html">← State</a> &nbsp;|&nbsp; <a href="0024-template-method.vi.html">Template Method →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

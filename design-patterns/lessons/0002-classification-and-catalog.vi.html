@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 2: Danh mục: creational, structural, behavioral</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Danh mục: creational, structural, behavioral</h1>
+<p class="meta">Design Patterns · Bài 0002 · bước 2/30 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-classification-and-catalog.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> xếp được từng pattern trong 22 pattern kinh điển vào đúng nhóm và nói được mỗi nhóm nói về điều gì.</div>
+
+<h2>Ba nhóm</h2>
+<table><tr><th>Nhóm</th><th>Nói về<a class="cite" href="https://refactoring.guru/design-patterns/catalog">[1]</a></th><th>Các pattern</th></tr>
+<tr><td>Creational</td><td>"các cơ chế tạo object khác nhau, giúp tăng tính linh hoạt và khả năng tái sử dụng code sẵn có"</td><td>Factory Method, Abstract Factory, Builder, Prototype, Singleton</td></tr>
+<tr><td>Structural</td><td>"cách lắp ráp object và class thành những cấu trúc lớn hơn mà vẫn giữ được sự linh hoạt và hiệu quả"</td><td>Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy</td></tr>
+<tr><td>Behavioral</td><td>"thuật toán và việc phân chia trách nhiệm giữa các object"</td><td>Chain of Responsibility, Command, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor</td></tr></table>
+<h2>Dùng danh mục thế nào</h2>
+<p>Hãy tự hỏi mình đang gặp vấn đề nào trong ba loại: <em>tạo nó ra thế nào</em> (creational), <em>lắp ráp nó thế nào</em> (structural), hay <em>các object này phối hợp với nhau ra sao</em> (behavioral). Mỗi pattern ở đây đều có một bài riêng, kèm ví dụ chạy được, theo đúng thứ tự trên: bắt đầu từ <a href="0004-factory-method.vi.html">Factory Method</a>. Bảng tóm tắt nằm trong <a href="../../reference/design-patterns.vi.html">trang tham khảo</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Các cơ chế tạo object thuộc nhóm nào?</p>
+  <button>Concurrent</button>
+  <button data-correct>Creational</button>
+  <button>Behavioral</button>
+  <button>Structural</button>
+  <p class="explain">Creational pattern cung cấp các cơ chế tạo object.<a class="cite" href="https://refactoring.guru/design-patterns/catalog">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Adapter thuộc nhóm...?</p>
+  <button data-correct>Structural</button>
+  <button>Không nhóm nào</button>
+  <button>Behavioral</button>
+  <button>Creational</button>
+  <p class="explain">Adapter được xếp vào nhóm structural.<a class="cite" href="https://refactoring.guru/design-patterns/catalog">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Strategy thuộc nhóm...?</p>
+  <button data-correct>Behavioral</button>
+  <button>Structural</button>
+  <button>Không nhóm nào</button>
+  <button>Creational</button>
+  <p class="explain">Strategy là một behavioral pattern.<a class="cite" href="https://refactoring.guru/design-patterns/catalog">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Behavioral pattern quan tâm đến...?</p>
+  <button>Chỉ cách bố trí class</button>
+  <button data-correct>Trách nhiệm giữa các object</button>
+  <button>Việc tạo object</button>
+  <button>Bộ nhớ</button>
+  <p class="explain">Thuật toán và việc phân chia trách nhiệm giữa các object.<a class="cite" href="https://refactoring.guru/design-patterns/catalog">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-classify-the-problem.vi.md">Bài tập 2: phân loại vấn đề</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/catalog">Design patterns catalog (Refactoring.Guru)</a>. Trang danh mục.</p>
+<p><a href="0001-what-is-a-design-pattern.vi.html">← Design pattern là gì?</a> &nbsp;|&nbsp; <a href="0003-criticism-and-anti-patterns.vi.html">Những lời chỉ trích pattern, và anti-pattern →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/catalog">Design patterns catalog (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

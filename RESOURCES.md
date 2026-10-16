@@ -71,7 +71,21 @@ Verified this session (fetched and read):
 - [Wikipedia: SOLID, Liskov substitution principle, Composition over inheritance, Law of Demeter, Coupling, God object, Anti-pattern](https://en.wikipedia.org/wiki/SOLID)
   Tertiary source used for principle definitions because primary sources could not be fetched (Robert C. Martin's own site refused the connection and Baeldung returned 403). Use for: SOLID and design-principle lessons; check Martin's original writing when you can.
 
-Books to add (not yet verified this session, check editions before relying on them):
+- [Kafka 4.3 docs, deep-dive pages: consumer rebalance protocol (KIP-848), KRaft, monitoring, tiered storage, geo-replication, security overview, ACLs, group configs, Streams DSL; KafkaProducer / KafkaShareConsumer Javadoc](https://kafka.apache.org/43/operations/)
+  Read for Kafka lessons 0011-0023. Use for: rebalancing, KRaft, operations, share groups, security, multi-cluster.
+- [Apache Kafka 4.2.0 release announcement (17 Feb 2026)](https://kafka.apache.org/blog/2026/02/17/apache-kafka-4.2.0-release-announcement/)
+  Share groups production-ready, Streams DLQ and server-side Streams rebalance. Use for: "what's new in Kafka" questions.
+- [Spring for Apache Kafka reference 4.1: quick tour, listener containers (AckMode), handling exceptions (DefaultErrorHandler, DLT)](https://docs.spring.io/spring-kafka/reference/)
+  Use for: Spring Kafka lessons 0013 and 0016.
+- [Confluent Docs: Schema Registry schema evolution and serializer formats](https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html)
+  Vendor docs (Schema Registry is a Confluent product, not Apache Kafka). Use for: Kafka lesson 0017.
+
+- [Java SE 21 API docs (java.util): List, Map, HashMap, HashSet, LinkedHashMap, TreeMap, PriorityQueue, EnumMap/EnumSet, IdentityHashMap, WeakHashMap, Collections, Arrays, ConcurrentModificationException, CopyOnWriteArrayList, BlockingQueue, ConcurrentSkipListMap; java.lang.Comparable](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html)
+  Read for the Java collections deep dive (lessons 0028-0039). JDK 21 pages are used because the course scope is 8/17/21.
+- [OpenJDK jdk21u source: HashMap.java and ArrayList.java](https://github.com/openjdk/jdk21u/tree/master/src/java.base/share/classes/java/util)
+  Implementation details the Javadoc does not promise (treeify thresholds, hash spreading, 1.5x growth). Say "in OpenJDK" when quoting them in an interview.
+- [Java SE 21 Core Libraries guide: Java Collections Framework](https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html) and [JLS 21 §5.1.7 boxing](https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7)
+ (not yet verified this session, check editions before relying on them):
 
 - *Effective Java* (Joshua Bloch): idioms and pitfalls, staple of Senior interviews.
 - *Java Concurrency in Practice* (Goetz et al.): memory model and concurrency.
@@ -80,7 +94,7 @@ Books to add (not yet verified this session, check editions before relying on th
 
 ## Wisdom (Communities)
 
-Not yet vetted. Candidates to check next session: r/java, r/kubernetes, r/PostgreSQL, the PostgreSQL mailing lists, CNCF Slack. The learner has not opted out of communities.
+Not yet vetted. For Kafka (verified on the official contact page, https://kafka.apache.org/community/contact/): the users mailing list (subscribe via users-subscribe@kafka.apache.org, plain-text email) and the `apache-kafka` tag on Stack Overflow. Good places to test answers to the lesson 0015/0016/0021 design questions. Candidates to check next session: r/java, r/kubernetes, r/PostgreSQL, the PostgreSQL mailing lists, CNCF Slack. The learner has not opted out of communities.
 
 ## Gaps
 
@@ -88,7 +102,7 @@ Not yet vetted. Candidates to check next session: r/java, r/kubernetes, r/Postgr
 - Domain-driven design, concurrency patterns and enterprise patterns: no sources gathered yet.
 
 - A high-trust source for mock Senior interview questions. The interview pages are written from the same official docs used in the lessons; questions were chosen by me, not sourced from a vetted question bank.
-- Kibana dashboards and Lens, hot/warm sizing, Kafka Schema Registry and security, RabbitMQ monitoring, Spring Security, RBAC/NetworkPolicy/Helm: not yet read; listed as planned.
+- Kibana dashboards and Lens, hot/warm sizing, RabbitMQ monitoring, Spring Security, RBAC/NetworkPolicy/Helm: not yet read; listed as planned.
 - Java 8 to 17 migration breaking changes: not yet sourced.
 - Spring Data JPA / Hibernate depth (N+1, lazy loading): only the derived-query page was read; fetch more before the planned lesson.
 - A source for capacity estimation and consistency models (CAP, quorum) for the planned system-design lesson. The AWS Builders' Library page on retries could not be fetched (redirect returned no content).

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 8: Singleton</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Singleton</h1>
+<p class="meta">Design Patterns · Bài 0008 · bước 8/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-singleton.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> cài đặt một singleton thread-safe trong Java, và giải thích vì sao nó gây khó cho việc test và khi nào không nên dùng.</div>
+
+<h2>Mục đích</h2>
+<p>Singleton là "một creational design pattern cho phép bạn đảm bảo một class chỉ có đúng một instance, đồng thời cung cấp một điểm truy cập toàn cục tới instance đó." Nó giải quyết hai vấn đề cùng lúc: kiểm soát số lượng instance, và truy cập toàn cục một cách an toàn.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/SingletonDemo.java
+enum singleton same instance      : true
+holder singleton same instance    : true
+JDK Runtime.getRuntime() same     : true
+distinct holder instances across 8 threads: 1
+test B sees leftover state         : test-A</code></pre><p>Hai cách viết an toàn: một <code>enum</code> chỉ có một phần tử (JVM đảm bảo chỉ khởi tạo một lần) và lazy holder class (việc khởi tạo class là thread-safe). <code>Runtime</code> của JDK được tài liệu mô tả là "một instance duy nhất của class Runtime", lấy ra bằng <code>getRuntime()</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">[2]</a> Dòng cuối cùng là cái giá phải trả: trạng thái toàn cục có thể thay đổi bị rò rỉ giữa các test ("test B sees leftover state"). Hãy ưu tiên truyền một instance duy nhất qua constructor (dependency injection) và để container quản lý scope: singleton scope của Spring tính theo container, không theo class loader (<a href="../../spring-boot/lessons/0007-bean-scopes.vi.html">bài bean scope</a>). Mã nguồn: <a href="../examples/SingletonDemo.java"><code>SingletonDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Đảm bảo chỉ có một instance</li><li>Một điểm truy cập toàn cục có kiểm soát</li><li>Có thể khởi tạo lazy</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Vi phạm Single Responsibility Principle (giải quyết hai vấn đề)</li><li>Có thể che giấu thiết kế tồi và tạo ra phụ thuộc không đáng có</li><li>Cần xử lý đặc biệt trong code đa luồng</li><li>Khó unit test</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a> Facade, Flyweight, Abstract Factory, Builder và Prototype đều có thể được cài đặt dưới dạng Singleton.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Singleton đảm bảo...?</p>
+  <button data-correct>Một instance và một điểm truy cập toàn cục</button>
+  <button>Tính immutable</button>
+  <button>Nhiều instance</button>
+  <button>Tốc độ</button>
+  <p class="explain">Một instance cộng với truy cập toàn cục.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một cách viết an toàn trong Java?</p>
+  <button>Biến đếm static</button>
+  <button>Constructor public</button>
+  <button>Cloneable</button>
+  <button data-correct>Enum một phần tử</button>
+  <p class="explain">Bản demo dùng một enum và một lazy holder.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vấn đề chính khi test?</p>
+  <button>Khởi động chậm</button>
+  <button>Thiếu method</button>
+  <button>Không có interface</button>
+  <button data-correct>Rò rỉ trạng thái toàn cục</button>
+  <p class="explain">Trạng thái dùng chung có thể thay đổi còn sót lại giữa các test.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Nó vi phạm nguyên tắc nào?</p>
+  <button data-correct>Single Responsibility</button>
+  <button>Liskov</button>
+  <button>Không nguyên tắc nào</button>
+  <button>Interface Segregation</button>
+  <p class="explain">Nó giải quyết hai vấn đề cùng lúc.<a class="cite" href="https://refactoring.guru/design-patterns/singleton">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-replace-a-singleton.vi.md">Bài tập 8: thay thế một singleton</a></p>
+<p>Ví dụ chạy được: <a href="../examples/SingletonDemo.java"><code>SingletonDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/singleton">Singleton (Refactoring.Guru)</a>. Đọc các phần Intent và Pros and cons.</p>
+<p><a href="0007-prototype.vi.html">← Prototype</a> &nbsp;|&nbsp; <a href="0009-adapter.vi.html">Adapter →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/singleton">Singleton (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Runtime.html">Runtime Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

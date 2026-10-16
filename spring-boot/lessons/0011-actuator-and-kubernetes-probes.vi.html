@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 11: Actuator và Kubernetes probe</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Actuator và Kubernetes probe</h1>
+<p class="meta">Spring Boot · Bài 0011 · bước 11/13 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-actuator-and-kubernetes-probes.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> expose các health endpoint một cách an toàn, và nối các group liveness và readiness của Spring vào Kubernetes probe mà không gây ra restart dây chuyền.</div>
+
+<h2>Endpoint và việc expose</h2>
+<p>Các endpoint của Actuator cho phép bạn giám sát và tương tác với ứng dụng. "Mặc định, chỉ có endpoint health được expose qua HTTP và JMX", tại <code>/actuator/health</code>; mở rộng thêm bằng <code>management.endpoints.web.exposure.include</code>. Trước khi expose thêm, hãy chắc chắn chúng không chứa thông tin nhạy cảm hoặc đã được bảo vệ (firewall hoặc Spring Security).<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+<h2>Kubernetes probe</h2>
+<p>Có sẵn hai health group: <code>/actuator/health/liveness</code> và <code>/actuator/health/readiness</code>; trỏ <code>livenessProbe</code>/<code>readinessProbe</code> của Kubernetes vào đó. Cảnh báo quan trọng nhất trong tài liệu: liveness "không nên phụ thuộc vào health check của các hệ thống bên ngoài": nếu database gặp sự cố, Kubernetes "có thể restart toàn bộ instance của ứng dụng và gây ra sự cố dây chuyền". Readiness thì có thể bao gồm các dependency thiết yếu dùng chung.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+<pre><code>RESULT GET /actuator/health           -&gt; 200 {"groups":["liveness","readiness"],"status":"UP"}
+RESULT GET /actuator/health/liveness  -&gt; 200 {"status":"UP"}
+RESULT GET /actuator/health/readiness -&gt; 200 {"status":"UP"}
+RESULT GET /actuator/env              -&gt; 404          # not exposed
+RESULT GET /actuator/beans            -&gt; 404          # not exposed</code></pre>
+<pre><code>livenessProbe:
+  httpGet: { path: /actuator/health/liveness, port: 8080 }
+readinessProbe:
+  httpGet: { path: /actuator/health/readiness, port: 8080 }</code></pre>
+<p>Demo bật các group này bằng <code>management.endpoint.health.probes.enabled=true</code> (tài liệu nói chúng tự bật khi chạy trên Kubernetes; tôi đặt tường minh để chạy được ngoài cluster). Code: <a href="../examples/demo-app/src/test/java/com/example/demo/ActuatorProbesTest.java"><code>ActuatorProbesTest.java</code></a>. Đọc kèm <a href="../../kubernetes/lessons/0006-probes.vi.html">bài về Kubernetes probe</a>.</p><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mặc định endpoint nào được expose qua HTTP?</p>
+  <button data-correct>Chỉ health</button>
+  <button>Chỉ env</button>
+  <button>Không có gì</button>
+  <button>Mọi endpoint</button>
+  <p class="explain">Mặc định chỉ endpoint health được expose.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Property để expose thêm endpoint?</p>
+  <button>spring.actuator.on</button>
+  <button data-correct>management.endpoints.web.exposure.include</button>
+  <button>management.port.all</button>
+  <button>app.expose</button>
+  <p class="explain">Dùng management.endpoints.web.exposure.include.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Liveness có nên kiểm tra database không?</p>
+  <button>Chỉ vào ban đêm</button>
+  <button>Có, luôn luôn</button>
+  <button>Chỉ với MySQL</button>
+  <button data-correct>Không, tránh hệ thống ngoài</button>
+  <p class="explain">Sự cố bên ngoài có thể làm restart mọi instance và lan thành dây chuyền.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Path của group readiness?</p>
+  <button data-correct>/actuator/health/readiness</button>
+  <button>/status</button>
+  <button>/health/ready</button>
+  <button>/actuator/ready</button>
+  <p class="explain">Readiness nằm ở /actuator/health/readiness.<a class="cite" href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-secure-actuator.vi.md">Bài tập 0011: bảo vệ actuator</a></p>
+<p>Ví dụ chạy được: <a href="../examples/demo-app/src/test/java/com/example/demo/ActuatorProbesTest.java"><code>demo-app/src/test/java/com/example/demo/ActuatorProbesTest.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot: Actuator Endpoints</a>. Phần 'Kubernetes Probes'.</p>
+<p><a href="0006-transaction-propagation.vi.html">← Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</a> &nbsp;|&nbsp; <a href="0012-test-slices-and-springboottest.vi.html">Testing: @SpringBootTest và test slice →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot: Actuator Endpoints</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

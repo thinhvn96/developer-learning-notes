@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 38: Capacity, boxing và chi phí bộ nhớ của collection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Capacity, boxing và chi phí bộ nhớ của collection</h1>
+<p class="subtitle">Vì sao một list một triệu số có thể nặng 19 MB thay vì 4, và hai bug boxing compile mà không có cảnh báo nào.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0038 · bước 20/46 · Senior · ~22 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0038-capacity-boxing-and-memory.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Một service cache mười triệu ID, một batch job hết heap, một test chạy với 100 nhưng hỏng với 1000: đó là chuyện capacity và boxing. Interview Senior hỏi <em>"ArrayList lớn lên thế nào?"</em> và <em>"Vì sao <code>Integer == Integer</code> nguy hiểm?"</em> để xem bạn có nghĩ tới chi phí của code mình không.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> ước lượng chi phí bộ nhớ và resize của các collection thông dụng, giải thích cách ArrayList lớn lên, và tránh bẫy Integer <code>==</code> và <code>remove(int)</code>.</div>
+
+<dl class="words">
+  <dt>capacity</dt><dd>Số ô của mảng bên trong một collection. Size là số ô thật sự đang dùng.</dd>
+  <dt>amortized O(1)</dt><dd>Phần lớn thao tác rẻ, thỉnh thoảng có một thao tác đắt, và tính trung bình mỗi thao tác tốn một lượng hằng số.</dd>
+  <dt>primitive</dt><dd>Một giá trị thuần như <code>int</code> hay <code>long</code>: chỉ là con số, không có object bọc ngoài.</dd>
+  <dt>boxing</dt><dd>Bọc một primitive trong một object, <code>int</code> → <code>Integer</code>, vì collection chỉ chứa được object. Unboxing là chiều ngược lại.</dd>
+  <dt>reference</dt><dd>Địa chỉ của một object. <code>List&lt;Integer&gt;</code> lưu các reference, mỗi cái trỏ tới một object <code>Integer</code> riêng.</dd>
+  <dt>overload</dt><dd>Hai method cùng tên nhưng khác kiểu tham số, như <code>remove(int)</code> và <code>remove(Object)</code>. Compiler chọn một.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Đoán xem: một <code>ArrayList&lt;Integer&gt;</code> chứa một triệu số cần bao nhiêu megabyte, so với một <code>int[]</code> một triệu phần tử? Ghi lại cả hai con số. Phần 3 có số đo thật (thô).</p>
+
+<h2>1. ArrayList lớn lên thế nào</h2>
+<p>Hãy hình dung một gia đình mua bàn ăn. Khi có vị khách thứ năm, họ không thể "nối dài" bàn; họ mua bàn lớn hơn và chuyển toàn bộ chén đĩa sang. Mỗi lần chỉ mua bàn hơn một chỗ thì lần nào có khách cũng phải chuyển đĩa, nên họ mua bàn lớn hơn khoảng một nửa.</p>
+<p><code>ArrayList</code> cũng vậy: bên trong là một mảng thường không lớn lên được. Khi đầy, Java tạo một mảng lớn hơn và copy mọi thứ sang. Javadoc cố ý nói rất ít: "Chi tiết của chính sách tăng trưởng không được quy định, ngoài việc thêm một phần tử có chi phí thời gian hằng số khấu hao."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a> Mã nguồn OpenJDK 21 thì cụ thể: <code>new ArrayList&lt;&gt;()</code> rỗng dùng chung một mảng rỗng và cấp <code>DEFAULT_CAPACITY = 10</code> ở lần add đầu tiên; sau đó mức tăng ưu tiên là <code>oldCapacity &gt;&gt; 1</code>, tức khoảng 1,5 lần.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">OpenJDK source</a></p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Một ArrayList capacity 10 đã đầy. Thêm phần tử thứ 11 sẽ tạo mảng mới 15 ô, copy 10 phần tử, rồi thêm phần tử mới. Còn trống 4 ô.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="26">capacity 10, size 10 (đầy)</text>
+    <g fill="var(--accent-soft)" stroke="currentColor">
+      <rect x="20" y="36" width="36" height="30"/><rect x="56" y="36" width="36" height="30"/><rect x="92" y="36" width="36" height="30"/>
+      <rect x="128" y="36" width="36" height="30"/><rect x="164" y="36" width="36" height="30"/><rect x="200" y="36" width="36" height="30"/>
+      <rect x="236" y="36" width="36" height="30"/><rect x="272" y="36" width="36" height="30"/><rect x="308" y="36" width="36" height="30"/>
+      <rect x="344" y="36" width="36" height="30"/>
+    </g>
+    <text x="400" y="56" fill="var(--accent)">add(thứ 11) → hết chỗ</text>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M200 70v40M195 104l5 6 5-6"/>
+    </g>
+    <text x="212" y="96" font-size="11" fill="var(--accent)">mảng mới: 10 + (10 &gt;&gt; 1) = 15, copy 10 phần tử</text>
+    <text x="20" y="132">capacity 15, size 11</text>
+    <g fill="var(--accent-soft)" stroke="currentColor">
+      <rect x="20" y="142" width="36" height="30"/><rect x="56" y="142" width="36" height="30"/><rect x="92" y="142" width="36" height="30"/>
+      <rect x="128" y="142" width="36" height="30"/><rect x="164" y="142" width="36" height="30"/><rect x="200" y="142" width="36" height="30"/>
+      <rect x="236" y="142" width="36" height="30"/><rect x="272" y="142" width="36" height="30"/><rect x="308" y="142" width="36" height="30"/>
+      <rect x="344" y="142" width="36" height="30"/><rect x="380" y="142" width="36" height="30"/>
+    </g>
+    <g fill="none" stroke="currentColor" opacity=".5">
+      <rect x="416" y="142" width="36" height="30"/><rect x="452" y="142" width="36" height="30"/>
+      <rect x="488" y="142" width="36" height="30"/><rect x="524" y="142" width="36" height="30"/>
+    </g>
+    <text x="398" y="162" text-anchor="middle" font-size="11">mới</text>
+    <text x="488" y="192" text-anchor="middle" font-size="11" opacity=".75">4 ô trống (dư)</text>
+  </g>
+</svg>
+<figcaption>Một lần copy đắt, rồi nhiều lần add rẻ. Trong OpenJDK mỗi mảng mới khoảng 1,5 lần mảng cũ; Javadoc chỉ hứa "thời gian hằng số khấu hao".</figcaption>
+</figure>
+
+<p>Ví dụ in ra các capacity mà quy tắc trong mã nguồn sinh ra (nó tính chúng bằng đúng công thức đó, bắt đầu từ 10):</p>
+<pre><code>$ java -Xmx1g java/examples/collections/CapacityAndBoxing.java
+ArrayList capacities: [10, 15, 22, 33, 49, 73, 109, 163, 244, 366, 549, 823] ...</code></pre>
+<p>Mỗi bước đều copy mảng, vì thế mới gọi là O(1) "khấu hao": tăng theo hệ số nghĩa là tổng lượng copy vẫn tỉ lệ với số phần tử. <strong>Nếu biết trước kích thước:</strong> <code>new ArrayList&lt;&gt;(n)</code> hoặc <code>ensureCapacity</code>, vốn "có thể giảm số lần cấp phát lại từng bước"; <code>trimToSize</code> trả lại phần dư.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+
+<h2>2. Presize một HashMap</h2>
+<p>HashMap gấp đôi mảng bucket khi vượt 75% và chuyển mọi entry (<a href="0030-hashmap-internals.vi.html">bài 0030</a>). Đưa 2.000.000 entry vào một map mặc định sẽ gây nhiều lần resize như vậy. <code>HashMap.newHashMap(n)</code> (JDK 19+, tức có trên 21) định kích thước một lần cho <code>n</code> entry:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<pre><code>HashMap default      : 172 ms     <span class="c">(2,000,000 puts, one rough run)</span>
+HashMap.newHashMap(n):  94 ms</code></pre>
+<p>Hãy coi đây là một lần chạy thô trên một máy laptop, không phải benchmark: số của bạn sẽ khác, và đo đúng cách cần công cụ như JMH. Bài học nằm ở <em>chiều hướng</em>: không resize thì ít việc hơn. Trên JDK 8 và 17 hãy viết <code>new HashMap&lt;&gt;((int) (n / 0.75f) + 1)</code>.</p>
+
+<h2>3. Boxing: chi phí ẩn</h2>
+<p>Hãy nghĩ tới trứng. <code>int[]</code> là một khay trứng: trứng nằm ngay trong khay. <code>List&lt;Integer&gt;</code> là một khay chứa <em>địa chỉ</em>, còn mỗi quả trứng nằm trong một hộp nhỏ riêng ở chỗ khác trong kho. Bạn trả tiền cho khay, cho hộp, và cho quãng đường đi lấy.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="int[] lưu con số trực tiếp trong mảng. ArrayList Integer lưu reference trong mảng, mỗi cái trỏ tới một object Integer riêng. LinkedList Integer thêm một object node cho mỗi phần tử với con trỏ next và prev, cộng object Integer.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="30">int[]</text>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="180" y="14" width="50" height="26"/><rect x="230" y="14" width="50" height="26"/><rect x="280" y="14" width="50" height="26"/>
+    </g>
+    <g text-anchor="middle" fill="var(--accent)"><text x="205" y="32">7</text><text x="255" y="32">8</text><text x="305" y="32">9</text></g>
+    <text x="350" y="32" font-size="11" opacity=".8">giá trị nằm ngay trong mảng</text>
+
+    <text x="20" y="96">ArrayList&lt;Integer&gt;</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="180" y="80" width="50" height="26"/><rect x="230" y="80" width="50" height="26"/><rect x="280" y="80" width="50" height="26"/>
+    </g>
+    <g fill="currentColor"><circle cx="205" cy="93" r="3"/><circle cx="255" cy="93" r="3"/><circle cx="305" cy="93" r="3"/></g>
+    <g fill="none" stroke="currentColor">
+      <path d="M205 96v28"/><path d="M255 96v28"/><path d="M305 96v28"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="180" y="124" width="50" height="24" rx="4"/><rect x="230" y="124" width="50" height="24" rx="4"/><rect x="280" y="124" width="50" height="24" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11" fill="var(--accent)"><text x="205" y="141">Int 7</text><text x="255" y="141">Int 8</text><text x="305" y="141">Int 9</text></g>
+    <text x="350" y="98" font-size="11" opacity=".8">mảng các reference</text>
+    <text x="350" y="141" font-size="11" opacity=".8">+ mỗi phần tử một object Integer</text>
+
+    <text x="20" y="196">LinkedList&lt;Integer&gt;</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="180" y="180" width="70" height="26" rx="4"/><rect x="290" y="180" width="70" height="26" rx="4"/>
+      <path d="M250 190h34M278 185l6 5-6 5"/><path d="M290 200h-34M262 195l-6 5 6 5"/>
+      <path d="M215 206v14"/><path d="M325 206v14"/>
+    </g>
+    <g text-anchor="middle" font-size="11"><text x="215" y="197">node</text><text x="325" y="197">node</text></g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="190" y="220" width="50" height="22" rx="4"/><rect x="300" y="220" width="50" height="22" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11" fill="var(--accent)"><text x="215" y="236">Int 7</text><text x="325" y="236">Int 8</text></g>
+    <text x="380" y="197" font-size="11" opacity=".8">mỗi phần tử một node prev/next</text>
+    <text x="380" y="236" font-size="11" opacity=".8">+ mỗi phần tử một object Integer</text>
+  </g>
+</svg>
+<figcaption>Càng nhiều object cho mỗi phần tử thì càng tốn bộ nhớ và càng phải đi theo con trỏ nhiều hơn. Các ô được tô là con số thật.</figcaption>
+</figure>
+
+<p>Mức tăng heap thô cho 1.000.000 số int, một lần chạy trên JDK 21 (đo bằng <code>Runtime</code>, nên chỉ coi là cỡ độ lớn; số của bạn sẽ khác):</p>
+<pre><code>int[]               ~  4 MB
+ArrayList&lt;Integer&gt;  ~ 19 MB
+LinkedList&lt;Integer&gt; ~ 38 MB
+HashSet&lt;Integer&gt;    ~ 54 MB</code></pre>
+<p>Mức 4 đến 13 lần đó là lý do các đường code nóng và tập dữ liệu lớn trong bộ nhớ dùng mảng primitive, <code>IntStream</code>, hoặc thư viện primitive collection, và là lý do mỗi phần tử một node của <code>LinkedList</code> gây hại (<a href="0002-choosing-a-list.vi.html">bài 0002</a>). <code>HashSet</code> nặng nhất: mỗi phần tử là một node entry của HashMap cộng key đã box, cộng mảng bucket.</p>
+
+<h2>4. Hai bug boxing người phỏng vấn thích</h2>
+<pre><code>Integer a = 127, b = 127, c = 128, d = 128;
+System.out.println(a == b);       <span class="c">// compares references!</span>
+System.out.println(c == d);
+System.out.println(c.equals(d));
+
+List&lt;Integer&gt; nums = new ArrayList&lt;&gt;(List.of(10, 20, 30));
+nums.remove(1);                   <span class="c">// which remove?</span>
+nums.remove(Integer.valueOf(10));</code></pre>
+<pre><code>Integer 127 == 127: true   128 == 128: false   128 equals: true
+remove(1) then remove(Integer.valueOf(10)): [30]</code></pre>
+
+<h3>Bug 1: <code>==</code> trên số đã box</h3>
+<p><code>==</code> trên hai object hỏi "cùng một object?", không phải "cùng một số?". Các giá trị nhỏ tình cờ được dùng chung: JLS chỉ đảm bảo box giống hệt nhau cho giá trị hằng trong khoảng -128..127; "Với các giá trị khác, quy tắc không cho phép bất kỳ giả định nào về identity của các giá trị đã box".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 5.1.7</a> <code>Integer.valueOf</code> nói điều tương tự từ phía thư viện: nó "luôn cache các giá trị trong khoảng -128 tới 127, bao gồm hai đầu, và có thể cache các giá trị khác ngoài khoảng này".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html#valueOf(int)">Integer javadoc</a></p>
+<p>Vì thế bug trốn được qua test: ID từ 1 đến 100 so sánh vẫn đúng, rồi production chạm tới 128. <strong>Cách sửa:</strong> so sánh giá trị đã box bằng <code>equals</code> (hoặc <code>Objects.equals</code> khi một bên có thể null), không bao giờ dùng <code>==</code>.</p>
+
+<h3>Bug 2: <code>remove(1)</code> trên <code>List&lt;Integer&gt;</code></h3>
+<p><code>List</code> có hai method <code>remove</code>: <code>remove(int index)</code> và <code>remove(Object o)</code>. Với <code>remove(1)</code>, compiler chọn method không cần boxing, nên nó xóa <strong>chỉ số</strong> 1 (giá trị 20), không phải giá trị 1.</p>
+<pre><code><span class="c">Step 1  [10, 20, 30].remove(1)                 → removes index 1 → [10, 30]</span>
+<span class="c">Step 2  [10, 30].remove(Integer.valueOf(10))   → removes value 10 → </span><span class="hl">[30]</span></code></pre>
+<p><strong>Cách sửa:</strong> muốn xóa một giá trị, viết <code>remove(Integer.valueOf(x))</code>.</p>
+<p><strong>JDK 8, 17 và 21:</strong> quy tắc boxing như nhau ở cả ba. <code>HashMap.newHashMap</code> cần JDK 19+. Từ JDK 9, constructor <code>new Integer(int)</code> bị deprecated, và được đánh dấu sẽ bị xóa; hãy dùng <code>Integer.valueOf</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html#valueOf(int)">Integer javadoc</a></p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Trong OpenJDK, <code>new ArrayList&lt;&gt;()</code> có capacity bao nhiêu ở lần <code>add</code> đầu tiên?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mười</button>
+    <button class="opt">Mười sáu</button>
+    <button class="opt">Một</button>
+    <button class="opt">Không</button>
+  </div>
+  <div class="why">DEFAULT_CAPACITY = 10, được cấp ở lần add đầu; trước đó list dùng chung một mảng rỗng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một ArrayList của OpenJDK đã đầy. Nó ưu tiên tăng thêm bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Khoảng 1,5 lần</button>
+    <button class="opt">Đúng 2 lần</button>
+    <button class="opt">Thêm một ô</button>
+    <button class="opt">Thêm mười ô</button>
+  </div>
+  <div class="why">grow() dùng oldCapacity &gt;&gt; 1 làm mức tăng ưu tiên: 10 → 15 → 22. Bản thân Javadoc chỉ hứa thời gian hằng số khấu hao.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Integer a = 128, b = 128;</code> Bạn nói được gì về <code>a == b</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không được đảm bảo gì cả</button>
+    <button class="opt">Luôn luôn là true</button>
+    <button class="opt">Không compile được</button>
+    <button class="opt">Ném ra một NPE</button>
+  </div>
+  <div class="why">Identity chỉ được đảm bảo cho -128..127. Trên mức đó, == so hai reference có thể cùng hoặc không cùng một object; hãy dùng equals.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List&lt;Integer&gt; nums = [10, 20, 30]</code>. Sau <code>nums.remove(1)</code>, list là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>[10, 30]</code></button>
+    <button class="opt"><code>[20, 30]</code></button>
+    <button class="opt"><code>[10, 20, 30]</code></button>
+    <button class="opt"><code>[10, 20]</code></button>
+  </div>
+  <div class="why">Overload resolution chọn remove(int index), nên chỉ số 1 (giá trị 20) bị xóa. Dùng remove(Integer.valueOf(x)) để xóa theo giá trị.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>ArrayList&lt;Integer&gt;</code> tốn bộ nhớ gấp mấy lần <code>int[]</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mỗi phần tử là reference tới một object Integer riêng</button>
+    <button class="opt">ArrayList luôn giữ capacity gấp đôi số nó thật sự cần</button>
+    <button class="opt">ArrayList lưu một hash code cạnh từng phần tử một</button>
+    <button class="opt">Kiểu generic được copy thêm một lần lúc runtime do erasure</button>
+  </div>
+  <div class="why">Collection chứa object, nên mỗi int được box thành một Integer riêng, cộng reference tới nó. Lần chạy cho thấy khoảng 4 MB so với 19 MB.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn sẽ đưa 2.000.000 entry vào HashMap trên JDK 21. Cách đơn giản nhất để tránh resize là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>HashMap.newHashMap(2_000_000)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;(2_000_000)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;().trimToSize()</code></button>
+    <button class="opt"><code>new TreeMap&lt;&gt;(2_000_000)</code></button>
+  </div>
+  <div class="why">newHashMap(n) định kích thước bảng cho n mapping, đã tính load factor 0.75. Đối số của constructor là capacity, nên 2.000.000 vẫn resize khi vượt 75%.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Service của bạn giữ hàng triệu con số trong collection và tốn quá nhiều bộ nhớ. Chuyện gì đang xảy ra, và bạn sẽ đổi gì?"</strong> Bấm giờ. Trả lời thành tiếng, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Collection chứa object: mỗi int được box thành một Integer, cộng một reference.</label></li>
+      <li><label><input type="checkbox"> Cỡ độ lớn: int[] ~4 MB, ArrayList ~19 MB, LinkedList ~38 MB, HashSet ~54 MB mỗi triệu.</label></li>
+      <li><label><input type="checkbox"> Cách sửa: mảng primitive, IntStream hoặc thư viện primitive collection ở đường code nóng.</label></li>
+      <li><label><input type="checkbox"> ArrayList lớn lên bằng cách copy (OpenJDK: 10, rồi ~1,5 lần); presize hoặc <code>trimToSize</code>.</label></li>
+      <li><label><input type="checkbox"> HashMap resize ở 75%; presize bằng <code>HashMap.newHashMap(n)</code>.</label></li>
+      <li><label><input type="checkbox"> Bẫy boxing: <code>==</code> chỉ an toàn trong -128..127; <code>remove(int)</code> và <code>remove(Object)</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Nghi phạm đầu tiên là boxing. Collection chỉ chứa được object, nên List Integer lưu một reference cho mỗi phần tử cộng một object Integer riêng. Đo thô thì một triệu số int khoảng 4 MB trong mảng int, khoảng 19 trong ArrayList, 38 trong LinkedList và hơn 50 trong HashSet. Nên ở đường code nóng em chuyển sang mảng primitive, IntStream, hoặc thư viện primitive collection. Thứ hai là tăng trưởng: ArrayList copy mảng khi đầy, trong OpenJDK tăng khoảng một lần rưỡi, còn HashMap gấp đôi khi đầy 75%, nên em presize: new ArrayList với n, hoặc HashMap.newHashMap từ Java 19 trở đi. Boxing còn kéo theo bug: so hai Integer bằng hai dấu bằng chỉ đáng tin trong khoảng âm 128 tới 127, nên em dùng equals, và trên List Integer thì remove(1) xóa chỉ số 1, không phải giá trị 1."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0038-size-the-cache.vi.md">Bài tập 0038: định cỡ cache</a>. Ước lượng trước, rồi mới đo.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/CapacityAndBoxing.java"><code>CapacityAndBoxing.java</code></a> (chạy với <code>-Xmx1g</code>).</p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Câu hỏi cuối của khối này là về thread: <em>"Bốn thread cùng add vào một ArrayList. Chuyện gì xảy ra? Bạn sẽ dùng collection nào thay thế?"</em> <a href="0039-concurrent-collections.vi.html">Bài 0039</a> trả lời bằng một lần chạy thật.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc (JDK 21)</a>. Đọc đoạn về capacity và ensureCapacity/trimToSize; rồi <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 5.1.7</a> về boxing.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao tăng theo hệ số lại là O(1) khấu hao?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0037-map-default-methods.vi.html">← Các method mạnh của Map: merge, compute và cái bẫy</a> &nbsp;|&nbsp; <a href="0039-concurrent-collections.vi.html">Concurrent collection: synchronized, copy-on-write, blocking queue →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, JLS 21 và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">OpenJDK 21 source: ArrayList.java</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 21 §5.1.7 Boxing Conversion</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html">Integer Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

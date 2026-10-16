@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 12: Ingest pipeline: parse ngay bên trong Elasticsearch</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ingest pipeline: parse ngay bên trong Elasticsearch</h1>
+<p class="meta">ELK Stack · Bài 0012 · bước 12/14 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-ingest-pipelines.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> parse nhẹ ngay bên trong Elasticsearch bằng một ingest pipeline, test nó bằng simulate, và biết giới hạn của nó so với Logstash.</div>
+
+<h2>Ingest pipeline là gì</h2>
+<p>Ingest pipeline "cho phép bạn thực hiện các phép biến đổi thông dụng trên dữ liệu trước khi index", như xoá field, tách giá trị text và làm giàu dữ liệu (enrich). Một pipeline là chuỗi các <em>processor</em> chạy tuần tự; sau đó document mới được index. Dùng pipeline qua query parameter <code>pipeline</code>, hoặc đặt làm <code>index.default_pipeline</code> của index; test bằng API <em>simulate</em>.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+<p><strong>Giới hạn:</strong> pipeline xử lý từng document một tại thời điểm nó được index, nên không thể tách document, aggregate trên nhiều document hay sửa dữ liệu đã index (processor <code>enrich</code> cho phép tra cứu ở mức hạn chế).<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+<pre><code>PUT _ingest/pipeline/access   {grok, lowercase, set}
+simulate "10.0.0.7 GET /orders/42 200"
+  -&gt; {client: 10.0.0.7, method: get, path: /orders/42, status: 200, pipeline: access}
+simulate "garbage"
+  -&gt; Provided Grok expressions do not match field value: [garbage]
+PUT weblogs/_doc/1?pipeline=access   then   q=status:200  -&gt; found</code></pre>
+<p>Cú pháp grok <code>%{SYNTAX:SEMANTIC}</code> ở đây giống hệt trong Logstash.<a class="cite" href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">[2]</a> Chọn cái nào là một bài toán đánh đổi (trade-off) trong thiết kế: ingest pipeline không cần thêm service nào; Logstash có nhiều input/output hơn và có buffer (<a href="0006-logstash-grok-and-persistent-queues.vi.html">bài Logstash</a>); các trang tài liệu mình đọc không đưa ra so sánh, nên hãy tự trình bày lập luận của bạn. Script: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Ingest pipeline chạy...?</p>
+  <button>Sau khi search</button>
+  <button>Trong lúc merge</button>
+  <button data-correct>Trước khi index</button>
+  <button>Chỉ trong Kibana</button>
+  <p class="explain">Chúng biến đổi dữ liệu trước khi index.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một pipeline được tạo từ...?</p>
+  <button>Segment</button>
+  <button data-correct>Processor</button>
+  <button>Shard</button>
+  <button>Alias</button>
+  <p class="explain">Pipeline là một chuỗi các processor có thể cấu hình.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Test pipeline an toàn bằng cách nào?</p>
+  <button>Xoá index</button>
+  <button>Restart node</button>
+  <button data-correct>API simulate</button>
+  <button>Bật replica</button>
+  <p class="explain">API simulate pipeline test với các document mẫu.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Pipeline không thể...?</p>
+  <button>Xoá một field</button>
+  <button data-correct>Aggregate trên nhiều document</button>
+  <button>Đổi tên một field</button>
+  <button>Tách text</button>
+  <p class="explain">Nó xử lý từng document một.<a class="cite" href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-write-a-pipeline.vi.md">Bài tập 0012: viết một pipeline</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">Elasticsearch: Ingest pipelines</a>. Processor, simulate, giới hạn.</p>
+<p><a href="0007-filebeat-delivery-and-backpressure.vi.html">← Filebeat: harvester, registry và đảm bảo giao nhận</a> &nbsp;|&nbsp; <a href="0013-data-streams.vi.html">Data stream và rollover →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/manage-data/ingest/transform-enrich/ingest-pipelines">Elasticsearch: Ingest pipelines</a> · [2] <a href="https://www.elastic.co/docs/reference/logstash/plugins/plugins-filters-grok">Logstash: Grok filter</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

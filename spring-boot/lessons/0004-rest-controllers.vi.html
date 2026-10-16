@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 4: REST controller và request mapping</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>REST controller và request mapping</h1>
+<p class="meta">Spring Boot · Bài 0004 · bước 7/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-rest-controllers.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết một REST controller có path variable và mapping HTTP method đúng, và giải thích vì sao các composed annotation được ưu tiên dùng.</div>
+
+<h2>Các annotation mapping viết tắt</h2>
+<p>Spring MVC ánh xạ request tới các method của controller bằng <code>@RequestMapping</code>, và cung cấp các composed annotation <code>@GetMapping</code>, <code>@PostMapping</code>, <code>@PutMapping</code>, <code>@DeleteMapping</code> và <code>@PatchMapping</code>. Chúng được ưu tiên vì phần lớn method của controller nên ánh xạ tới một HTTP method cụ thể, trong khi <code>@RequestMapping</code> đứng một mình thì "mặc định khớp với mọi HTTP method".<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+<pre><code>@RestController
+@RequestMapping("/persons")
+class PersonController {
+
+    @GetMapping("/{id}")
+    public Person getPerson(@PathVariable Long id) { ... }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public void add(@RequestBody Person person) { ... }
+}</code></pre>
+<p>File: <a href="../examples/PersonController.java"><code>PersonController.java</code></a>. <code>@PathVariable</code> bind đoạn <code>{id}</code>; <code>@RequestBody</code> bind body của request vào một object; <code>@ResponseStatus(HttpStatus.CREATED)</code> trả về 201.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+<div class="aside">Góc phỏng vấn: "PUT khác PATCH thế nào, và cái nào idempotent?" là câu hỏi về ngữ nghĩa HTTP, không phải về Spring. Hãy liên hệ với bài về retry: <a href="../../system-design/lessons/0002-retries-and-idempotency.vi.html">retry cần các thao tác idempotent</a>.</div><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Annotation nào chỉ ánh xạ HTTP GET?</p>
+  <button>@RequestBody</button>
+  <button>@ResponseStatus</button>
+  <button data-correct>@GetMapping</button>
+  <button>@PathVariable</button>
+  <p class="explain">@GetMapping là composed annotation dành cho GET.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. @RequestMapping đứng một mình khớp với method nào?</p>
+  <button>Chỉ GET</button>
+  <button>Chỉ POST</button>
+  <button data-correct>Mọi HTTP method</button>
+  <button>Không method nào</button>
+  <p class="explain">Mặc định nó khớp với mọi HTTP method.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cái nào bind đoạn URL <code>{id}</code>?</p>
+  <button>@RestController</button>
+  <button>@GetMapping</button>
+  <button>@RequestBody</button>
+  <button data-correct>@PathVariable</button>
+  <p class="explain">@PathVariable bind một biến trong URI template.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái nào đặt response 201 cho POST?</p>
+  <button>@GetMapping</button>
+  <button data-correct>@ResponseStatus CREATED</button>
+  <button>Chỉ @RequestMapping</button>
+  <button>@PathVariable</button>
+  <p class="explain">@ResponseStatus(HttpStatus.CREATED) đặt status.<a class="cite" href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-design-a-resource-api.vi.md">Bài tập 0004: thiết kế API cho một resource</a></p>
+<p>Ví dụ chạy được: <a href="../examples/PersonController.java"><code>PersonController.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">Spring Framework Reference: Mapping Requests</a>. Sau đó đọc 'Handler Methods' để biết các kiểu tham số.</p>
+<p><a href="0009-configuration-properties-binding.vi.html">← @ConfigurationProperties: cấu hình type-safe</a> &nbsp;|&nbsp; <a href="0010-validation-and-400-errors.vi.html">Bean Validation và response 400 →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html">Spring Framework Reference: Mapping Requests</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@
 <body>
 <main>
 <h1>Kafka: interview questions and answers</h1>
-<p class="meta"><a href="../index.html">Home</a> · Kafka · 11 questions · <a href="index.html">Kafka ladder</a> · <a href="../reference/roadmap.html">Roadmap</a></p>
+<p class="meta"><a href="../index.html">Home</a> · Kafka · 22 questions · <a href="index.html">Kafka ladder</a> · <a href="../reference/roadmap.html">Roadmap</a> · <a class="lang" href="interview.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 <p>Kafka questions for Senior backend interviews. Commands and outputs mentioned come from a throwaway single-node <code>apache/kafka</code> container; production topics should use replication factor 3.</p>
 <p class="controls"><button id="open-all">Expand all</button><button id="close-all">Collapse all</button> Try answering out loud first, then open the answer. Superscript links go to the source that backs the claim.</p>
 <details class="qa">
@@ -26,8 +26,8 @@
 <div class="ans">
 <p><strong>Short answer:</strong> per partition only; events with the same key go to the same partition.</p>
 <p>A topic is spread over partitions on different brokers. Events with the same key are written to the same partition, and consumers of a partition read them in the order written.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> There is no global order across partitions. To keep per-entity order, key by entity id. In my run all three <code>u1</code> events went to one partition.</p>
-<div class="follow"><strong>Likely follow-up:</strong> What happens to per-key ordering if you add partitions later? (Prepare an answer from the docs beyond this course's excerpts; say you would check the docs.)</div>
-<p class="see">Learn it: <a href="lessons/0001-events-topics-partitions.html">Events, topics and partitions</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What happens to per-key ordering if you add partitions later? (The default partitioner's mapping changes and existing data is not moved, so one key's events end up in two partitions; partitions cannot be reduced.)<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[9]</a></div>
+<p class="see">Learn it: <a href="lessons/0001-events-topics-partitions.html">Events, topics and partitions</a> · <a href="lessons/0012-partitioning-and-partition-count.html">Partitioning and partition count</a></p>
 </div>
 </details>
 <details class="qa">
@@ -112,9 +112,109 @@
 </div>
 </details>
 
+<details class="qa">
+<summary><span class="n">12.</span>How do you choose a key and the number of partitions for a topic?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> key by the entity whose events must stay ordered; size partitions for future peak consumer parallelism, because growing later remaps keys and shrinking is impossible.</p>
+<p>The default partitioner hashes the key; keyless records use a sticky partition per batch. Adding partitions changes the key mapping and Kafka does not move existing data; reducing partitions is not supported.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[9]</a> Partitions also cap consumers per group. In my run, keys <code>u1</code>, <code>u3</code>, <code>u6</code> moved from partition 1 to 4 after going from 3 to 6 partitions.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Your keyed topic must grow 4×. How do you migrate? (New topic with more partitions, switch producers, drain the old topic before consumers switch, so a key is never processed by two consumers at once.)</div>
+<p class="see">Learn it: <a href="lessons/0012-partitioning-and-partition-count.html">Partitioning</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Why are rebalances a problem, and how do you reduce them?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> classic rebalances are client-driven and can pause the whole group; use cooperative sticky assignment and static membership, or the new KIP-848 protocol.</p>
+<p><code>group.instance.id</code> makes a consumer a static member, so a quick restart keeps its partitions. KIP-848 (<code>group.protocol=consumer</code>, GA in 4.0) moves assignment to the broker with a fully incremental design and no global synchronization barrier; <code>session.timeout.ms</code> and <code>partition.assignment.strategy</code> are not supported with it.<a class="cite" href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">[10]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> When does the new protocol become the client default? (5.0; in 6.0 the client supports only it.)</div>
+<p class="see">Learn it: <a href="lessons/0015-rebalancing-and-group-protocols.html">Rebalancing</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>A record keeps failing in your consumer. What do you do?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> classify the error; retry transient failures with bounded backoff; send permanent failures (poison pills) to a dead letter topic with error headers; alert and replay.</p>
+<p>In Spring Kafka, <code>DefaultErrorHandler</code> retries (default 9 retries, no delay) then logs; with <code>DeadLetterPublishingRecoverer</code> it publishes to <code>&lt;topic&gt;-dlt</code> on the same partition. Deserialization and conversion errors are fatal by default and are not retried.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[11]</a> Retry topics (<code>@RetryableTopic</code>) keep the partition flowing but give up strict per-key order.</p>
+<div class="follow"><strong>Likely follow-up:</strong> How do you avoid a poison pill crashing the consumer on deserialization? (<code>ErrorHandlingDeserializer</code> around the real deserializer.)</div>
+<p class="see">Learn it: <a href="lessons/0016-error-handling-and-dead-letter-topics.html">Error handling</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>How do you evolve message formats safely?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> schemas in a registry with a compatibility mode; BACKWARD (default) means upgrade consumers first and only add fields with defaults.</p>
+<p>BACKWARD: consumers on the new schema read data written with the last one. FORWARD: old consumers read new data, upgrade producers first. FULL: both. Transitive variants check all earlier versions. Adding a field with a default is fully compatible in Avro and Protobuf.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[12]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why would a compacted topic need BACKWARD_TRANSITIVE? (New consumers replay from the beginning and must read every historic version.)</div>
+<p class="see">Learn it: <a href="lessons/0017-schemas-and-schema-registry.html">Schemas</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">16.</span>What is KRaft and why 3 controllers?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> Kafka's built-in Raft metadata quorum that replaced ZooKeeper; a majority of controllers must be alive, so 3 tolerate 1 failure and 5 tolerate 2.</p>
+<p>Nodes take <code>process.roles</code> broker, controller or both; combined mode is not recommended for critical environments. The last bridge release for migrating from ZooKeeper is 3.9.<a class="cite" href="https://kafka.apache.org/43/operations/kraft/">[13]</a> <code>kafka-metadata-quorum.sh describe --status</code> shows leader, voters and follower lag.</p>
+<div class="follow"><strong>Likely follow-up:</strong> Why not 4 controllers? (A majority of 4 is 3, so it still tolerates only 1 failure.)</div>
+<p class="see">Learn it: <a href="lessons/0019-kraft-and-controllers.html">KRaft</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">17.</span>Which metrics do you alert on for a Kafka cluster?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> under-replicated partitions, under-min-ISR partitions, offline partitions, active controller count, handler/network idle ratios, and consumer lag trend.</p>
+<p>UnderReplicatedPartitions and UnderMinIsrPartitionCount should be 0, exactly one node should report ActiveControllerCount 1, and request handler and network processor idle should stay above 0.3. <code>TotalTimeMs</code> splits latency into queue, local, remote and response time.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[14]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Lag grows but brokers look fine. Next step? (Check processing time per record, max.poll.interval, rebalances, partition skew per consumer.)</div>
+<p class="see">Learn it: <a href="lessons/0020-monitoring-and-operations.html">Monitoring</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">18.</span>Can Kafka work like a queue now? What are share groups?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> yes, since 4.2 share groups (KIP-932) are production-ready: many consumers share one partition, records are locked and acknowledged individually, at the cost of ordering.</p>
+<p>Records are acquired with a time-limited lock (30 s default); consumers ACCEPT, RELEASE, REJECT or RENEW each record; there is a delivery attempt limit (default 5); share groups trade ordering for flexible sharing.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">[15]</a> In my run two share consumers split 20 records from a single partition, 8 and 12.</p>
+<div class="follow"><strong>Likely follow-up:</strong> When would you still choose RabbitMQ? (Rich routing via exchanges, per-message TTL and priorities, existing AMQP ecosystem.)</div>
+<p class="see">Learn it: <a href="lessons/0021-share-groups.html">Share groups</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">19.</span>How do you secure a Kafka cluster?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> TLS for encryption, SASL (SCRAM or OAUTHBEARER) or mTLS for authentication, StandardAuthorizer with least-privilege ACLs, and quotas for noisy clients.</p>
+<p>With an authorizer and no matching ACL only super users get access. <code>kafka-acls.sh --producer</code> / <code>--consumer --group</code> grant the needed operations.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[16]</a> Clients get unlimited quotas by default; set <code>producer_byte_rate</code>, <code>consumer_byte_rate</code> and <code>request_percentage</code> per user.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[9]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> What breaks the moment you enable the authorizer? (Every non-super-user client without ACLs; add ACLs first.)</div>
+<p class="see">Learn it: <a href="lessons/0022-security-and-quotas.html">Security</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">20.</span>How do you survive losing a whole region?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> MirrorMaker 2 (built on Connect) replicates topics and consumer offsets to another cluster; replication is asynchronous, so expect a small data loss window.</p>
+<p>Topologies are active/passive or active/active; mirrored topics are prefixed with the source alias (<code>us-west.foo</code>); consumer offsets are replicated through checkpoints; exactly-once is supported for dedicated MirrorMaker clusters since 3.5.0.<a class="cite" href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">[17]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> How would you cut storage cost for a year of retention? (Tiered storage to object storage, except compacted topics.)</div>
+<p class="see">Learn it: <a href="lessons/0023-multi-cluster-and-tiered-storage.html">Multi-cluster</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">21.</span>Kafka Streams: windows, joins and exactly-once in one answer?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> windowed aggregations with a grace period for late data; equi-joins need co-partitioned inputs; processing.guarantee=exactly_once_v2 makes read-process-write atomic.</p>
+<p>KStream-KStream joins are always windowed; GlobalKTable and foreign-key joins do not need co-partitioning; <code>groupBy</code> always repartitions, and key-changing operations mark the stream for repartitioning.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[18]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why prefer mapValues over map? (No key change, so no repartition topic.)</div>
+<p class="see">Learn it: <a href="lessons/0018-streams-windows-joins-exactly-once.html">Streams windows and joins</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">22.</span>When does Spring Kafka commit offsets, and what does that mean for your listener?</summary>
+<div class="ans">
+<p><strong>Short answer:</strong> auto-commit is disabled; the container commits by AckMode, default BATCH after the whole poll is processed: at-least-once, so the listener must be idempotent.</p>
+<p>RECORD commits per record, MANUAL / MANUAL_IMMEDIATE leave it to <code>Acknowledgment.acknowledge()</code>; <code>concurrency</code> creates one consumer per container and is capped by partitions.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[19]</a></p>
+<div class="follow"><strong>Likely follow-up:</strong> Why is one KafkaProducer shared but one KafkaConsumer per thread? (The producer is thread-safe; the consumer is not.)<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[20]</a></div>
+<p class="see">Learn it: <a href="lessons/0013-spring-kafka.html">Spring Kafka</a> · <a href="lessons/0011-java-producer-and-consumer.html">Java clients</a></p>
+</div>
+</details>
+
 <footer>
   <p><strong>Ask your teacher</strong> for a mock interview: "ask me these Kafka questions one at a time and push back on my answers".</p>
-  <p>Sources: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka: Introduction</a> · [2] <a href="https://kafka.apache.org/43/design/design/">Kafka: Design</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [4] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka: Consumer configs</a> · [5] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka: Producer configs</a> · [6] <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka: Topic configs</a> · [7] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams: core concepts</a> · [8] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect: user guide</a></p>
+  <p>Sources: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka: Introduction</a> · [2] <a href="https://kafka.apache.org/43/design/design/">Kafka: Design</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [4] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka: Consumer configs</a> · [5] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka: Producer configs</a> · [6] <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka: Topic configs</a> · [7] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams: core concepts</a> · [8] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect: user guide</a> · [9] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka: Basic operations</a> · [10] <a href="https://kafka.apache.org/43/operations/consumer-rebalance-protocol/">Kafka: Consumer rebalance protocol</a> · [11] <a href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">Spring Kafka: Handling exceptions</a> · [12] <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">Confluent: Schema evolution</a> · [13] <a href="https://kafka.apache.org/43/operations/kraft/">Kafka: KRaft</a> · [14] <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka: Monitoring</a> · [15] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaShareConsumer.html">KafkaShareConsumer Javadoc</a> · [16] <a href="https://kafka.apache.org/43/security/authorization-and-acls/">Kafka: Authorization and ACLs</a> · [17] <a href="https://kafka.apache.org/43/operations/geo-replication-cross-cluster-data-mirroring/">Kafka: Geo-replication</a> · [18] <a href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">Kafka Streams: DSL API</a> · [19] <a href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">Spring Kafka: Listener containers</a> · [20] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a></p>
 </footer>
 </main>
 <script src="../assets/interview.js"></script>

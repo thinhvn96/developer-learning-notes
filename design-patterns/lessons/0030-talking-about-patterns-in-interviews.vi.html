@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 30: Nói về pattern khi phỏng vấn</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Nói về pattern khi phỏng vấn</h1>
+<p class="meta">Design Patterns · Bài 0030 · bước 30/30 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0030-talking-about-patterns-in-interviews.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> trả lời câu "bạn sẽ dùng pattern nào và vì sao?" theo một cấu trúc đặt vấn đề lên trước và có nhắc đến trade-off.</div>
+
+<h2>Câu trả lời bốn bước</h2>
+<ol><li><strong>Gọi tên vấn đề</strong> bằng lời đơn giản ("thuật toán thay đổi lúc runtime").</li>
+<li><strong>Gọi tên pattern và mục đích của nó</strong> trong một câu (dòng Intent trên trang mô tả pattern là mẫu tốt).<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[2]</a></li>
+<li><strong>Chỉ ra hình dạng</strong>: interface nào, object nào giữ object nào.</li>
+<li><strong>Nêu trade-off</strong>: trang nào cũng liệt kê nhược điểm (thêm class, vấn đề thứ tự, nguy cơ god object...). Nhắc tới phương án đơn giản hơn (một lambda, một enum, một method bình thường).<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li></ol>
+<h2>Những cái bẫy cần tránh</h2>
+<ul><li>Đọc vanh vách tên pattern mà không có vấn đề đi kèm: chính là lời chỉ trích "cái búa và cái đinh".<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li>
+<li>Cài đặt "đúng từng chữ" mà không điều chỉnh theo bối cảnh.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></li>
+<li>Lấy Singleton làm câu trả lời mặc định cho trạng thái dùng chung (cái giá khi test: xem <a href="0008-singleton.vi.html">bài Singleton</a>).</li>
+<li>Dùng kế thừa ở chỗ composition phù hợp hơn (<a href="../../oop/lessons/0011-composition-over-inheritance.vi.html">bài OOP</a>).</li></ul>
+<h2>Luyện tập</h2>
+<p>Dùng <a href="../interview.vi.html">trang phỏng vấn</a> để xem các câu hỏi kèm câu trả lời chi tiết, và chọn hai vấn đề trong chính code của bạn để mô tả theo bốn bước. Nhờ giáo viên phỏng vấn thử: "cho tôi một tình huống, tôi sẽ gọi tên pattern".</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Bước đầu tiên của một câu trả lời tốt về pattern?</p>
+  <button data-correct>Gọi tên vấn đề</button>
+  <button>Liệt kê các class</button>
+  <button>Vẽ UML</button>
+  <button>Gọi tên pattern</button>
+  <p class="explain">Vấn đề trước, pattern sau.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Câu trả lời nào cũng nên có gì?</p>
+  <button>Một benchmark</button>
+  <button>Chỉ một sơ đồ</button>
+  <button data-correct>Một trade-off</button>
+  <button>Tên một library</button>
+  <p class="explain">Trang mô tả pattern có liệt kê nhược điểm; hãy nêu chúng ra.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Câu "cái búa và cái đinh" cảnh báo điều gì?</p>
+  <button data-correct>Dùng không có lý do</button>
+  <button>Interface</button>
+  <button>Class nhỏ</button>
+  <button>Việc test</button>
+  <p class="explain">Áp dụng pattern một cách tràn lan.<a class="cite" href="https://refactoring.guru/design-patterns/criticism">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Phương án đơn giản hơn Strategy?</p>
+  <button>Một queue</button>
+  <button>Một thread</button>
+  <button data-correct>Một lambda</button>
+  <button>Một cache</button>
+  <p class="explain">Với interface chỉ có một method, một lambda thường là đủ.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0030-mock-interview.vi.md">Bài tập 30: phỏng vấn thử</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a>. Trang ngắn.</p>
+<p><a href="0029-patterns-in-spring.vi.html">← Pattern trong Spring</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay về lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/criticism">Criticism of patterns (Refactoring.Guru)</a> · [2] <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern? (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

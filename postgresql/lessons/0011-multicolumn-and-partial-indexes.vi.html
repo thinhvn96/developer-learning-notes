@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 11: Index nhiều cột và partial index</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Index nhiều cột và partial index</h1>
+<p class="meta">PostgreSQL · Bài 0011 · bước 9/13 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-multicolumn-and-partial-indexes.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> sắp xếp thứ tự cột trong một index nhiều cột, và dùng partial index để giữ index nhỏ gọn.</div>
+
+<h2>B-tree nhiều cột</h2>
+<p>Hiệu quả nhất khi có điều kiện trên các cột <em>đứng đầu</em>: "các điều kiện so sánh bằng trên những cột đứng đầu, cộng với điều kiện bất đẳng thức trên cột đầu tiên không có điều kiện so sánh bằng, sẽ luôn được dùng để giới hạn phần index cần quét." Với index trên <code>(a, b, c)</code>: <code>WHERE a = 5 AND b &gt;= 42 AND c &lt; 77</code> là lý tưởng.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a> Các phiên bản gần đây còn có thể áp dụng tối ưu skip scan khi các cột đứng đầu có ít giá trị khác nhau.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a> Cảnh báo: hãy dùng tiết chế; index nhiều hơn ba cột hiếm khi có ích, trừ khi cách dùng cực kỳ cố định.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a></p>
+<h2>Partial index</h2>
+<p>Partial index chỉ bao phủ một tập con các dòng được chọn bởi một điều kiện (predicate). Lợi ích chính của nó là "tránh đánh index cho các giá trị phổ biến": index nhỏ hơn, update nhanh hơn vì không phải lần ghi nào cũng đụng tới nó.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-partial.html">[2]</a></p>
+<pre><code>./run.sh 10-index-types.sql
+CREATE INDEX t_ab   ON t (a, b);                 -- 1352 kB
+CREATE INDEX t_rare ON t (c) WHERE status='rare';-- 64 kB
+EXPLAIN ... WHERE a = 5 AND b = 505      -&gt; Bitmap Index Scan on t_ab
+EXPLAIN ... WHERE b = 505                -&gt; Bitmap Index Scan on t_ab   (a has 100 distinct values)
+EXPLAIN ... WHERE status='rare' AND c=300 -&gt; Index Scan using t_rare</code></pre>
+<p>Plan thứ hai vẫn dùng index dù <code>a</code> không có điều kiện: điều này khớp với ghi chú về skip scan, vì trong dữ liệu này <code>a</code> chỉ có 100 giá trị khác nhau. Đừng trông cậy vào điều đó với những cột có nhiều giá trị khác nhau. Source: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Index trên (a, b, c). Điều kiện nào hữu ích nhất?</p>
+  <button>Chỉ trên c</button>
+  <button data-correct>So sánh bằng trên a</button>
+  <button>Không có điều kiện</button>
+  <button>Chỉ trên b</button>
+  <p class="explain">Điều kiện trên các cột đứng đầu giới hạn phần index cần quét.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lợi ích chính của partial index?</p>
+  <button>Thay cho primary key</button>
+  <button data-correct>Không index giá trị phổ biến</button>
+  <button>Lưu được nhiều cột hơn</button>
+  <button>Chỉ tăng tốc sắp xếp</button>
+  <p class="explain">Nó tránh đánh index cho các giá trị phổ biến, nhờ vậy index nhỏ đi.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-partial.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Khuyến nghị về index có nhiều cột?</p>
+  <button>Mười cột là lý tưởng</button>
+  <button>Không bao giờ dùng</button>
+  <button>Luôn thêm cột nữa</button>
+  <button data-correct>Dùng tiết chế</button>
+  <p class="explain">Index nhiều hơn ba cột khó mà có ích, trừ khi cách dùng cực kỳ cố định.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Trong lần chạy, partial index lớn bao nhiêu?</p>
+  <button>1352 kB</button>
+  <button data-correct>64 kB</button>
+  <button>1 GB</button>
+  <button>64 MB</button>
+  <p class="explain">64 kB, so với 1352 kB của index nhiều cột.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-design-two-indexes.vi.md">Bài tập 0011: thiết kế hai index</a></p>
+<p>Ví dụ chạy được: <a href="../examples/10-index-types.sql"><code>10-index-types.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">PostgreSQL Docs: Multicolumn Indexes</a>. Sau đó đọc Partial Indexes.</p>
+<p><a href="0010-index-types.vi.html">← Các loại index: B-tree, hash, GIN, BRIN</a> &nbsp;|&nbsp; <a href="0005-reading-explain.vi.html">Đọc EXPLAIN và EXPLAIN ANALYZE →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">PostgreSQL Docs: Multicolumn Indexes</a> · [2] <a href="https://www.postgresql.org/docs/current/indexes-partial.html">PostgreSQL Docs: Partial Indexes</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

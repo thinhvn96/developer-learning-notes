@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 28: The Collections Framework map: interfaces and implementations</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>A map of Java collections</h1>
+<p class="subtitle">The interfaces, the classes behind them, and three questions that pick the right one.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0028 · step 6 of 46 · Foundation · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0028-collections-framework-map.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Every backend method passes lists, sets and maps around. Interviewers ask <em>"Which collection would you use here, and why?"</em> and <em>"Is Map a Collection?"</em>. With one clear map in your head, the next lessons (ArrayList, HashMap, TreeMap, …) each fill in one box.</div>
+
+<div class="win"><b>Today's win:</b> draw the collection interface hierarchy from memory and pick an implementation by asking three questions: duplicates? order? keyed lookup?</div>
+
+<dl class="words">
+  <dt>interface</dt><dd>A list of methods a class promises to have. <code>List</code> is an interface: it says what you can do, not how.</dd>
+  <dt>implementation</dt><dd>A real class that keeps that promise with a real data structure, like <code>ArrayList</code> (an array inside).</dd>
+  <dt>element</dt><dd>One item stored in a collection.</dd>
+  <dt>duplicate</dt><dd>Two elements that are <code>equals()</code> to each other. A <code>List</code> allows them; a <code>Set</code> does not.</dd>
+  <dt>insertion order</dt><dd>Elements come back in the order you added them.</dd>
+  <dt>sorted order</dt><dd>Elements come back from smallest to largest, whatever order you added them in.</dd>
+  <dt>view</dt><dd>A live window on another object's data, not a copy. Changes in one show in the other.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Name three collection interfaces and one class for each. Is <code>Map</code> one of the collection interfaces?"</em> Answer before scrolling. You will check it against the diagram in section 2.</p>
+
+<h2>1. The picture: job titles and people</h2>
+<p>A restaurant hires a "cashier". That is a job description: take money, give change. Many different people can do that job. The manager writes the schedule with the job title, not with a person's name, so a new person can take the job without rewriting the schedule.</p>
+<p>In Java, the <strong>interface</strong> is the job title (<code>List</code>) and the <strong>implementation</strong> is the person (<code>ArrayList</code>, <code>LinkedList</code>). The official guide describes the Collections Framework as "a unified architecture for representing and manipulating collections", built from <strong>interfaces</strong> (what you program against), <strong>implementations</strong> (the data structures) and <strong>algorithms</strong> (static methods such as sorting).<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Java SE 21: Collections Framework</a></p>
+<pre><code>List&lt;Order&gt; orders = new ArrayList&lt;&gt;();   <span class="c">// declare the job title</span>
+orders.add(order);
+process(orders);
+
+void process(List&lt;Order&gt; orders) { ... }   <span class="c">// accepts ANY List</span></code></pre>
+<p>You declare <code>List&lt;Order&gt;</code>, not <code>ArrayList&lt;Order&gt;</code>, so the structure can change without touching callers. Notice the <code>&lt;Order&gt;</code>: every collection is generic, as you saw in <a href="0020-generics-basics-and-invariance.html">lesson 0020</a>.</p>
+
+<h2>2. The family tree (JDK 21)</h2>
+<p>At the top is <code>Collection</code>, "The root interface in the collection hierarchy". The JDK does not implement it directly: "it provides implementations of more specific subinterfaces like Set and List".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html">Collection javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Iterable is the parent of Collection. Collection has List, Set and Queue. Set leads to SortedSet then NavigableSet. Queue leads to Deque. Map is a separate root with SortedMap and NavigableMap, and gives Collection views through keySet, values and entrySet. List, Deque, SortedSet and SortedMap are also sequenced types in JDK 21.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="185" y="20" width="120" height="32" rx="6"/>
+      <rect x="185" y="75" width="120" height="32" rx="6"/>
+      <rect x="185" y="135" width="120" height="32" rx="6"/>
+      <rect x="350" y="135" width="120" height="32" rx="6"/>
+      <rect x="185" y="255" width="120" height="32" rx="6"/>
+      <rect x="515" y="75" width="120" height="32" rx="6"/>
+      <rect x="515" y="195" width="120" height="32" rx="6"/>
+      <path d="M245 52V75"/>
+      <path d="M245 107V121H70V135M245 121V135M245 121H410V135"/>
+      <path d="M245 167V195M245 227V255M410 167V195"/>
+      <path d="M575 107V135M575 167V195"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="10" y="135" width="120" height="32" rx="6"/>
+      <rect x="185" y="195" width="120" height="32" rx="6"/>
+      <rect x="350" y="195" width="120" height="32" rx="6"/>
+      <rect x="515" y="135" width="120" height="32" rx="6"/>
+    </g>
+    <path d="M515 91H311" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <path d="M317 86l-6 5 6 5" fill="none" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="245" y="41">Iterable</text>
+      <text x="245" y="96">Collection</text>
+      <text x="70" y="156" fill="var(--accent)">List</text>
+      <text x="245" y="156">Set</text>
+      <text x="410" y="156">Queue</text>
+      <text x="245" y="216" fill="var(--accent)">SortedSet</text>
+      <text x="410" y="216" fill="var(--accent)">Deque</text>
+      <text x="245" y="276">NavigableSet</text>
+      <text x="575" y="96">Map</text>
+      <text x="575" y="156" fill="var(--accent)">SortedMap</text>
+      <text x="575" y="216">NavigableMap</text>
+      <text x="575" y="62" font-size="11" opacity=".75">separate root</text>
+      <text x="413" y="82" font-size="10" fill="var(--accent)">keySet() values() entrySet()</text>
+      <text x="70" y="186" font-size="11" opacity=".75">index, duplicates</text>
+      <text x="410" y="246" font-size="11" opacity=".75">both ends</text>
+    </g>
+    <rect x="20" y="304" width="14" height="14" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="42" y="316" font-size="11">also a SequencedCollection / SequencedMap: first, last, reversed (new in JDK 21)</text>
+  </g>
+</svg>
+<figcaption>The collection interfaces. <code>Map</code> stands apart; the dashed arrow shows that it hands out collection <em>views</em>.</figcaption>
+</figure>
+
+<p>The package documentation describes the important boxes:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary</a></p>
+<ul>
+  <li><strong>List</strong>: ordered, access by index, duplicates allowed.</li>
+  <li><strong>Set</strong>: no duplicates. A <code>SortedSet</code> provides "a total ordering on its elements"; a <code>NavigableSet</code> adds "navigation methods reporting closest matches".</li>
+  <li><strong>Queue / Deque</strong>: a <code>Deque</code> supports "insertion and removal at both ends".</li>
+  <li><strong>Map</strong>: keys to values, with <code>SortedMap → NavigableMap</code> for sorted keys.</li>
+</ul>
+
+<h3>Is a Map a Collection?</h3>
+<p>No. This is a favourite trick question. <code>Map</code> is "An object that maps keys to values", and it does not extend <code>Collection</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a> Instead it gives you collections to look through: "The Map interface provides three collection views, which allow a map's contents to be viewed as a set of keys, collection of values, or set of key-value mappings." Those are <code>keySet()</code>, <code>values()</code> and <code>entrySet()</code>.</p>
+
+<h3>JDK 8 versus 21: sequenced collections</h3>
+<p>JDK 21 added three interfaces: <code>SequencedCollection</code>, <code>SequencedSet</code> and <code>SequencedMap</code>. A sequenced collection is "A collection that has a well-defined encounter order, that supports operations at both ends, and that is reversible." It brings methods such as <code>getFirst()</code>, <code>getLast()</code> and <code>reversed()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/SequencedCollection.html">SequencedCollection javadoc</a> On JDK 8 and 17 these interfaces do not exist; you write <code>list.get(list.size() - 1)</code> instead of <code>list.getLast()</code>.</p>
+
+<h2>3. What each class really is</h2>
+<p>The example program creates one object of each common class and asks Java which interfaces it implements:</p>
+<pre><code>$ java java/examples/collections/FrameworkMap.java
+ArrayList          List, SequencedCollection, RandomAccess
+LinkedList         List, Queue, Deque, SequencedCollection
+ArrayDeque         Queue, Deque, SequencedCollection
+PriorityQueue      Queue
+HashSet            Set
+LinkedHashSet      Set, SequencedCollection
+TreeSet            Set, SortedSet, NavigableSet, SequencedCollection
+HashMap            Map
+LinkedHashMap      Map, SequencedMap
+TreeMap            Map, NavigableMap, SequencedMap
+ConcurrentHashMap  Map</code></pre>
+<p>Read it as a decision table, step by step:</p>
+<ol class="steps">
+  <li><strong>The prefix tells you the order.</strong> <code>HashSet</code> and <code>HashMap</code> promise no order at all. The <code>Linked*</code> variants keep insertion order. The <code>Tree*</code> ones keep sorted order. That is why only <code>LinkedHashSet</code>, <code>TreeSet</code>, <code>LinkedHashMap</code> and <code>TreeMap</code> are sequenced.</li>
+  <li><strong><code>RandomAccess</code> marks fast <code>get(i)</code>.</strong> Only <code>ArrayList</code> has it: an array can jump to slot <em>i</em>, a linked list must walk.</li>
+  <li><strong><code>LinkedList</code> is two things.</strong> It is a <code>List</code> and a <code>Deque</code>. <a href="0002-choosing-a-list.html">Lesson 0002</a> explains why <code>ArrayDeque</code> is usually the better deque.</li>
+  <li><strong><code>PriorityQueue</code> is only a <code>Queue</code>.</strong> It is not ordered from first to last; it only promises to hand out the smallest element next.</li>
+</ol>
+
+<h2>4. Three questions pick the structure</h2>
+<p>Think of a doctor asking a few questions before choosing a medicine. You ask three: <em>Do I look things up by a key? Must elements be unique? What order do I need?</em></p>
+
+<figure>
+<svg viewBox="0 0 680 285" role="img" aria-label="Decision tree. Look up by key? Yes leads to HashMap, LinkedHashMap or TreeMap. No leads to: unique only? Yes leads to HashSet, LinkedHashSet or TreeSet. No leads to ArrayList, ArrayDeque or PriorityQueue. Defaults are ArrayList, HashSet and HashMap.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="240" y="16" width="200" height="34" rx="17"/>
+      <rect x="130" y="72" width="200" height="30" rx="15"/>
+      <path d="M440 33H565V104M560 98l5 6 5-6"/>
+      <path d="M340 50V61H230V72"/>
+      <path d="M130 87H115V104M110 98l5 6 5-6"/>
+      <path d="M330 87H340V104M335 98l5 6 5-6"/>
+      <rect x="20" y="172" width="190" height="32" rx="5"/><rect x="20" y="214" width="190" height="32" rx="5"/>
+      <rect x="245" y="172" width="190" height="32" rx="5"/><rect x="245" y="214" width="190" height="32" rx="5"/>
+      <rect x="470" y="172" width="190" height="32" rx="5"/><rect x="470" y="214" width="190" height="32" rx="5"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="20" y="130" width="190" height="32" rx="5"/>
+      <rect x="245" y="130" width="190" height="32" rx="5"/>
+      <rect x="470" y="130" width="190" height="32" rx="5"/>
+    </g>
+    <g text-anchor="middle" font-size="12">
+      <text x="340" y="38">look up by a key?</text>
+      <text x="230" y="92">unique elements only?</text>
+    </g>
+    <g text-anchor="middle">
+      <text x="500" y="27">yes</text>
+      <text x="346" y="59" text-anchor="start" opacity=".75">no</text>
+      <text x="100" y="82">yes</text>
+      <text x="354" y="82">no</text>
+      <text x="115" y="124" opacity=".75">a Set, by order:</text>
+      <text x="340" y="124" opacity=".75">a List or Queue:</text>
+      <text x="565" y="124" opacity=".75">a Map, by order:</text>
+    </g>
+    <g fill="var(--accent)">
+      <text x="32" y="150">HashSet: no order</text>
+      <text x="257" y="150">ArrayList: by index</text>
+      <text x="482" y="150">HashMap: no order</text>
+    </g>
+    <text x="32" y="192">LinkedHashSet: insertion</text>
+    <text x="32" y="234">TreeSet: sorted</text>
+    <text x="257" y="192">ArrayDeque: both ends</text>
+    <text x="257" y="234">PriorityQueue: min first</text>
+    <text x="482" y="192">LinkedHashMap: insertion</text>
+    <text x="482" y="234">TreeMap: sorted, ranges</text>
+    <text x="340" y="272" text-anchor="middle" fill="var(--accent)">highlighted = the default; move down only when you need that property</text>
+  </g>
+</svg>
+<figcaption>Two yes/no questions choose the family; the order you need chooses the class.</figcaption>
+</figure>
+
+<p>The same choices as a table, with the lesson that covers each one:</p>
+<table>
+<tr><th>Need</th><th>Default choice</th><th>Lesson</th></tr>
+<tr><td>Ordered sequence, index access</td><td><code>ArrayList</code></td><td><a href="0002-choosing-a-list.html">0002</a></td></tr>
+<tr><td>Queue or stack</td><td><code>ArrayDeque</code></td><td><a href="0002-choosing-a-list.html">0002</a></td></tr>
+<tr><td>No duplicates, fast contains</td><td><code>HashSet</code> (order: <code>LinkedHashSet</code>, sorted: <code>TreeSet</code>)</td><td><a href="0033-hashset-linkedhashmap-and-lru.html">0033</a></td></tr>
+<tr><td>Lookup by key</td><td><code>HashMap</code> (order: <code>LinkedHashMap</code>, sorted/range: <code>TreeMap</code>)</td><td><a href="0030-hashmap-internals.html">0030</a>, <a href="0034-treemap-and-navigable-maps.html">0034</a></td></tr>
+<tr><td>Always take the smallest/largest next</td><td><code>PriorityQueue</code></td><td><a href="0035-priorityqueue-and-top-k.html">0035</a></td></tr>
+<tr><td>Shared between threads</td><td><code>ConcurrentHashMap</code>, <code>BlockingQueue</code>, ...</td><td><a href="0039-concurrent-collections.html">0039</a></td></tr>
+</table>
+<p>Trace one example: <em>"Store user IDs we have already emailed, so we never email twice."</em></p>
+<pre><code><span class="c">Step 1  look up by a key?   no, we only ask "have we seen this ID?"</span>
+<span class="c">Step 2  unique only?        yes, an ID is either there or not</span>
+<span class="c">Step 3  order needed?       no</span>
+Set&lt;Long&gt; emailed = new HashSet&lt;&gt;();
+emailed.add(id);   <span class="hl">// returns false if id was already there</span></code></pre>
+
+<h2>5. Trap: "optional" operations</h2>
+<p>Some interface methods are "optional": an implementation may throw <code>UnsupportedOperationException</code> instead of supporting them, and the Javadoc marks each one "(optional operation)".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> That is how unmodifiable collections fit the same interfaces:</p>
+<pre><code>List&lt;String&gt; names = List.of("Ann", "Bob");
+names.add("Cid");     <span class="hl">// UnsupportedOperationException</span></code></pre>
+<p>The type says <code>List</code>, so the code compiles; the object refuses at run time. <a href="0032-unmodifiable-vs-immutable.html">Lesson 0032</a> covers this in detail.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Does <code>Map</code> extend <code>Collection</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, it is a separate root that offers collection views</button>
+    <button class="opt">Yes, it extends Collection through the Set interface</button>
+    <button class="opt">Yes, it extends Collection through the List interface</button>
+    <button class="opt">Only HashMap does; TreeMap is a separate root interface</button>
+  </div>
+  <div class="why"><code>Map</code> holds key-value pairs; <code>keySet()</code>, <code>values()</code> and <code>entrySet()</code> are collection views.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which of these keeps its elements sorted?</p>
+  <div class="options">
+    <button class="opt" data-correct>TreeSet</button>
+    <button class="opt">LinkedHashSet</button>
+    <button class="opt">HashSet</button>
+    <button class="opt">ArrayDeque</button>
+  </div>
+  <div class="why"><code>TreeSet</code> implements <code>NavigableSet</code>, a <code>SortedSet</code>. <code>LinkedHashSet</code> keeps insertion order, not sorted order.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which list implements <code>RandomAccess</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayList</button>
+    <button class="opt">LinkedList</button>
+    <button class="opt">PriorityQueue</button>
+    <button class="opt">ArrayDeque</button>
+  </div>
+  <div class="why">Only <code>ArrayList</code> printed <code>RandomAccess</code> in the run above: an array jumps straight to index <em>i</em>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What happens when you call a mutator that the collection does not support, like <code>List.of("a").add("b")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>UnsupportedOperationException</button>
+    <button class="opt">IllegalStateException</button>
+    <button class="opt">ClassCastException</button>
+    <button class="opt">NullPointerException</button>
+  </div>
+  <div class="why">Optional operations throw <code>UnsupportedOperationException</code> when not supported.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You must keep page visits in the order they happened and never store the same URL twice. Which class?</p>
+  <div class="options">
+    <button class="opt" data-correct>LinkedHashSet</button>
+    <button class="opt">HashSet</button>
+    <button class="opt">TreeSet</button>
+    <button class="opt">ArrayList</button>
+  </div>
+  <div class="why">Unique → a Set; insertion order → the <code>Linked</code> variant. <code>TreeSet</code> would sort the URLs alphabetically.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why declare a parameter as <code>List&lt;Order&gt;</code> instead of <code>ArrayList&lt;Order&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Callers can pass any List, and you can swap the class later</button>
+    <button class="opt">List is faster than ArrayList because it has less code inside</button>
+    <button class="opt">ArrayList cannot be used as a method parameter type in Java</button>
+    <button class="opt">List makes the collection thread-safe for all of its callers</button>
+  </div>
+  <div class="why">Program against the interface (the job title), not the implementation (the person).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is new in JDK 21 for <code>List</code>, <code>Deque</code> and <code>LinkedHashMap</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Sequenced interfaces: getFirst(), getLast(), reversed()</button>
+    <button class="opt">They became thread-safe by default without extra locks</button>
+    <button class="opt">They now keep their elements sorted like TreeSet does</button>
+    <button class="opt">They moved from java.util to a new java.collections package</button>
+  </div>
+  <div class="why"><code>SequencedCollection</code> and <code>SequencedMap</code> (since 21) add operations at both ends and a reversed view.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Give me an overview of the Java Collections Framework, and how you choose a collection."</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Interfaces, implementations and algorithms; I program against the interface.</label></li>
+      <li><label><input type="checkbox"> <code>Collection</code> is the root; <code>List</code>, <code>Set</code> and <code>Queue</code>/<code>Deque</code> extend it.</label></li>
+      <li><label><input type="checkbox"> <code>Map</code> is not a <code>Collection</code>; it gives views: <code>keySet</code>, <code>values</code>, <code>entrySet</code>.</label></li>
+      <li><label><input type="checkbox"> Order: Hash = none, Linked = insertion, Tree = sorted.</label></li>
+      <li><label><input type="checkbox"> Choosing: key lookup → Map; unique → Set; otherwise List or Deque; defaults ArrayList, HashSet, HashMap.</label></li>
+      <li><label><input type="checkbox"> JDK 21 adds sequenced interfaces; unsupported optional operations throw <code>UnsupportedOperationException</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"The Collections Framework is a set of interfaces, implementations and algorithms. I code against the interfaces, like <code>List</code> or <code>Map</code>, so I can change the implementation later. <code>Collection</code> is the root, with <code>List</code> for ordered sequences with duplicates, <code>Set</code> for unique elements, and <code>Queue</code> and <code>Deque</code> for queues and stacks. <code>Map</code> is separate: it's not a Collection, but it gives me views through <code>keySet</code>, <code>values</code> and <code>entrySet</code>. To choose, I ask: do I look up by key? Then a Map. Must elements be unique? Then a Set. Otherwise a List or Deque. Then the order decides the class: Hash for no order, Linked for insertion order, Tree for sorted. My defaults are ArrayList, HashSet and HashMap. In JDK 21 there are also sequenced interfaces with <code>getFirst</code> and <code>reversed</code>."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0028-pick-the-structure.md">Exercise 0028: pick the structure</a>. For each case, say your three answers (key? unique? order?) before naming a class.</p>
+<p>Runnable example: <a href="../examples/collections/FrameworkMap.java"><code>FrameworkMap.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer will zoom in on one box: <em>"ArrayList or LinkedList? How does HashMap work inside? When would you use a TreeMap?"</em> Start with the lists in <a href="0002-choosing-a-list.html">lesson 0002</a>, then <a href="0030-hashmap-internals.html">HashMap internals</a> and <a href="0034-treemap-and-navigable-maps.html">TreeMap</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Java SE 21 Core Libraries: Java Collections Framework</a>. Short page; then open the Collections Framework section of the java.util package summary.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What is Iterable for?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0040-review-fundamentals.html">← Review 1: strings, exceptions and generics</a> &nbsp;|&nbsp; <a href="0002-choosing-a-list.html">ArrayList, LinkedList or ArrayDeque? →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/core/java-collections-framework.html">Java SE 21 Core Libraries: Java Collections Framework</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/package-summary.html">java.util package summary (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html">Collection Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/SequencedCollection.html">SequencedCollection Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

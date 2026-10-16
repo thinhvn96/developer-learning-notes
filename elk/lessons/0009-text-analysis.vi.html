@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 9: Text analysis: analyzer và token</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Text analysis: analyzer và token</h1>
+<p class="meta">ELK Stack · Bài 0009 · bước 4/14 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-text-analysis.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được analyzer làm gì lúc index và lúc search, và tận mắt thấy các token mà một field text sinh ra.</div>
+
+<h2>Analysis là gì</h2>
+<p>"Text analysis là quá trình chuyển văn bản phi cấu trúc ... thành một định dạng có cấu trúc, được tối ưu cho việc tìm kiếm." Một analyzer điều khiển những gì xảy ra trước khi tách token (tokenization), cách văn bản biến thành token, và cách token được chuẩn hoá. Elasticsearch analyze các field <code>text</code> khi index <em>và</em> khi search; áp cùng một bộ quy tắc lên chuỗi query giúp các term khớp với nhau. Mặc định là analyzer <code>standard</code>, thứ "hoạt động tốt cho hầu hết các use case".<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[1]</a></p>
+<h2>Kiểm tra bằng _analyze</h2>
+<pre><code>POST _analyze {"analyzer":"standard","text":"Connection Timeout to payment-service!"}
+['connection', 'timeout', 'to', 'payment', 'service']
+
+POST _analyze {"analyzer":"keyword","text":"Connection Timeout"}
+['Connection Timeout']</code></pre>
+<p>Analyzer standard đã chuyển về chữ thường, tách theo dấu câu và bỏ dấu <code>!</code>; analyzer keyword thì giữ nguyên một token. Đây chính là lý do <code>term</code> query trên field <code>text</code> hay làm người ta bất ngờ (<a href="0005-query-dsl-term-match-bool.vi.html">bài 5</a>) và là lý do field <code>keyword</code> tồn tại. Script: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a>.</p>
+<div class="aside">Câu nói khi phỏng vấn: "Full-text search khớp trên các token đã được analyze, lọc chính xác thì dùng field keyword, và tôi kiểm tra các token sinh ra bằng <code>_analyze</code>."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Elasticsearch analyze field text khi nào?</p>
+  <button data-correct>Lúc index và lúc search</button>
+  <button>Chỉ lúc search</button>
+  <button>Chỉ lúc index</button>
+  <button>Không bao giờ</button>
+  <p class="explain">Analysis diễn ra khi index hoặc search các field text.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Analyzer mặc định?</p>
+  <button>simple</button>
+  <button data-correct>standard</button>
+  <button>keyword</button>
+  <button>whitespace</button>
+  <p class="explain">Analyzer standard là mặc định.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Analyzer keyword cho ra gì với 'Connection Timeout'?</p>
+  <button>Ba token</button>
+  <button data-correct>Một token</button>
+  <button>Không token nào</button>
+  <button>Hai token</button>
+  <p class="explain">Trong lần chạy, nó giữ cả giá trị thành một token duy nhất.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. API nào cho xem các token?</p>
+  <button>_bulk</button>
+  <button>_refresh</button>
+  <button>_rollover</button>
+  <button data-correct>_analyze</button>
+  <p class="explain">POST _analyze đã trả về các token trong demo.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-inspect-tokens.vi.md">Bài tập 0009: soi các token</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">Elasticsearch: Text analysis</a>. Trang tổng quan.</p>
+<p><a href="0002-documents-indices-and-mappings.vi.html">← Document, index và mapping</a> &nbsp;|&nbsp; <a href="0003-shards-and-replicas.vi.html">Shard và replica →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/manage-data/data-store/text-analysis">Elasticsearch: Text analysis</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

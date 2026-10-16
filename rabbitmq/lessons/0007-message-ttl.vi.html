@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 7: Message TTL: hết hạn theo queue và theo từng message</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Message TTL: hết hạn theo queue và theo từng message</h1>
+<p class="meta">RabbitMQ · Bài 0007 · bước 5/9 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-message-ttl.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> cho message hết hạn bằng queue TTL hoặc per-message TTL, biết message hết hạn đi đâu và nắm được lưu ý về đầu queue (head-of-queue).</div>
+
+<h2>Hai cách</h2>
+<ul><li><strong>Message TTL theo queue</strong>: queue argument <code>x-message-ttl</code> (hoặc một policy), áp dụng cho mọi message trong queue.</li>
+<li><strong>Per-message TTL</strong>: thuộc tính <code>expiration</code> đặt lúc publish. Nếu có cả hai, "giá trị nhỏ hơn trong hai giá trị sẽ được chọn".<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></li></ul>
+<h2>Message hết hạn sẽ đi đâu</h2>
+<p>Quorum queue dead-letter các message hết hạn khi chúng tới đầu queue; classic queue làm việc đó khi message ở đầu queue hoặc khi nhận được thông báo thay đổi policy. Hết hạn là một trong bốn lý do dead-letter, nên một DLX có thể hứng các message này.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a><a class="cite" href="https://www.rabbitmq.com/docs/dlx">[2]</a></p>
+<p><strong>Lưu ý (classic queue, per-message TTL):</strong> "message đã hết hạn có thể nằm chờ phía sau những message chưa hết hạn cho tới khi các message kia được consume hoặc hết hạn", nên tài nguyên của chúng chưa được giải phóng; tài liệu gợi ý dùng queue TTL nếu bạn cần dọn dẹp ngay lập tức.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+<pre><code>cd rabbitmq/examples &amp;&amp; ./02-ttl-and-streams.sh
+per-queue TTL 2000 ms + DLX:  right after publish q.ttl=2 q.expired=0 ; after 4 s q.ttl=0 q.expired=2
+per-message expiration=1000:  queue depth after 3 s = 1   (the message without TTL is still there)</code></pre>
+<p>Mã nguồn: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a>. TTL + DLX là nền tảng cho các queue retry có độ trễ (bài tập trong <a href="0005-dead-letter-exchanges.vi.html">bài DLX</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Tên argument cho queue TTL?</p>
+  <button>x-retention</button>
+  <button>x-max-age</button>
+  <button data-correct>x-message-ttl</button>
+  <button>x-expires-at</button>
+  <p class="explain">Message TTL theo queue dùng x-message-ttl.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Đặt cả hai loại TTL. Loại nào được áp dụng?</p>
+  <button>Giá trị lớn hơn</button>
+  <button>Giá trị của queue</button>
+  <button data-correct>Giá trị nhỏ hơn</button>
+  <button>Giá trị của message</button>
+  <p class="explain">Giá trị nhỏ hơn trong hai giá trị sẽ được chọn.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Message hết hạn có thể đi tới...?</p>
+  <button data-correct>Một dead letter exchange</button>
+  <button>Publisher</button>
+  <button>Một stream</button>
+  <button>Default exchange</button>
+  <p class="explain">Hết hạn là một lý do dead-letter.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lưu ý về per-message TTL trên classic queue?</p>
+  <button data-correct>Message hết hạn chờ tới đầu queue</button>
+  <button>Queue bị xoá</button>
+  <button>Message bị nhân bản</button>
+  <button>TTL bị bỏ qua</button>
+  <p class="explain">Message hết hạn có thể nằm sau các message chưa hết hạn cho tới khi chúng tới đầu queue.<a class="cite" href="https://www.rabbitmq.com/docs/ttl">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-delay-queue.vi.md">Bài tập 0007: một delay queue</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-ttl-and-streams.sh"><code>02-ttl-and-streams.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/ttl">RabbitMQ: Time-To-Live and Expiration</a>. Đọc cả phần message TTL lẫn queue TTL.</p>
+<p><a href="0004-publisher-confirms-and-durability.vi.html">← Publisher confirm và độ bền dữ liệu</a> &nbsp;|&nbsp; <a href="0005-dead-letter-exchanges.vi.html">Dead letter exchange →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/ttl">RabbitMQ: Time-To-Live and Expiration</a> · [2] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

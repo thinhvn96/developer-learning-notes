@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 4: Stream và Optional</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Stream và Optional, tránh các cái bẫy</h1>
+<p class="subtitle">Stream là băng chuyền chỉ chạy khi có người ở cuối kéo. Optional là một chiếc hộp có thể rỗng.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0004 · bước 25/46 · Core · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-streams-and-optional.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Stream có mặt khắp nơi trong service Java hiện đại: lọc đơn hàng, map sang DTO, cộng tổng tiền. Interviewer rất thích các câu đố nhỏ kiểu "đoạn này in ra gì?" về stream, vì đáp án thường là <em>không in gì cả</em>. Họ cũng hỏi <em>"Nên dùng Optional thế nào?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> đoán đúng một stream pipeline in ra gì (hoặc không in gì), giải thích vì sao stream không dùng lại được, và chọn đúng giữa <code>orElse</code> và <code>orElseGet</code>.</div>
+
+<dl class="words">
+  <dt>stream</dt><dd>Một dòng phần tử chảy qua một lần để bạn xử lý từng bước. Nó không phải list; nó không lưu gì cả.</dd>
+  <dt>source</dt><dd>Nơi các phần tử đến từ đó: một list, một mảng, một file.</dd>
+  <dt>pipeline</dt><dd>Chuỗi các bước: source, rồi không hoặc nhiều bước giữa, rồi một bước cuối.</dd>
+  <dt>intermediate operation</dt><dd>Bước giữa như <code>filter</code> hay <code>map</code>. Nó trả về stream mới và chỉ <em>mô tả</em> công việc.</dd>
+  <dt>terminal operation</dt><dd>Bước cuối như <code>toList()</code>, <code>count()</code> hay <code>forEach</code>. Nó tạo ra kết quả và khởi động công việc.</dd>
+  <dt>lazy</dt><dd>"Chưa làm cho tới khi cần." Công việc chờ tới khi có người hỏi kết quả.</dd>
+  <dt>side effect</dt><dd>Khi một lambda thay đổi thứ gì đó bên ngoài nó, như thêm vào một list hay in ra màn hình.</dd>
+  <dt>Optional</dt><dd>Một chiếc hộp nhỏ chứa đúng một giá trị hoặc không chứa gì. Nó làm cho "không có kết quả" hiện rõ trong kiểu trả về của method.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"<code>List.of(1, 2, 3).stream().peek(System.out::println).map(x -&gt; x * 2);</code> in ra gì?"</em> Chốt một đáp án trước khi đọc tiếp.</p>
+
+<h2>1. Hình dung: băng chuyền có nút khởi động ở cuối</h2>
+<p>Hãy hình dung một băng chuyền trong nhà máy. Ở đầu là thùng linh kiện (<span class="term">source</span>). Dọc băng chuyền là các trạm: một trạm loại bỏ linh kiện hỏng (<code>filter</code>), một trạm sơn từng linh kiện (<code>map</code>). Ở cuối cùng có một công nhân đóng gói kết quả (<span class="term">terminal operation</span>).</p>
+<p>Điểm lạ là: <strong>băng chuyền không có công tắc ở đầu.</strong> Dựng các trạm lên thì chưa có gì xảy ra. Băng chuyền chỉ chạy khi công nhân ở cuối kéo linh kiện tiếp theo. Không có công nhân ở cuối thì không có gì chuyển động.</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Stream pipeline như một băng chuyền: source List.of(1,2,3), các trạm peek và map, và terminal toList. Terminal operation kéo từng phần tử đi qua toàn bộ băng chuyền, từng cái một.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <path d="M150 66C150 30 560 30 560 66" fill="none" stroke="var(--accent)"/>
+    <path d="M144 58l6 9 6-9" fill="none" stroke="var(--accent)"/>
+    <text x="355" y="26" text-anchor="middle" font-size="11" fill="var(--accent)">toList() kéo: 1 đi hết băng, rồi 2, rồi 3</text>
+    <rect x="20" y="80" width="130" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="85" y="102" text-anchor="middle">source</text>
+    <text x="85" y="120" text-anchor="middle" font-size="11">List.of(1,2,3)</text>
+    <path d="M150 105h40M310 105h40M470 105h40" stroke="currentColor" stroke-width="3" opacity=".35"/>
+    <rect x="190" y="80" width="120" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="250" y="102" text-anchor="middle">peek(print)</text>
+    <text x="250" y="120" text-anchor="middle" font-size="11" opacity=".75">intermediate</text>
+    <rect x="350" y="80" width="120" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="410" y="102" text-anchor="middle">map(x*2)</text>
+    <text x="410" y="120" text-anchor="middle" font-size="11" opacity=".75">intermediate</text>
+    <rect x="510" y="80" width="150" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="585" y="102" text-anchor="middle" fill="var(--accent)">toList()</text>
+    <text x="585" y="120" text-anchor="middle" font-size="11" fill="var(--accent)">terminal</text>
+    <path d="M30 160h620" stroke="currentColor" opacity=".25"/>
+    <text x="250" y="188" text-anchor="middle" font-size="11">không có toList(): trạm đã dựng,</text>
+    <text x="250" y="206" text-anchor="middle" font-size="11">không gì chạy, không in gì</text>
+    <text x="510" y="188" text-anchor="middle" font-size="11" fill="var(--accent)">có toList(): saw 1, saw 2, saw 3</text>
+    <text x="510" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">kết quả [2, 4, 6]</text>
+  </g>
+</svg>
+<figcaption>Intermediate operation chỉ dựng băng chuyền. Terminal operation ở cuối là nút khởi động: nó kéo các phần tử đi qua.</figcaption>
+</figure>
+
+<p>Tài liệu <code>java.util.stream</code> nói stream "không lưu trữ": nó "không phải cấu trúc dữ liệu lưu phần tử; thay vào đó, nó chuyển các phần tử từ một source ... qua một pipeline các phép tính."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></p>
+
+<h2>2. Quy tắc một: intermediate operation là lazy</h2>
+<p>"Intermediate operation luôn luôn lazy." Việc duyệt source "không bắt đầu cho tới khi terminal operation của pipeline được thực thi."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></p>
+<pre><code>List&lt;Integer&gt; data = List.of(1, 2, 3);
+
+data.stream().peek(x -&gt; System.out.println("  saw " + x)).map(x -&gt; x * 2);
+<span class="c">Step 1  stream()  → a belt starting at data</span>
+<span class="c">Step 2  peek(...) → a station is added; nothing runs</span>
+<span class="c">Step 3  map(...)  → a station is added; nothing runs</span>
+<span class="c">Step 4  the line ends. No terminal op → </span><span class="hl">nothing is printed</span>
+
+data.stream().peek(x -&gt; System.out.println("  saw " + x)).map(x -&gt; x * 2).toList();
+<span class="c">Step 1  toList() asks for an element → 1 goes through peek ("saw 1") and map (2)</span>
+<span class="c">Step 2  toList() asks again          → 2 goes through ("saw 2") → 4</span>
+<span class="c">Step 3  toList() asks again          → 3 goes through ("saw 3") → 6</span></code></pre>
+<p>Để ý ở Step 1 đến 3: mỗi phần tử đi <strong>hết</strong> băng chuyền rồi phần tử sau mới bắt đầu. Đó là lý do laziness có lợi: với yêu cầu "tìm String đầu tiên có ba nguyên âm liên tiếp", stream "không cần xem xét mọi string đầu vào".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a> Các operation như <code>findFirst</code> hay <code>limit</code> là <em>short-circuiting</em>: chúng có thể dừng sớm, kể cả với stream vô hạn.</p>
+<p class="muted"><code>peek</code> "tồn tại chủ yếu để hỗ trợ debug", để nhìn các phần tử khi chúng chảy qua một điểm.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Javadoc Stream</a> Đừng đặt business logic vào đó.</p>
+
+<h2>3. Quy tắc hai: stream chỉ dùng một lần</h2>
+<p>Băng chuyền được dựng cho một lượt chạy. "Sau khi terminal operation được thực hiện, stream pipeline được coi là đã tiêu thụ, và không thể dùng lại nữa"; muốn duyệt lại cùng dữ liệu, bạn quay về source để lấy stream mới.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></p>
+<pre><code>Stream&lt;Integer&gt; s = data.stream();
+s.count();     <span class="c">// 3</span>
+s.count();     <span class="hl">// IllegalStateException</span></code></pre>
+<p><strong>Cách sửa:</strong> đừng lưu stream vào field hay biến để dùng lại. Hãy giữ <em>source</em> (cái list) và gọi <code>data.stream()</code> mỗi lần, hoặc dùng <code>Supplier&lt;Stream&lt;T&gt;&gt;</code>.</p>
+
+<h2>4. Quy tắc ba: đừng động vào thế giới bên ngoài từ bên trong</h2>
+<p>Hai quy tắc trong tài liệu về các lambda bạn truyền vào (tài liệu gọi chúng là <em>behavioral parameter</em>):</p>
+<ul>
+  <li><strong>Non-interference (không can thiệp).</strong> Chúng "không bao giờ được sửa data source của stream".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a> Đừng thêm hay xóa phần tử trong list mà bạn đang stream.</li>
+  <li><strong>Tránh side effect.</strong> "Side effect trong behavioral parameter của stream operation, nói chung, không được khuyến khích." Tài liệu đưa <code>forEach(results::add)</code> làm anti-pattern và dùng một terminal operation kiểu collect làm cách sửa.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">stream package</a></li>
+</ul>
+<pre><code><span class="c">// Wrong: the lambda changes a list outside the stream</span>
+List&lt;String&gt; results = new ArrayList&lt;&gt;();
+names.stream().filter(n -&gt; n.length() &lt;= 3).forEach(results::add);
+
+<span class="c">// Right: let the stream build the result</span>
+List&lt;String&gt; results = names.stream().filter(n -&gt; n.length() &lt;= 3).<span class="hl">toList()</span>;</code></pre>
+<p>Vì sao quan trọng? Bản có side effect sẽ hỏng ngay khi ai đó thêm <code>.parallel()</code>: lúc đó nhiều thread cùng gọi <code>add</code> trên một <code>ArrayList</code>.</p>
+<h3>JDK 8 so với 17 và 21: <code>toList()</code></h3>
+<p><code>Stream.toList()</code> có từ JDK 16, nên chạy trên 17 và 21 nhưng không có trên 8. "List trả về là unmodifiable"; gọi <code>add</code> sẽ ném <code>UnsupportedOperationException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Javadoc Stream</a> Trên JDK 8 bạn viết <code>.collect(Collectors.toList())</code>, và cách này không đảm bảo gì về khả năng sửa đổi (xem <a href="0022-collectors-groupingby-tomap.vi.html">bài 0022</a>).</p>
+
+<h2>5. Optional: chiếc hộp có thể rỗng</h2>
+<p>Hãy nghĩ tới tủ nhận hàng. Mở ra thì hoặc có bưu kiện, hoặc trống. Bạn không thể quên kiểm tra, vì phải mở hộp trước đã. So với <code>null</code>: method trả về <code>null</code>, bạn quên kiểm tra, rồi gặp <code>NullPointerException</code> ở một chỗ rất xa.</p>
+<p>Javadoc nói rõ mục đích: "<code>Optional</code> chủ yếu dùng làm kiểu trả về của method khi thật sự cần biểu diễn 'không có kết quả', và khi dùng <code>null</code> dễ gây lỗi." Và: "Một biến có kiểu <code>Optional</code> không bao giờ được tự nó là <code>null</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Javadoc Optional</a></p>
+<pre><code>Optional&lt;User&gt; findByEmail(String email);              <span class="c">// good: return type</span>
+
+String city = findByEmail(e)
+    .map(User::city)                                   <span class="c">// empty stays empty</span>
+    .orElse("unknown");
+
+class User { Optional&lt;String&gt; nickname; }              <span class="hl">// avoid: not a field type</span></code></pre>
+
+<h3>Cái bẫy: <code>orElse</code> so với <code>orElseGet</code></h3>
+<p>Cả hai đều cho giá trị dự phòng khi hộp rỗng. Khác nhau ở <strong>thời điểm giá trị dự phòng được tính</strong>. <code>orElse(x)</code> nhận một giá trị có sẵn, nên Java tính <code>x</code> trước khi gọi, kể cả khi hộp có hàng. <code>orElseGet(supplier)</code> nhận một công thức (một <code>Supplier</code>) và chỉ chạy nó khi hộp rỗng.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Javadoc Optional</a></p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Với orElse, expensive() chạy trước lời gọi dù Optional có giá trị, và kết quả bị bỏ đi. Với orElseGet, chỉ truyền supplier và nó không bao giờ được gọi.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="30">Optional.of("present").orElse(expensive())</text>
+    <rect x="20" y="44" width="200" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="66" text-anchor="middle" fill="var(--accent)">1. expensive() chạy</text>
+    <text x="120" y="84" text-anchor="middle" font-size="11" fill="var(--accent)">in ra, tốn thời gian</text>
+    <g fill="none" stroke="currentColor"><path d="M220 69h28M242 64l6 5-6 5"/></g>
+    <rect x="250" y="44" width="190" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="345" y="66" text-anchor="middle">2. orElse mở hộp</text>
+    <text x="345" y="84" text-anchor="middle" font-size="11">có giá trị</text>
+    <g fill="none" stroke="currentColor"><path d="M440 69h28M462 64l6 5-6 5"/></g>
+    <rect x="470" y="44" width="190" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="565" y="66" text-anchor="middle">3. "present"</text>
+    <text x="565" y="84" text-anchor="middle" font-size="11">"default" bị bỏ phí</text>
+    <text x="20" y="140">Optional.of("present").orElseGet(App::expensive)</text>
+    <rect x="20" y="154" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="120" y="176" text-anchor="middle">1. truyền công thức</text>
+    <text x="120" y="194" text-anchor="middle" font-size="11">chưa có gì chạy</text>
+    <g fill="none" stroke="currentColor"><path d="M220 179h28M242 174l6 5-6 5"/></g>
+    <rect x="250" y="154" width="190" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="345" y="176" text-anchor="middle">2. mở hộp</text>
+    <text x="345" y="194" text-anchor="middle" font-size="11">có giá trị</text>
+    <g fill="none" stroke="currentColor"><path d="M440 179h28M462 174l6 5-6 5"/></g>
+    <rect x="470" y="154" width="190" height="50" rx="6" fill="none" stroke="var(--accent)"/>
+    <text x="565" y="176" text-anchor="middle" fill="var(--accent)">3. "present"</text>
+    <text x="565" y="194" text-anchor="middle" font-size="11" fill="var(--accent)">supplier không được gọi</text>
+  </g>
+</svg>
+<figcaption>Java tính các đối số trước khi gọi method. Vì vậy <code>orElse</code> luôn trả giá cho giá trị dự phòng; <code>orElseGet</code> chỉ trả khi hộp rỗng.</figcaption>
+</figure>
+
+<h3>Chạy cả năm quy tắc</h3>
+<pre><code>$ java java/examples/StreamAndOptional.java
+1. Intermediate ops are lazy (no terminal op, no output):
+2. A terminal op triggers the pipeline:
+  saw 1
+  saw 2
+  saw 3
+3. A stream is consumed once:
+  IllegalStateException: stream has already been operated upon or closed
+4. orElse evaluates its argument even when a value is present:
+  expensive() called
+5. orElseGet only calls the supplier when empty:
+  (nothing printed above)</code></pre>
+
+<h3>Lỗi Optional hay gặp</h3>
+<ul>
+  <li><strong>Gọi <code>get()</code> mà không kiểm tra.</strong> Nó ném <code>NoSuchElementException</code> khi rỗng. Javadoc nói "Lựa chọn nên dùng thay cho method này là <code>orElseThrow()</code>", vốn làm đúng việc đó nhưng tên gọi trung thực hơn.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Javadoc Optional</a></li>
+  <li><strong>Trả về <code>null</code> từ method có kiểu Optional.</strong> Hãy trả về <code>Optional.empty()</code>; dùng <code>Optional.ofNullable(x)</code> để bọc một giá trị có thể null.</li>
+  <li><strong>Dùng <code>orElse(callDatabase())</code>.</strong> Lời gọi chạy mọi lúc. Hãy dùng <code>orElseGet(() -&gt; callDatabase())</code>.</li>
+</ul>
+<p class="muted">Ghi chú phiên bản: <code>orElseThrow()</code> không tham số có từ JDK 10, và <code>isEmpty()</code> có từ JDK 11.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Javadoc Optional</a> Trên JDK 8 hãy dùng <code>get()</code> sau <code>isPresent()</code>, hoặc <code>orElseThrow(SomeException::new)</code>.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Một pipeline có <code>peek(print)</code> và <code>map</code> nhưng không có terminal operation. In ra gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không in gì cả</button>
+    <button class="opt">Mỗi phần tử một lần</button>
+    <button class="opt">Chỉ phần tử đầu tiên</button>
+    <button class="opt">Mỗi phần tử hai lần</button>
+  </div>
+  <div class="why">Intermediate operation là lazy. Không có terminal operation thì băng chuyền không chạy, nên <code>peek</code> không bao giờ chạy.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn gọi <code>s.count()</code> hai lần trên cùng stream <code>s</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lần gọi thứ hai ném IllegalStateException</button>
+    <button class="opt">Cả hai lần đều trả về cùng một số là 3</button>
+    <button class="opt">Lần thứ hai trả về 0, vì stream đã rỗng</button>
+    <button class="opt">Lần đầu ném lỗi, lần thứ hai trả về 3</button>
+  </div>
+  <div class="why">Terminal operation tiêu thụ stream. Muốn duyệt lại, quay về source: <code>data.stream()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong <code>data.stream().peek(print).map(x -&gt; x * 2).toList()</code> với data 1, 2, 3, mọi thứ xảy ra theo thứ tự nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>1 đi qua peek và map, rồi tới 2, rồi tới 3</button>
+    <button class="opt">peek thấy 1, 2, 3 trước, rồi map nhân đôi cả ba</button>
+    <button class="opt">map nhân đôi cả ba trước, rồi peek mới in chúng</button>
+    <button class="opt">Thứ tự ngẫu nhiên vì stream luôn chạy song song</button>
+  </div>
+  <div class="why">Terminal operation kéo từng phần tử một đi qua cả pipeline. Nhờ vậy các operation short-circuiting mới dừng sớm được.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bug ở đâu? <code>List&lt;String&gt; out = new ArrayList&lt;&gt;(); names.stream().filter(ok).forEach(out::add);</code></p>
+  <div class="options">
+    <button class="opt" data-correct>Side effect: hãy để stream tự dựng list bằng toList()</button>
+    <button class="opt">forEach là lazy, nên không có gì được thêm vào list out</button>
+    <button class="opt">Không thể dùng method reference bên trong forEach được</button>
+    <button class="opt">filter luôn phải đứng sau forEach trong một pipeline</button>
+  </div>
+  <div class="why">Tài liệu không khuyến khích side effect trong behavioral parameter và đưa <code>forEach(results::add)</code> làm anti-pattern. Nó hỏng khi có <code>.parallel()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Mục đích sử dụng chính của <code>Optional</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Kiểu trả về của method</button>
+    <button class="opt">Field trong một entity</button>
+    <button class="opt">Tham số của method</button>
+    <button class="opt">Field trong một DTO</button>
+  </div>
+  <div class="why">Javadoc: "chủ yếu dùng làm kiểu trả về của method khi thật sự cần biểu diễn 'không có kết quả'".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Giá trị dự phòng cần một lời gọi database chậm. Dòng nào tốt nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>opt.orElseGet(() -&gt; loadFromDb())</button>
+    <button class="opt">opt.orElse(loadFromDb())</button>
+    <button class="opt">opt.get() ?: loadFromDb()</button>
+    <button class="opt">opt.orElse(null).loadFromDb()</button>
+  </div>
+  <div class="why">Đối số của <code>orElse</code> được tính kể cả khi có giá trị. <code>orElseGet</code> chỉ gọi supplier khi Optional rỗng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trên JDK 21, <code>var list = Stream.of(1, 2).toList(); list.add(3);</code> Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>UnsupportedOperationException</button>
+    <button class="opt">List trở thành [1, 2, 3]</button>
+    <button class="opt">Lỗi compile ở toList()</button>
+    <button class="opt">IllegalStateException</button>
+  </div>
+  <div class="why"><code>Stream.toList()</code> (JDK 16+) trả về list unmodifiable; mọi method sửa đổi đều ném <code>UnsupportedOperationException</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Java stream hoạt động thế nào, và nên dùng Optional ra sao?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Pipeline gồm một source, không hoặc nhiều intermediate operation, và một terminal operation.</label></li>
+      <li><label><input type="checkbox"> Intermediate operation là lazy; không gì chạy cho tới terminal operation.</label></li>
+      <li><label><input type="checkbox"> Phần tử chảy qua từng cái một, nên operation short-circuiting như <code>findFirst</code> dừng sớm được.</label></li>
+      <li><label><input type="checkbox"> Stream chỉ dùng một lần; dùng lại ném <code>IllegalStateException</code>.</label></li>
+      <li><label><input type="checkbox"> Lambda không nên sửa source hay có side effect; gom kết quả bằng <code>toList()</code> / collector.</label></li>
+      <li><label><input type="checkbox"> Optional chủ yếu là kiểu trả về cho "không có kết quả"; không bao giờ để Optional là null.</label></li>
+      <li><label><input type="checkbox"> <code>orElse</code> luôn tính đối số; <code>orElseGet</code> chỉ tính khi rỗng.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Một stream pipeline có source, ví dụ một list, rồi các intermediate operation như <code>filter</code>, <code>map</code>, và một terminal operation như <code>toList</code> hay <code>count</code>. Intermediate operation là lazy: nó chỉ mô tả công việc, không gì chạy cho tới khi terminal operation kéo phần tử đi qua, từng cái một. Vì vậy <code>findFirst</code> dừng sớm được. Stream chỉ dùng một lần; gọi terminal operation lần hai sẽ ném <code>IllegalStateException</code>, nên em giữ cái list và gọi lại <code>stream()</code>. Em tránh side effect trong lambda, ví dụ add vào list bên ngoài trong <code>forEach</code>, mà để collector dựng kết quả. Với Optional: em dùng nó làm kiểu trả về khi 'không có kết quả' là chuyện bình thường, không dùng làm field, và không bao giờ trả null thay cho nó. Còn khi giá trị mặc định tốn kém thì em dùng <code>orElseGet</code>, vì <code>orElse</code> luôn tính đối số của nó."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-fix-the-pipeline.vi.md">Bài tập 0004: sửa pipeline</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/StreamAndOptional.java"><code>StreamAndOptional.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Terminal operation <code>collect</code> xứng đáng có một bài riêng: gom nhóm, đếm và dựng map. Interviewer cấp Senior sẽ hỏi <em>"Chuyện gì xảy ra khi <code>toMap</code> gặp cùng một key hai lần?"</em> Đó là <a href="0022-collectors-groupingby-tomap.vi.html">bài 0022</a>. Bản thân lambda nằm ở <a href="0008-lambdas-and-functional-interfaces.vi.html">bài 0008</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a>, các phần "Stream operations and pipelines", "Non-interference" và "Side-effects".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Parallel stream có nhanh hơn không?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0009-default-methods-and-conflicts.vi.html">← Default method: thêm vào interface mà không làm hỏng ai</a> &nbsp;|&nbsp; <a href="0022-collectors-groupingby-tomap.vi.html">Collectors: phân loại stream vào các thùng →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/package-summary.html">java.util.stream package summary</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Javadoc Stream</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html">Javadoc Optional</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

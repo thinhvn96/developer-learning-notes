@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java Collections Cheat Sheet</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main style="max-width:54rem">
+<h1>Java collections cheat sheet</h1>
+<p class="meta"><a href="../index.html">Home</a> · Reference · <a href="../java/index.html">Java ladder</a> · <a href="../java/interview.html">Interview Q&amp;A</a> · JDK 8 / 17 / 21 · print-friendly · <a class="lang" href="java-collections.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<h2>Pick by question</h2>
+<table>
+<tr><th>Need</th><th>Single thread</th><th>Shared by threads</th></tr>
+<tr><td>Sequence, index access</td><td><code>ArrayList</code></td><td><code>CopyOnWriteArrayList</code> (read-mostly) / <code>synchronizedList</code></td></tr>
+<tr><td>Stack or FIFO queue</td><td><code>ArrayDeque</code></td><td><code>ArrayBlockingQueue</code>, <code>LinkedBlockingQueue</code>, <code>ConcurrentLinkedQueue</code></td></tr>
+<tr><td>Smallest / largest next</td><td><code>PriorityQueue</code></td><td><code>PriorityBlockingQueue</code></td></tr>
+<tr><td>Unique, no order</td><td><code>HashSet</code></td><td><code>ConcurrentHashMap.newKeySet()</code></td></tr>
+<tr><td>Unique, insertion order</td><td><code>LinkedHashSet</code></td><td>(synchronize yourself)</td></tr>
+<tr><td>Unique, sorted / ranges</td><td><code>TreeSet</code></td><td><code>ConcurrentSkipListSet</code></td></tr>
+<tr><td>Key → value</td><td><code>HashMap</code></td><td><code>ConcurrentHashMap</code></td></tr>
+<tr><td>Key → value, insertion or LRU order</td><td><code>LinkedHashMap</code></td><td>(synchronize; or a cache library)</td></tr>
+<tr><td>Key → value, sorted / nearest key</td><td><code>TreeMap</code></td><td><code>ConcurrentSkipListMap</code></td></tr>
+<tr><td>Enum keys / enum set</td><td><code>EnumMap</code> / <code>EnumSet</code></td><td>wrap with <code>Collections.synchronized*</code></td></tr>
+</table>
+
+<h2>Costs</h2>
+<table>
+<tr><th>Structure</th><th>get / contains</th><th>add / put</th><th>remove</th><th>Notes</th></tr>
+<tr><td><code>ArrayList</code></td><td>get O(1), contains O(n)</td><td>end: amortized O(1); middle O(n)</td><td>O(n)</td><td>grows ~1.5×, first add allocates 10 (OpenJDK)</td></tr>
+<tr><td><code>LinkedList</code></td><td>get(i) O(n)</td><td>ends O(1)</td><td>ends O(1)</td><td>one node object per element</td></tr>
+<tr><td><code>ArrayDeque</code></td><td>—</td><td>ends O(1)</td><td>ends O(1)</td><td>no nulls</td></tr>
+<tr><td><code>HashMap</code> / <code>HashSet</code></td><td>O(1) expected</td><td>O(1) expected</td><td>O(1) expected</td><td>bad hash: O(log n) per bin (tree) or O(n)</td></tr>
+<tr><td><code>LinkedHashMap</code></td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td>iteration ∝ size, not capacity</td></tr>
+<tr><td><code>TreeMap</code> / <code>TreeSet</code></td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td><td>guaranteed; red-black tree</td></tr>
+<tr><td><code>PriorityQueue</code></td><td>peek O(1), contains O(n)</td><td>O(log n)</td><td>poll O(log n), remove(o) O(n)</td><td>iteration NOT sorted</td></tr>
+<tr><td><code>CopyOnWriteArrayList</code></td><td>O(1)</td><td>O(n) copy</td><td>O(n) copy</td><td>snapshot iterators</td></tr>
+<tr><td><code>ConcurrentSkipListMap</code></td><td>O(log n) avg</td><td>O(log n) avg</td><td>O(log n) avg</td><td>no nulls</td></tr>
+</table>
+
+<h2>HashMap numbers</h2>
+<p>Capacity 16 (power of two) · load factor 0.75 → resize at 12, doubles · hash = <code>h ^ (h &gt;&gt;&gt; 16)</code> · index = <code>(n − 1) &amp; hash</code> · bin → tree at 8 nodes if table ≥ 64, back at 6 · one null key allowed · presize: <code>HashMap.newHashMap(n)</code> (JDK 19+) or <code>new HashMap&lt;&gt;((int)(n / 0.75f) + 1)</code>. Source: OpenJDK 21 <code>HashMap.java</code>.</p>
+
+<h2>Nulls</h2>
+<table>
+<tr><th>Allows null</th><th>Rejects null</th></tr>
+<tr><td><code>ArrayList</code>, <code>LinkedList</code>, <code>HashMap</code> (one key), <code>HashSet</code>, <code>LinkedHashMap</code>, <code>Arrays.asList</code>, <code>IdentityHashMap</code></td><td><code>List/Set/Map.of</code>, <code>copyOf</code>, <code>ArrayDeque</code>, <code>PriorityQueue</code>, <code>ConcurrentHashMap</code>, <code>ConcurrentSkipListMap</code>, <code>BlockingQueue</code>, <code>EnumMap</code> keys, <code>TreeMap</code> keys (natural order)</td></tr>
+</table>
+
+<h2>Traps</h2>
+<ul>
+<li><code>list.remove(x)</code> inside for-each → <code>ConcurrentModificationException</code> (or a silent skip). Use <code>removeIf</code> / <code>Iterator.remove</code>.</li>
+<li>Comparator by one field in a <code>TreeSet</code>/<code>TreeMap</code> drops "duplicates". Add a tie-breaker.</li>
+<li><code>(a, b) -&gt; a - b</code> overflows. Use <code>Integer.compare</code> / <code>Comparator.comparingInt</code>.</li>
+<li><code>unmodifiableList</code> is a view; <code>List.copyOf</code> is a copy; neither freezes mutable elements.</li>
+<li><code>Integer</code> <code>==</code> works only for -128..127 constants. Use <code>equals</code>.</li>
+<li><code>List&lt;Integer&gt;.remove(1)</code> removes index 1.</li>
+<li><code>putIfAbsent(k, expensive())</code> always runs <code>expensive()</code>. Use <code>computeIfAbsent</code>.</li>
+<li>Do not modify a map inside its own <code>compute*</code> function (HashMap may throw CME).</li>
+<li>Printing a <code>PriorityQueue</code> or <code>HashSet</code> shows no meaningful order.</li>
+<li>Iterating a <code>synchronizedList</code> needs <code>synchronized (list) { ... }</code>.</li>
+</ul>
+
+<h2>Which JDK added it</h2>
+<table>
+<tr><th>JDK</th><th>Collections features</th></tr>
+<tr><td>8</td><td><code>Map.getOrDefault/putIfAbsent/computeIfAbsent/compute/merge/replaceAll</code>, <code>Collection.removeIf</code>, <code>Comparator.comparing/thenComparing/nullsFirst</code>, streams and <code>Collectors</code>, treeified HashMap bins</td></tr>
+<tr><td>9 / 10</td><td><code>List/Set/Map.of</code>, <code>Map.ofEntries</code> (9); <code>List/Set/Map.copyOf</code> (10)</td></tr>
+<tr><td>16</td><td><code>Stream.toList()</code> (unmodifiable)</td></tr>
+<tr><td>19</td><td><code>HashMap.newHashMap(n)</code>, <code>HashSet.newHashSet(n)</code></td></tr>
+<tr><td>21</td><td><code>SequencedCollection/Set/Map</code>: <code>getFirst</code>, <code>getLast</code>, <code>reversed</code>, <code>putFirst</code> (<a href="../java/lessons/0016-sequenced-collections.html">lesson 0016</a>)</td></tr>
+</table>
+<footer><p>Compressed from the <a href="../java/index.html">Java collections deep dive</a>; each lesson cites the JDK 21 Javadoc or OpenJDK source. <a href="../RESOURCES.md">All resources</a></p></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 28: Pattern trong Java hiện đại: lambda, record, sealed type</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pattern trong Java hiện đại: lambda, record, sealed type</h1>
+<p class="meta">Design Patterns · Bài 0028 · bước 28/30 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0028-patterns-in-modern-java.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được những pattern kinh điển nào co lại hoặc biến mất nhờ lambda, record, enum và sealed type.</div>
+
+<p>Lời chỉ trích đầu tiên nhắm vào pattern là có những pattern chỉ để bù đắp cho giới hạn của ngôn ngữ.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a> Java hiện đại đã dẹp bỏ được khá nhiều thủ tục rườm rà.</p>
+<table><tr><th>Pattern</th><th>Kiểu kinh điển</th><th>Java hiện đại</th></tr>
+<tr><td>Strategy</td><td>interface + N class</td><td>một lambda hoặc method reference cho interface chỉ có một method (chính trang Strategy cũng ghi rằng ngôn ngữ hàm có thể khiến pattern này trở nên thừa)<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></td></tr>
+<tr><td>Command</td><td>mỗi command một class</td><td><code>Runnable</code>/lambda (vẫn dùng class khi cần <code>undo</code>)</td></tr>
+<tr><td>Template Method</td><td>abstract class</td><td>truyền function vào cho các bước thay đổi (gợi ý của tôi)</td></tr>
+<tr><td>Visitor</td><td>double dispatch accept/visit</td><td>sealed interface + record pattern + <code>switch</code>: compiler kiểm tra tính exhaustive<a class="cite" href="https://openjdk.org/jeps/441">[2]</a><a class="cite" href="https://openjdk.org/jeps/409">[3]</a></td></tr>
+<tr><td>Singleton</td><td>private constructor + static</td><td>enum một phần tử, hoặc một bean do container quản lý</td></tr>
+<tr><td>Builder</td><td>fluent builder</td><td>record với compact constructor cho dữ liệu nhỏ; builder vẫn cần khi có nhiều tham số tùy chọn</td></tr>
+<tr><td>State</td><td>các state class</td><td>enum có hành vi, hoặc sealed type + switch</td></tr></table>
+<p>Các ví dụ đã kiểm chứng trong khóa học: strategy bằng lambda (<a href="../examples/StrategyDemo.java"><code>StrategyDemo.java</code></a>), visitor bằng sealed/pattern switch (<a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a>), enum singleton và strategy theo từng hằng (<a href="../examples/SingletonDemo.java"><code>SingletonDemo.java</code></a>, <a href="../../oop/examples/EnumsAsClasses.java"><code>EnumsAsClasses.java</code></a>). JEP 441 nói rằng pattern switch phải exhaustive và, trên một hệ phân cấp sealed, độ bao phủ được compiler kiểm tra, đôi khi không cần đến <code>default</code> nữa.<a class="cite" href="https://openjdk.org/jeps/441">[2]</a></p>
+<div class="aside">Câu nói khi phỏng vấn: "Pattern là vốn từ vựng chung. Với Java 21 tôi thường dùng lambda thay cho một Strategy class, hoặc sealed interface với switch thay cho Visitor, nhưng tôi vẫn gọi tên pattern để cả team hiểu thiết kế."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một Strategy chỉ có một method có thể là...?</p>
+  <button data-correct>Một lambda</button>
+  <button>Chỉ một enum</button>
+  <button>Một thread</button>
+  <button>Một static class</button>
+  <p class="explain">Functional interface nhận được lambda.<a class="cite" href="https://refactoring.guru/design-patterns/strategy">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Thứ thay thế Visitor trong Java hiện đại?</p>
+  <button>Thread</button>
+  <button>Serialization</button>
+  <button data-correct>Sealed type và switch</button>
+  <button>Reflection</button>
+  <p class="explain">Pattern matching exhaustive trên một hệ phân cấp sealed.<a class="cite" href="https://openjdk.org/jeps/441">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Với sealed switch, compiler kiểm tra gì?</p>
+  <button>Thread</button>
+  <button>Tốc độ</button>
+  <button>Cách đặt tên</button>
+  <button data-correct>Tính exhaustive</button>
+  <p class="explain">Độ bao phủ được kiểm tra dựa trên các subtype được permit.<a class="cite" href="https://openjdk.org/jeps/441">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Pattern có biến mất hoàn toàn không?</p>
+  <button>Chỉ creational</button>
+  <button data-correct>Không, vốn từ vựng vẫn còn</button>
+  <button>Có</button>
+  <button>Chỉ trong Java 8</button>
+  <p class="explain">Chúng gọn lại nhưng vẫn là vốn từ vựng chung.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0028-modernize-three-patterns.vi.md">Bài tập 28: hiện đại hóa ba pattern</a></p>
+<p>Ví dụ chạy được: <a href="../examples/VisitorDemo.java"><code>VisitorDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a>. Phần Cons nói về ngôn ngữ hàm.</p>
+<p><a href="0027-patterns-in-the-jdk.vi.html">← Những pattern bạn vẫn đang dùng trong JDK</a> &nbsp;|&nbsp; <a href="0029-patterns-in-spring.vi.html">Pattern trong Spring →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/strategy">Strategy (Refactoring.Guru)</a> · [2] <a href="https://openjdk.org/jeps/441">JEP 441: Pattern Matching for switch</a> · [3] <a href="https://openjdk.org/jeps/409">JEP 409: Sealed Classes</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

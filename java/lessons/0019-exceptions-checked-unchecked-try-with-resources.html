@@ -8,72 +8,331 @@
 </head>
 <body>
 <main>
-<h1>Exceptions: checked vs unchecked and try-with-resources</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0019 · step 2 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>What happens when Java code fails</h1>
+<p class="subtitle">Checked versus unchecked exceptions, and how try-with-resources closes things for you.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0019 · step 2 of 46 · Foundation · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0019-exceptions-checked-unchecked-try-with-resources.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> say which exceptions you must catch or declare, and use try-with-resources with correct close order and suppressed exceptions.</div>
+<div class="mission"><strong>Why this lesson?</strong> Every backend reads files, calls databases and talks to other services, and all of these can fail. Interviewers ask <em>"What is the difference between checked and unchecked exceptions?"</em> and <em>"How does try-with-resources work?"</em> to see whether you can write code that fails cleanly and never leaks connections.</div>
 
-<h2>What an exception is</h2>
-<p>"An exception is an event, which occurs during the execution of a program, that disrupts the normal flow of the program's instructions." The runtime searches the call stack for a matching handler; if none is found the program terminates.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">[3]</a></p>
-<h2>Three kinds</h2>
-<ul><li><strong>Checked</strong> exceptions: must be caught or declared (catch-or-specify).</li>
-<li><strong>Runtime exceptions</strong> and <strong>errors</strong> are unchecked: no catch or declaration required.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[1]</a></li></ul>
-<p>The tutorial's guideline: "If a client can reasonably be expected to recover from an exception, make it a checked exception. If a client cannot do anything to recover from the exception, make it an unchecked exception." Do not use <code>RuntimeException</code> merely to avoid declaring exceptions.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[1]</a></p>
-<h2>try-with-resources</h2>
-<p>A resource is an object that must be closed; anything implementing <code>AutoCloseable</code> qualifies. Resources are closed in the <em>opposite</em> order of creation. If the body throws and <code>close()</code> also throws, the body's exception is the one propagated and the others are <em>suppressed</em>, retrievable with <code>getSuppressed()</code>. Any <code>catch</code>/<code>finally</code> runs after the resources are closed.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
-<pre><code>java java/examples/ExceptionsDemo.java
-open first / open second / body / close second / close first
+<div class="win"><b>Today's win:</b> say which exceptions you must catch or declare, and use try-with-resources while explaining its close order and suppressed exceptions.</div>
+
+<dl class="words">
+  <dt>exception</dt><dd>An object that describes a problem. Java "throws" it to stop the normal flow of your code.</dd>
+  <dt>throw / catch</dt><dd><code>throw</code> starts the problem; a <code>catch</code> block is the place that handles it.</dd>
+  <dt>call stack</dt><dd>The list of methods that are running right now: <code>main</code> called <code>a</code>, which called <code>b</code>, and so on.</dd>
+  <dt>checked</dt><dd>An exception the compiler forces you to handle: you must catch it or write <code>throws</code> on your method.</dd>
+  <dt>unchecked</dt><dd>An exception the compiler does not force you to handle: <code>RuntimeException</code>, <code>Error</code> and their subclasses.</dd>
+  <dt>interface</dt><dd>A list of methods a class promises to have. A class "implements" an interface by writing those methods.</dd>
+  <dt>resource</dt><dd>Something you must close when you are done with it, like a file, a socket or a database connection.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"If my code opens two files with try-with-resources, in which order are they closed? And if the body throws and <code>close()</code> also throws, which exception do I see?"</em> Guess now. Section 5 shows the real output.</p>
+
+<h2>1. The picture: a fire alarm going up the floors</h2>
+<p>Imagine a building. The ground floor is <code>main</code>. It asks floor 1 to do some work, floor 1 asks floor 2, and so on. Suddenly there is a fire on floor 3. The alarm goes up, floor by floor, until somebody who knows what to do picks up the phone. If nobody does, the whole building is evacuated.</p>
+<p>That is an exception. The tutorial defines it as "an event, which occurs during the execution of a program, that disrupts the normal flow of the program's instructions." The runtime searches the call stack for a matching handler; if none is found, the program terminates.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">Tutorial: what is an exception</a></p>
+<pre><code>void main() {
+    try { service(); } catch (IOException e) { log(e); }
+}
+void service() throws IOException { repository(); }
+void repository() throws IOException {
+    throw new IOException("disk");
+}
+<span class="c">Step 1  repository() throws: its normal code stops at once</span>
+<span class="c">Step 2  repository has no catch → the exception goes up to service()</span>
+<span class="c">Step 3  service has no catch → it goes up to main()</span>
+<span class="c">Step 4  main has a matching catch → log(e) runs, program continues</span></code></pre>
+
+<h2>2. The family tree</h2>
+<p>Every exception is an object, and all of them come from one class. "The Throwable class is the superclass of all errors and exceptions in the Java language."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable javadoc</a> Below it there are two branches, and one of them splits again:</p>
+
+<figure>
+<svg viewBox="0 0 680 345" role="img" aria-label="Class tree: Throwable has children Error and Exception. Exception has children RuntimeException and IOException. Error and RuntimeException branches are unchecked; the rest of Exception is checked.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="270" y="20" width="140" height="36" rx="6"/>
+      <rect x="60" y="100" width="140" height="36" rx="6"/>
+      <rect x="30" y="180" width="200" height="36" rx="6"/>
+      <rect x="260" y="180" width="180" height="36" rx="6"/>
+      <rect x="260" y="250" width="180" height="36" rx="6"/>
+      <path d="M340 56V78H130V100M340 78H450V100"/>
+      <path d="M130 136V180"/>
+      <path d="M450 136V158H350V180M450 158H560V180"/>
+      <path d="M350 216V250M560 216V250"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="380" y="100" width="140" height="36" rx="6"/>
+      <rect x="470" y="180" width="180" height="36" rx="6"/>
+      <rect x="470" y="250" width="180" height="36" rx="6"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="340" y="43">Throwable</text>
+      <text x="130" y="123">Error</text>
+      <text x="130" y="203">OutOfMemoryError</text>
+      <text x="350" y="203">RuntimeException</text>
+      <text x="350" y="273" font-size="12">NullPointerException</text>
+    </g>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="450" y="123">Exception</text>
+      <text x="560" y="203">IOException</text>
+      <text x="560" y="273" font-size="12">FileNotFoundException</text>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="130" y="306" opacity=".75">unchecked</text>
+      <text x="350" y="306" opacity=".75">unchecked</text>
+      <text x="560" y="306" fill="var(--accent)">checked</text>
+    </g>
+    <text x="340" y="333" text-anchor="middle" font-size="11" fill="var(--accent)">checked = the compiler makes you catch it or declare it with throws</text>
+  </g>
+</svg>
+<figcaption>Highlighted boxes are checked. Anything under <code>RuntimeException</code> or <code>Error</code> is unchecked.</figcaption>
+</figure>
+
+<p>The Java Language Specification gives the exact rule: "The <em>unchecked exception classes</em> are the run-time exception classes and the error classes." Everything else is checked.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-11.html#jls-11.1.1">JLS §11.1.1</a></p>
+<ul>
+  <li><strong>Error</strong>: serious problems of the JVM itself, like running out of memory. The JLS calls them the exceptions "from which ordinary programs are not ordinarily expected to recover."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-11.html#jls-11.1.1">JLS §11.1.1</a> You normally do not catch them.</li>
+  <li><strong>RuntimeException</strong>: usually a bug in the code, like using <code>null</code> or a bad cast.</li>
+  <li><strong>Other Exceptions</strong> (checked): problems outside your code that a caller may handle, like a missing file.</li>
+</ul>
+
+<h2>3. Checked exceptions: catch or specify</h2>
+<p>For a <strong>checked</strong> exception the compiler insists on one of two things: you <em>catch</em> it, or you <em>declare</em> it with <code>throws</code> so your caller must deal with it. The tutorial calls this "catch or specify". Runtime exceptions and errors are unchecked: no catch or declaration is required.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Tutorial: unchecked exceptions</a></p>
+<pre><code>static void mayFail() throws IOException {   <span class="c">// "I may throw this"</span>
+    throw new IOException("checked");
+}
+
+public static void main(String[] a) {
+    mayFail();          <span class="hl">// does not compile</span>
+}</code></pre>
+<p>JDK 21's <code>javac</code> refuses this with a clear message:</p>
+<pre><code>A.java:4: error: unreported exception IOException; must be caught or declared to be thrown</code></pre>
+<p>The example program shows both kinds. The cast fails with an unchecked <code>ClassCastException</code>, and nobody had to declare it. The checked one compiles only because it is caught:</p>
+<pre><code>$ java java/examples/ExceptionsDemo.java
+...
+--- unchecked exceptions need no catch or declaration
+ClassCastException
+caught checked: checked</code></pre>
+
+<h3>Which kind should <em>your</em> exception be?</h3>
+<p>The tutorial's guideline: "If a client can reasonably be expected to recover from an exception, make it a checked exception. If a client cannot do anything to recover from the exception, make it an unchecked exception."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Tutorial: unchecked exceptions</a></p>
+<h3>Traps and fixes</h3>
+<ul>
+  <li><strong>Using <code>RuntimeException</code> only to avoid writing <code>throws</code>.</strong> The tutorial says not to do this.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Tutorial: unchecked exceptions</a></li>
+  <li><strong>Losing the original error when you wrap it.</strong> If you convert a checked exception into your own, pass the original as the <em>cause</em>: <code>throw new OrderException("save failed", e);</code>. Java keeps the "chain" of causes, so the stack trace still shows the real problem.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable javadoc</a></li>
+  <li><strong>An empty <code>catch</code> block.</strong> It hides the failure; the program continues with bad data. At least log it, or let it go up.</li>
+</ul>
+
+<h2>4. Closing things: <code>finally</code>, then try-with-resources</h2>
+<p>Think of a library book. Whatever happens while you read, you must give it back. Even if you fall asleep, even if the fire alarm rings. A file or a database connection is the same: you must close it, or your server slowly runs out of them.</p>
+<p>The old tool is <code>finally</code>: "The finally block <em>always</em> executes when the try block exits."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/finally.html">Tutorial: finally</a> But the same page adds: "Use a try-with-resources statement instead of a finally block when closing a file or otherwise recovering resources."</p>
+<p>A <span class="term">resource</span> is "an object that must be closed after the program is finished with it", and anything that implements the <code>AutoCloseable</code> interface qualifies.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Tutorial: try-with-resources</a> You declare it in brackets after <code>try</code>, and Java calls <code>close()</code> for you:</p>
+<pre><code>try (Res first = new Res("first", false);
+     Res second = new Res("second", false)) {
+    System.out.println("body");
+}   <span class="c">// no finally needed: both are closed here</span></code></pre>
+<p>The rules from the tutorial:<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Tutorial: try-with-resources</a></p>
+<ol class="steps">
+  <li><strong>Reverse order.</strong> "the close methods of resources are called in the <em>opposite</em> order of their creation." Like stacking plates: the last one on is the first one off.</li>
+  <li><strong>Closing comes first.</strong> "any catch or finally block is run after the resources declared have been closed."</li>
+  <li><strong>The body's exception wins.</strong> If the body throws and <code>close()</code> also throws, the close exceptions are <em>suppressed</em>, and you can read them with <code>getSuppressed()</code>.</li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 680 245" role="img" aria-label="Row 1: open first, open second, body, close second, close first, then catch or finally. Row 2: open r, the body throws body failed, close throws close failed, the caught exception is body failed with the close exception attached as suppressed.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="34" font-size="11" opacity=".75">1. two resources, the body works</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="46" width="95" height="40" rx="6"/>
+      <rect x="128" y="46" width="95" height="40" rx="6"/>
+      <rect x="236" y="46" width="95" height="40" rx="6"/>
+      <rect x="560" y="46" width="100" height="40" rx="6"/>
+      <path d="M115 66h7M118 62l4 4-4 4M223 66h7M226 62l4 4-4 4M331 66h7M334 62l4 4-4 4M439 66h7M442 62l4 4-4 4M547 66h7M550 62l4 4-4 4"/>
+      <path d="M20 96v6H223v-6" opacity=".6"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="344" y="46" width="95" height="40" rx="6"/>
+      <rect x="452" y="46" width="95" height="40" rx="6"/>
+    </g>
+    <path d="M344 96v6H547v-6" fill="none" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="67" y="70">open first</text>
+      <text x="175" y="66" font-size="11">open</text><text x="175" y="79" font-size="11">second</text>
+      <text x="283" y="70">body</text>
+      <text x="610" y="66" font-size="11">catch /</text><text x="610" y="79" font-size="11">finally</text>
+      <text x="121" y="118" font-size="11" opacity=".75">opened: first, second</text>
+    </g>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="391" y="66" font-size="11">close</text><text x="391" y="79" font-size="11">second</text>
+      <text x="499" y="66" font-size="11">close</text><text x="499" y="79" font-size="11">first</text>
+      <text x="445" y="118" font-size="11">closed: reverse order</text>
+    </g>
+    <text x="20" y="152" font-size="11" opacity=".75">2. the body throws, then close() throws too</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="164" width="140" height="50" rx="6"/>
+      <rect x="340" y="164" width="140" height="50" rx="6"/>
+      <path d="M160 189h14M170 185l4 4-4 4M320 189h14M330 185l4 4-4 4M480 189h14M490 185l4 4-4 4"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="180" y="164" width="140" height="50" rx="6"/>
+      <rect x="500" y="164" width="160" height="50" rx="6"/>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="90" y="193">open r</text>
+      <text x="250" y="184" fill="var(--accent)">body throws</text>
+      <text x="250" y="201" fill="var(--accent)">"body failed"</text>
+      <text x="410" y="184">close() throws</text>
+      <text x="410" y="201">"close failed: r"</text>
+      <text x="580" y="184" fill="var(--accent)">caught: body failed</text>
+      <text x="580" y="201" fill="var(--accent)">+ 1 suppressed</text>
+      <text x="410" y="234" opacity=".75">attached to the body exception</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Resources close in reverse order before any <code>catch</code> runs. If both the body and <code>close()</code> fail, you catch the body's exception, and the close exception rides along as "suppressed".</figcaption>
+</figure>
+
+<h2>5. Run it and read the output</h2>
+<p>The example has a small resource class <code>Res</code> that prints when it opens and closes. The second resource is made to fail in <code>close()</code>.</p>
+<pre><code>$ java java/examples/ExceptionsDemo.java
+--- close order is the reverse of opening
+open  first
+open  second
+body
+close second
+close first
+--- an exception from close() is suppressed when the body already threw
+open  r
+close r
 caught: body failed
-suppressed: close failed: r</code></pre>
-<p>Source: <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a>. Link to Spring: checked exceptions do not roll back <code>@Transactional</code> by default (<a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">lesson</a>).</p>
+suppressed: close failed: r
+...</code></pre>
+<p>Trace the second block:</p>
+<pre><code>try (Res r = new Res("r", true)) {
+    throw new IllegalStateException("body failed");
+} catch (Exception e) { ... }
+<span class="c">Step 1  open r</span>
+<span class="c">Step 2  the body throws "body failed"</span>
+<span class="c">Step 3  Java still calls r.close(): "close r" is printed,</span>
+<span class="c">        then close() throws "close failed: r"</span>
+<span class="c">Step 4  "close failed" is attached to "body failed" as suppressed</span>
+<span class="c">Step 5  only now does catch run, with e = "body failed"</span>
+<span class="c">Step 6  e.getSuppressed() returns the close exception</span></code></pre>
+<p>Why is this design good? The body's exception is usually the real cause. With an old <code>finally { r.close(); }</code>, a failing <code>close()</code> would throw a new exception and the original one would be lost. The <code>getSuppressed()</code> method returns the exceptions "that were suppressed, typically by the try-with-resources statement, in order to deliver this exception".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable javadoc</a></p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Which kind must be caught or declared?</p>
-  <button>Runtime exceptions</button>
-  <button>None of them</button>
-  <button data-correct>Checked exceptions</button>
-  <button>Errors only</button>
-  <p class="explain">Catch-or-specify applies to checked exceptions only.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. try-with-resources closes resources in what order?</p>
-  <button>Order of opening</button>
-  <button>Alphabetical order</button>
-  <button data-correct>Reverse of opening</button>
-  <button>Random order</button>
-  <p class="explain">Close methods are called in the opposite order of creation.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Body and close() both throw. Which propagates?</p>
-  <button>The close exception</button>
-  <button data-correct>The body's exception</button>
-  <button>Both together</button>
-  <button>Neither exception</button>
-  <p class="explain">The close exception is suppressed; retrieve it with getSuppressed.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Interface a resource must implement?</p>
-  <button>Cloneable</button>
-  <button>Serializable</button>
-  <button data-correct>AutoCloseable</button>
-  <button>Comparable</button>
-  <p class="explain">Any object implementing AutoCloseable can be a resource.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">[2]</a></p>
-</div>
+<h3>JDK 8 versus 9+</h3>
+<p>On JDK 8 every resource must be declared inside the brackets (<code>try (Res r = ...)</code>).<a class="src" href="https://docs.oracle.com/javase/specs/jls/se8/html/jls-14.html#jls-14.20.3">JLS 8 §14.20.3</a> Since JDK 9 you may also name an existing variable, as long as it is final or "effectively final" (never reassigned):<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.20.3">JLS 21 §14.20.3</a></p>
+<pre><code>Res r = new Res("r", false);
+try (r) {               <span class="c">// JDK 9+, r must be effectively final</span>
+    ...
+}</code></pre>
+<p class="muted">Link to Spring: checked exceptions do not roll back <code>@Transactional</code> by default, which surprises many people. See the <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">Spring lesson on @Transactional</a>.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Which exceptions must you catch or declare with <code>throws</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Checked ones, like IOException</button>
+    <button class="opt">Runtime ones, like NullPointerException</button>
+    <button class="opt">Errors, like OutOfMemoryError</button>
+    <button class="opt">None: the compiler never checks them</button>
+  </div>
+  <div class="why">Catch-or-specify applies only to checked exceptions. Runtime exceptions and errors are unchecked.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A method calls <code>mayFail()</code>, which is declared <code>throws IOException</code>, with no try and no throws. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>It does not compile: unreported exception</button>
+    <button class="opt">It compiles, and crashes only if it throws</button>
+    <button class="opt">It compiles, and Java silently ignores it</button>
+    <button class="opt">It compiles, and Java wraps it for you</button>
+  </div>
+  <div class="why"><code>IOException</code> is checked, so javac says "must be caught or declared to be thrown".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">try-with-resources opens <code>first</code>, then <code>second</code>. In which order are they closed?</p>
+  <div class="options">
+    <button class="opt" data-correct>second, then first</button>
+    <button class="opt">first, then second</button>
+    <button class="opt">both at the same time</button>
+    <button class="opt">in alphabetical order</button>
+  </div>
+  <div class="why">Close methods run in the opposite order of creation; the demo prints <code>close second</code> before <code>close first</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The body throws <code>"body failed"</code> and <code>close()</code> throws <code>"close failed"</code>. What does the <code>catch</code> receive?</p>
+  <div class="options">
+    <button class="opt" data-correct>"body failed", with "close failed" suppressed inside</button>
+    <button class="opt">"close failed", with "body failed" suppressed inside</button>
+    <button class="opt">Only "close failed"; the body exception is lost</button>
+    <button class="opt">Two separate catches, one for each exception</button>
+  </div>
+  <div class="why">The body's exception is propagated; the close exception is suppressed and available through <code>getSuppressed()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which interface must a class implement to be used in try-with-resources?</p>
+  <div class="options">
+    <button class="opt" data-correct>AutoCloseable</button>
+    <button class="opt">Serializable</button>
+    <button class="opt">Cloneable</button>
+    <button class="opt">Comparable</button>
+  </div>
+  <div class="why">Any object that implements <code>AutoCloseable</code> can be a resource.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the bug in <code>catch (SQLException e) { throw new RuntimeException("save failed"); }</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The original exception is not passed as the cause</button>
+    <button class="opt">RuntimeException cannot be thrown from a catch block</button>
+    <button class="opt">SQLException is unchecked, so it cannot be caught</button>
+    <button class="opt">The message must be the same as the original one</button>
+  </div>
+  <div class="why">Without <code>e</code> as the cause, the stack trace no longer shows the real SQL problem. Write <code>new RuntimeException("save failed", e)</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Checked versus unchecked exceptions, and how does try-with-resources work?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> All exceptions extend <code>Throwable</code>; the two branches are <code>Error</code> and <code>Exception</code>.</label></li>
+      <li><label><input type="checkbox"> <code>RuntimeException</code>, <code>Error</code> and their subclasses are unchecked; all other exceptions are checked.</label></li>
+      <li><label><input type="checkbox"> Checked exceptions must be caught or declared with <code>throws</code> (catch or specify).</label></li>
+      <li><label><input type="checkbox"> Guideline: checked if the caller can reasonably recover, unchecked if not.</label></li>
+      <li><label><input type="checkbox"> try-with-resources closes any <code>AutoCloseable</code>, in reverse order, before <code>catch</code>/<code>finally</code> run.</label></li>
+      <li><label><input type="checkbox"> If the body and <code>close()</code> both throw, the body's exception wins and the other is in <code>getSuppressed()</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Every exception in Java extends <code>Throwable</code>. Under it there's <code>Error</code>, for serious JVM problems like out of memory, and <code>Exception</code>. <code>RuntimeException</code> and <code>Error</code>, with their subclasses, are unchecked; everything else is checked. For a checked exception, like <code>IOException</code>, the compiler forces me to either catch it or declare it with <code>throws</code>. The usual guideline: if the caller can reasonably recover, make it checked; if it's a programming bug, make it unchecked. When I wrap an exception I always pass the original as the cause. For closing files or connections I use try-with-resources: anything that implements <code>AutoCloseable</code> is closed automatically, in reverse order of opening, and before my catch block runs. If the body throws and <code>close</code> also throws, I get the body's exception, and the close exception is attached as suppressed, so nothing is lost."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0019-design-an-exception-hierarchy.md">Exercise 0019: design exceptions</a></p>
+<p><a href="../exercises/0019-design-an-exception-hierarchy.md">Exercise 0019: design exceptions</a>. Decide checked or unchecked for each case first, and explain why to the teacher.</p>
 <p>Runnable example: <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/index.html">Java Tutorials: Exceptions trail</a>. Read 'The Catch or Specify Requirement' and 'The try-with-resources Statement'.</p>
-<p><a href="0018-strings-immutability-and-stringbuilder.html">← Strings: immutability, the pool and StringBuilder</a> &nbsp;|&nbsp; <a href="0001-hashmap-equals-hashcode.html">HashMap, equals and hashCode →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Why do many modern frameworks use mostly unchecked exceptions? Does a checked exception roll back a Spring transaction? How do you handle an exception thrown inside a lambda?"</em> The Spring question is answered in the <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.html">@Transactional lesson</a>; lambdas come in <a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a>. Next in this ladder: generics, in <a href="0020-generics-basics-and-invariance.html">lesson 0020</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/index.html">Java Tutorials: Exceptions trail</a>. Read "The Catch or Specify Requirement" and "The try-with-resources Statement".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When should I create my own exception class?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0018-strings-immutability-and-stringbuilder.html">← Why a Java string never changes</a> &nbsp;|&nbsp; <a href="0020-generics-basics-and-invariance.html">Why a List is not a List →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Java Tutorials: Three kinds of exceptions</a> · [2] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Java Tutorials: try-with-resources</a> · [3] <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">Java Tutorials: What is an exception</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java Tutorials, the Java 21 documentation and the Java Language Specification, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Java Tutorials: Three kinds of exceptions</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Java Tutorials: try-with-resources</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">Java Tutorials: What is an exception</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/finally.html">Java Tutorials: finally</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable Javadoc</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-11.html">JLS §11 Exceptions</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.20.3">JLS §14.20.3</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

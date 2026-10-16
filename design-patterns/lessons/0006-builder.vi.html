@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 6: Builder</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Builder</h1>
+<p class="meta">Design Patterns · Bài 0006 · bước 6/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-builder.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> thay một telescoping constructor bằng builder và validate trong <code>build()</code>.</div>
+
+<h2>Mục đích</h2>
+<p>Builder là "một creational design pattern cho phép bạn dựng các object phức tạp theo từng bước." Nó giải quyết vấn đề telescoping constructor (constructor có quá nhiều tham số tùy chọn), dựng ra các dạng biểu diễn khác nhau bằng cùng một chuỗi bước, và dựng cây composite mà không để lộ product còn dang dở.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/BuilderDemo.java
+Pizza(large, cheese=true, pepperoni=false, mushrooms=true, olives=false, extra=2)
+Pizza(large, cheese=true, pepperoni=false, mushrooms=true, olives=false, extra=2)
+StringBuilder is the JDK&#x27;s best-known builder: a1!
+build() validates: size is required</code></pre><p>So sánh lời gọi constructor với builder kiểu fluent: chỉ những bước bạn cần mới phải viết ra, và <code>build()</code> là nơi duy nhất để validate. Mã nguồn: <a href="../examples/BuilderDemo.java"><code>BuilderDemo.java</code></a>. Builder ở đây là một static nested class (<a href="../../oop/lessons/0012-nested-classes.vi.html">bài OOP</a>). Trong JDK: <code>StringBuilder</code> và <code>HttpRequest.newBuilder()</code>; với dữ liệu immutable đơn giản, record cộng với compact constructor (<a href="../../java/lessons/0003-records-and-immutability.vi.html">bài học</a>) thường là đủ.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Dựng từng bước, có thể hoãn lại hoặc đệ quy</li><li>Tái sử dụng code dựng object cho nhiều dạng biểu diễn</li><li>Cô lập logic dựng phức tạp (Single Responsibility)</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Thêm class và code phức tạp hơn</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a> Factory Method đơn giản hơn nhưng kém linh hoạt hơn; Abstract Factory trả product về ngay, còn Builder cho phép thêm bước; Builder đi cùng Composite để dựng cây.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Builder giải quyết vấn đề nào?</p>
+  <button>Vòng lặp chậm</button>
+  <button data-correct>Telescoping constructor</button>
+  <button>Deep copy</button>
+  <button>Truy cập toàn cục</button>
+  <p class="explain">Constructor tích tụ quá nhiều tham số tùy chọn.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Validate ở đâu?</p>
+  <button>Không ở đâu cả</button>
+  <button>Trong toString</button>
+  <button>Chỉ trong từng setter</button>
+  <button data-correct>Trong build()</button>
+  <p class="explain">Bản demo ném exception từ build() khi size bị bỏ trống.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Builder so với Abstract Factory?</p>
+  <button>Builder nhanh hơn</button>
+  <button>Là một thứ</button>
+  <button>Builder không cần class</button>
+  <button data-correct>Builder cho phép thêm bước</button>
+  <p class="explain">Abstract Factory trả product về ngay; Builder cho phép thêm các bước bổ sung.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cái giá phải trả?</p>
+  <button>Trạng thái static</button>
+  <button>Mất tính immutable</button>
+  <button data-correct>Thêm class</button>
+  <button>Đọc chậm</button>
+  <p class="explain">Nó làm code phức tạp hơn vì phải thêm class mới.<a class="cite" href="https://refactoring.guru/design-patterns/builder">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-build-an-http-request.vi.md">Bài tập 6: dựng một request</a></p>
+<p>Ví dụ chạy được: <a href="../examples/BuilderDemo.java"><code>BuilderDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/builder">Builder (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0005-abstract-factory.vi.html">← Abstract Factory</a> &nbsp;|&nbsp; <a href="0007-prototype.vi.html">Prototype →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/builder">Builder (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

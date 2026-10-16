@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tóm tắt JDK 8, 17, 21</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bảng tóm tắt JDK 8, 17 và 21</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Tài liệu tra cứu · thân thiện khi in · <a href="../java/index.vi.html">Lộ trình Java</a> · <a href="../java/interview.vi.html">Hỏi đáp phỏng vấn Java</a> · <a class="lang" href="jdk-8-17-21.html" hreflang="en" lang="en">English</a></p>
+<p>Mỗi tính năng được xếp vào JDK đã đưa nó thành <em>chính thức</em>. JDK 17 bao gồm mọi thứ đã chính thức từ 9 đến 17; JDK 21 bao gồm mọi thứ tính đến 21. Các bản LTS theo Oracle: 8, 11, 17, 21, 25 (<a href="https://www.oracle.com/java/technologies/java-se-support-roadmap.html">lộ trình hỗ trợ</a>).</p>
+
+<h2>Mốc nền JDK 8</h2>
+<table>
+<tr><th>Tính năng</th><th>Tóm tắt một dòng</th><th>Bài</th></tr>
+<tr><td>Lambda, method reference</td><td><code>(a, b) -&gt; a + b</code>, <code>String::length</code>; biến local được capture phải effectively final. <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Tutorial</a></td><td><a href="../java/lessons/0008-lambdas-and-functional-interfaces.vi.html">8</a></td></tr>
+<tr><td>Functional interface</td><td>một abstract method; <code>Predicate</code>, <code>Function</code>, <code>Consumer</code>, <code>Supplier</code> trong <code>java.util.function</code></td><td><a href="../java/lessons/0008-lambdas-and-functional-interfaces.vi.html">8</a></td></tr>
+<tr><td>Default method</td><td>class thắng; hai default xung đột thì bắt buộc override, dùng <code>X.super.m()</code>. <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Tutorial</a></td><td><a href="../java/lessons/0009-default-methods-and-conflicts.vi.html">9</a></td></tr>
+<tr><td>Stream</td><td>lazy; terminal op mới kích hoạt; dùng một lần; tránh side effect. <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/stream/package-summary.html">Tài liệu</a></td><td><a href="../java/lessons/0004-streams-and-optional.vi.html">4</a></td></tr>
+<tr><td>Optional</td><td>kiểu trả về cho "không có kết quả"; <code>orElseGet</code> là lazy, <code>orElse</code> thì không</td><td><a href="../java/lessons/0004-streams-and-optional.vi.html">4</a></td></tr>
+<tr><td>java.time</td><td><code>LocalDate</code>, <code>Instant</code>, <code>ZonedDateTime</code>, <code>Duration</code>, <code>Period</code>. <a href="https://docs.oracle.com/javase/tutorial/datetime/iso/overview.html">Tutorial</a></td><td><a href="../java/lessons/0011-java-time.vi.html">11</a></td></tr>
+<tr><td>CompletableFuture</td><td>chuỗi async chạy trên <code>ForkJoinPool.commonPool()</code> theo mặc định; exception của <code>join</code> khác <code>get</code></td><td><a href="../java/lessons/0010-completablefuture.vi.html">10</a></td></tr>
+</table>
+
+<h2>Những gì có đến JDK 17</h2>
+<table>
+<tr><th>Tính năng</th><th>Phiên bản</th><th>Tóm tắt một dòng</th><th>Bài</th></tr>
+<tr><td><code>var</code> (<a href="https://openjdk.org/jeps/286">JEP 286</a>)</td><td>10</td><td>chỉ cho biến local có khởi tạo</td><td><a href="../java/lessons/0012-var-and-text-blocks.vi.html">12</a></td></tr>
+<tr><td>Switch expression (<a href="https://openjdk.org/jeps/361">JEP 361</a>)</td><td>14</td><td><code>case X -&gt; ...</code>, <code>yield</code>, vét cạn</td><td><a href="../java/lessons/0013-switch-expressions-and-instanceof-patterns.vi.html">13</a></td></tr>
+<tr><td>Text block (<a href="https://openjdk.org/jeps/378">JEP 378</a>)</td><td>15</td><td>chuỗi nhiều dòng <code>"""</code></td><td><a href="../java/lessons/0012-var-and-text-blocks.vi.html">12</a></td></tr>
+<tr><td>instanceof pattern (<a href="https://openjdk.org/jeps/394">JEP 394</a>)</td><td>16</td><td><code>if (o instanceof String s)</code></td><td><a href="../java/lessons/0013-switch-expressions-and-instanceof-patterns.vi.html">13</a></td></tr>
+<tr><td>Record</td><td>16</td><td>vật chứa bất biến nông; compact constructor. <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Javadoc</a></td><td><a href="../java/lessons/0003-records-and-immutability.vi.html">3</a></td></tr>
+<tr><td>Sealed class (<a href="https://openjdk.org/jeps/409">JEP 409</a>)</td><td>17</td><td><code>sealed ... permits</code>; subclass là <code>final</code>, <code>sealed</code> hoặc <code>non-sealed</code></td><td><a href="../java/lessons/0014-sealed-classes.vi.html">14</a></td></tr>
+</table>
+
+<h2>Những gì có đến JDK 21</h2>
+<table>
+<tr><th>Tính năng</th><th>Tóm tắt một dòng</th><th>Bài</th></tr>
+<tr><td>Pattern matching cho switch (<a href="https://openjdk.org/jeps/441">JEP 441</a>)</td><td>type pattern, guard <code>when</code>, <code>case null</code>, vét cạn trên kiểu sealed, quy tắc dominance</td><td><a href="../java/lessons/0015-pattern-matching-switch-and-record-patterns.vi.html">15</a></td></tr>
+<tr><td>Record pattern (<a href="https://openjdk.org/jeps/440">JEP 440</a>)</td><td><code>case Circle(Point(var x, var y), var r)</code></td><td><a href="../java/lessons/0015-pattern-matching-switch-and-record-patterns.vi.html">15</a></td></tr>
+<tr><td>Sequenced collection (<a href="https://openjdk.org/jeps/431">JEP 431</a>)</td><td><code>getFirst</code>, <code>getLast</code>, <code>reversed</code>; <code>SequencedCollection/Set/Map</code></td><td><a href="../java/lessons/0016-sequenced-collections.vi.html">16</a></td></tr>
+<tr><td>Virtual thread (<a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">tài liệu</a>)</td><td>mở rộng chứ không phải tốc độ; mỗi task một thread; không bao giờ pool; giới hạn bằng <code>Semaphore</code></td><td><a href="../java/lessons/0006-virtual-threads.vi.html">6</a></td></tr>
+<tr><td>Generational ZGC (<a href="https://openjdk.org/jeps/439">JEP 439</a>)</td><td><code>-XX:+UseZGC -XX:+ZGenerational</code></td><td><a href="../java/lessons/0017-generational-zgc.vi.html">17</a></td></tr>
+</table>
+
+<h2>Ranh giới đã kiểm chứng</h2>
+<p>Đã biên dịch khi viết khóa học này: các ví dụ JDK 8 với <code>javac --release 8</code>, ví dụ JDK 17 với <code>--release 17</code>, ví dụ JDK 21 với <code>--release 21</code>. Biên dịch ví dụ JDK 21 với <code>--release 17</code> sẽ lỗi ("patterns in switch statements are not supported in -source 17").</p>
+<h2>Những điều phải biết, không phụ thuộc phiên bản</h2>
+<ul>
+<li>Contract <code>equals</code>/<code>hashCode</code>; giá trị mặc định của HashMap (capacity 16, load factor 0.75), không được synchronized. <a href="../java/lessons/0001-hashmap-equals-hashcode.vi.html">Bài 1</a></li>
+<li>Happens-before: unlock/lock monitor, ghi/đọc volatile, <code>Thread.start</code>, <code>join</code>. <a href="../java/lessons/0005-visibility-and-happens-before.vi.html">Bài 5</a></li>
+<li>GC mặc định: G1 trên server-class machine, ngược lại là Serial; heap tối đa bằng 1/4 RAM. <a href="../java/lessons/0007-heap-and-garbage-collection.vi.html">Bài 7</a></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> để được kiểm tra xem JDK nào đã giới thiệu tính năng nào.</p></footer>
+</main>
+</body>
+</html>

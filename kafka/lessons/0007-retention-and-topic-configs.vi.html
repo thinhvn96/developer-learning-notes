@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 7: Retention và cấu hình topic</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Retention và cấu hình topic</h1>
+<p class="meta">Kafka · Bài 0007 · bước 4/23 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-retention-and-topic-configs.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được Kafka giữ dữ liệu bao lâu, những cấu hình topic nào điều khiển việc đó, và vì sao 'đã consume' không có nghĩa là 'đã xoá'.</div>
+
+<h2>Retention, không phải consumption</h2>
+<p>"Event không bị xoá sau khi được tiêu thụ"; retention được cấu hình theo từng topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[2]</a> Các cấu hình topic quyết định việc này (giá trị mặc định lấy từ tài liệu 4.3):<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+<table><tr><th>Cấu hình</th><th>Ý nghĩa và giá trị mặc định<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></th></tr>
+<tr><td><code>cleanup.policy</code></td><td><code>delete</code> (mặc định) bỏ các segment cũ khi chúng chạm giới hạn thời gian hoặc kích thước</td></tr>
+<tr><td><code>retention.ms</code></td><td>thời gian tối đa giữ một log: 604800000 (7 ngày)</td></tr>
+<tr><td><code>retention.bytes</code></td><td>kích thước tối đa của một partition trước khi các segment cũ bị bỏ: -1 (không giới hạn)</td></tr>
+<tr><td><code>segment.bytes</code></td><td>kích thước file segment: 1073741824 (1 GiB); "retention và cleaning luôn được thực hiện theo từng file một"</td></tr>
+<tr><td><code>min.insync.replicas</code></td><td>số in-sync replica tối thiểu để một lần ghi thành công khi <code>acks=all</code>: 1</td></tr>
+<tr><td><code>max.message.bytes</code></td><td>record batch lớn nhất: 1048588</td></tr></table>
+<pre><code>cd kafka/examples &amp;&amp; ./02-retention-and-compaction.sh
+cleanup.policy=delete   retention.ms=604800000   retention.bytes=-1</code></pre>
+<p>Output đó là kết quả của <code>kafka-configs.sh --describe --all</code> trên một topic mới tạo. Lưu ý độ mịn của retention: vì việc xoá diễn ra theo từng file segment, dữ liệu có thể sống lâu hơn <code>retention.ms</code> cho tới khi segment của nó được đóng lại và đủ điều kiện xoá (suy ra từ ghi chú về segment ở trên). Mã nguồn: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. cleanup.policy mặc định là gì?</p>
+  <button>archive</button>
+  <button>none</button>
+  <button>compact</button>
+  <button data-correct>delete</button>
+  <p class="explain">Policy delete là mặc định.<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. retention.ms mặc định là bao nhiêu?</p>
+  <button>Mãi mãi</button>
+  <button>Một phút</button>
+  <button>Một giờ</button>
+  <button data-correct>Bảy ngày</button>
+  <p class="explain">604800000 ms là bảy ngày.<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Sau khi một consumer đọc một event...?</p>
+  <button>Nó bị xoá</button>
+  <button>Nó bị di chuyển</button>
+  <button>Nó bị nhân bản</button>
+  <button data-correct>Nó ở lại tới hết retention</button>
+  <p class="explain">Event không bị xoá sau khi được tiêu thụ.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Việc xoá theo retention thực hiện trên đơn vị nào?</p>
+  <button>Cả topic</button>
+  <button>Từng partition</button>
+  <button>Từng record</button>
+  <button data-correct>Cả file segment</button>
+  <p class="explain">Retention và cleaning được thực hiện theo từng file một.<a class="cite" href="https://kafka.apache.org/43/configuration/topic-configs/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-set-retention.vi.md">Bài tập 0007: đặt retention</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka Topic Configs</a>. Các mục cleanup.policy, retention.ms, retention.bytes, segment.bytes.</p>
+<p><a href="0011-java-producer-and-consumer.vi.html">← Producer và consumer Java đầu tiên</a> &nbsp;|&nbsp; <a href="0003-consumers-groups-and-offsets.vi.html">Consumer, consumer group và offset →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/configuration/topic-configs/">Kafka Topic Configs</a> · [2] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka Introduction</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

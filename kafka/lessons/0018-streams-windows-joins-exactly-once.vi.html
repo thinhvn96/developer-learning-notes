@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 18: Kafka Streams: window, join và exactly-once</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka Streams: window, join và exactly-once</h1>
+<p class="meta">Kafka · Bài 0018 · bước 17/23 · Senior · ~15 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0018-streams-windows-joins-exactly-once.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn đúng loại window, giải thích co-partitioning và repartition topic khi join, và bật exactly-once trong một ứng dụng Kafka Streams.</div>
+
+<h2>Ba abstraction kiểu bảng</h2>
+<ul>
+<li><code>KStream</code>: mỗi record là một sự kiện độc lập ("dữ liệu tự đứng một mình").<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li><code>KTable</code>: mỗi record là một "UPDATE" của giá trị gần nhất theo key; giá trị <code>null</code> nghĩa là xoá.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li><code>GlobalKTable</code>: mỗi instance giữ một bản sao đầy đủ, "được nạp dữ liệu từ tất cả partition của topic".<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a> Hợp với dữ liệu tham chiếu nhỏ.</li>
+</ul>
+<h2>Window và dữ liệu đến muộn</h2>
+<p>Tổng hợp theo thời gian thì cần window. DSL cung cấp tumbling (<code>TimeWindows.ofSizeWithNoGrace</code>), hopping, sliding (<code>SlidingWindows.ofTimeDifferenceAndGrace</code>) và session window (<code>SessionWindows.ofInactivityGapWithNoGrace</code>).<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a> Tumbling: cố định, không chồng lấn (số order mỗi phút). Hopping: kích thước cố định, có chồng lấn (window 5 phút, trượt mỗi phút). Session: kéo dài chừng nào event vẫn tới trong khoảng inactivity gap (phiên người dùng).</p>
+<p>Thời gian ở đây là <em>stream time</em>, được đẩy đi bởi timestamp của record, và nó "chỉ tiến lên khi có record mới tới". Record có thể đến không theo thứ tự; <strong>grace period</strong> quy định một window còn nhận record muộn trong bao lâu, record đến sau đó sẽ bị bỏ.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+<pre><code>orders.groupByKey()
+      .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofMinutes(1), Duration.ofSeconds(30)))
+      .count();   // orders per key per minute, late records accepted for 30 s</code></pre>
+<h2>Join cần co-partitioning</h2>
+<ul>
+<li>"KStream-KStream join luôn là windowed join." KStream-KTable và KStream-GlobalKTable hỗ trợ inner và left, không hỗ trợ outer.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li>"Với equi-join, dữ liệu đầu vào phải được co-partition": cùng key, cùng số partition, cùng partitioner. GlobalKTable và foreign-key join thì không cần.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li>Đổi key (<code>selectKey</code>, <code>map</code>) sẽ đánh dấu stream cần repartition; lần <code>groupByKey</code> hoặc join tiếp theo sẽ ghi qua một repartition topic nội bộ. "<code>groupBy</code> luôn gây ra repartition dữ liệu." Hãy ưu tiên <code>mapValues</code> khi key không đổi.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+</ul>
+<h2>Exactly-once trong Streams</h2>
+<p>Mặc định là at-least-once. Đặt <code>processing.guarantee=exactly_once_v2</code> thì việc commit offset đầu vào, cập nhật state store và ghi đầu ra "sẽ được hoàn tất một cách nguyên tử", dựa trên Kafka transaction.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a> Đây là mức exactly-once mạnh nhất Kafka cung cấp, vì toàn bộ vòng đọc-xử lý-ghi nằm gọn trong Kafka. State store local được khôi phục từ các changelog topic sau sự cố.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+<div class="aside">Câu trả lời khi phỏng vấn: "Đếm theo window với grace period cho dữ liệu muộn; với join thì tôi kiểm tra co-partitioning trước, hoặc dùng GlobalKTable cho dữ liệu dimension nhỏ; dùng <code>exactly_once_v2</code> khi đầu ra đi vào logic liên quan đến tiền."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. KStream-KStream join luôn là...?</p>
+  <button>Global join</button>
+  <button data-correct>Windowed join</button>
+  <button>Foreign-key join</button>
+  <button>Outer join</button>
+  <p class="explain">KStream-KStream join luôn là windowed join.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Join nào KHÔNG cần co-partitioning?</p>
+  <button>KStream-KStream</button>
+  <button>KTable-KTable</button>
+  <button>KStream-KTable</button>
+  <button data-correct>KStream-GlobalKTable</button>
+  <p class="explain">GlobalKTable và foreign-key join không yêu cầu đầu vào được co-partition.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Một record đến sau grace period. Kết quả?</p>
+  <button>Nó được sắp lại</button>
+  <button>Nó mở window mới</button>
+  <button data-correct>Nó bị bỏ đi</button>
+  <button>Nó làm dừng app</button>
+  <p class="explain">Record đến sau grace period sẽ bị loại bỏ.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Giá trị nào bật exactly-once trong Streams?</p>
+  <button>idempotent_true</button>
+  <button>transactional</button>
+  <button>at_least_once</button>
+  <button data-correct>exactly_once_v2</button>
+  <p class="explain">Đặt processing.guarantee thành exactly_once_v2.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0018-fraud-window.vi.md">Bài tập 0018: xây một window phát hiện gian lận</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-streams-wordcount.sh"><code>04-streams-wordcount.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">Kafka Streams DSL API</a>. Đọc mục 'Windowing' và 'Joining', bao gồm cả các yêu cầu về co-partitioning.</p>
+<p><a href="0006-idempotence-and-transactions.vi.html">← Idempotent producer và transaction</a> &nbsp;|&nbsp; <a href="0010-kafka-connect.vi.html">Kafka Connect: đưa dữ liệu vào và ra →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">Kafka Streams DSL API</a> · [2] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams Core Concepts</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

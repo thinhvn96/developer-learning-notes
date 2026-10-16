@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 8: Polymorphism và cơ chế gọi virtual method</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Polymorphism và cơ chế gọi virtual method</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0008 · bước 8/22 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-polymorphism.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được virtual method invocation và phân biệt được dispatch lúc runtime (override) với việc chọn method lúc compile (overload).</div>
+
+<h2>Định nghĩa</h2>
+<p>"Các subclass của một class có thể định nghĩa behavior riêng của mình nhưng vẫn dùng chung một phần chức năng của class cha." Cơ chế then chốt: "Máy ảo Java (JVM) gọi method phù hợp với object mà mỗi biến đang trỏ tới. Nó không gọi method được định nghĩa bởi kiểu của biến. Hành vi này được gọi là <em>virtual method invocation</em>."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[1]</a></p>
+<pre><code>java oop/examples/PolymorphismDemo.java
+Circle  area=3.14
+Square  area=4.00
+Circle  area=0.79
+total=7.93
+overload chosen for a Shape-typed variable holding a Circle: describe(Shape)</code></pre>
+<p>Một vòng lặp duy nhất trên <code>List&lt;Shape&gt;</code> tạo ra ba behavior khác nhau. Dòng cuối cùng là cái bẫy: các <em>overload</em> (<code>describe(Shape)</code> so với <code>describe(Circle)</code>) được chọn lúc compile dựa trên kiểu khai báo của biến, nên một biến kiểu <code>Shape</code> đang giữ một <code>Circle</code> sẽ chọn <code>describe(Shape)</code>. Override là động; overload là tĩnh. Mã nguồn: <a href="../examples/PolymorphismDemo.java"><code>PolymorphismDemo.java</code></a>.</p>
+<p>Vì sao điều này quan trọng: chính cơ chế này cho phép phía gọi phụ thuộc vào một interface mà vẫn mở cho các kiểu mới: nền tảng của hầu hết các <a href="../../design-patterns/index.vi.html">design pattern</a> và của <a href="0018-open-closed-principle.vi.html">Open/Closed Principle</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Với một lời gọi method đã override, method nào chạy?</p>
+  <button>Luôn là của class cha</button>
+  <button data-correct>Của class runtime của object</button>
+  <button>Cái được tìm thấy đầu tiên</button>
+  <button>Của kiểu khai báo của biến</button>
+  <p class="explain">JVM gọi method của object mà biến đang trỏ tới.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Việc chọn overload diễn ra...?</p>
+  <button>Không bao giờ</button>
+  <button data-correct>Lúc compile</button>
+  <button>Lúc runtime</button>
+  <button>Lúc load class</button>
+  <p class="explain">Demo chọn describe(Shape) dựa trên kiểu khai báo.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Virtual method invocation là...?</p>
+  <button>Một từ khoá</button>
+  <button>Một flag của JIT</button>
+  <button data-correct>Dispatch lúc runtime theo object</button>
+  <button>Một design pattern</button>
+  <p class="explain">Đó là việc chọn method đã override lúc runtime.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Polymorphism mang lại điều gì?</p>
+  <button>Vòng lặp nhanh hơn</button>
+  <button>Bỏ được kiểu tĩnh</button>
+  <button>Quyền truy cập private</button>
+  <button data-correct>Một vòng lặp, nhiều behavior</button>
+  <p class="explain">Một vòng lặp duy nhất trong demo in ra ba diện tích khác nhau.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-shapes-and-overloads.vi.md">Bài tập 8: hình học và overload</a></p>
+<p>Ví dụ chạy được: <a href="../examples/PolymorphismDemo.java"><code>PolymorphismDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">Java Tutorials: Polymorphism</a>. Trang ngắn.</p>
+<p><a href="0007-overriding-and-hiding.vi.html">← Override và hiding</a> &nbsp;|&nbsp; <a href="0009-abstract-classes-vs-interfaces.vi.html">Abstract class và interface →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/polymorphism.html">Java Tutorials: Polymorphism</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

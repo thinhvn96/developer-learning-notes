@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 10: Sharding, shard key và consistent hashing</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Sharding, shard key và consistent hashing</h1>
+<p class="meta">System Design · Bài 0010 · bước 11/11 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-sharding.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được shard key và ba chiến lược chính, đồng thời chỉ ra vì sao hash-mod-N rất đau đầu khi thêm một shard.</div>
+
+<h2>Ý tưởng</h2>
+<p>"Chia một data store thành một tập các phân vùng ngang, hay shard": mỗi shard có cùng schema và giữ một tập con dữ liệu riêng. <strong>Shard key</strong> là quyết định quan trọng nhất; đổi nó thường đồng nghĩa với việc migrate toàn bộ dữ liệu. Một key tốt thì bất biến, có cardinality cao (nhiều giá trị khác nhau), dàn đều dữ liệu và tải, và khớp với các query chủ đạo; tránh các giá trị tăng đơn điệu và các thuộc tính có cardinality thấp.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+<h2>Các chiến lược</h2>
+<ul><li><strong>Lookup (directory):</strong> một bảng ánh xạ từ key sang shard; linh hoạt, nhưng tốn thêm một bước tra cứu.</li>
+<li><strong>Range:</strong> tốt cho range query; dễ sinh hotspot (điểm nóng) và khó rebalance.</li>
+<li><strong>Hash:</strong> phân bố đều; với <code>hash(key) mod N</code> thuần túy, "thêm hoặc bớt một shard sẽ gán lại phần lớn các key"; consistent hashing chỉ di chuyển một phần nhỏ.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></li>
+<li><strong>Geographic (theo địa lý):</strong> phục vụ yêu cầu lưu trú dữ liệu và latency; có nguy cơ mất cân bằng.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></li></ul>
+<pre><code>java system-design/examples/ShardingDemo.java     # 100,000 keys, 4 -&gt; 5 shards
+hash(key) mod N            : 80.1% of keys move
+consistent hashing (ring)  : 18.2% of keys move (ideal 20%)</code></pre>
+<p>Mã nguồn: <a href="../examples/ShardingDemo.java"><code>ShardingDemo.java</code></a>. Những cái giá mà tài liệu liệt kê: query và transaction xuyên shard, gánh nặng vận hành (giám sát, backup, thay đổi schema). Hãy cân nhắc read replica, caching, hoặc table partitioning trước khi shard.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a> Liên quan: partition của Kafka chính là sharding theo key (<a href="../../kafka/lessons/0001-events-topics-partitions.vi.html">bài học</a>) và shard của Elasticsearch (<a href="../../elk/lessons/0003-shards-and-replicas.vi.html">bài học</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Quyết định sharding quan trọng nhất?</p>
+  <button>Cái logo</button>
+  <button data-correct>Shard key</button>
+  <button>Cổng mạng</button>
+  <button>Driver</button>
+  <p class="explain">Shard key là quyết định thiết kế quan trọng nhất.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. hash mod N khi thêm một shard?</p>
+  <button data-correct>Phần lớn key di chuyển</button>
+  <button>Không key nào di chuyển</button>
+  <button>Chỉ một key di chuyển</button>
+  <button>Một nửa đứng yên</button>
+  <p class="explain">Thêm hoặc bớt một shard sẽ gán lại phần lớn key (80.1% trong demo).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Consistent hashing di chuyển khoảng...?</p>
+  <button>Không gì cả</button>
+  <button>Tất cả</button>
+  <button>Đúng một nửa</button>
+  <button data-correct>Một phần nhỏ</button>
+  <p class="explain">Chỉ một phần nhỏ key di chuyển (18.2% trong demo).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Đặc điểm của một shard key tốt?</p>
+  <button data-correct>Cardinality cao</button>
+  <button>Thay đổi thường xuyên</button>
+  <button>Auto-increment</button>
+  <button>Boolean</button>
+  <p class="explain">Key hiệu quả là key bất biến và có cardinality cao.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-choose-a-shard-key.vi.md">Bài tập 0010: chọn shard key</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ShardingDemo.java"><code>ShardingDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">Azure: Sharding pattern</a>. Giải pháp, cách chọn shard key, các chiến lược.</p>
+<p><a href="0011-transactional-outbox.vi.html">← Transactional outbox</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">Azure: Sharding pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

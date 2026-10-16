@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 6: Quorum queue và poison message</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Quorum queue và poison message</h1>
+<p class="meta">RabbitMQ · Bài 0006 · bước 7/9 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-quorum-queues-and-poison-messages.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được vì sao quorum queue là lựa chọn mặc định cho replicated queue, và delivery limit biến poison message thành dead letter như thế nào.</div>
+
+<h2>Quorum queue là gì</h2>
+<p>Theo tài liệu, "quorum queue của RabbitMQ là một kiểu queue hiện đại, hiện thực một queue durable, có replication, dựa trên thuật toán đồng thuận Raft."<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a> Chúng hợp với các queue sống lâu chứa dữ liệu quan trọng (ví dụ đơn hàng), và không dành cho queue tạm thời.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a> Lời khuyên của tài liệu: "quorum queue nên được xem là lựa chọn mặc định khi cần một queue có replication và tính sẵn sàng cao." Classic queue mirroring "đã bị loại bỏ kể từ RabbitMQ 4.0."<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+<h2>Poison message</h2>
+<p>Poison message là message lần nào xử lý cũng lỗi và sẽ bị requeue mãi mãi. Quorum queue đếm số lần giao lại trong header <code>x-delivery-count</code>; từ RabbitMQ 4.0, chúng áp dụng delivery limit mặc định là 20. Vượt quá giới hạn này, message sẽ bị bỏ, hoặc bị dead-letter nếu có cấu hình DLX.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a> Vượt delivery limit là một trong bốn lý do dead-letter.<a class="cite" href="https://www.rabbitmq.com/docs/dlx">[2]</a></p>
+<h2>Dead lettering at-least-once</h2>
+<p>Quorum queue hỗ trợ cả dead lettering kiểu truyền thống lẫn kiểu <em>at-least-once</em>, trong đó "quorum queue nguồn sẽ giữ lại các message đã dead-letter cho tới khi chúng được ack" bởi đích dead-letter.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+<div class="aside">Pattern hay gặp khi phỏng vấn: quorum queue + manual ack + delivery limit + DLX, kèm một job kiểm tra và replay dead-letter queue. Đó là câu trả lời chuẩn cho câu "bạn xử lý poison message thế nào?".</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Thuật toán đồng thuận đứng sau quorum queue?</p>
+  <button>Paxos</button>
+  <button data-correct>Raft</button>
+  <button>Gossip</button>
+  <button>Two-phase commit</button>
+  <p class="explain">Quorum queue dựa trên thuật toán đồng thuận Raft.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Delivery limit mặc định từ RabbitMQ 4.0?</p>
+  <button>Không giới hạn</button>
+  <button>Một trăm</button>
+  <button>Ba</button>
+  <button data-correct>Hai mươi</button>
+  <p class="explain">Chúng áp dụng delivery limit mặc định là 20.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Mirrored classic queue trong RabbitMQ 4.0?</p>
+  <button>Vẫn được ưu tiên</button>
+  <button data-correct>Đã bị loại bỏ</button>
+  <button>Chỉ cho stream</button>
+  <button>Giờ là mặc định</button>
+  <p class="explain">Classic queue mirroring đã bị loại bỏ kể từ RabbitMQ 4.0.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message vượt delivery limit. Kết quả?</p>
+  <button data-correct>Dead-letter nếu có DLX</button>
+  <button>Retry mãi mãi</button>
+  <button>Tự động được ack</button>
+  <button>Chuyển sang fanout</button>
+  <p class="explain">Nó bị bỏ, hoặc được route tới DLX nếu có cấu hình.<a class="cite" href="https://www.rabbitmq.com/docs/quorum-queues">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-poison-message-plan.vi.md">Bài tập 0006: kế hoạch xử lý poison message</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum Queues</a>. Đọc phần mở đầu, 'Use Cases' và 'Poison Message Handling'.</p>
+<p><a href="0005-dead-letter-exchanges.vi.html">← Dead letter exchange</a> &nbsp;|&nbsp; <a href="0008-streams.vi.html">Stream: một append-only log ngay trong RabbitMQ →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/quorum-queues">RabbitMQ: Quorum Queues</a> · [2] <a href="https://www.rabbitmq.com/docs/dlx">RabbitMQ: Dead Letter Exchanges</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

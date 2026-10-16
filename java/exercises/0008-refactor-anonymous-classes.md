@@ -1,5 +1,7 @@
 # Exercise 0008: replace anonymous classes
 
+[Tiếng Việt](0008-refactor-anonymous-classes.vi.md)
+
 Companion to [lesson 8](../lessons/0008-lambdas-and-functional-interfaces.html).
 
 1. Rewrite `Collections.sort(list, new Comparator<String>() {...})` using a lambda, then a method reference / `Comparator.comparing`.

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 12: Testing: @SpringBootTest và test slice</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Testing: @SpringBootTest và test slice</h1>
+<p class="meta">Spring Boot · Bài 0012 · bước 12/13 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-test-slices-and-springboottest.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn giữa một <code>@SpringBootTest</code> đầy đủ và một test slice, và biết <code>webEnvironment</code> làm gì.</div>
+
+<h2>@SpringBootTest</h2>
+<p>Nó tạo <code>ApplicationContext</code> thông qua <code>SpringApplication</code>, nên external properties, logging và profile đều hoạt động. Mặc định nó <strong>không</strong> khởi động server. <code>webEnvironment</code>: <code>MOCK</code> (mặc định, môi trường servlet giả lập), <code>RANDOM_PORT</code> và <code>DEFINED_PORT</code> (embedded server thật), <code>NONE</code> (không có môi trường web).<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+<h2>Slice</h2>
+<p>Slice chỉ load một phần cấu hình để chạy nhanh hơn và tập trung vào một tầng: <code>@WebMvcTest</code> (controller, advice, filter, converter), <code>@DataJpaTest</code> (các component JPA), <code>@JsonTest</code>, <code>@RestClientTest</code>. Thay bean bằng <code>@MockitoBean</code>/<code>@MockitoSpyBean</code>. Test bằng MockMvc nhanh hơn chạy server thật nhưng không test được hành vi của servlet container.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+<pre><code>@WebMvcTest(PersonController.class)     // only the web layer
+class PersonControllerTest { @Autowired MockMvc mvc; ... }
+
+@SpringBootTest @AutoConfigureMockMvc   // full context + MockMvc
+class ActuatorProbesTest { ... }</code></pre>
+<p>Cả hai kiểu đều đã chạy trong demo project (17 test, tất cả đều pass). Lưu ý với Boot 4.x: các annotation slice nằm trong package riêng theo từng công nghệ, ví dụ <code>org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest</code> (tôi vấp phải lỗi này khi compile; hãy kiểm tra import nếu copy các ví dụ cũ). Code: <a href="../examples/demo-app/src/test/java/com/example/demo/PersonControllerTest.java"><code>PersonControllerTest.java</code></a>.</p>
+<div class="aside">Quy tắc kinh nghiệm khi phỏng vấn: nhiều slice test chạy nhanh, ít test full-context, và integration test với dependency thật cho tầng persistence (xem Testcontainers ở bài tiếp theo).</div><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. webEnvironment mặc định của @SpringBootTest?</p>
+  <button>DEFINED_PORT</button>
+  <button data-correct>MOCK</button>
+  <button>NONE</button>
+  <button>RANDOM_PORT</button>
+  <p class="explain">MOCK là mặc định; không có server nào được khởi động.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Annotation nào chỉ test controller?</p>
+  <button>@JsonTest</button>
+  <button>@SpringBootApplication</button>
+  <button data-correct>@WebMvcTest</button>
+  <button>@DataJpaTest</button>
+  <p class="explain">@WebMvcTest scan controller và các component web.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao nên ưu tiên slice?</p>
+  <button>Chúng thay thế JUnit</button>
+  <button data-correct>Test nhanh hơn, tập trung hơn</button>
+  <button>Chúng test mọi thứ</button>
+  <button>Chúng khởi động server</button>
+  <p class="explain">Slice chỉ load cấu hình liên quan, giúp giảm thời gian khởi động.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Annotation để thay một bean bằng mock?</p>
+  <button>@Primary</button>
+  <button data-correct>@MockitoBean</button>
+  <button>@Scope</button>
+  <button>@Profile</button>
+  <p class="explain">@MockitoBean định nghĩa các Mockito mock trong context.<a class="cite" href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-test-pyramid.vi.md">Bài tập 0012: kim tự tháp test</a></p>
+<p>Ví dụ chạy được: <a href="../examples/demo-app/src/test/java/com/example/demo/PersonControllerTest.java"><code>demo-app/src/test/java/com/example/demo/PersonControllerTest.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot: Testing Spring Boot Applications</a>. Các phần về @SpringBootTest và test slice.</p>
+<p><a href="0011-actuator-and-kubernetes-probes.vi.html">← Actuator và Kubernetes probe</a> &nbsp;|&nbsp; <a href="0013-testcontainers-and-service-connection.vi.html">Testcontainers và @ServiceConnection →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot: Testing Spring Boot Applications</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

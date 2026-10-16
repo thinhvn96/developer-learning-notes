@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 11: Composite</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Composite</h1>
+<p class="meta">Design Patterns · Bài 0011 · bước 11/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-composite.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> xử lý một lá và một nhóm lá qua cùng một interface, và tính toán đệ quy trên một cây.</div>
+
+<h2>Mục đích</h2>
+<p>Composite là "một structural design pattern cho phép bạn ghép các object thành cấu trúc cây rồi làm việc với các cấu trúc đó như thể chúng là từng object riêng lẻ." Hãy dùng nó cho các cấu trúc object dạng cây và khi code phía client cần xử lý phần tử đơn giản lẫn phức tạp theo cùng một cách.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/CompositeDemo.java
+total size = 75
+root/ (75)
+  a.txt (10)
+  src/ (65)
+    Main.java (40)
+    Util.java (25)
+  empty/ (0)</code></pre><p><code>Folder.size()</code> cộng dồn kích thước các con thông qua cùng interface <code>Node</code>; client gọi <code>tree.size()</code> mà không cần biết mình đang cầm file hay folder. Mã nguồn: <a href="../examples/CompositeDemo.java"><code>CompositeDemo.java</code></a>. Hình dạng này cũng xuất hiện ở cây biểu thức, cây UI component và sơ đồ tổ chức (so sánh với recursive CTE trong <a href="../../postgresql/lessons/0009-ctes-with-and-recursive.vi.html">PostgreSQL</a>).</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Xử lý hệ phân cấp phức tạp nhờ đa hình và đệ quy</li><li>Open/Closed: loại phần tử mới vẫn lắp vừa</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Khó định nghĩa interface chung khi các component khác nhau quá nhiều</li><li>Interface quá chung chung làm giảm độ rõ ràng</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a> Builder có thể dựng cây Composite, Iterator và Visitor dùng để duyệt cây, Flyweight có thể dùng chung các lá; Decorator cũng đệ quy tương tự nhưng chỉ thêm trách nhiệm cho một con, còn Composite tổng hợp kết quả từ các con.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Composite xử lý...?</p>
+  <button>Chỉ lá</button>
+  <button>Chỉ nhóm</button>
+  <button>Chỉ gốc</button>
+  <button data-correct>Lá và nhóm như nhau</button>
+  <p class="explain">Code phía client xử lý phần tử đơn giản và phức tạp theo cùng một cách.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Cấu trúc điển hình?</p>
+  <button>Một stack</button>
+  <button>Một hash</button>
+  <button>Một queue</button>
+  <button data-correct>Một cây</button>
+  <p class="explain">Cấu trúc object dạng cây.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thao tác trên folder dùng...?</p>
+  <button data-correct>Đệ quy qua các con</button>
+  <button>Một cache</button>
+  <button>Một thread</button>
+  <button>Một biến toàn cục</button>
+  <p class="explain">Folder.size cộng dồn các con qua cùng một interface.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Composite so với Decorator?</p>
+  <button>Decorator tổng hợp các con</button>
+  <button>Như nhau</button>
+  <button>Không cái nào</button>
+  <button data-correct>Composite tổng hợp các con</button>
+  <p class="explain">Composite cộng dồn kết quả của các con; Decorator thêm hành vi cho một object được bọc.<a class="cite" href="https://refactoring.guru/design-patterns/composite">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-menu-tree.vi.md">Bài tập 11: cây menu</a></p>
+<p>Ví dụ chạy được: <a href="../examples/CompositeDemo.java"><code>CompositeDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/composite">Composite (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0010-bridge.vi.html">← Bridge</a> &nbsp;|&nbsp; <a href="0012-decorator.vi.html">Decorator →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/composite">Composite (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

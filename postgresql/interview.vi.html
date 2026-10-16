@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn PostgreSQL</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>PostgreSQL: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · PostgreSQL · 14 câu hỏi · <a href="index.vi.html">Lộ trình PostgreSQL</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi PostgreSQL cho phỏng vấn Senior backend, kèm cách lập luận mà người phỏng vấn muốn nghe. Các con số được trích (số dòng, thời gian) lấy từ những lần tôi chạy các script ví dụ trong một container <code>postgres:18</code> dùng một lần.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Vì sao nên đặt constraint trong database thay vì chỉ trong code ứng dụng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> mọi bên ghi đều phải tuân theo, và constraint được kiểm tra nguyên tử cùng với dữ liệu; kiểm tra ở tầng app thì bị race condition.</p>
+<p>PostgreSQL hỗ trợ <code>CHECK</code>, <code>NOT NULL</code>, <code>UNIQUE</code>, <code>PRIMARY KEY</code> (unique và not null, mỗi table tối đa một cái) và <code>FOREIGN KEY</code> với <code>ON DELETE RESTRICT</code> hoặc <code>CASCADE</code>.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a> Script của tôi cho thấy mỗi loại khi vi phạm đều trả về một lỗi cụ thể. Một bước "kiểm tra rồi mới insert" trong Java có thể bị chen ngang bởi một request khác; unique constraint thì không, vì database thực thi nó ngay trong lúc ghi.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Xử lý lỗi duplicate key trong Java thế nào? (Bắt lỗi vi phạm constraint và coi như 'đã tồn tại'; cân nhắc logic retry và tính idempotent.)</div>
+<p class="see">Học bài: <a href="lessons/0001-tables-and-constraints.vi.html">Table và constraint</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>INNER JOIN khác LEFT JOIN thế nào, và cái bẫy WHERE kinh điển là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> inner join chỉ giữ các dòng khớp; left join giữ mọi dòng bên trái, điền NULL cho phía bên phải bị thiếu; một điều kiện WHERE trên cột của table bên phải sẽ biến left join trở lại thành inner join.</p>
+<p>Left outer join: "table nằm bên trái toán tử join sẽ có mỗi dòng của nó xuất hiện trong kết quả ít nhất một lần"; các dòng không khớp được điền NULL vào các cột bên phải.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[2]</a> Khi tôi chạy, inner join cho 2 dòng, left join cho 3, và thêm <code>WHERE cities.location IS NOT NULL</code> lại chỉ còn 2. Hãy chuyển điều kiện vào <code>ON</code> để giữ các dòng bên trái.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Viết query lấy các customer chưa có order nào. (LEFT JOIN orders và WHERE orders.id IS NULL, hoặc dùng NOT EXISTS.)</div>
+<p class="see">Học bài: <a href="lessons/0002-joins-inner-and-left.vi.html">Join</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Window function là gì và làm sao lấy người lương cao nhất mỗi phòng ban?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một phép tính trên các dòng có liên quan mà không gộp chúng lại; dùng <code>row_number() OVER (PARTITION BY dept ORDER BY salary DESC)</code> trong một subquery rồi lọc rn = 1.</p>
+<p>Window function tính toán trên các dòng có liên quan tới dòng hiện tại mà không gom chúng thành một dòng kết quả; <code>OVER</code> đánh dấu nó, <code>PARTITION BY</code> chia nhóm, <code>ORDER BY</code> bên trong <code>OVER</code> sắp thứ tự trong một partition.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-window.html">[3]</a> Không thể lọc window function trực tiếp trong <code>WHERE</code>, nên phải bọc trong subquery. Khi có giá trị bằng nhau (hai nhân viên cùng 4800), <code>row_number()</code> chọn tùy ý một người; hãy dùng <code>rank()</code> hoặc <code>dense_rank()</code> khi trường hợp bằng nhau quan trọng.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> rank khác dense_rank thế nào? (rank để lại khoảng trống sau các giá trị bằng nhau, dense_rank thì không; hãy kiểm tra lại trong trang tham chiếu window function của tài liệu.)</div>
+<p class="see">Học bài: <a href="lessons/0003-window-functions.vi.html">Window function</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Khi nào index có ích, và nó tốn gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> nó tăng tốc các phép tra cứu có tính chọn lọc cao, join và điều kiện tìm kiếm; cái giá là chi phí khi ghi và dung lượng lưu trữ.</p>
+<p>Không có index, hệ thống quét toàn bộ table từng dòng một; có index thì nó có thể "đi xuống vài tầng của một cây tìm kiếm." Sau khi tạo, "hệ thống phải giữ nó đồng bộ với table. Điều này làm tăng chi phí cho các thao tác thay đổi dữ liệu", nên các index không dùng tới thì nên xóa.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-intro.html">[5]</a> Trong bài test của tôi trên 200.000 dòng, một phép tra cứu đi từ sequential scan (khoảng 5 ms, loại 199.999 dòng bằng filter) xuống index scan (khoảng 0.03 ms). Muốn hiểu sâu về composite index, sắp xếp và join, hãy đọc <em>Use The Index, Luke</em>.<a class="cite" href="https://use-the-index-luke.com/">[6]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao PostgreSQL có thể bỏ qua index của bạn? (Table nhỏ hoặc điều kiện ít tính chọn lọc có thể khiến sequential scan rẻ hơn; tài liệu EXPLAIN lưu ý seq scan hiệu quả với table nhỏ hoặc tập kết quả lớn.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[4]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0004-indexes-what-they-buy.vi.html">Index</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Bạn chẩn đoán một query chậm thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>EXPLAIN (ANALYZE)</code>, tìm node tốn kém nhất, so sánh số dòng ước tính với thực tế, kiểm tra loại scan và index.</p>
+<p><code>EXPLAIN</code> hiển thị một cây các node của plan với startup cost, total cost, số dòng ước tính và width; cost tính bằng đơn vị tùy ý và node cha bao gồm cost của các node con.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[4]</a> <code>EXPLAIN ANALYZE</code> thực sự thực thi query và bổ sung actual time, loops, buffers và thời gian lập plan/thực thi. Với UPDATE/DELETE hãy bọc lại: <code>BEGIN; EXPLAIN ANALYZE ...; ROLLBACK;</code> (script của tôi xác nhận không có dòng nào bị đổi sau rollback). Chênh lệch lớn giữa số dòng ước tính và thực tế gợi ý thống kê đã cũ (thử chạy <code>ANALYZE</code>). Plan trên table test nhỏ có thể không suy rộng được cho production.<a class="cite" href="https://www.postgresql.org/docs/current/using-explain.html">[4]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Chạy EXPLAIN ANALYZE với câu lệnh ghi trên production có an toàn không? (Chỉ khi nằm trong một transaction mà bạn rollback; nó chạy thật câu lệnh.)</div>
+<p class="see">Học bài: <a href="lessons/0005-reading-explain.vi.html">Đọc EXPLAIN</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Giải thích MVCC.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> bên đọc và bên ghi không chặn nhau vì mỗi câu lệnh nhìn thấy một snapshot.</p>
+<p>"Đọc không bao giờ chặn ghi và ghi không bao giờ chặn đọc": lock lấy để query không xung đột với lock lấy để ghi, kể cả ở isolation level chặt nhất (Serializable Snapshot Isolation).<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[7]</a> Mỗi câu lệnh SQL nhìn thấy một snapshot của dữ liệu tại một thời điểm trước đó.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[7]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> MVCC phải trả giá gì? (Các phiên bản cũ của dòng phải được dọn dẹp; cơ chế chi tiết của vacuum nằm ngoài các nguồn đã đọc ở đây.)</div>
+<p class="see">Học bài: <a href="lessons/0006-mvcc-and-isolation-levels.vi.html">MVCC và isolation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Liệt kê các isolation level và các hiện tượng bất thường (anomaly). Mặc định của PostgreSQL là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> mặc định là Read committed; trong PostgreSQL, Repeatable read ngăn được non-repeatable read và phantom read; Serializable ngăn mọi thứ nhưng có thể phải retry.</p>
+<p>Các anomaly: dirty read, non-repeatable read, phantom read, serialization anomaly. PostgreSQL hiện thực ba mức thực sự khác nhau: Read uncommitted hoạt động giống Read committed, và Repeatable read của nó không cho phép phantom read. Read committed là mặc định, và một câu <code>SELECT</code> chỉ thấy dữ liệu đã commit trước khi query bắt đầu. Serializable có thể thất bại với lỗi "could not serialize access due to read/write dependencies", và ứng dụng "phải sẵn sàng retry transaction."<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[8]</a> Demo hai session của tôi cho thấy non-repeatable read dưới Read committed (100 rồi 200) và snapshot ổn định dưới Repeatable read (100 rồi 100).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Trong Spring, retry khi gặp serialization failure thế nào? (Retry toàn bộ transaction; liên hệ với các bài về @Transactional của Spring.)</div>
+<p class="see">Học bài: <a href="lessons/0006-mvcc-and-isolation-levels.vi.html">MVCC và isolation</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Hai request cùng kiểm tra 'username đã tồn tại chưa?' rồi insert. Chuyện gì sai và sửa thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> race condition: cả hai đều thấy 'chưa tồn tại' và cả hai đều insert; sửa bằng UNIQUE constraint (và xử lý lỗi vi phạm).</p>
+<p>Dưới Read committed, mỗi câu lệnh thấy dữ liệu đã commit trước khi nó bắt đầu, nên hai transaction đồng thời đều có thể không thấy dòng nào.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[8]</a> Một constraint <code>UNIQUE</code> hoặc <code>PRIMARY KEY</code> khiến lần insert thứ hai thất bại một cách nguyên tử.<a class="cite" href="https://www.postgresql.org/docs/current/ddl-constraints.html">[1]</a> Cách khác là dùng Serializable và retry, nhưng constraint đơn giản và rẻ hơn.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Còn INSERT ... ON CONFLICT thì sao? (Một tính năng của PostgreSQL đáng biết; hãy kiểm tra tài liệu trước khi dựa vào chi tiết, vì các nguồn tôi đọc không đề cập.)</div>
+<p class="see">Học bài: <a href="lessons/0001-tables-and-constraints.vi.html">Table và constraint</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>WHERE khác HAVING thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> WHERE lọc dòng trước khi gom nhóm; HAVING lọc nhóm sau khi tổng hợp.</p>
+<p>"WHERE chọn các dòng đầu vào trước khi tính nhóm và hàm tổng hợp ... còn HAVING chọn các dòng nhóm sau đó"; không được dùng hàm tổng hợp trong WHERE (khi tôi chạy, PostgreSQL trả lời <code>aggregate functions are not allowed in WHERE</code>); hãy dùng subquery cho kiểu "các dòng bằng giá trị max".<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[9]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Những thành phố có nhiệt độ thấp nhất cực đại dưới 40? (GROUP BY city HAVING max(temp_lo) &lt; 40.)</div>
+<p class="see">Học bài: <a href="lessons/0007-aggregates-group-by-having.vi.html">Hàm tổng hợp</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Transaction đảm bảo điều gì? Làm sao hủy một phần của nó?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> tất cả hoặc không gì cả; savepoint cho phép rollback một phần.</p>
+<p>Các bước được gói lại theo kiểu tất cả hoặc không gì cả, và trạng thái trung gian không hiển thị với bên khác; câu lệnh nằm ngoài <code>BEGIN</code> là transaction ngầm định; <code>ROLLBACK TO savepoint</code> chỉ hủy phần việc phía sau và savepoint vẫn còn được định nghĩa.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[10]</a> Khi tôi chạy, một lỗi bên trong block đã hủy transaction, và câu <code>COMMIT</code> phía sau nhận về <code>ROLLBACK</code>, số dư giữ nguyên.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Spring ánh xạ propagation NESTED thế nào? (Thành savepoint trên JDBC.)</div>
+<p class="see">Học bài: <a href="lessons/0008-transactions-commit-rollback-savepoints.vi.html">Transaction</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Khi nào dùng CTE, và CTE đệ quy là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> để đặt tên cho các kết quả trung gian; CTE đệ quy dùng để duyệt cấu trúc phân cấp.</p>
+<p>CTE giống table tạm cho một query; CTE đệ quy có một phần không đệ quy, <code>UNION [ALL]</code>, và một phần đệ quy, lặp cho tới khi không còn sinh dòng mới; CTE không có side effect và chỉ dùng một lần sẽ được inline, <code>MATERIALIZED</code> buộc tính toán riêng.<a class="cite" href="https://www.postgresql.org/docs/current/queries-with.html">[11]</a> Ví dụ của tôi liệt kê một chuỗi quản lý: dev, lead, vp, ceo.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao tránh đệ quy vô hạn với dữ liệu có vòng lặp? (Theo dõi các id đã đi qua hoặc giới hạn độ sâu; bài tập có yêu cầu điều này.)</div>
+<p class="see">Học bài: <a href="lessons/0009-ctes-with-and-recursive.vi.html">CTE</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>PostgreSQL có những loại index nào và khi nào chọn loại nào? Còn index nhiều cột và partial index?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> B-tree là mặc định (so sánh bằng và theo khoảng), hash (so sánh bằng), GIN (mảng, full-text), BRIN (table lớn có tương quan vật lý), GiST/SP-GiST (hình học, v.v.).</p>
+<p><a class="cite" href="https://www.postgresql.org/docs/current/indexes-types.html">[12]</a> B-tree nhiều cột hoạt động tốt nhất khi có so sánh bằng trên các cột đứng đầu cộng một điều kiện khoảng trên cột kế tiếp; nhiều hơn ba cột hiếm khi có ích.<a class="cite" href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">[13]</a> Partial index bao phủ một predicate, tránh đánh index cho các giá trị phổ biến (của tôi: 64 kB so với 1352 kB của index nhiều cột).<a class="cite" href="https://www.postgresql.org/docs/current/indexes-partial.html">[14]</a> Tài liệu cũng nhắc tới tối ưu skip scan khi cột đứng đầu có ít giá trị khác nhau; query chỉ lọc trên cột thứ hai của tôi vẫn dùng index, khớp với điều đó.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn đã thêm index nhưng planner bỏ qua nó. Tại sao? (Tính chọn lọc thấp hoặc table nhỏ; kiểm tra EXPLAIN và thống kê.)</div>
+<p class="see">Học bài: <a href="lessons/0011-multicolumn-and-partial-indexes.vi.html">Index nhiều cột và partial index</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span><code>SELECT ... FOR UPDATE</code> là gì, deadlock phát sinh thế nào và xử lý ra sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> nó lock các dòng được chọn để chặn các bên ghi khác; deadlock đến từ thứ tự lấy lock ngược nhau và được PostgreSQL phát hiện rồi hủy; khắc phục bằng thứ tự lock nhất quán và retry.</p>
+<p><a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[15]</a> Lần chạy hai session của tôi: bên ghi thứ hai phải chờ khoảng 2.1 s trên dòng đang bị lock; thứ tự update ngược nhau tạo ra <code>ERROR: deadlock detected</code> cho một session trong khi session kia commit được.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Hiện thực một job queue bằng row lock? (Nằm ngoài các trang đã đọc ở đây; SKIP LOCKED không có trong các nguồn tôi đã tham khảo.)</div>
+<p class="see">Học bài: <a href="lessons/0012-row-locks-and-deadlocks.vi.html">Row lock</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>VACUUM dùng để làm gì, và dead tuple là gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> thu hồi dung lượng từ các phiên bản dòng cũ, cập nhật thống kê và visibility map, và ngăn transaction ID wraparound; autovacuum làm việc này theo mặc định.</p>
+<p><a class="cite" href="https://www.postgresql.org/docs/current/routine-vacuuming.html">[16]</a> MVCC giữ lại các phiên bản cũ của dòng, nên một lệnh UPDATE trên mọi dòng đã để lại 100.000 dead tuple và làm file to gấp đôi cho tới khi VACUUM dọn chúng (lần chạy của tôi, autovacuum bị tắt trên table đó).</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao không nên tắt autovacuum? (Nó được bật mặc định và được tài liệu rất khuyến nghị.)</div>
+<p class="see">Học bài: <a href="lessons/0013-vacuum-and-dead-tuples.vi.html">VACUUM</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để phỏng vấn thử: "hỏi tôi lần lượt từng câu PostgreSQL này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://www.postgresql.org/docs/current/ddl-constraints.html">PostgreSQL: Constraints</a> · [2] <a href="https://www.postgresql.org/docs/current/tutorial-join.html">PostgreSQL: Joins</a> · [3] <a href="https://www.postgresql.org/docs/current/tutorial-window.html">PostgreSQL: Window functions</a> · [4] <a href="https://www.postgresql.org/docs/current/using-explain.html">PostgreSQL: Using EXPLAIN</a> · [5] <a href="https://www.postgresql.org/docs/current/indexes-intro.html">PostgreSQL: Indexes intro</a> · [6] <a href="https://use-the-index-luke.com/">Use The Index, Luke</a> · [7] <a href="https://www.postgresql.org/docs/current/mvcc-intro.html">PostgreSQL: MVCC intro</a> · [8] <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL: Transaction isolation</a> · [9] <a href="https://www.postgresql.org/docs/current/tutorial-agg.html">PostgreSQL: Aggregates</a> · [10] <a href="https://www.postgresql.org/docs/current/tutorial-transactions.html">PostgreSQL: Transactions</a> · [11] <a href="https://www.postgresql.org/docs/current/queries-with.html">PostgreSQL: WITH queries</a> · [12] <a href="https://www.postgresql.org/docs/current/indexes-types.html">PostgreSQL: Index types</a> · [13] <a href="https://www.postgresql.org/docs/current/indexes-multicolumn.html">PostgreSQL: Multicolumn indexes</a> · [14] <a href="https://www.postgresql.org/docs/current/indexes-partial.html">PostgreSQL: Partial indexes</a> · [15] <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: Explicit locking</a> · [16] <a href="https://www.postgresql.org/docs/current/routine-vacuuming.html">PostgreSQL: Routine vacuuming</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

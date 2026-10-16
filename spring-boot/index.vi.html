@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình Spring Boot</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Spring Boot: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình Spring Boot · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="spring-boot" data-total="13">13 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>DI, cấu hình, REST, transaction, actuator và testing. 13 bài theo thứ tự nên đọc, học xong bài nào thì đánh dấu bài đó (chỉ lưu trong trình duyệt này). Thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<p><code>examples/demo-app</code> là một project Spring Boot 4.1.1 thật (JDK 21) với 17 test đều pass, là nguồn của các output được trích trong bài: <code>./mvnw test</code>.</p><h2>Foundation</h2>
+<ol class="steps" data-stack="spring-boot">
+<li data-id="0001-ioc-and-beans"><a href="lessons/0001-ioc-and-beans.vi.html">Inversion of control và bean</a></li>
+<li data-id="0002-constructor-injection"><a href="lessons/0002-constructor-injection.vi.html">Constructor injection so với setter injection</a></li>
+</ol>
+<h2>Core</h2>
+<ol class="steps" data-stack="spring-boot">
+<li data-id="0007-bean-scopes"><a href="lessons/0007-bean-scopes.vi.html">Bean scope: singleton và prototype</a></li>
+<li data-id="0003-auto-configuration"><a href="lessons/0003-auto-configuration.vi.html">Auto-configuration và cách nhìn thấy nó</a></li>
+<li data-id="0008-externalized-configuration-and-profiles"><a href="lessons/0008-externalized-configuration-and-profiles.vi.html">Externalized configuration, thứ tự ưu tiên và profile</a></li>
+<li data-id="0009-configuration-properties-binding"><a href="lessons/0009-configuration-properties-binding.vi.html">@ConfigurationProperties: cấu hình type-safe</a></li>
+<li data-id="0004-rest-controllers"><a href="lessons/0004-rest-controllers.vi.html">REST controller và request mapping</a></li>
+<li data-id="0010-validation-and-400-errors"><a href="lessons/0010-validation-and-400-errors.vi.html">Bean Validation và response 400</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="spring-boot">
+<li data-id="0005-transactional-proxies-and-rollback"><a href="lessons/0005-transactional-proxies-and-rollback.vi.html">@Transactional: proxy và quy tắc rollback</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="spring-boot">
+<li data-id="0006-transaction-propagation"><a href="lessons/0006-transaction-propagation.vi.html">Transaction propagation: REQUIRED, REQUIRES_NEW, NESTED</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="spring-boot">
+<li data-id="0011-actuator-and-kubernetes-probes"><a href="lessons/0011-actuator-and-kubernetes-probes.vi.html">Actuator và Kubernetes probe</a></li>
+<li data-id="0012-test-slices-and-springboottest"><a href="lessons/0012-test-slices-and-springboottest.vi.html">Testing: @SpringBootTest và test slice</a></li>
+</ol>
+<h2>Senior</h2>
+<ol class="steps" data-stack="spring-boot">
+<li data-id="0013-testcontainers-and-service-connection"><a href="lessons/0013-testcontainers-and-service-connection.vi.html">Testcontainers và @ServiceConnection</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Query với Spring Data JPA và vấn đề N+1 <span class="meta">(dự kiến)</span></li>
+<li>Kiến thức cơ bản về Spring Security <span class="meta">(dự kiến)</span></li>
+<li>Caching abstraction <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> để thêm, sắp xếp lại hoặc bỏ qua bài, hoặc để chạy một buổi phỏng vấn thử từ <a href="interview.vi.html">trang Hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 9: Default method và xung đột</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Default method: thêm vào interface mà không làm hỏng ai</h1>
+<p class="subtitle">Vì sao JDK 8 cho interface chứa code, và method nào chạy khi hai interface "cãi nhau".</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0009 · bước 24/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-default-methods-and-conflicts.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Ngày nào bạn cũng gọi default method (<code>list.forEach</code>, <code>map.getOrDefault</code>, <code>predicate.and</code>). Interviewer thích hỏi <em>"Vì sao có default method?"</em> rồi đưa ra một class implement hai interface có cùng một default: <em>"Cái nào chạy?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích trong một câu vì sao có default method, và đoán đúng <code>move()</code> nào chạy trong ba tình huống: class với interface, hai interface, và một interface extend interface khác.</div>
+
+<dl class="words">
+  <dt>implement</dt><dd>Một class <em>implement</em> một interface khi nó hứa cung cấp các method của interface đó: <code>class Duck implements Walker</code>.</dd>
+  <dt>extend</dt><dd>Một class <em>extend</em> một class cha và thừa hưởng code của nó. Một interface có thể extend các interface khác.</dd>
+  <dt>default method</dt><dd>Method trong interface đã có sẵn thân, đánh dấu bằng chữ <code>default</code>.</dd>
+  <dt>static method</dt><dd>Method thuộc về chính kiểu đó, không thuộc về object nào. Gọi bằng <code>Type.method()</code>.</dd>
+  <dt>signature</dt><dd>Tên method cộng với kiểu các tham số, ví dụ <code>move()</code>. Hai method cùng signature sẽ tranh nhau.</dd>
+  <dt>abstract class</dt><dd>Class không tạo trực tiếp được; nó có thể chứa field và các method chưa hoàn thiện cho class con.</dd>
+  <dt>binary compatibility</dt><dd>Code cũ đã compile vẫn chạy được với phiên bản mới của library, không cần compile lại.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Một class extend <code>Base</code> (có <code>move()</code>) và implement <code>Walker</code> (có default <code>move()</code>). Cái nào chạy?"</em> Hãy đoán. Bạn sẽ kiểm tra bằng output thật ở phần 3.</p>
+
+<h2>1. Vấn đề: một quy định mới làm mọi thành viên vi phạm</h2>
+<p>Hãy tưởng tượng một câu lạc bộ thể thao có cuốn nội quy mà mọi thành viên phải theo. Câu lạc bộ thêm quy định mới: "mọi thành viên phải viết báo cáo hằng tháng". Chỉ sau một đêm, ai chưa từng viết báo cáo đều đang vi phạm. Trừ khi câu lạc bộ thêm: "nếu bạn không tự viết, chúng tôi dùng mẫu chuẩn này". Thế là không ai vi phạm cả.</p>
+<p>Interface chính là cuốn nội quy đó. Trước JDK 8, thêm một method vào interface sẽ làm hỏng <strong>mọi</strong> class đang implement nó: class nào cũng bỗng thiếu một method. Vì vậy JDK 8 cần default method để thêm <code>forEach</code> và <code>stream</code> vào collection. Tutorial nói chúng "cho phép bạn thêm chức năng mới vào interface của library và đảm bảo binary compatibility với code viết cho các phiên bản cũ của interface đó."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a></p>
+<pre><code>interface Walker {
+  String name();                                  <span class="c">// abstract: each class must write it</span>
+  <span class="hl">default</span> String move() { return "walk"; }       <span class="c">// new rule WITH a standard body</span>
+}
+
+class Cat implements Walker {
+  public String name() { return "cat"; }         <span class="c">// no move() here, still compiles</span>
+}
+new Cat().move();                                 <span class="hl">// "walk"</span></code></pre>
+<p>Bạn khai báo bằng từ khóa <code>default</code> kèm thân method.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a> Đặc tả ngôn ngữ nói phần thân đó "cung cấp cài đặt mặc định cho mọi class implement interface mà không override method này".<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4</a></p>
+
+<h3>Static method trong interface</h3>
+<p>JDK 8 cũng cho phép <code>static</code> method trong interface, để các method tiện ích nằm ngay trong interface "thay vì trong một class riêng".<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a> Bạn gọi chúng qua tên interface, ví dụ <code>Comparator.naturalOrder()</code>. Mọi method trong interface đều ngầm định là <code>public</code>, trừ khi khai báo <code>private</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4</a></p>
+
+<h2>2. Quy tắc một: class thắng</h2>
+<p>Nghĩ về công thức nấu ăn của gia đình. Bố mẹ bạn (superclass) truyền cho bạn công thức nấu canh, và cuốn sách nấu ăn bạn mua (interface) cũng có công thức canh. Ở nhà, bạn nấu theo công thức gia đình. Java cũng vậy: method thật trong class, hoặc trong superclass, luôn thắng default của interface.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a></p>
+<p>Đặc tả ngôn ngữ nói chính xác hơn: class không thừa hưởng một default method nếu một method cụ thể nó thừa hưởng từ superclass có cùng signature.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.8">JLS 8.4.8</a></p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Robot extend Base và implement Walker. Base.move trả về base và thắng default Walker.move trả về walk.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="50" y="30" width="230" height="64" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="165" y="54" text-anchor="middle" fill="var(--accent)">class Base</text>
+    <text x="165" y="78" text-anchor="middle" fill="var(--accent)">move() → "base"</text>
+    <rect x="400" y="30" width="230" height="64" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="515" y="54" text-anchor="middle">interface Walker</text>
+    <text x="515" y="78" text-anchor="middle" opacity=".75">default move() → "walk"</text>
+    <rect x="225" y="160" width="230" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="190" text-anchor="middle">class Robot</text>
+    <g fill="none"><path d="M165 94L300 158" stroke="var(--accent)" stroke-width="2"/><path d="M515 94L380 158" stroke="currentColor" stroke-dasharray="5 3"/></g>
+    <text x="180" y="135" text-anchor="middle" font-size="11" fill="var(--accent)">extends: thắng</text>
+    <text x="452" y="135" font-size="11" opacity=".75">implements: bị bỏ qua</text>
+    <text x="340" y="236" text-anchor="middle" fill="var(--accent)">new Robot().move()  →  "base"</text>
+  </g>
+</svg>
+<figcaption>Class thắng. Method từ superclass che default của interface, nên <code>Robot</code> thậm chí không thừa hưởng <code>Walker.move()</code>.</figcaption>
+</figure>
+
+<h2>3. Quy tắc hai: hai interface, cùng default → bạn phải chọn</h2>
+<p>Bây giờ class không có method nào từ superclass, nhưng hai interface đều mang theo default <code>move()</code>. Java không đoán thay bạn. Đặc tả: "Là lỗi compile nếu class C thừa hưởng một default method có signature override-equivalent với một method khác mà C thừa hưởng" (có một ngoại lệ hiếm cho abstract method của superclass).<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.8.4">JLS 8.4.8.4</a> "Override-equivalent" ở đây đơn giản là "cùng signature".</p>
+<p>Để sửa, bạn override method trong class. Bên trong, bạn có thể gọi phiên bản của một interface cụ thể bằng cú pháp <code>InterfaceName.super.method()</code>.</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Duck implement Walker và Swimmer, cả hai có default move. Duck phải override move và có thể gọi Walker.super.move và Swimmer.super.move.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="50" y="24" width="230" height="64" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="165" y="48" text-anchor="middle">interface Walker</text>
+    <text x="165" y="72" text-anchor="middle" opacity=".75">default move() → "walk"</text>
+    <rect x="400" y="24" width="230" height="64" rx="6" fill="none" stroke="currentColor" stroke-dasharray="5 3"/>
+    <text x="515" y="48" text-anchor="middle">interface Swimmer</text>
+    <text x="515" y="72" text-anchor="middle" opacity=".75">default move() → "swim"</text>
+    <g fill="none" stroke="currentColor"><path d="M165 88L250 150"/><path d="M515 88L430 150"/></g>
+    <text x="340" y="118" text-anchor="middle" font-size="11">cùng signature: xung đột!</text>
+    <rect x="70" y="152" width="540" height="70" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="176" text-anchor="middle" fill="var(--accent)">class Duck implements Walker, Swimmer</text>
+    <text x="340" y="204" text-anchor="middle" font-size="11">move() { Walker.super.move() + " and " + Swimmer.super.move() }</text>
+    <text x="340" y="248" text-anchor="middle" font-size="11" opacity=".8">không override: lỗi compile · có override: "walk and swim"</text>
+  </g>
+</svg>
+<figcaption>Hình kim cương của default. Compiler bắt <code>Duck</code> phải override <code>move()</code>; <code>X.super.move()</code> chọn phiên bản của một interface cha.</figcaption>
+</figure>
+
+<h3>Lần theo ví dụ từng bước</h3>
+<pre><code>new Duck().move();
+<span class="c">Step 1  Duck has its own move()            → run it</span>
+<span class="c">Step 2  Walker.super.move()                → "walk"</span>
+<span class="c">Step 3  Swimmer.super.move()               → "swim"</span>
+<span class="c">Step 4  "walk" + " and " + "swim"          → "walk and swim"</span>
+
+new Robot().move();
+<span class="c">Step 1  Robot has no move() of its own</span>
+<span class="c">Step 2  superclass Base has move()         → class wins</span>
+<span class="c">Step 3  Walker's default is never used     → "base"</span></code></pre>
+<pre><code>$ java java/examples/jdk8/DefaultMethods.java
+walk and swim
+base</code></pre>
+<p>Dòng đầu là <code>Duck</code> tự giải quyết xung đột; dòng hai là <code>Robot</code>, nơi method của class thắng default của interface.</p>
+
+<h2>4. Quy tắc ba: khi một interface extend interface khác</h2>
+<p>Một interface có thể extend một interface có default. Tutorial liệt kê ba lựa chọn:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Default methods tutorial</a></p>
+<ol class="steps">
+  <li><strong>Không nhắc tới nó.</strong> Interface mới cứ thế thừa hưởng default.</li>
+  <li><strong>Khai báo lại không có thân.</strong> Nó trở lại thành <code>abstract</code>, nên mọi class implement phải tự viết.</li>
+  <li><strong>Định nghĩa lại với thân mới.</strong> Nó override default; interface cụ thể hơn thắng.</li>
+</ol>
+<pre><code>interface FastWalker extends Walker {
+  default String move() { return "run"; }   <span class="c">// choice 3: redefine</span>
+}
+class Dog implements Walker, FastWalker {}
+new Dog().move();                            <span class="hl">// "run": FastWalker is more specific</span></code></pre>
+<p class="muted">Ở đây không có xung đột: <code>FastWalker</code> đã override <code>Walker.move()</code>, nên chỉ còn một ứng viên.</p>
+
+<h3>Lỗi hay gặp</h3>
+<ul>
+  <li><strong>Quên override trong hình kim cương.</strong> Code không compile. Cách sửa: override và chọn bằng <code>X.super.method()</code>.</li>
+  <li><strong>Cố cho <code>equals</code>, <code>hashCode</code> hay <code>toString</code> một default.</strong> "Là lỗi compile nếu một default method override-equivalent với một method không private của class <code>Object</code>", vì class nào cũng đã thừa hưởng method đó từ <code>Object</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4.1.2">JLS 9.4.1.2</a></li>
+  <li><strong>Dùng interface làm chỗ giữ state.</strong> Interface không có instance field, nên default method chỉ có thể gọi các method khác.</li>
+</ul>
+
+<div class="aside">Góc interview: "Default method so với abstract class?" Một interface có thể được nhiều class không liên quan implement và vẫn không có instance state; abstract class có thể giữ field nhưng một class chỉ extend được một class. Default method tồn tại chủ yếu để interface tiến hóa, đúng như động cơ mà tutorial trình bày.</div>
+
+<h3>JDK 8 so với 17 và 21</h3>
+<p>Default và static method trong interface có từ JDK 8. Trong đặc tả ngôn ngữ JDK 21, method của interface còn có thể là <code>private</code> (và <code>private static</code>), giúp nhiều default dùng chung một helper; JDK 8 chưa có điều này.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4</a> Các quy tắc "ai thắng" giống nhau trên 8, 17 và 21.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Lý do chính để thêm default method vào JDK 8 là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Để thêm method vào interface có sẵn mà không làm hỏng class cũ</button>
+    <button class="opt">Để lời gọi method qua interface chạy nhanh hơn qua abstract class</button>
+    <button class="opt">Để interface giữ được instance field, giống hệt như abstract class</button>
+    <button class="opt">Để thay thế hoàn toàn abstract class trong mọi code library mới</button>
+  </div>
+  <div class="why">Default method cho phép library phát triển interface (như thêm <code>forEach</code> vào collection) mà vẫn giữ binary compatibility với code cũ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Robot extends Base implements Walker</code>. Cả <code>Base</code> và <code>Walker</code> có <code>move()</code>; của Walker là default. <code>new Robot().move()</code> chạy cái nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Base.move(), vì class thắng</button>
+    <button class="opt">Walker.move(), vì nó mới hơn</button>
+    <button class="opt">Không gì cả: đây là lỗi compile</button>
+    <button class="opt">Cái nào khai báo trước trong code</button>
+  </div>
+  <div class="why">Method cụ thể từ class hoặc superclass luôn thắng default của interface. Output thật là <code>base</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>class Duck implements Walker, Swimmer {}</code>, và cả hai interface đều có default <code>move()</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Lỗi compile cho tới khi Duck override move()</button>
+    <button class="opt">Walker thắng vì được liệt kê trước tiên</button>
+    <button class="opt">Swimmer thắng vì được liệt kê sau cùng</button>
+    <button class="opt">Chạy cả hai rồi nối hai kết quả lại</button>
+  </div>
+  <div class="why">Hai default thừa hưởng cùng signature là lỗi compile. Duck phải override và chọn, ví dụ bằng <code>Walker.super.move()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bên trong <code>Duck</code>, làm sao gọi phiên bản <code>move()</code> của Walker?</p>
+  <div class="options">
+    <button class="opt" data-correct>Walker.super.move()</button>
+    <button class="opt">super.Walker.move()</button>
+    <button class="opt">Walker.move(this)</button>
+    <button class="opt">((Walker) this).move()</button>
+  </div>
+  <div class="why">Cú pháp là <code>InterfaceName.super.method()</code>. Ép kiểu <code>this</code> vẫn gọi bản override của chính Duck.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một interface extend <code>Walker</code> và khai báo lại <code>String move();</code> không có thân. Giờ <code>move()</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó lại là abstract</button>
+    <button class="opt">Nó vẫn là default</button>
+    <button class="opt">Nó thành static</button>
+    <button class="opt">Nó thành private</button>
+  </div>
+  <div class="why">Khai báo lại default method làm nó thành abstract, nên mọi class implement interface mới phải tự viết.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>interface Named { default String toString() { return "x"; } }</code> sai ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không compile được: default không thể override method của Object</button>
+    <button class="opt">Không sai gì: mọi object Named giờ sẽ in ra "x" khi được in</button>
+    <button class="opt">Compile được, nhưng chỉ chạy với class không có superclass nào</button>
+    <button class="opt">Phải khai báo static, vì toString không có state gì cả</button>
+  </div>
+  <div class="why">Default method override-equivalent với method không private của <code>Object</code> là lỗi compile. Class nào cũng đã thừa hưởng <code>toString</code> từ <code>Object</code>, và class đằng nào cũng thắng.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Vì sao có default method, và chuyện gì xảy ra khi hai interface định nghĩa cùng một default?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Default method là method trong interface có thân, có từ JDK 8.</label></li>
+      <li><label><input type="checkbox"> Lý do: để interface tiến hóa (ví dụ <code>Collection.stream</code>, <code>forEach</code>) mà không làm hỏng class đang implement.</label></li>
+      <li><label><input type="checkbox"> Quy tắc 1: method trong class hoặc superclass thắng mọi default của interface.</label></li>
+      <li><label><input type="checkbox"> Quy tắc 2: interface cụ thể hơn (interface override default) thắng.</label></li>
+      <li><label><input type="checkbox"> Quy tắc 3: hai default không liên quan cùng signature là lỗi compile; override và chọn bằng <code>X.super.m()</code>.</label></li>
+      <li><label><input type="checkbox"> So với abstract class: interface không có instance state, nhưng một class implement được nhiều interface.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Default method có từ JDK 8 để tác giả library thêm method vào interface có sẵn mà không làm hỏng mọi class đang implement nó. Nhờ vậy <code>Collection</code> mới có <code>stream()</code> và <code>Iterable</code> có <code>forEach</code>. Khi có xung đột thì có ba quy tắc. Một, class thắng: nếu class của em hoặc superclass có method đó thì default của interface bị bỏ qua. Hai, interface cụ thể hơn thắng, tức nếu một interface extend interface khác và override default thì dùng bản đó. Ba, nếu hai interface không liên quan cho em cùng một default thì code không compile cho tới khi em override; bên trong em có thể gọi <code>Walker.super.move()</code> để tái sử dụng một bản. So với abstract class: interface không có instance field, nhưng một class implement được nhiều interface còn chỉ extend được một class."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-diamond-of-defaults.vi.md">Bài tập 0009: hình kim cương của default</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk8/DefaultMethods.java"><code>jdk8/DefaultMethods.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp Senior có thể hỏi: <em>"Kể vài default method bạn dùng hằng ngày"</em>. Câu trả lời tốt: <code>Map.getOrDefault</code> và <code>Map.merge</code> (xem <a href="0037-map-default-methods.vi.html">bài 0037</a>), và <code>Collection.stream()</code>, chính là điểm bắt đầu của <a href="0004-streams-and-optional.vi.html">bài 0004 về stream</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a>. Đọc phần "Extending Interfaces That Contain Default Methods".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào nên dùng abstract class thay vì interface?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0008-lambdas-and-functional-interfaces.vi.html">← Lambda: truyền một đoạn code như một giá trị</a> &nbsp;|&nbsp; <a href="0004-streams-and-optional.vi.html">Stream và Optional, tránh các cái bẫy →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Oracle Java Tutorials và Java Language Specification (Java SE 21), tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/java/IandI/defaultmethods.html">Oracle Java Tutorials: Default Methods</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.8">JLS 8.4.8 Inheritance, Overriding, and Hiding</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-9.html#jls-9.4">JLS 9.4 Interface Method Declarations</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

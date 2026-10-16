@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 22: Bảo mật và quota</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bảo mật và quota</h1>
+<p class="meta">Kafka · Bài 0022 · bước 22/23 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0022-security-and-quotas.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> bảo mật một cluster Kafka bằng TLS, xác thực SASL và ACL, và bảo vệ nó khỏi các client "ồn ào" bằng quota.</div>
+
+<h2>Mặc định là tắt</h2>
+<p>"Bảo mật là tuỳ chọn - cluster không bảo mật vẫn được hỗ trợ."<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a> Một broker mới tinh chấp nhận bất kỳ ai trên listener <code>PLAINTEXT</code> của nó. Production cần ba lớp:<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a></p>
+<ul>
+<li><strong>Mã hoá trên đường truyền:</strong> SSL/TLS giữa client và broker (và giữa các broker với nhau). Nó tốn CPU và vô hiệu hoá việc truyền zero-copy.</li>
+<li><strong>Xác thực (authentication):</strong> chứng chỉ client TLS hoặc các cơ chế SASL: GSSAPI (Kerberos), PLAIN, SCRAM-SHA-256/512, OAUTHBEARER. Cặp hay gặp: <code>SASL_SSL</code> với SCRAM hoặc OAUTHBEARER.</li>
+<li><strong>Phân quyền (authorization):</strong> ACL trên các thao tác đọc/ghi, có thể cắm hệ thống bên ngoài vào.</li>
+</ul>
+<h2>ACL</h2>
+<p>Trong KRaft, đặt <code>authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer</code> trên tất cả các node.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a> Một ACL được đọc là: "Principal P được [Cho phép|Từ chối] thực hiện Operation O từ Host H trên mọi Resource R khớp với ResourcePattern RP".<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a> Khi đã có authorizer mà không có ACL nào khớp, "chỉ super user mới được phép truy cập" (trừ khi bạn đặt <code>allow.everyone.if.no.acl.found=true</code>, điều mà bạn không nên làm).<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a></p>
+<pre><code>kafka-acls.sh --bootstrap-server localhost:9092 --add --allow-principal User:Bob --producer --topic Test-topic
+kafka-acls.sh --bootstrap-server localhost:9092 --add --allow-principal User:Bob --consumer --topic Test-topic --group Group-1</code></pre>
+<p>Lệnh tắt cho consumer cần thêm group vì consume còn đòi quyền truy cập vào resource consumer group.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a> Cấp quyền theo từng service, theo nguyên tắc quyền tối thiểu, dùng pattern topic theo prefix cho từng team.</p>
+<h2>Quota</h2>
+<p>Trong một cluster dùng chung, chỉ một client xấu cũng có thể làm bão hoà broker. "Có quota sẽ bảo vệ khỏi những vấn đề này, và điều đó càng quan trọng trong các cluster multi-tenant lớn."<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a> Có hai loại: băng thông network (byte/giây) và tốc độ request (phần trăm thời gian của request-handler thread), áp theo user, theo client-id hoặc cả hai; broker sẽ throttle những client vượt mức.<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a> "Mặc định, client nhận quota không giới hạn."<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+<pre><code>kafka-configs.sh --bootstrap-server localhost:9092 --alter \
+  --add-config 'producer_byte_rate=1024,consumer_byte_rate=2048,request_percentage=200' \
+  --entity-type users --entity-name user1</code></pre>
+<div class="aside">Câu trả lời khi phỏng vấn: "Listener SASL_SSL, SCRAM hoặc OAuth với principal riêng cho từng service, StandardAuthorizer với ACL theo nguyên tắc quyền tối thiểu và không có fallback cho phép tất cả, quota theo user trong cluster multi-tenant, và JMX được bảo vệ."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Bảo mật Kafka có bật sẵn không?</p>
+  <button>Chỉ SASL được bật</button>
+  <button>Chỉ ACL được bật</button>
+  <button data-correct>Không, nó là tuỳ chọn</button>
+  <button>Có, luôn bật TLS</button>
+  <p class="explain">Bảo mật là tuỳ chọn; cluster không bảo mật vẫn được hỗ trợ.<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Đã bật authorizer, không có ACL khớp. Ai được truy cập?</p>
+  <button>Chỉ producer</button>
+  <button>Chỉ localhost</button>
+  <button data-correct>Chỉ super user</button>
+  <button>Mọi người đều được</button>
+  <p class="explain">Không có ACL thì chỉ super user truy cập được resource.<a class="cite" href="https://kafka.apache.org/43/security/authorization-and-acls/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Quota mặc định của client?</p>
+  <button>Nửa thread</button>
+  <button>Mười request</button>
+  <button data-correct>Không giới hạn</button>
+  <button>Một MB mỗi giây</button>
+  <p class="explain">Mặc định client nhận quota không giới hạn.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cơ chế SASL nào dùng Kerberos?</p>
+  <button>PLAIN</button>
+  <button>OAUTHBEARER</button>
+  <button data-correct>GSSAPI</button>
+  <button>SCRAM-SHA-512</button>
+  <p class="explain">GSSAPI là cơ chế dành cho Kerberos.<a class="cite" href="https://kafka.apache.org/43/security/security-overview/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0022-lock-down-a-cluster.vi.md">Bài tập 0022: khoá chặt một cluster</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/security/authorization-and-acls/">Kafka Security: Authorization and ACLs</a>. Đọc các khái niệm ACL và ví dụ kafka-acls.sh; sau đó đọc phần Security overview.</p>
+<p><a href="0021-share-groups.vi.html">← Share group: queue cho Kafka</a> &nbsp;|&nbsp; <a href="0023-multi-cluster-and-tiered-storage.vi.html">Replication đa cluster và tiered storage →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/security/security-overview/">Kafka Security: Overview</a> · [2] <a href="https://kafka.apache.org/43/security/authorization-and-acls/">Kafka Security: Authorization and ACLs</a> · [3] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a> · [4] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

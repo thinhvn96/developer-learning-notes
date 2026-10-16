@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 6: Idempotent producer và transaction</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Idempotent producer và transaction</h1>
+<p class="meta">Kafka · Bài 0006 · bước 16/23 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-idempotence-and-transactions.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được idempotent producer và transaction đảm bảo điều gì, và không đảm bảo điều gì.</div>
+
+<h2>Idempotent producer</h2>
+<p>Từ bản 0.11.0.0, producer hỗ trợ tuỳ chọn idempotent, thứ "đảm bảo rằng việc gửi lại sẽ không tạo ra bản ghi trùng lặp."<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> Trong tài liệu cấu hình 4.3, <code>enable.idempotence</code> được bật mặc định, đảm bảo "mỗi message chỉ có đúng một bản được ghi vào stream."<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a> Nó loại bỏ các bản trùng do chính việc retry của producer gây ra.</p>
+<h2>Transaction</h2>
+<p>Producer có thể "gửi message một cách nguyên tử tới nhiều topic partition bằng transaction, để hoặc mọi message đều được ghi thành công, hoặc không message nào được ghi."<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+<h2>Được gì và không được gì</h2>
+<ul>
+<li>Retry của producer không còn sinh record trùng trong log (idempotence).</li>
+<li>Một bước consume-transform-produce có thể ghi các output của nó một cách nguyên tử (transaction).</li>
+<li>Nó <strong>không</strong> biến các side effect của bạn thành exactly-once: một email đã gửi hay một dòng đã ghi vào database khác nằm ngoài phạm vi đảm bảo của Kafka. Hãy giữ consumer idempotent (xem <a href="0004-delivery-semantics.vi.html">bài về delivery semantics</a>).</li>
+</ul>
+<div class="aside">Mô tả đầy đủ về exactly-once trên trang design (và về việc consumer chỉ đọc dữ liệu transaction đã commit) đi xa hơn những đoạn trích dùng ở đây. Hãy nhờ giáo viên đi qua phần đó, hoặc tự đọc mục "Message Delivery Semantics" trong chương Design.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Idempotent producer ngăn chặn điều gì?</p>
+  <button>Mạng chậm</button>
+  <button data-correct>Bản trùng do gửi lại</button>
+  <button>Broker gặp sự cố</button>
+  <button>Consumer lag</button>
+  <p class="explain">Việc gửi lại sẽ không tạo ra bản ghi trùng lặp.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Transaction cho phép producer ghi vào nhiều partition...?</p>
+  <button>Không cần acks</button>
+  <button data-correct>Một cách nguyên tử</button>
+  <button>Chỉ tuần tự</button>
+  <button>Chỉ vào một cái</button>
+  <p class="explain">Hoặc mọi message đều được ghi, hoặc không message nào.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Trong tài liệu 4.3, enable.idempotence có bật mặc định không?</p>
+  <button>Chỉ khi test</button>
+  <button>Chỉ với acks 1</button>
+  <button data-correct>Có, là true</button>
+  <button>Không, là false</button>
+  <p class="explain">Tài liệu ghi giá trị mặc định là true.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Kafka có làm cho side effect gửi email thành exactly-once không?</p>
+  <button data-correct>Không, không hề</button>
+  <button>Chỉ khi acks all</button>
+  <button>Có, luôn luôn</button>
+  <button>Chỉ khi có retry</button>
+  <p class="explain">Các đảm bảo chỉ áp dụng cho việc ghi vào Kafka; side effect bên ngoài vẫn cần được xử lý idempotent.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-design-an-idempotent-consumer.vi.md">Bài tập 0006: thiết kế một consumer idempotent</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design, Message Delivery Semantics</a>. Đọc tiếp sau các đoạn về 'at least once'.</p>
+<p><a href="0009-kafka-streams-basics.vi.html">← Kafka Streams: stream, table và state</a> &nbsp;|&nbsp; <a href="0018-streams-windows-joins-exactly-once.vi.html">Kafka Streams: window, join và exactly-once →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: idempotence and transactions</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

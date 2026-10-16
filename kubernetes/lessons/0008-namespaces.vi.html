@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 8: Namespace: cô lập các nhóm tài nguyên</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Namespace: cô lập các nhóm tài nguyên</h1>
+<p class="meta">Kubernetes · Bài 0008 · bước 3/15 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-namespaces.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích namespace cô lập những gì, kể tên bốn namespace mặc định, và đặt namespace mặc định cho <code>kubectl</code>.</div>
+
+<h2>Namespace làm gì</h2>
+<p>"Namespace cung cấp cơ chế để cô lập các nhóm tài nguyên trong cùng một cluster. Tên tài nguyên phải là duy nhất trong một namespace, nhưng không cần duy nhất giữa các namespace." Phạm vi này chỉ áp dụng cho các object thuộc namespace (Deployment, Service...), không áp dụng cho các object toàn cluster (StorageClass, Node, PersistentVolume). Namespace không lồng nhau được, và mỗi tài nguyên chỉ thuộc đúng một namespace.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+<table><tr><th>Namespace ban đầu</th><th>Mục đích<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></th></tr>
+<tr><td><code>default</code></td><td>nơi bạn rơi vào khi không chỉ định namespace nào</td></tr>
+<tr><td><code>kube-system</code></td><td>các object do chính Kubernetes tạo ra</td></tr>
+<tr><td><code>kube-public</code></td><td>mọi client đều đọc được; dành riêng cho cluster dùng</td></tr>
+<tr><td><code>kube-node-lease</code></td><td>các object Lease cho heartbeat của node</td></tr></table>
+<p>Không dùng cho những khác biệt nhỏ: "hãy dùng label để phân biệt các tài nguyên trong cùng một namespace" thay vì tạo một namespace cho mỗi phiên bản phần mềm.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+<h2>Thử ngay</h2>
+<pre><code>kubectl apply -f examples/namespace-demo.yaml     # Namespace demo + Pod demo/hello
+kubectl -n demo logs hello                 -&gt; hello from hello
+kubectl get pod hello                      -&gt; Error: pods "hello" not found     # wrong namespace
+kubectl config set-context --current --namespace=demo   # change the default</code></pre>
+<p>Lỗi "not found" là triệu chứng hằng ngày của việc quên <code>-n</code>. File: <a href="../examples/namespace-demo.yaml"><code>namespace-demo.yaml</code></a>.</p><p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Tên phải là duy nhất trong phạm vi nào?</p>
+  <button>Giữa các image</button>
+  <button data-correct>Trong một namespace</button>
+  <button>Giữa các node</button>
+  <button>Trong toàn cluster</button>
+  <p class="explain">Tên phải duy nhất trong một namespace, không cần duy nhất giữa các namespace.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Namespace có lồng nhau được không?</p>
+  <button>Chỉ với Node</button>
+  <button>Có, không giới hạn</button>
+  <button>Có, tối đa hai cấp</button>
+  <button data-correct>Không</button>
+  <p class="explain">Namespace không lồng nhau.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Object nào có phạm vi toàn cluster?</p>
+  <button>Pod</button>
+  <button>Service</button>
+  <button data-correct>PersistentVolume</button>
+  <button>Deployment</button>
+  <p class="explain">PersistentVolume, Node và StorageClass không thuộc namespace nào.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Để phân biệt các phiên bản của app, dùng...?</p>
+  <button>Node</button>
+  <button data-correct>Label</button>
+  <button>Namespace</button>
+  <button>Secret</button>
+  <p class="explain">Dùng label để phân biệt các tài nguyên hơi khác nhau trong cùng một namespace.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-two-environments.vi.md">Bài tập 0008: hai môi trường</a></p>
+<p>Ví dụ chạy được: <a href="../examples/namespace-demo.yaml"><code>namespace-demo.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">Kubernetes Docs: Namespaces</a>. Trang ngắn.</p>
+<p><a href="0002-pods.vi.html">← Pod: đơn vị deploy nhỏ nhất</a> &nbsp;|&nbsp; <a href="0003-deployments-and-labels.vi.html">Deployment, ReplicaSet và label →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">Kubernetes Docs: Namespaces</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

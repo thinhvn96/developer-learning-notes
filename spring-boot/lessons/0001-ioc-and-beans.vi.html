@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 1: Inversion of control và bean</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Inversion of control và bean</h1>
+<p class="meta">Spring Boot · Bài 0001 · bước 1/13 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-ioc-and-beans.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> định nghĩa chính xác IoC, DI, bean và ApplicationContext, đúng kiểu interviewer mong đợi.</div>
+
+<h2>Định nghĩa theo tài liệu reference</h2>
+<p><strong>Dependency injection</strong> là "một dạng chuyên biệt của IoC, trong đó các object khai báo dependency của mình ... chỉ thông qua tham số constructor, tham số của một factory method, hoặc các property được set trên instance của object". Sau đó container inject các dependency này khi tạo bean. Đây là chiều ngược lại so với việc bean tự kiểm soát việc khởi tạo dependency của nó, vì thế mới gọi là <em>inversion of control</em> (đảo ngược quyền điều khiển).<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+<p><strong>Bean</strong>: "một object được khởi tạo, lắp ráp và quản lý bởi Spring IoC container."<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+<p><strong>BeanFactory</strong> "cung cấp một cơ chế cấu hình nâng cao, có khả năng quản lý mọi loại object". <strong>ApplicationContext</strong> là một sub-interface, bổ sung thêm tích hợp AOP, xử lý message resource, publish event và các context ở tầng ứng dụng như <code>WebApplicationContext</code>; nó "là một tập cha đầy đủ (superset) của <code>BeanFactory</code>".<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+<div class="aside">Câu trả lời một câu: "Trong Spring, tôi khai báo một class cần gì; container tạo và nối các object lại với nhau, nên code của tôi phụ thuộc vào abstraction và dễ test."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. IoC container làm gì?</p>
+  <button data-correct>Tạo và nối các bean</button>
+  <button>Lưu row vào table</button>
+  <button>Lập lịch cho Pod</button>
+  <button>Biên dịch code Java</button>
+  <p class="explain">Container khởi tạo, lắp ráp, quản lý bean và inject dependency.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Spring bean là gì?</p>
+  <button>Một artifact khi build</button>
+  <button>Một property JSON</button>
+  <button>Bất kỳ class Java nào</button>
+  <button data-correct>Object do container quản lý</button>
+  <p class="explain">Bean là object được IoC container khởi tạo, lắp ráp và quản lý.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. ApplicationContext so với BeanFactory?</p>
+  <button>Một library riêng biệt</button>
+  <button data-correct>Một superset đầy đủ</button>
+  <button>Một class không liên quan</button>
+  <button>Một subset đã deprecated</button>
+  <p class="explain">ApplicationContext là sub-interface và là superset đầy đủ.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao gọi là inversion of control?</p>
+  <button>Test chạy trước</button>
+  <button>Bean gọi main()</button>
+  <button>Thread chạy ngược</button>
+  <button data-correct>Container dựng dependency</button>
+  <p class="explain">Bean không còn tự kiểm soát việc khởi tạo dependency của mình nữa; container làm việc đó.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-explain-ioc.vi.md">Bài tập 0001: giải thích IoC</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">Spring Framework Reference: The IoC Container</a>. Đọc phần giới thiệu, rồi tới 'Dependencies'.</p>
+<p> &nbsp;|&nbsp; <a href="0002-constructor-injection.vi.html">Constructor injection so với setter injection →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">Spring Framework Reference: Introduction to the IoC Container and Beans</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

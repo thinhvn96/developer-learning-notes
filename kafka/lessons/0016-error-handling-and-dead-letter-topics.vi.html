@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 16: Xử lý lỗi: retry, poison pill, dead letter topic</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Xử lý lỗi: retry, poison pill, dead letter topic</h1>
+<p class="meta">Kafka · Bài 0016 · bước 13/23 · Advanced · ~13 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0016-error-handling-and-dead-letter-topics.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> xử lý một record lỗi mà không chặn partition mãi mãi: tách lỗi tạm thời khỏi lỗi vĩnh viễn, retry có backoff, và đưa poison pill (record "độc") sang một dead letter topic.</div>
+
+<h2>Vấn đề</h2>
+<p>Partition là một log có thứ tự và consumer của bạn commit một vị trí. Nếu record 42 lần nào cũng ném exception và bạn không bao giờ commit vượt qua nó, partition bị kẹt: mọi record phía sau đều phải chờ. Nếu bạn lặng lẽ bỏ qua nó, bạn mất dữ liệu. Bạn cần một chính sách.</p>
+<ul>
+<li>Lỗi <strong>tạm thời</strong> (timeout, database chết trong chốc lát): retry có backoff.</li>
+<li>Lỗi <strong>vĩnh viễn</strong> (không deserialize được, validation thất bại): retry là vô ích; hãy chuyển record sang một bên.</li>
+</ul>
+<h2>Các thành phần có sẵn của Spring Kafka</h2>
+<ul>
+<li><code>DefaultErrorHandler</code>: mặc định dùng <code>FixedBackOff(0L, 9)</code>, nên "sau mười lần thất bại, record lỗi được ghi log" và consumer đi tiếp.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></li>
+<li><code>DeadLetterPublishingRecoverer</code>: thay vì ghi log, nó publish sang "<code>&lt;originalTopic&gt;-dlt</code>" và "vào cùng partition với record gốc", nên DLT "phải có số partition ít nhất bằng topic gốc".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></li>
+<li>Mặc định coi là fatal, không retry: <code>DeserializationException</code>, <code>MessageConversionException</code>, <code>ClassCastException</code> và vài loại khác, "vì những exception này khó có khả năng được giải quyết khi gửi lại".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a> Bạn tự thêm loại của mình bằng <code>addNotRetryableExceptions(...)</code>.</li>
+<li><code>ErrorHandlingDeserializer</code> bọc deserializer thật của bạn, để một payload hỏng trở thành một exception được xử lý (nằm trong header) thay vì một vòng lặp crash.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></li>
+</ul>
+<pre><code>@Bean
+DefaultErrorHandler errorHandler(KafkaTemplate&lt;Object, Object&gt; template) {
+    var recoverer = new DeadLetterPublishingRecoverer(template);       // -&gt; orders-dlt, same partition
+    var handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 2L)); // 3 attempts, 1 s apart
+    handler.addNotRetryableExceptions(IllegalArgumentException.class); // validation: straight to DLT
+    return handler;
+}</code></pre>
+<p>Cách này retry tại chỗ (retry "blocking"): partition phải chờ trong lúc backoff. <code>@RetryableTopic</code> cho retry "non-blocking" qua các retry topic riêng, với cái giá là mất thứ tự chặt chẽ theo từng key.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+<h2>Cùng ý tưởng ở chỗ khác</h2>
+<p>Kafka Connect có sẵn cơ chế này: <code>errors.tolerance=all</code>, <code>errors.deadletterqueue.topic.name</code>, <code>errors.deadletterqueue.context.headers.enable=true</code> và <code>errors.retry.timeout</code>.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[2]</a> Kafka Streams bổ sung hỗ trợ DLQ vào các exception handler từ bản 4.2.</p>
+<div class="aside">Câu trả lời khi phỏng vấn: "Phân loại lỗi. Lỗi tạm thời: retry có giới hạn kèm backoff. Lỗi vĩnh viễn: đưa vào DLT cùng record gốc và header chứa thông tin exception, cảnh báo khi có traffic vào DLT, và có công cụ replay. Nếu thứ tự theo key quan trọng thì retry tại chỗ; nếu không thì retry topic giữ cho partition tiếp tục chảy."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Tên DLT mặc định của Spring cho topic orders?</p>
+  <button>orders.error</button>
+  <button>dead-orders</button>
+  <button data-correct>orders-dlt</button>
+  <button>dlq.orders</button>
+  <p class="explain">Mặc định record dead-letter đi vào &lt;originalTopic&gt;-dlt.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao DLT phải có đủ số partition?</p>
+  <button>Để phục vụ việc nén</button>
+  <button>Để giữ lại offset cũ</button>
+  <button data-correct>Vì dùng cùng partition gốc</button>
+  <button>Vì broker bắt buộc vậy</button>
+  <p class="explain">Resolver mặc định publish vào cùng partition với record gốc.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. DeserializationException với DefaultErrorHandler thì sao?</p>
+  <button>Bị lặng lẽ bỏ qua</button>
+  <button data-correct>Recover ngay lập tức</button>
+  <button>Làm dừng broker</button>
+  <button>Retry chín lần</button>
+  <p class="explain">Mặc định nó là fatal, nên recoverer được gọi ngay ở lần thất bại đầu tiên.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Retry topic phải đánh đổi điều gì?</p>
+  <button data-correct>Thứ tự chặt chẽ theo key</button>
+  <button>Giao nhận at-least-once</button>
+  <button>Idempotence của producer</button>
+  <button>Replication của broker</button>
+  <p class="explain">Record được retry trên topic khác có thể bị các record sau cùng key vượt mặt.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0016-design-a-retry-policy.vi.md">Bài tập 0016: thiết kế một chính sách retry</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">Spring for Apache Kafka: Handling Exceptions</a>. Đọc mục 'DefaultErrorHandler' và 'Publishing Dead-letter Records', sau đó đọc trang Non-Blocking Retries.</p>
+<p><a href="0015-rebalancing-and-group-protocols.vi.html">← Rebalance: giao thức classic và giao thức consumer mới</a> &nbsp;|&nbsp; <a href="0017-schemas-and-schema-registry.vi.html">Schema, Schema Registry và tính tương thích →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">Spring for Apache Kafka: Handling Exceptions</a> · [2] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect User Guide</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -8,74 +8,262 @@
 </head>
 <body>
 <main>
-<h1>Heap sizing and garbage collection</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0007 · step 18 of 27 · Senior · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Where your objects live, and who cleans them up</h1>
+<p class="subtitle">The heap, its generations, the default sizes, and how to read one line of a GC log.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0007 · step 35 of 46 · Senior · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0007-heap-and-garbage-collection.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> "The service was killed with OutOfMemoryError", "latency spikes every few minutes", "the pod keeps restarting": these are memory problems, and a Senior engineer is expected to reason about them. Interviewers ask <em>"How does garbage collection work in Java?"</em> and <em>"What is the default heap size?"</em></div>
 
 <div class="win"><b>Today's win:</b> state the default heap size and collector rules, read one line of a GC log, and know which knob to turn first.</div>
 
-<h2>What the GC does</h2>
-<p>The garbage collector allocates memory, hands it to the application, "determines which parts of that memory is still in use", and reclaims the rest.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">[1]</a> HotSpot collectors use "generational scavenging in conjunction with aging" to concentrate effort where reclaimable memory is most likely.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">[1]</a></p>
-<h2>Defaults you should be able to recite</h2>
-<ul>
-<li>Collector: G1 on a "server-class machine" (two or more processors and at least 1792 MB physical memory), otherwise the Serial collector.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></li>
-<li>Initial heap: 1/64 of physical memory. Maximum heap: 1/4 of physical memory.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></li>
-<li><code>-XX:MaxRAMPercentage</code> sets the maximum heap as a percentage of the max memory the JVM sees; default 25 percent.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[3]</a></li>
-</ul>
-<h2>Read a GC log line</h2>
-<pre><code>java -Xmx64m -Xlog:gc java/examples/GcDemo.java
-[0.001s][info][gc] Using G1
-max heap (MB): 64
-[0.278s][info][gc] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 24M-&gt;3M(64M) 2.547ms</code></pre>
-<p>Reading it: collection number 0, a young-generation pause, heap occupancy went from 24 MB to 3 MB out of 64 MB, taking 2.5 ms. The demo allocates short-lived arrays, so almost everything is reclaimed. (Log format is from running the example on this machine with JDK 21.)</p>
-<div class="aside">Interview move: before touching collector flags, set the heap size on purpose (<code>-Xmx</code> or <code>MaxRAMPercentage</code>) and turn on GC logging. The Docker and Kubernetes lessons revisit this: heap is only part of a container's memory.</div>
+<dl class="words">
+  <dt>heap</dt><dd>The big memory area where Java stores every object you create with <code>new</code>. All threads share it.</dd>
+  <dt>garbage</dt><dd>An object that no running code can reach any more, so nobody can ever use it again.</dd>
+  <dt>garbage collector (GC)</dt><dd>The part of the JVM that finds garbage and gives its memory back, so you never free memory by hand.</dd>
+  <dt>generation</dt><dd>A part of the heap for objects of a certain age: a <em>young</em> one for new objects, an <em>old</em> one for objects that lived long.</dd>
+  <dt>pause</dt><dd>A short moment when the GC stops your application threads to do its work. Users feel long pauses as latency.</dd>
+  <dt><code>-Xmx</code></dt><dd>A <code>java</code> command-line option that sets the maximum heap size, for example <code>-Xmx512m</code>.</dd>
+  <dt>GC log</dt><dd>Lines the JVM prints about each collection when you start it with <code>-Xlog:gc</code>.</dd>
+</dl>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Default maximum heap without flags?</p>
-  <button>One eighth of RAM</button>
-  <button data-correct>One quarter of RAM</button>
-  <button>One half of RAM</button>
-  <button>All physical RAM</button>
-  <p class="explain">The maximum heap defaults to 1/4 of physical memory.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Which collector is the default on a server-class machine?</p>
-  <button data-correct>Garbage-First G1</button>
-  <button>Shenandoah low-pause</button>
-  <button>Epsilon no-op</button>
-  <button>Serial collector</button>
-  <p class="explain">G1 on server-class machines, Serial otherwise.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Server-class means at least how much?</p>
-  <button data-correct>Two CPUs, 1792 MB</button>
-  <button>Two CPUs, 4 GB</button>
-  <button>One CPU, 512 MB</button>
-  <button>Four CPUs, 8 GB</button>
-  <p class="explain">Two or more processors and physical memory of at least 1792 MB.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Log shows <code>24M-&gt;3M(64M)</code>. What is 64M?</p>
-  <button data-correct>Total heap size</button>
-  <button>Pause length</button>
-  <button>Live objects left</button>
-  <button>Bytes reclaimed</button>
-  <p class="explain">Before -> after (total heap capacity).</p>
-</div>
+<h2>Before you start</h2>
+<p>Say out loud: <em>"You start <code>java -jar app.jar</code> with no memory options on a machine with 16 GB of RAM. How big can the heap get?"</em> Give a number. Section 3 has the documented rule, and a check on a real machine.</p>
+
+<h2>1. The heap and the garbage collector</h2>
+<p>Think of the heap as a big shared <strong>warehouse</strong>. Every <code>new Order(...)</code> puts a box on a shelf. Your code keeps <strong>labels</strong> (references, held in variables and fields) that point to boxes. When no label points to a box any more, nobody can ever find it again: it is garbage.</p>
+<p>The JVM specification: the heap "is shared among all Java Virtual Machine threads" and is "the run-time data area from which memory for all class instances and arrays is allocated". Its storage "is reclaimed by an automatic storage management system (known as a <em>garbage collector</em>); objects are never explicitly deallocated."<a class="src" href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3">JVMS 2.5.3</a></p>
+<p>The garbage collector allocates memory, hands it to the application, "determines which parts of that memory is still in use", and reclaims the rest.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC tuning: introduction</a> "An object is considered garbage and its memory can be reused by the VM when it can no longer be reached from any reference of any other live object in the running program."<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC tuning: implementation</a></p>
+<pre><code>static Object sink;
+for (int i = 0; i &lt; 2_000_000; i++) {
+    sink = new byte[1024];   <span class="c">// the previous array loses its only label → garbage</span>
+}</code></pre>
+<p>That loop from <code>GcDemo.java</code> creates about 2 GB of arrays in total, yet it runs fine in a 64 MB heap, because each array becomes garbage one step later.</p>
+
+<h2>2. Most objects die young: generations</h2>
+<p>Checking every box in the warehouse each time would take forever. So HotSpot (the JVM in OpenJDK and Oracle JDK) uses an observation called the <strong>weak generational hypothesis</strong>, "which states that most objects survive for only a short period of time". For example, "iterator objects are often only alive for the duration of a single loop."<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC tuning: implementation</a> HotSpot collectors use "generational scavenging in conjunction with aging" to concentrate effort where reclaimable memory is most likely.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC tuning: introduction</a></p>
+
+<figure>
+<svg viewBox="0 0 680 290" role="img" aria-label="The Java heap split into a young generation (eden and two survivor spaces) and an old generation. New objects go to eden; a minor GC copies live objects to a survivor space; objects that survive several copies are promoted to the old generation.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="135" y="18" text-anchor="middle" font-size="12" fill="var(--accent)">new objects</text>
+    <path d="M135 24v58M130 76l5 6 5-6" fill="none" stroke="var(--accent)"/>
+    <rect x="20" y="36" width="640" height="232" rx="6" fill="none" stroke="currentColor" opacity=".5"/>
+    <rect x="30" y="46" width="395" height="190" rx="4" fill="none" stroke="currentColor"/>
+    <text x="300" y="66" font-size="12" opacity=".8">young generation</text>
+    <rect x="40" y="84" width="190" height="90" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="135" y="122" text-anchor="middle" fill="var(--accent)">eden</text>
+    <text x="135" y="142" text-anchor="middle" font-size="11">most objects</text>
+    <text x="135" y="157" text-anchor="middle" font-size="11">die here</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="245" y="84" width="80" height="90" rx="4"/>
+      <rect x="335" y="84" width="80" height="90" rx="4"/>
+      <rect x="445" y="46" width="205" height="190" rx="4"/>
+      <path d="M135 174v26h152v-20M282 186l5-6 5 6"/>
+      <path d="M375 174v36h64M433 205l6 5-6 5"/>
+    </g>
+    <text x="285" y="124" text-anchor="middle">S0</text>
+    <text x="285" y="142" text-anchor="middle" font-size="11">survivor</text>
+    <text x="375" y="124" text-anchor="middle">S1</text>
+    <text x="375" y="142" text-anchor="middle" font-size="11">survivor</text>
+    <text x="210" y="216" text-anchor="middle" font-size="11">minor GC: copy live ones</text>
+    <text x="320" y="228" font-size="11">promote (aging)</text>
+    <text x="547" y="100" text-anchor="middle">old generation</text>
+    <text x="547" y="118" text-anchor="middle" font-size="11" opacity=".8">(tenured)</text>
+    <text x="547" y="150" text-anchor="middle" font-size="11">long-lived objects:</text>
+    <text x="547" y="166" text-anchor="middle" font-size="11">caches, singletons</text>
+    <text x="547" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">full → major GC (slow)</text>
+    <text x="30" y="258" font-size="11" opacity=".8">Java heap: maximum size set by -Xmx (default 1/4 of physical memory)</text>
+  </g>
+</svg>
+<figcaption>Generations in the classic layout. Most objects are created in eden and die there; survivors are copied between S0 and S1, and after enough copies they move to the old generation.</figcaption>
+</figure>
+
+<p>Follow one object through its life:</p>
+<pre><code><span class="c">Step 1  new byte[1024]           → allocated in eden ("Most objects are initially allocated in eden")</span>
+<span class="c">Step 2  eden fills up            → a minor collection: only the young generation is collected</span>
+<span class="c">Step 3  object still reachable?  → copied to the empty survivor space; eden is now empty</span>
+<span class="c">Step 4  next minor GCs           → copied S0 ↔ S1 again, getting "older" each time</span>
+<span class="c">Step 5  copied enough times      → moved to the old generation ("aging")</span>
+<span class="c">Step 6  old generation fills up  → a major collection of the entire heap: much slower</span></code></pre>
+<p>All from the GC tuning guide: "a young generation full of dead objects is collected very quickly", while major collections "usually last much longer than minor collections because a significantly larger number of objects are involved".<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC tuning: implementation</a> The key insight: the cost of a minor GC depends on the objects that <em>survive</em>, not on the garbage. Dead objects cost almost nothing.</p>
+<p class="muted">G1, the default collector, keeps the same idea but splits the heap into many equal regions: "G1 partitions the heap into a set of equally sized heap regions", and the young generation is a set of eden and survivor regions.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">GC tuning: G1</a></p>
+
+<h2>3. Defaults you should be able to recite</h2>
+<ul>
+<li>Collector: G1 on a "server-class machine" (two or more processors and at least 1792 MB physical memory), otherwise the Serial collector.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC tuning: ergonomics</a></li>
+<li>Initial heap: 1/64 of physical memory. Maximum heap: 1/4 of physical memory.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC tuning: ergonomics</a></li>
+<li><code>-XX:MaxRAMPercentage</code> sets the maximum heap as a percentage of the max memory the JVM sees; default 25 percent.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html">java command</a></li>
+</ul>
+<p>Check it on a real machine. This laptop (JDK 21) has 15,716 MB of RAM and 12 CPUs:</p>
+<pre><code>$ java -XX:+PrintFlagsFinal -version | grep -E " MaxHeapSize | UseG1GC "
+   size_t MaxHeapSize = <span class="hl">4120903680</span>   {product} {ergonomic}
+     bool UseG1GC     = true         {product} {ergonomic}</code></pre>
+<p>4,120,903,680 bytes is about 3,930 MB: one quarter of 15,716 MB. And G1 is on, because the machine is "server-class". (Spaces in the output shortened.)</p>
+<p class="muted">JDK 8 vs 17 vs 21: in JDK 8 the default was the throughput-oriented Parallel collector; JEP 248 made G1 the default in JDK 9<a class="src" href="https://openjdk.org/jeps/248">JEP 248</a>, so JDK 17 and 21 both default to G1. JDK 21 also adds Generational ZGC (<a href="0017-generational-zgc.html">lesson 0017</a>).</p>
+<p><strong>Trap: containers.</strong> In a container, "physical memory" means the memory the JVM sees, usually the container's limit. Only 25% of it becomes heap by default, and the heap is only part of the process's memory (threads, metaspace, buffers also use some). The Docker and Kubernetes lessons revisit this.</p>
+
+<h2>4. Read a GC log line</h2>
+<p>Run the demo with a 64 MB heap and GC logging on:</p>
+<pre><code>$ java -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.002s][info][gc] Using G1
+max heap (MB): 64
+[0.361s][info][gc] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 24M-&gt;3M(64M) 3.213ms
+[0.369s][info][gc] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 38M-&gt;3M(64M) 2.740ms
+[0.376s][info][gc] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 38M-&gt;3M(64M) 2.086ms
+...                                                  <span class="c">(55 collections in total, all young)</span>
+[0.592s][info][gc] GC(54) Pause Young (Normal) (G1 Evacuation Pause) 40M-&gt;3M(64M) 0.228ms
+done</code></pre>
+<p class="muted">Timestamps and pause times change on every run and every machine; the shape stays the same.</p>
+
+<figure>
+<svg viewBox="0 0 680 130" role="img" aria-label="One G1 log line split into parts: collection number, pause type, cause, heap before and after, total heap size, and pause time.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="34">GC(0)</text>
+    <text x="80" y="34">Pause Young</text>
+    <text x="180" y="34" opacity=".75">(Normal) (G1 Evacuation Pause)</text>
+    <rect x="404" y="18" width="62" height="24" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="410" y="34" fill="var(--accent)">24M-&gt;3M</text>
+    <text x="470" y="34">(64M)</text>
+    <text x="520" y="34">3.213ms</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <path d="M38 44v16"/>
+      <path d="M120 44v48"/>
+      <path d="M288 44v16"/>
+      <path d="M487 44v16"/>
+      <path d="M545 44v48"/>
+    </g>
+    <path d="M435 44v48" fill="none" stroke="var(--accent)"/>
+    <g font-size="11">
+      <text x="20" y="74">collection #0</text>
+      <text x="288" y="74" text-anchor="middle">cause</text>
+      <text x="487" y="74" text-anchor="middle">heap size</text>
+      <text x="120" y="106" text-anchor="middle">young-gen pause</text>
+      <text x="435" y="106" text-anchor="middle" fill="var(--accent)">used: before → after</text>
+      <text x="560" y="106" text-anchor="middle">pause length</text>
+    </g>
+  </g>
+</svg>
+<figcaption>One line, six facts. The highlighted part tells you how much was garbage: 24 MB used before, 3 MB after.</figcaption>
+</figure>
+
+<p>Reading it: collection number 0, a young-generation pause, heap occupancy went from 24 MB to 3 MB out of 64 MB, taking about 3 ms. The demo allocates short-lived arrays, so almost everything is reclaimed. (Log format is from running the example on this machine with JDK 21.)</p>
+<p>What would worry you? A "3M" after-value that keeps <strong>growing</strong> from line to line (live data piling up: a leak or a cache without limits), pauses that get longer, or "Pause Full" lines. If live data finally needs more than the heap, the JVM gives up: "If a computation requires more heap than can be made available by the automatic storage management system, the Java Virtual Machine throws an <code>OutOfMemoryError</code>."<a class="src" href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3">JVMS 2.5.3</a> Exercise 0007 makes this happen on purpose.</p>
+<p>Same program with the Serial collector, for comparison (first lines only):</p>
+<pre><code>$ java -XX:+UseSerialGC -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.002s][info][gc] Using Serial
+[0.349s][info][gc] GC(0) Pause Young (Allocation Failure) 18M-&gt;4M(61M) 7.715ms
+max heap (MB): 61</code></pre>
+<p>Different collector, different cause text ("Allocation Failure": eden was full), and slightly different heap accounting (61 MB). The way to read the line is the same.</p>
+
+<h2>5. The interview move</h2>
+<div class="aside">Interview move: before touching collector flags, set the heap size on purpose (<code>-Xmx</code> or <code>MaxRAMPercentage</code>) and turn on GC logging. The Docker and Kubernetes lessons revisit this: heap is only part of a container's memory.</div>
+<p>The GC tuning guide itself says to use the defaults "before using the more detailed controls described in subsequent sections".<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC tuning: ergonomics</a> So the order is: measure (GC log), size the heap, and only then consider a different collector or its flags.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">With no heap flags, what is the default maximum heap size?</p>
+  <div class="options">
+    <button class="opt" data-correct>One quarter of physical memory</button>
+    <button class="opt">One eighth of physical memory</button>
+    <button class="opt">One half of physical memory</button>
+    <button class="opt">All of the physical memory</button>
+  </div>
+  <div class="why">Maximum heap defaults to 1/4 of physical memory (initial heap: 1/64). <code>MaxRAMPercentage</code> defaults to 25 percent.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which collector is the default on a server-class machine in JDK 17 and 21?</p>
+  <div class="options">
+    <button class="opt" data-correct>Garbage-First (G1)</button>
+    <button class="opt">Shenandoah low-pause</button>
+    <button class="opt">Epsilon no-op</button>
+    <button class="opt">Serial collector</button>
+  </div>
+  <div class="why">G1 on server-class machines, Serial otherwise. (JDK 8 defaulted to Parallel; G1 became default in JDK 9.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What counts as a "server-class" machine for these defaults?</p>
+  <div class="options">
+    <button class="opt" data-correct>Two or more CPUs and at least 1792 MB</button>
+    <button class="opt">Two or more CPUs and at least 4 GB</button>
+    <button class="opt">One or more CPUs and at least 512 MB</button>
+    <button class="opt">Four or more CPUs and at least 8 GB</button>
+  </div>
+  <div class="why">Two or more processors and physical memory of at least 1792 MB.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A log line ends with <code>24M-&gt;3M(64M) 3.213ms</code>. What is <code>64M</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The total heap size</button>
+    <button class="opt">The length of the pause</button>
+    <button class="opt">The live objects left over</button>
+    <button class="opt">The bytes that were reclaimed</button>
+  </div>
+  <div class="why">Before → after (total heap capacity), then the pause time.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why is a minor GC of a young generation full of dead objects so fast?</p>
+  <div class="options">
+    <button class="opt" data-correct>Its cost depends on the live objects, not the dead</button>
+    <button class="opt">It runs on a separate CPU core that is idle</button>
+    <button class="opt">It skips eden and only scans the old generation</button>
+    <button class="opt">It deletes each dead object one by one quickly</button>
+  </div>
+  <div class="why">Minor collections cost roughly in proportion to the live objects collected; dead objects are just left behind and eden is reused.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In a GC log, the "after" value grows every collection: 3M, 9M, 20M, 41M… What does it suggest?</p>
+  <div class="options">
+    <button class="opt" data-correct>Live data is piling up, like a leak</button>
+    <button class="opt">The GC is working faster each time</button>
+    <button class="opt">The heap is shrinking to save memory</button>
+    <button class="opt">More garbage is created per second</button>
+  </div>
+  <div class="why">"After" is what survived. If it keeps climbing, objects stay reachable (a leak or an unbounded cache), and an <code>OutOfMemoryError</code> may follow.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How does garbage collection work in Java, and how would you size the heap?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Objects live in the shared heap; the GC frees objects no longer reachable.</label></li>
+      <li><label><input type="checkbox"> Most objects die young, so the heap is split into young and old generations.</label></li>
+      <li><label><input type="checkbox"> Minor GC: collect young (eden + survivors), copy survivors, promote old ones; major GC is slower.</label></li>
+      <li><label><input type="checkbox"> Defaults: G1 on server-class machines, max heap 1/4 of RAM (MaxRAMPercentage 25).</label></li>
+      <li><label><input type="checkbox"> Read a log line: before → after (total), pause time.</label></li>
+      <li><label><input type="checkbox"> First steps: set -Xmx or MaxRAMPercentage on purpose and turn on -Xlog:gc, before collector flags.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"All objects live in the heap, which every thread shares. The garbage collector finds objects that are no longer reachable from live references and reuses their memory. HotSpot collectors are generational, because most objects die young: new objects go into eden; when it fills, a minor GC copies the few live ones into a survivor space, and objects that survive several times are promoted to the old generation. A minor GC is cheap because it only pays for live objects; a major GC of the whole heap is much slower. Since JDK 9 the default is G1 on server-class machines, and the default max heap is a quarter of physical memory, which in a container is often too small or misunderstood. So first I set the heap size on purpose with -Xmx or MaxRAMPercentage and turn on -Xlog:gc. In the log I look at before → after and the pause time; if the after-value keeps growing, live data is piling up, which points to a leak, not to a GC setting."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0007-gc-log-reading.md">Exercise 0007: two collectors, one program</a></p>
+<p><a href="../exercises/0007-gc-log-reading.md">Exercise 0007: two collectors, one program</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a>. Then read the Ergonomics chapter.</p>
-<p><a href="0026-deadlock-and-lock-ordering.html">← Deadlock and lock ordering</a> &nbsp;|&nbsp; <a href="0012-var-and-text-blocks.html">JDK 10 and 15: var and text blocks (in JDK 17) →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may continue: <em>"G1 pauses are too long for us. What would you try?"</em> <a href="0017-generational-zgc.html">Lesson 0017</a> covers Generational ZGC in JDK 21. First, close this section with <a href="0045-review-concurrency-jvm.html">Review 6: concurrency and the JVM</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a>, then the <a href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">Ergonomics</a> chapter and the <a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">Garbage Collector Implementation</a> chapter (it has the object-lifetime chart).</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What is the difference between -Xms and -Xmx?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0026-deadlock-and-lock-ordering.html">← When two threads wait for each other forever: deadlock</a> &nbsp;|&nbsp; <a href="0045-review-concurrency-jvm.html">Review 6: concurrency and the JVM →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 HotSpot GC Tuning Guide, the java command reference, the JVM Specification (Java SE 21) and JEP 248, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC Tuning Guide: Ergonomics</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC Tuning Guide: Garbage Collector Implementation</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">GC Tuning Guide: G1</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html">java command reference</a> · <a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3">JVMS 2.5.3: Heap</a> · <a href="https://openjdk.org/jeps/248">JEP 248</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

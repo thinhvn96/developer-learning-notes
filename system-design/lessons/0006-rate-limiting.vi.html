@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 6: Rate limiting và token bucket</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Rate limiting và token bucket</h1>
+<p class="meta">System Design · Bài 0006 · bước 5/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-rate-limiting.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích rate limiting như một kỷ luật phía client và chạy thử một token bucket.</div>
+
+<h2>Vấn đề</h2>
+<p>Dội request vào một service đang throttle rồi retry các request bị từ chối sẽ nhân lưu lượng lên: ví dụ trong tài liệu nạp 10.000 bản ghi vào một service chỉ nhận 2.000 bản ghi mỗi lượt, và rốt cuộc gửi tổng cộng 30.000 bản ghi.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a> Pattern Rate Limiting kiểm soát "tốc độ ứng dụng của bạn gửi request tới một service để bạn luôn nằm trong giới hạn throttling của service đó".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+<h2>Cách làm</h2>
+<ul><li>Throttle theo số thao tác mỗi giây, lượng dữ liệu mỗi phút, hoặc chi phí của thao tác.</li>
+<li>Ưu tiên gửi các batch nhỏ hơn và thường xuyên hơn (làm đều luồng dữ liệu) thay vì dồn một đợt burst mỗi chu kỳ.</li>
+<li>Đưa bản ghi vào một hệ thống messaging bền vững và để các job processor đọc ra với tốc độ có kiểm soát.</li>
+<li>Phối hợp retry với rate limiting: tránh retry storm (bão retry), truyền back-pressure ngược lên như HTTP 429 kèm <code>Retry-After</code>, và giới hạn số lần retry với các delay ngẫu nhiên nhỏ.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></li></ul>
+<h2>Một token bucket (bản cài đặt của mình cho một thuật toán phổ biến)</h2>
+<pre><code>java system-design/examples/TokenBucketDemo.java     # burst 5, refill 10/s
+20 requests fired instantly -&gt; allowed=5 rejected=15
+1 s of attempts every 10 ms -&gt; allowed=9 (about the refill rate)</code></pre>
+<p>Trang Azure mô tả pattern; token bucket chỉ là một thuật toán phổ biến và là ví dụ của mình, không phải của tài liệu. Mã nguồn: <a href="../examples/TokenBucketDemo.java"><code>TokenBucketDemo.java</code></a>. Không phù hợp khi thao tác cần hoàn tất đồng bộ ngay lập tức với latency rất thấp, hoặc khi nút thắt cổ chai là mức độ đồng thời (concurrency) chứ không phải tốc độ request.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a> Xem thêm <a href="0002-retries-and-idempotency.vi.html">retry</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Rate limiting kiểm soát cái gì?</p>
+  <button>Tên thread</button>
+  <button>Mức log</button>
+  <button data-correct>Request gửi tới một service</button>
+  <button>Dung lượng đĩa</button>
+  <p class="explain">Nó kiểm soát tốc độ ứng dụng gửi request.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Retry ngây thơ khi bị throttle gây ra gì?</p>
+  <button>Không gì cả</button>
+  <button>Xong nhanh hơn</button>
+  <button>Ít lưu lượng hơn</button>
+  <button data-correct>Lưu lượng thừa</button>
+  <p class="explain">Ví dụ trong tài liệu gửi 30.000 bản ghi cho 10.000 bản ghi thật.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Tín hiệu server báo client chậm lại?</p>
+  <button data-correct>HTTP 429 kèm Retry-After</button>
+  <button>HTTP 301</button>
+  <button>HTTP 404</button>
+  <button>HTTP 200</button>
+  <p class="explain">Truyền back-pressure ngược lên, ví dụ 429 kèm Retry-After.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Token bucket burst 5. Bắn tức thì 20 request. Bao nhiêu được qua?</p>
+  <button data-correct>Năm</button>
+  <button>Mười</button>
+  <button>Không</button>
+  <button>Hai mươi</button>
+  <p class="explain">Demo cho qua 5 và từ chối 15.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-limit-an-api.vi.md">Bài tập 0006: giới hạn một API</a></p>
+<p>Ví dụ chạy được: <a href="../examples/TokenBucketDemo.java"><code>TokenBucketDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">Azure: Rate Limiting pattern</a>. Bối cảnh, giải pháp, các điểm cần cân nhắc.</p>
+<p><a href="0005-bulkhead.vi.html">← Pattern bulkhead</a> &nbsp;|&nbsp; <a href="0007-queue-based-load-leveling.vi.html">Queue-based load leveling →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">Azure: Rate Limiting pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

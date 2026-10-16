@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 39: Concurrent collection: synchronized, copy-on-write, blocking queue</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Concurrent collection: synchronized, copy-on-write, blocking queue</h1>
+<p class="subtitle">Bốn thread, một ArrayList, 40.000 lần add, và khoảng 27.000 lần biến mất mà không có một lỗi nào. Đây là thứ nên dùng thay thế.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0039 · bước 21/46 · Senior · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0039-concurrent-collections.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Service backend nào cũng chia sẻ dữ liệu giữa các thread: request handler, listener, worker pool. Chọn sai collection sẽ gây bug chỉ xuất hiện khi tải cao. <em>"Ở đây bạn dùng collection thread-safe nào, và vì sao?"</em> là câu hỏi senior tiêu chuẩn, và câu trả lời không bao giờ là "cứ synchronized hết".</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn được giữa synchronized wrapper, CopyOnWriteArrayList, ConcurrentHashMap, ConcurrentSkipListMap và BlockingQueue, và dùng mỗi cái một cách an toàn.</div>
+
+<dl class="words">
+  <dt>thread</dt><dd>Một luồng thực thi trong chương trình. Nhiều thread chạy cùng lúc và có thể đụng vào cùng object.</dd>
+  <dt>thread-safe</dt><dd>Vẫn đúng khi nhiều thread dùng cùng lúc, mà bên gọi không cần lock thêm.</dd>
+  <dt>lock</dt><dd>Quy tắc "mỗi lần một người": khi một thread giữ nó, các thread khác muốn lấy phải chờ. <code>synchronized</code> là lock có sẵn của Java.</dd>
+  <dt>contention</dt><dd>Nhiều thread cùng muốn một lock một lúc, nên tốn thời gian chờ.</dd>
+  <dt>snapshot</dt><dd>Một bản sao đóng băng của dữ liệu tại một thời điểm; thay đổi sau đó không xuất hiện trong nó.</dd>
+  <dt>producer / consumer</dt><dd>Một bên tạo ra việc, bên kia xử lý. Queue ở giữa là điểm bàn giao.</dd>
+  <dt>backpressure</dt><dd>Làm chậm producer khi consumer theo không kịp, thay vì để việc dồn lại tới khi hết bộ nhớ.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Đoán xem: bốn thread, mỗi thread gọi <code>list.add(i)</code> 10.000 lần trên cùng một <code>ArrayList</code>. Cuối cùng <code>list.size()</code> là bao nhiêu? Chọn một: đúng 40.000; ít hơn 40.000; nhiều hơn 40.000; luôn ném lỗi. Nói vì sao.</p>
+
+<h2>1. Vì sao collection thường bị hỏng</h2>
+<p>Hãy tưởng tượng hai thu ngân dùng chung một cuốn sổ ghi doanh thu. Cả hai cùng nhìn sổ: "dòng trống tiếp theo là dòng 5". Cả hai cùng ghi vào dòng 5. Một giao dịch đè lên giao dịch kia, và không ai biết.</p>
+<p>Đó là chuyện xảy ra bên trong <code>ArrayList.add</code>. Đơn giản hóa, nó đọc size hiện tại, ghi phần tử vào chỉ số đó, rồi lưu size + 1. Hai thread có thể đọc cùng một size cùng một lúc:</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Hai dòng thời gian thread. Thread A đọc size 5, Thread B đọc size 5. A ghi x vào ô 5 và đặt size 6. B ghi y vào ô 5, đè lên x, và đặt size 6. Hai lần add, nhưng size chỉ tăng một.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="40">Thread A</text>
+    <text x="20" y="130">Thread B</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M100 36H660"/><path d="M100 126H660"/>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <rect x="110" y="20" width="130" height="32" rx="4"/>
+      <rect x="350" y="20" width="150" height="32" rx="4"/>
+      <rect x="510" y="20" width="140" height="32" rx="4"/>
+      <rect x="170" y="110" width="130" height="32" rx="4"/>
+      <rect x="510" y="110" width="140" height="32" rx="4"/>
+    </g>
+    <rect x="350" y="110" width="150" height="32" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="175" y="41">đọc size: 5</text>
+      <text x="425" y="41">slot[5] = x</text>
+      <text x="580" y="41">size = 6</text>
+      <text x="235" y="131">đọc size: 5</text>
+      <text x="425" y="131" fill="var(--accent)">slot[5] = y</text>
+      <text x="580" y="131">size = 6</text>
+    </g>
+    <text x="425" y="168" text-anchor="middle" font-size="11" fill="var(--accent)">đè lên x</text>
+    <path d="M100 196H660" stroke="currentColor" opacity=".4" fill="none"/>
+    <text x="640" y="214" text-anchor="end" font-size="11" opacity=".75">thời gian →</text>
+    <text x="20" y="240" font-size="12">Kết quả: hai lần add(), một phần tử, size 6 thay vì 7. Không exception.</text>
+  </g>
+</svg>
+<figcaption>Một "lost update" được đơn giản hóa. Thứ tự đan xen thật thì thay đổi; đôi khi một thread còn gặp <code>ArrayIndexOutOfBoundsException</code> trong lúc resize.</figcaption>
+</figure>
+
+<pre><code>$ java java/examples/collections/ConcurrentCollections.java
+ArrayList, 4 threads x 10,000 adds   : size=12481
+synchronizedList, same work          : size=40000
+CopyOnWriteArrayList iterate+add     : saw 2, list now [a, b, a2, b2]
+offer on full queue                  : true true false
+producer/consumer sum 1..100         : 5050
+ConcurrentSkipListMap first/last key : 2 / 996  ceilingKey(500)=500</code></pre>
+<p>Hơn 27.000 lần add biến mất mà không có exception trong lần chạy này; con số đổi sau mỗi lần chạy (một lần trước cho 13.243), và có lần ví dụ còn báo thêm một exception. Collection không synchronized không hỏng ầm ĩ. Javadoc của ArrayList cảnh báo: "Lưu ý rằng cài đặt này không được synchronized."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+
+<h2>2. Các lựa chọn</h2>
+<table>
+<tr><th>Dùng</th><th>Khi nào</th><th>Cẩn thận</th></tr>
+<tr><td><code>Collections.synchronizedList/Map</code></td><td>ít contention, đơn giản</td><td>một lock cho mọi thứ; bạn "phải tự synchronize trên list trả về khi duyệt nó" bằng iterator hay stream<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a></td></tr>
+<tr><td><code>CopyOnWriteArrayList</code></td><td>số lần đọc "vượt xa số lần sửa" (listener, config)</td><td>mỗi lần ghi copy cả mảng<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList javadoc</a></td></tr>
+<tr><td><code>ConcurrentHashMap</code></td><td>map dùng chung, contention cao</td><td>dùng các method nguyên tử (<a href="0025-concurrenthashmap.vi.html">bài 0025</a>)</td></tr>
+<tr><td><code>ConcurrentSkipListMap/Set</code></td><td>map <em>có thứ tự</em> dùng chung, truy vấn khoảng</td><td>log(n); không cho key null<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentSkipListMap.html">ConcurrentSkipListMap javadoc</a></td></tr>
+<tr><td><code>BlockingQueue</code></td><td>bàn giao producer-consumer</td><td>chọn loại có giới hạn để có backpressure<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></td></tr>
+</table>
+
+<h3>Synchronized wrapper và cái bẫy khi duyệt</h3>
+<p>Synchronized wrapper giống một chìa khóa duy nhất của phòng chung: mỗi method (<code>add</code>, <code>get</code>, <code>size</code>) lấy chìa, làm việc rồi trả chìa. Điều đó đã sửa lần chạy: <code>size=40000</code>. Nhưng một vòng lặp là nhiều lần gọi liên tiếp, và giữa chúng thread khác có thể giành chìa và đổi list. Nên khi duyệt bạn phải tự giữ chìa:</p>
+<pre><code>List&lt;String&gt; list = Collections.synchronizedList(new ArrayList&lt;&gt;());
+synchronized (list) {                 <span class="c">// required for iteration</span>
+    for (String s : list) process(s);
+}</code></pre>
+<p>Không có block này, vòng lặp có thể ném <code>ConcurrentModificationException</code> (<a href="0029-iterators-and-fail-fast.vi.html">bài 0029</a>). Có nó, mọi thread khác phải chờ hết vòng lặp: đó là cái giá của một lock duy nhất.</p>
+
+<h3>ConcurrentSkipListMap: loại có thứ tự</h3>
+<p>Với một map <em>có thứ tự</em> dùng chung (<a href="0034-treemap-and-navigable-maps.vi.html">bài 0034</a>), bốn thread đưa giá ngẫu nhiên vào một <code>ConcurrentSkipListMap</code>, và <code>firstKey</code>, <code>lastKey</code> và <code>ceilingKey</code> vẫn chạy đúng: <code>2 / 996 ceilingKey(500)=500</code> trong lần chạy này (key là ngẫu nhiên, nên của bạn sẽ khác).</p>
+
+<h2>3. CopyOnWriteArrayList: snapshot</h2>
+<p>Hãy nghĩ tới bảng menu của nhà hàng. Đổi menu nghĩa là in một bảng mới hoàn toàn rồi thay vào. Khách đang đọc bảng cũ vẫn đọc tiếp, không bị làm phiền. In lại thì tốn, nhưng menu hiếm khi đổi và được đọc cả ngày.</p>
+<p>Javadoc: "Một biến thể thread-safe của ArrayList trong đó mọi thao tác thay đổi (add, set, v.v.) được cài đặt bằng cách tạo một bản sao mới của mảng bên dưới. Điều này thường quá tốn kém, nhưng có thể hiệu quả hơn các lựa chọn khác khi số thao tác duyệt vượt xa số lần sửa".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList javadoc</a></p>
+<p>Iterator dùng mảng "tại thời điểm iterator được tạo", nên không bao giờ ném <code>ConcurrentModificationException</code> và "sẽ không phản ánh các lần thêm, xóa hay thay đổi" xảy ra sau đó; <code>iterator.remove()</code> không được hỗ trợ.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList javadoc</a></p>
+<pre><code>List&lt;String&gt; listeners = new CopyOnWriteArrayList&lt;&gt;(List.of("a", "b"));
+for (String l : listeners) { listeners.add(l + "2"); seen++; }
+<span class="c">Step 1  The loop starts on snapshot [a, b]</span>
+<span class="c">Step 2  add("a2") makes a new array [a, b, a2]; the loop still reads [a, b]</span>
+<span class="c">Step 3  add("b2") makes another new array [a, b, a2, b2]</span>
+<span class="c">Step 4  The loop ends after 2 elements → </span><span class="hl">saw 2, list now [a, b, a2, b2]</span></code></pre>
+<p>Với một <code>ArrayList</code> thường, đúng vòng lặp đó sẽ ném <code>ConcurrentModificationException</code>, hoặc không bao giờ dừng. Ứng dụng điển hình: danh sách event listener, bảng routing, feature flag. <strong>Bẫy:</strong> một list được ghi thường xuyên (log, hàng đợi task) biến mỗi lần add thành một lần copy toàn bộ.</p>
+
+<h2>4. BlockingQueue: bàn giao producer-consumer</h2>
+<p>Hãy hình dung băng chuyền sushi chỉ đủ chỗ cho vài đĩa. Đầu bếp (producer) đặt đĩa lên; nếu băng đầy, đầu bếp chờ. Khách (consumer) lấy đĩa xuống; nếu băng trống, khách chờ. Không ai phải hét "xong chưa?": băng chuyền tự điều phối.</p>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Một thread producer put phần tử vào ArrayBlockingQueue có giới hạn capacity 2; một thread consumer take chúng ra. put chặn khi queue đầy, take chặn khi queue trống. Producer kết thúc bằng poison pill -1.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="70" width="140" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="90" y="96" text-anchor="middle">producer</text>
+    <text x="90" y="114" text-anchor="middle" font-size="11">put(1..100), put(-1)</text>
+    <rect x="240" y="60" width="200" height="80" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="52" text-anchor="middle" fill="var(--accent)">ArrayBlockingQueue(2)</text>
+    <rect x="270" y="80" width="60" height="40" fill="none" stroke="currentColor"/>
+    <rect x="350" y="80" width="60" height="40" fill="none" stroke="currentColor"/>
+    <text x="300" y="105" text-anchor="middle">7</text>
+    <text x="380" y="105" text-anchor="middle">8</text>
+    <rect x="520" y="70" width="140" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="590" y="96" text-anchor="middle">consumer</text>
+    <text x="590" y="114" text-anchor="middle" font-size="11">take() tới khi -1</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M160 100h74M228 95l6 5-6 5"/>
+      <path d="M440 100h74M508 95l6 5-6 5"/>
+    </g>
+    <text x="197" y="90" text-anchor="middle" font-size="11">put</text>
+    <text x="477" y="90" text-anchor="middle" font-size="11">take</text>
+    <text x="90" y="160" text-anchor="middle" font-size="11" fill="var(--accent)">đầy? put() chờ</text>
+    <text x="590" y="160" text-anchor="middle" font-size="11" fill="var(--accent)">trống? take() chờ</text>
+    <text x="340" y="195" text-anchor="middle" font-size="11">có giới hạn = backpressure: producer nhanh không làm đầy heap</text>
+  </g>
+</svg>
+<figcaption>Producer trong ví dụ put từ 1 tới 100 rồi một "poison pill" (-1); consumer cộng dồn tới khi gặp viên thuốc độc. Tổng: 5050.</figcaption>
+</figure>
+
+<h3>Bốn cách phản ứng khi không làm tiếp được</h3>
+<table>
+<tr><th></th><th>Ném lỗi</th><th>Giá trị đặc biệt</th><th>Chặn</th><th>Hết giờ<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></th></tr>
+<tr><td>Thêm</td><td><code>add</code></td><td><code>offer</code></td><td><code>put</code></td><td><code>offer(e, t, unit)</code></td></tr>
+<tr><td>Lấy ra</td><td><code>remove</code></td><td><code>poll</code></td><td><code>take</code></td><td><code>poll(t, unit)</code></td></tr>
+</table>
+<pre><code>BlockingQueue&lt;Integer&gt; q = new ArrayBlockingQueue&lt;&gt;(2);
+q.offer(1); q.offer(2); q.offer(3);   <span class="c">// true true false: no room for 3</span>
+
+<span class="c">// consumer thread</span>
+for (int x; (x = q.take()) != -1; ) sum += x;
+<span class="c">// producer thread</span>
+for (int i = 1; i &lt;= 100; i++) q.put(i);
+q.put(-1);                            <span class="c">// poison pill: "no more items"</span></code></pre>
+<p>Vì sao cần poison pill? "BlockingQueue tự nó không hỗ trợ bất kỳ thao tác 'close' hay 'shutdown' nào"; "một cách làm phổ biến là producer chèn các object đặc biệt báo hết luồng, hay poison object".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></p>
+<p>Các cài đặt: <code>ArrayBlockingQueue</code> (mảng có giới hạn), <code>LinkedBlockingQueue</code> (giới hạn tùy chọn), <code>PriorityBlockingQueue</code>, <code>DelayQueue</code>, <code>SynchronousQueue</code> (không có sức chứa, bàn giao trực tiếp), <code>LinkedTransferQueue</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a> Null bị từ chối vì <code>null</code> báo hiệu "poll thất bại".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a> Như các concurrent collection khác, việc đưa một phần tử vào happens-before việc lấy nó ra ở thread khác (<a href="0005-visibility-and-happens-before.vi.html">bài 0005</a>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a> Đây chính là queue bên trong <code>ThreadPoolExecutor</code> (<a href="0023-thread-pools-executors.vi.html">bài 0023</a>).</p>
+<p><strong>Bẫy:</strong> các method hàng loạt <code>addAll</code>, <code>containsAll</code>, <code>retainAll</code> và <code>removeAll</code> "không nhất thiết được thực hiện một cách nguyên tử", nên <code>addAll(c)</code> có thể lỗi sau khi mới thêm được một phần.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></p>
+<p><strong>JDK 8, 17 và 21:</strong> mọi class này đều có và hành xử giống nhau trên 8, 17 và 21. Trên JDK 21, consumer bị chặn trong <code>take()</code> có thể là một virtual thread (<a href="0006-virtual-threads.vi.html">bài 0006</a>), nơi việc bị chặn rất rẻ.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Bốn thread, mỗi thread add 10.000 phần tử vào một <code>ArrayList</code> thường. Kết quả nhiều khả năng nhất là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ít hơn 40.000 phần tử, thường không có exception</button>
+    <button class="opt">Đúng 40.000 phần tử, vì add chỉ là một lần gọi</button>
+    <button class="opt">Nhiều hơn 40.000 phần tử, vì có phần tử bị nhân đôi</button>
+    <button class="opt">Lỗi compile, vì ArrayList không thread-safe</button>
+  </div>
+  <div class="why">Cập nhật bị mất âm thầm khi hai thread ghi cùng một ô. Lần chạy cho size=12481.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cần gì để duyệt một <code>Collections.synchronizedList</code> an toàn?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một block <code>synchronized (list)</code></button>
+    <button class="opt">Không cần thêm gì cả</button>
+    <button class="opt">Một field list <code>volatile</code></button>
+    <button class="opt">Gọi <code>clone()</code> trước</button>
+  </div>
+  <div class="why">Mỗi method đều có lock, nhưng vòng lặp là nhiều lần gọi. Bạn phải tự synchronize trên list trả về khi duyệt nó.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Khi nào <code>CopyOnWriteArrayList</code> hợp nhất?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đọc nhiều hơn ghi rất nhiều</button>
+    <button class="opt">Ghi nhiều hơn đọc rất nhiều</button>
+    <button class="opt">List chứa hàng triệu phần tử</button>
+    <button class="opt">Thứ tự phần tử không quan trọng</button>
+  </div>
+  <div class="why">Mỗi lần ghi copy cả mảng. Chỉ đáng khi số lần duyệt vượt xa số lần sửa, như danh sách listener.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một vòng lặp trên <code>CopyOnWriteArrayList</code> <code>[a, b]</code> thêm một phần tử cho mỗi phần tử. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Vòng lặp thấy 2 phần tử; list kết thúc với 4</button>
+    <button class="opt">Vòng lặp thấy 4 phần tử; list kết thúc với 4</button>
+    <button class="opt">Ném ConcurrentModificationException</button>
+    <button class="opt">Vòng lặp không dừng vì list cứ lớn lên</button>
+  </div>
+  <div class="why">Iterator đọc snapshot lấy lúc nó được tạo; phần thêm vào đi tới một mảng mới.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Method nào của <code>BlockingQueue</code> chờ tới khi có chỗ?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>put(e)</code></button>
+    <button class="opt"><code>offer(e)</code></button>
+    <button class="opt"><code>add(e)</code></button>
+    <button class="opt"><code>peek()</code></button>
+  </div>
+  <div class="why">put thì chặn; offer trả về false; add thì ném lỗi. Lần chạy cho thấy offer trả về false trên ArrayBlockingQueue(2) đã đầy.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>BlockingQueue</code> từ chối phần tử <code>null</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>null là tín hiệu poll thất bại</button>
+    <button class="opt">null làm put bị chặn mãi mãi</button>
+    <button class="opt">null không lưu được trong mảng</button>
+    <button class="opt">null phá vỡ quy tắc happens-before</button>
+  </div>
+  <div class="why">poll trả về null khi không có gì, nên null không thể đồng thời là một phần tử thật.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn cần một map có thứ tự với truy vấn khoảng, dùng chung bởi nhiều thread. Chọn cái nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>ConcurrentSkipListMap</button>
+    <button class="opt">ConcurrentHashMap</button>
+    <button class="opt">CopyOnWriteArrayList</button>
+    <button class="opt">synchronized HashMap</button>
+  </div>
+  <div class="why">ConcurrentSkipListMap là một NavigableMap concurrent với thao tác log(n) kỳ vọng. ConcurrentHashMap không có thứ tự.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Java có những collection thread-safe nào, và bạn chọn thế nào?"</strong> Bấm giờ. Trả lời thành tiếng, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Collection thường mất cập nhật âm thầm khi bị ghi đồng thời.</label></li>
+      <li><label><input type="checkbox"> Synchronized wrapper: một lock, đơn giản, nhưng phải tự lock khi duyệt.</label></li>
+      <li><label><input type="checkbox"> CopyOnWriteArrayList: copy mỗi lần ghi, iterator snapshot; cho list chủ yếu là đọc.</label></li>
+      <li><label><input type="checkbox"> ConcurrentHashMap cho map dùng chung, với <code>merge</code>/<code>compute</code> nguyên tử.</label></li>
+      <li><label><input type="checkbox"> ConcurrentSkipListMap cho map có thứ tự dùng chung.</label></li>
+      <li><label><input type="checkbox"> BlockingQueue cho producer-consumer: put/take chặn; có giới hạn thì có backpressure.</label></li>
+      <li><label><input type="checkbox"> Không null trong concurrent queue; dùng poison pill để dừng consumer.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Trước hết là vì sao nó quan trọng: một ArrayList thường dùng chung bởi bốn thread đã mất phần lớn trong 40.000 lần add trong bài test của em, mà không có exception nào. Cách sửa đơn giản nhất là Collections.synchronizedList hoặc synchronizedMap: một lock bọc mọi method, ổn khi ít contention, nhưng khi duyệt thì em phải tự giữ lock. Với list được đọc liên tục mà hiếm khi ghi, như listener, em dùng CopyOnWriteArrayList: mỗi lần ghi copy mảng, còn iterator làm việc trên snapshot nên không bao giờ ném lỗi. Với map dùng chung em dùng ConcurrentHashMap với các method nguyên tử, và ConcurrentSkipListMap nếu cần có thứ tự. Giữa producer và consumer em dùng BlockingQueue, tốt nhất là có giới hạn như ArrayBlockingQueue, để put bị chặn khi đầy và tạo backpressure. Nó không nhận null, và để dừng consumer em gửi một poison pill."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0039-pick-the-concurrent-structure.vi.md">Bài tập 0039: chọn cấu trúc concurrent</a>. Với mỗi tình huống, nêu tên class và một cái bẫy.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/ConcurrentCollections.java"><code>ConcurrentCollections.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Bài này khép lại khối collection. Tiếp theo là <a href="0043-review-collections-advanced.vi.html">Ôn tập 4</a>, trộn các bài 0034 tới 0039. Sau đó, người phỏng vấn senior thường chuyển sang phong cách functional: <em>"Functional interface là gì? Lambda capture những gì?"</em> (<a href="0008-lambdas-and-functional-interfaces.vi.html">bài 0008</a>).</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue Javadoc (JDK 21)</a>. Đọc bảng bốn dạng method và ví dụ producer-consumer trong phần mô tả class.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao ConcurrentHashMap mở rộng tốt hơn synchronized map?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0038-capacity-boxing-and-memory.vi.html">← Capacity, boxing và chi phí bộ nhớ của collection</a> &nbsp;|&nbsp; <a href="0043-review-collections-advanced.vi.html">Ôn tập 4: navigable, priority, collection đặc biệt và concurrent collection →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentSkipListMap.html">ConcurrentSkipListMap Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

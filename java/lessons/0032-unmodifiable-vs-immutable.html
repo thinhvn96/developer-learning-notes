@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 32: Lists nobody can change</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Lists nobody can change (or can they?)</h1>
+<p class="subtitle"><code>Arrays.asList</code>, <code>unmodifiableList</code>, <code>List.of</code> and <code>List.copyOf</code> look alike. They are not.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0032 · step 13 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0032-unmodifiable-vs-immutable.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> A class returns its internal list, a caller adds to it, and your object's state is now wrong. Interviewers test this with <em>"How do you return a list that nobody can change?"</em> and then <em>"What's the difference between unmodifiable and immutable?"</em> After this lesson you can answer both, and predict which call throws.</div>
+
+<div class="win"><b>Today's win:</b> tell apart <code>Arrays.asList</code>, <code>Collections.unmodifiableList</code>, <code>List.of</code> and <code>List.copyOf</code>, and predict which call throws.</div>
+
+<dl class="words">
+  <dt>reference</dt><dd>A variable holding an object does not hold the object itself, only its address. Two lists can hold the address of the same object.</dd>
+  <dt>view</dt><dd>A collection that has no data of its own; it reads through to another collection, so it shows that collection's changes.</dd>
+  <dt>unmodifiable</dt><dd>The collection refuses <code>add</code>, <code>remove</code> and <code>set</code>. It says nothing about the elements inside.</dd>
+  <dt>immutable</dt><dd>Nothing can ever change: not the collection, not the elements, not through any other reference.</dd>
+  <dt>UnsupportedOperationException</dt><dd>The exception a collection throws when you call a method it chose not to support, like <code>add</code> on a fixed-size list. Often shortened to UOE.</dd>
+  <dt>defensive copy</dt><dd>Copying data before handing it out (or after taking it in), so outside code cannot change your object's state.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Predict: <code>List&lt;String&gt; view = Collections.unmodifiableList(backing);</code> then somebody calls <code>backing.add("c")</code>. Does <code>view</code> now contain <code>"c"</code>? Yes or no, and why? The answer is in section 2.</p>
+
+<h2>1. Four things that look alike</h2>
+<p>Picture a shop with a shelf of goods. There are four ways to let a customer "see" it:</p>
+<ul>
+  <li><strong>A frame around the shelf</strong> (<code>Arrays.asList</code>): the shelf has a fixed number of slots. The customer cannot add slots, but can swap what is in a slot, and that changes the real shelf.</li>
+  <li><strong>Glass in front of the shelf</strong> (<code>Collections.unmodifiableList</code>): the customer cannot touch anything. But the shopkeeper behind the glass can still rearrange, and the customer sees it.</li>
+  <li><strong>A photo of the shelf</strong> (<code>List.of</code>, <code>List.copyOf</code>): frozen. Nobody can change the photo, and later changes to the shelf do not appear in it.</li>
+</ul>
+<p>The runnable example tries each one:</p>
+<pre><code>$ java java/examples/collections/UnmodifiableVsImmutable.java
+Arrays.asList   set: ok  add: UnsupportedOperationException  -&gt; array now [X, b, c]
+unmodifiableList add: UnsupportedOperationException
+after backing.add("c"): view=[a, b, c]  copyOf=[a, b]
+List.of(null): NullPointerException
+List.of contains(null): NullPointerException
+Arrays.asList with null: ok
+Map.of duplicate key: IllegalArgumentException
+List.copyOf(List.of(..)) same instance? true
+List.of with mutable element: [hi there]
+Stream.toList add: UnsupportedOperationException</code></pre>
+<p>Read it as a table:</p>
+<table>
+<tr><th></th><th>Add/remove</th><th>set</th><th>Sees later changes to source</th><th>null</th></tr>
+<tr><td><code>Arrays.asList(arr)</code></td><td>no</td><td>yes, writes the array</td><td>yes (it <em>is</em> the array)</td><td>yes</td></tr>
+<tr><td><code>Collections.unmodifiableList(l)</code></td><td>no</td><td>no</td><td>yes, it is a view</td><td>as source</td></tr>
+<tr><td><code>List.of(...)</code>, <code>List.copyOf(c)</code></td><td>no</td><td>no</td><td>no, own copy</td><td>no (NPE)</td></tr>
+</table>
+<p class="muted">Why can a <code>List</code> refuse <code>add</code> at all? Because <code>add</code> is an "optional operation" in the <code>List</code> interface: an implementation may throw <code>UnsupportedOperationException</code> instead (lesson 0028).</p>
+
+<h2>2. Trace it: who sees which change?</h2>
+<pre><code>String[] arr = {"a", "b", "c"};
+List&lt;String&gt; asList = Arrays.asList(arr);
+asList.set(0, "X");     <span class="c">// ok: writes into arr → arr is [X, b, c]</span>
+asList.add("d");        <span class="hl">// UnsupportedOperationException: fixed size</span>
+
+List&lt;String&gt; backing = new ArrayList&lt;&gt;(List.of("a", "b"));
+List&lt;String&gt; view = Collections.unmodifiableList(backing);
+List&lt;String&gt; copy = List.copyOf(backing);
+view.add("x");          <span class="hl">// UnsupportedOperationException</span>
+
+<span class="c">Step 1  backing = [a, b]   view reads backing   copy holds its own [a, b]</span>
+<span class="c">Step 2  backing.add("c")   backing = [a, b, c]</span>
+<span class="c">Step 3  print view         reads through        → [a, b, c]</span>
+<span class="c">Step 4  print copy         own data             → [a, b]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="After backing.add c: the unmodifiable view points at the backing list and shows a, b, c. List.copyOf holds its own copy a, b. Arrays.asList points directly at the array it wraps.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11" opacity=".75">after backing.add("c")</text>
+    <rect x="240" y="40" width="200" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="60" text-anchor="middle">backing (ArrayList)</text>
+    <text x="340" y="78" text-anchor="middle">[a, b, <tspan fill="var(--accent)">c</tspan>]</text>
+    <rect x="20" y="150" width="190" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="115" y="172" text-anchor="middle" fill="var(--accent)">view</text>
+    <text x="115" y="192" text-anchor="middle" font-size="11">unmodifiableList</text>
+    <g fill="none" stroke="var(--accent)"><path d="M115 150V115h175V96M285 102l5-6 5 6"/></g>
+    <text x="130" y="132" font-size="11" fill="var(--accent)">reads through → [a, b, c]</text>
+    <rect x="470" y="150" width="190" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="565" y="172" text-anchor="middle">copy</text>
+    <text x="565" y="192" text-anchor="middle" font-size="11">List.copyOf → [a, b]</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".6"><path d="M440 65h125v79M560 138l5 6 5-6"/></g>
+    <text x="470" y="58" font-size="11" opacity=".75">copied once, at creation</text>
+    <rect x="250" y="150" width="180" height="56" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="172" text-anchor="middle">Arrays.asList(arr)</text>
+    <text x="340" y="192" text-anchor="middle" font-size="11">[X, b, c] = arr itself</text>
+    <text x="340" y="236" text-anchor="middle" font-size="11" opacity=".8">A view shares data, a copy owns data, asList is the array in a List costume</text>
+  </g>
+</svg>
+<figcaption>The view follows its source forever. The copy was taken once and never changes. <code>Arrays.asList</code> is not a copy either: it wraps the array itself.</figcaption>
+</figure>
+
+<p>The Javadoc says the same in words:</p>
+<ul>
+  <li><code>Arrays.asList</code> returns "a fixed-size list backed by the specified array".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays javadoc</a></li>
+  <li><code>unmodifiableList</code> returns an "unmodifiable view"; queries "'read through' to the specified list".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a> Whoever holds the original list can still change what you see.</li>
+  <li><code>List.of</code> (JDK 9) and <code>List.copyOf</code> (JDK 10): "Elements cannot be added, removed, or replaced", "They disallow null elements", and they are value-based, so do not rely on identity or lock on them.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> <code>copyOf</code> of an already-unmodifiable list may return the same instance, as the run shows (<code>same instance? true</code>).</li>
+  <li><code>Map.of</code> rejects duplicate keys with <code>IllegalArgumentException</code>, rejects nulls, and its "iteration order of mappings is unspecified and is subject to change".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a></li>
+</ul>
+<p><strong>Trap:</strong> <code>List.of</code> is strict about null even when you only <em>ask</em>: <code>List.of("a").contains(null)</code> threw <code>NullPointerException</code> in the run. <code>Arrays.asList("a", null)</code> is fine.</p>
+
+<h2>3. Unmodifiable is not immutable</h2>
+<p>Think of a printed address book. Nobody can add or cross out a line: the book is unmodifiable. But the houses at those addresses can still be repainted. The book holds <em>addresses</em> (references), not houses.</p>
+<p>All of these lists are <em>shallow</em>: "if the contained elements are themselves mutable, this may cause the List's contents to appear to change".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a></p>
+<pre><code>List&lt;StringBuilder&gt; sbs = List.of(new StringBuilder("hi"));
+sbs.add(new StringBuilder());   <span class="c">// throws UOE: list is locked</span>
+sbs.get(0).append(" there");    <span class="c">// allowed: element is mutable</span>
+System.out.println(sbs);        <span class="hl">// [hi there]</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="A List.of box holds one reference arrow to a StringBuilder object outside the list. add is refused at the list, but append changes the object the arrow points to.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="30" y="50" width="220" height="90" rx="6" fill="none" stroke="currentColor"/>
+    <text x="140" y="72" text-anchor="middle">List.of(...)  locked</text>
+    <rect x="60" y="88" width="160" height="36" rx="3" fill="none" stroke="currentColor" opacity=".7"/>
+    <text x="140" y="111" text-anchor="middle" font-size="11">[0] → reference</text>
+    <g fill="none" stroke="currentColor"><path d="M220 106h194M408 101l6 5-6 5"/></g>
+    <rect x="420" y="70" width="230" height="72" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="535" y="96" text-anchor="middle" fill="var(--accent)">StringBuilder</text>
+    <text x="535" y="122" text-anchor="middle" fill="var(--accent)">"hi there"</text>
+    <text x="140" y="34" text-anchor="middle" font-size="11">sbs.add(...) → UOE ✗</text>
+    <text x="535" y="56" text-anchor="middle" font-size="11" fill="var(--accent)">.append(" there") ✓</text>
+    <text x="340" y="180" text-anchor="middle" font-size="11" opacity=".8">The lock is on the list's slots, not on the objects they point to</text>
+  </g>
+</svg>
+<figcaption>Unmodifiable protects the list's shape. True immutability also needs immutable elements.</figcaption>
+</figure>
+
+<p>True immutability needs immutable elements too (records of immutable fields, <code>String</code>, <code>LocalDate</code>), as in <a href="0003-records-and-immutability.html">lesson 0003</a>.</p>
+
+<h2>4. Returning internal state safely</h2>
+<pre><code>class Cart {
+  private final List&lt;Item&gt; items = new ArrayList&lt;&gt;();
+
+  <span class="hl">// bad: the caller can add to your list</span>
+  List&lt;Item&gt; itemsBad()  { return items; }
+  <span class="c">// read-only, but live: sees later changes</span>
+  List&lt;Item&gt; itemsView() { return Collections.unmodifiableList(items); }
+  <span class="c">// frozen snapshot (JDK 10+)</span>
+  List&lt;Item&gt; items()     { return List.copyOf(items); }
+}</code></pre>
+<p>The first leaks your state. The second is read-only but live: fine if callers <em>should</em> see updates, wrong if they expect a snapshot. The third is a frozen snapshot.</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<p>JDK 8 has only <code>Arrays.asList</code>, <code>Collections.unmodifiable*</code>, <code>emptyList</code>/<code>singletonList</code>. <code>List/Set/Map.of</code> arrived in 9, <code>copyOf</code> in 10, <code>Stream.toList()</code> in 16, so all are available on 17 and 21.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List javadoc</a> The last line of the run shows that <code>Stream.toList()</code> gives an unmodifiable list too.</p>
+<p>Interview answer for returning internal state: <code>return List.copyOf(items);</code> (17/21) or <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code> (8).</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">What does <code>Arrays.asList(arr).set(0, "X")</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Writes "X" into the array itself</button>
+    <button class="opt">Throws UnsupportedOperationException</button>
+    <button class="opt">Changes only a private copy of the list</button>
+    <button class="opt">Adds "X" as a new first element</button>
+  </div>
+  <div class="why">The list is backed by the array, so <code>set</code> writes through: the run printed <code>array now [X, b, c]</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">And <code>Arrays.asList(arr).add("d")</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Throws UnsupportedOperationException</button>
+    <button class="opt">Grows the array to four elements</button>
+    <button class="opt">Silently ignores the new element</button>
+    <button class="opt">Throws ArrayIndexOutOfBoundsException</button>
+  </div>
+  <div class="why">It is a fixed-size list: you may replace elements but not add or remove them.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You return <code>Collections.unmodifiableList(backing)</code>. Later the class calls <code>backing.add("c")</code>. What does the caller see?</p>
+  <div class="options">
+    <button class="opt" data-correct>The new element: it is a live view</button>
+    <button class="opt">The old contents: it was copied before</button>
+    <button class="opt">An exception the next time they read it</button>
+    <button class="opt">An empty list, because the source changed</button>
+  </div>
+  <div class="why">Queries "read through" to the source list. Use <code>List.copyOf</code> for a snapshot.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>List.of("a", null)</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Throws NullPointerException</button>
+    <button class="opt">Creates a list of two elements</button>
+    <button class="opt">Creates a list with only "a"</button>
+    <button class="opt">Throws IllegalArgumentException</button>
+  </div>
+  <div class="why"><code>List.of</code> disallows null elements. <code>Arrays.asList("a", null)</code> would be fine.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>Map.of("k", 1, "k", 2)</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Throws IllegalArgumentException</button>
+    <button class="opt">Keeps the last value, so k is 2</button>
+    <button class="opt">Keeps the first value, so k is 1</button>
+    <button class="opt">Throws NullPointerException</button>
+  </div>
+  <div class="why">Duplicate keys are rejected when the map is created.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>List.of(new StringBuilder("hi"))</code>, then <code>get(0).append(" there")</code>. What does printing the list show?</p>
+  <div class="options">
+    <button class="opt" data-correct>[hi there], the element changed</button>
+    <button class="opt">[hi], the list is fully immutable</button>
+    <button class="opt">An UnsupportedOperationException</button>
+    <button class="opt">[hi, there], a new element added</button>
+  </div>
+  <div class="why">Unmodifiable is shallow. The list's slots are locked, but the <code>StringBuilder</code> they point to is still mutable.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">On JDK 8, how do you return a snapshot of <code>items</code> that callers cannot change?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code></button>
+    <button class="opt"><code>Collections.unmodifiableList(items)</code></button>
+    <button class="opt"><code>List.copyOf(items)</code></button>
+    <button class="opt"><code>Arrays.asList(items.toArray())</code></button>
+  </div>
+  <div class="why">Copy first, then wrap. Wrapping alone is a live view; <code>List.copyOf</code> needs JDK 10; <code>Arrays.asList</code> still allows <code>set</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How do you return a list nobody can change? And is it immutable?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>Arrays.asList</code> is fixed-size and backed by the array: <code>set</code> writes through, <code>add</code> throws.</label></li>
+      <li><label><input type="checkbox"> <code>unmodifiableList</code> is a read-only <em>view</em>: it still shows changes to the source.</label></li>
+      <li><label><input type="checkbox"> <code>List.of</code> / <code>List.copyOf</code> own their data; no nulls.</label></li>
+      <li><label><input type="checkbox"> Changes throw <code>UnsupportedOperationException</code>.</label></li>
+      <li><label><input type="checkbox"> Unmodifiable is shallow: mutable elements can still change.</label></li>
+      <li><label><input type="checkbox"> Answer: <code>List.copyOf(items)</code> on 10+; <code>unmodifiableList(new ArrayList&lt;&gt;(items))</code> on 8.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"There are a few options that look similar. <code>Arrays.asList</code> is just the array in a list: I can't add, but <code>set</code> writes into the array. <code>Collections.unmodifiableList</code> is a read-only view: callers can't change it, but if my class changes the original list, they see it, so it's not a snapshot. <code>List.of</code> and <code>List.copyOf</code> hold their own data and reject nulls; any change throws <code>UnsupportedOperationException</code>. So to return internal state I write <code>return List.copyOf(items)</code>, or on Java 8, <code>Collections.unmodifiableList(new ArrayList&lt;&gt;(items))</code>. But that's unmodifiable, not immutable: it's shallow. If the elements are mutable, like a <code>StringBuilder</code>, they can still change. For real immutability the elements must be immutable too, for example records with immutable fields."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0032-defend-the-state.md">Exercise 0032: defend the state</a>. Find every way a caller can change the object, then fix each one.</p>
+<p>Runnable example: <a href="../examples/collections/UnmodifiableVsImmutable.java"><code>UnmodifiableVsImmutable.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"Your unmodifiable list is shared between threads. Is it safe?"</em> A list that never changes after it is safely published is easy to share, but a <em>view</em> of a list that another thread still modifies is not: see <a href="0039-concurrent-collections.html">lesson 0039</a>. Next, <a href="0033-hashset-linkedhashmap-and-lru.html">lesson 0033</a> looks at which sets and maps remember order.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc (JDK 21)</a>. Read the 'Unmodifiable Lists' section; then Map's 'Unmodifiable Maps' section.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What does value-based mean?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0031-comparable-comparator-and-ordering.html">← How Java puts things in order</a> &nbsp;|&nbsp; <a href="0033-hashset-linkedhashmap-and-lru.html">Which collections remember order, and an LRU cache in ten lines →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html">List Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

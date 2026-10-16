@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lộ trình System Design</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>System Design: từ cơ bản đến nâng cao</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Lộ trình System Design · <a href="interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <span data-progress-for="system-design" data-total="11">11 bài</span> · <a class="lang" href="index.html" hreflang="en" lang="en">English</a></p>
+<p>Các pattern về khả năng chịu lỗi và dữ liệu: caching, retry, circuit breaker, saga, sharding, outbox. 11 bài theo thứ tự nên đọc, đánh dấu từng bài khi học xong (chỉ lưu trong trình duyệt này). Các thư mục: <code>lessons/</code>, <code>exercises/</code>, <code>examples/</code>.</p>
+<h2>Core</h2>
+<ol class="steps" data-stack="system-design">
+<li data-id="0001-cache-aside"><a href="lessons/0001-cache-aside.vi.html">Pattern cache-aside</a></li>
+<li data-id="0002-retries-and-idempotency"><a href="lessons/0002-retries-and-idempotency.vi.html">Retry, backoff và idempotency</a></li>
+<li data-id="0004-circuit-breaker"><a href="lessons/0004-circuit-breaker.vi.html">Pattern circuit breaker</a></li>
+<li data-id="0005-bulkhead"><a href="lessons/0005-bulkhead.vi.html">Pattern bulkhead</a></li>
+<li data-id="0006-rate-limiting"><a href="lessons/0006-rate-limiting.vi.html">Rate limiting và token bucket</a></li>
+<li data-id="0007-queue-based-load-leveling"><a href="lessons/0007-queue-based-load-leveling.vi.html">Queue-based load leveling</a></li>
+<li data-id="0008-competing-consumers"><a href="lessons/0008-competing-consumers.vi.html">Competing consumers</a></li>
+<li data-id="0003-queue-versus-log"><a href="lessons/0003-queue-versus-log.vi.html">Queue hay log: chọn RabbitMQ hay Kafka</a></li>
+</ol>
+<h2>Advanced</h2>
+<ol class="steps" data-stack="system-design">
+<li data-id="0009-saga"><a href="lessons/0009-saga.vi.html">Pattern saga: xử lý phân tán không cần distributed transaction</a></li>
+<li data-id="0011-transactional-outbox"><a href="lessons/0011-transactional-outbox.vi.html">Transactional outbox</a></li>
+<li data-id="0010-sharding"><a href="lessons/0010-sharding.vi.html">Sharding, shard key và consistent hashing</a></li>
+</ol>
+<h2>Dự kiến</h2>
+<ul>
+<li>Ước lượng capacity <span class="meta">(dự kiến)</span></li>
+<li>Consistency, CAP và quorum <span class="meta">(dự kiến)</span></li>
+<li>CQRS và event sourcing <span class="meta">(dự kiến)</span></li>
+<li>Pattern idempotent consumer <span class="meta">(dự kiến)</span></li>
+</ul>
+<footer><p><strong>Hỏi giáo viên</strong> để thêm, sắp xếp lại hoặc bỏ qua bài học, hoặc để phỏng vấn thử với các câu hỏi trong <a href="interview.vi.html">trang Hỏi đáp</a>.</p></footer>
+</main>
+<script src="../assets/progress.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 8: Log compaction và tombstone</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Log compaction và tombstone</h1>
+<p class="meta">Kafka · Bài 0008 · bước 9/23 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-log-compaction.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được các đảm bảo của log compaction, khi nào nên dùng nó thay cho retention theo thời gian, và tombstone làm gì.</div>
+
+<h2>Đảm bảo cốt lõi</h2>
+<p>"Log compaction đảm bảo rằng Kafka sẽ luôn giữ lại ít nhất giá trị cuối cùng được biết của mỗi message key trong log dữ liệu của một topic partition." Khác với retention theo thời gian hay kích thước, vốn bỏ <em>toàn bộ</em> dữ liệu cũ, compaction chỉ xoá những record đã có bản cập nhật mới hơn cho cùng key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+<h2>Các đảm bảo</h2>
+<ul><li>Consumer theo kịp sẽ thấy mọi message với offset liên tiếp.</li><li>Thứ tự message không bao giờ bị thay đổi; chỉ có việc xoá bớt.</li><li>Offset của các message còn lại không bao giờ thay đổi.</li><li>Một consumer đọc từ đầu sẽ thấy trạng thái cuối cùng của mọi record, theo đúng thứ tự ghi ban đầu.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li></ul>
+<p>Ứng dụng: subscribe các thay đổi của database, event sourcing, ghi journal để khôi phục state cục bộ.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> <strong>Tombstone:</strong> một message có payload null sẽ xoá các message trước đó cùng key, và bản thân nó bị dọn đi sau <code>delete.retention.ms</code> (mặc định 24 giờ).<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+<h2>Xem nó chạy (cấu hình mạnh tay để xong trong một phút)</h2>
+<pre><code>cleanup.policy=compact  segment.ms=1000  min.cleanable.dirty.ratio=0.01  delete.retention.ms=100
+produce u1:v1 u2:a u1:v2 u1:v3 u2:b
+before compaction: u1 v1 | u1 v2 | u1 v3 | u2 a | u2 b
+after  compaction: u1 v3 | u2 b            (plus later filler keys)
+produce u2:&lt;null&gt; (tombstone), more records, wait
+after  tombstone : u1 v3                     (u2 is gone)</code></pre>
+<p>Compaction chạy nền trên các segment đã đóng, nên nó không tức thì; bản demo ép segment phải roll bằng các record đệm. Đừng dùng những giá trị mạnh tay này trên production. Mã nguồn: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Compaction luôn giữ lại cái gì?</p>
+  <button>Mọi record</button>
+  <button data-correct>Giá trị cuối mỗi key</button>
+  <button>Không gì cả</button>
+  <button>Chỉ record đầu tiên</button>
+  <p class="explain">Ít nhất là giá trị cuối cùng được biết của mỗi key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Offset có thay đổi sau compaction không?</p>
+  <button>Chỉ ở các replica follower</button>
+  <button data-correct>Không, chúng ổn định</button>
+  <button>Có, bị đánh số lại</button>
+  <button>Chỉ với tombstone</button>
+  <p class="explain">Offset mãi mãi là định danh ổn định.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Tombstone là gì?</p>
+  <button>Một topic đã hết hạn</button>
+  <button>Một segment đã đầy</button>
+  <button>Một broker đã dừng</button>
+  <button data-correct>Một record có value null</button>
+  <p class="explain">Payload null đóng vai trò dấu xoá cho key của nó.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Trường hợp nào hợp để dùng compaction?</p>
+  <button data-correct>State mới nhất theo key</button>
+  <button>Lịch sử audit mọi event</button>
+  <button>Metric tạm thời</button>
+  <button>Lưu file dung lượng lớn</button>
+  <p class="explain">Subscribe thay đổi và khôi phục state chỉ cần giá trị mới nhất của mỗi key.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-compact-a-profile-topic.vi.md">Bài tập 0008: compact một topic profile</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-retention-and-compaction.sh"><code>02-retention-and-compaction.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Design: Log Compaction</a>. Đọc trọn phần 'Log Compaction'.</p>
+<p><a href="0013-spring-kafka.vi.html">← Spring Kafka: KafkaTemplate, @KafkaListener và commit</a> &nbsp;|&nbsp; <a href="0005-replication-isr-and-durability.vi.html">Replication, ISR và độ bền dữ liệu →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: Log Compaction</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

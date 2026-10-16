@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tóm tắt nhanh Java Collections</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main style="max-width:54rem">
+<h1>Tóm tắt nhanh Java collections</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Tài liệu tra cứu · <a href="../java/index.vi.html">Lộ trình Java</a> · <a href="../java/interview.vi.html">Hỏi đáp phỏng vấn</a> · JDK 8 / 17 / 21 · thân thiện khi in · <a class="lang" href="java-collections.html" hreflang="en" lang="en">English</a></p>
+
+<h2>Chọn theo nhu cầu</h2>
+<table>
+<tr><th>Nhu cầu</th><th>Một thread</th><th>Dùng chung giữa các thread</th></tr>
+<tr><td>Dãy phần tử, truy cập theo index</td><td><code>ArrayList</code></td><td><code>CopyOnWriteArrayList</code> (chủ yếu đọc) / <code>synchronizedList</code></td></tr>
+<tr><td>Stack hoặc queue FIFO</td><td><code>ArrayDeque</code></td><td><code>ArrayBlockingQueue</code>, <code>LinkedBlockingQueue</code>, <code>ConcurrentLinkedQueue</code></td></tr>
+<tr><td>Lấy phần tử nhỏ nhất / lớn nhất tiếp theo</td><td><code>PriorityQueue</code></td><td><code>PriorityBlockingQueue</code></td></tr>
+<tr><td>Không trùng lặp, không thứ tự</td><td><code>HashSet</code></td><td><code>ConcurrentHashMap.newKeySet()</code></td></tr>
+<tr><td>Không trùng lặp, theo thứ tự thêm vào</td><td><code>LinkedHashSet</code></td><td>(tự synchronize)</td></tr>
+<tr><td>Không trùng lặp, có sắp xếp / truy vấn theo khoảng</td><td><code>TreeSet</code></td><td><code>ConcurrentSkipListSet</code></td></tr>
+<tr><td>Key → value</td><td><code>HashMap</code></td><td><code>ConcurrentHashMap</code></td></tr>
+<tr><td>Key → value, theo thứ tự thêm vào hoặc LRU</td><td><code>LinkedHashMap</code></td><td>(tự synchronize; hoặc dùng library cache)</td></tr>
+<tr><td>Key → value, có sắp xếp / key gần nhất</td><td><code>TreeMap</code></td><td><code>ConcurrentSkipListMap</code></td></tr>
+<tr><td>Key là enum / tập enum</td><td><code>EnumMap</code> / <code>EnumSet</code></td><td>bọc bằng <code>Collections.synchronized*</code></td></tr>
+</table>
+
+<h2>Chi phí</h2>
+<table>
+<tr><th>Cấu trúc</th><th>get / contains</th><th>add / put</th><th>remove</th><th>Ghi chú</th></tr>
+<tr><td><code>ArrayList</code></td><td>get O(1), contains O(n)</td><td>cuối: O(1) khấu hao; giữa O(n)</td><td>O(n)</td><td>tăng ~1.5×, lần add đầu cấp phát 10 (OpenJDK)</td></tr>
+<tr><td><code>LinkedList</code></td><td>get(i) O(n)</td><td>hai đầu O(1)</td><td>hai đầu O(1)</td><td>mỗi phần tử một object node</td></tr>
+<tr><td><code>ArrayDeque</code></td><td>—</td><td>hai đầu O(1)</td><td>hai đầu O(1)</td><td>không nhận null</td></tr>
+<tr><td><code>HashMap</code> / <code>HashSet</code></td><td>O(1) kỳ vọng</td><td>O(1) kỳ vọng</td><td>O(1) kỳ vọng</td><td>hash tồi: O(log n) mỗi bin (dạng cây) hoặc O(n)</td></tr>
+<tr><td><code>LinkedHashMap</code></td><td>O(1)</td><td>O(1)</td><td>O(1)</td><td>duyệt tỉ lệ với size, không phải capacity</td></tr>
+<tr><td><code>TreeMap</code> / <code>TreeSet</code></td><td>O(log n)</td><td>O(log n)</td><td>O(log n)</td><td>được đảm bảo; cây đỏ-đen</td></tr>
+<tr><td><code>PriorityQueue</code></td><td>peek O(1), contains O(n)</td><td>O(log n)</td><td>poll O(log n), remove(o) O(n)</td><td>duyệt KHÔNG theo thứ tự sắp xếp</td></tr>
+<tr><td><code>CopyOnWriteArrayList</code></td><td>O(1)</td><td>O(n) copy</td><td>O(n) copy</td><td>iterator dạng snapshot</td></tr>
+<tr><td><code>ConcurrentSkipListMap</code></td><td>O(log n) trung bình</td><td>O(log n) trung bình</td><td>O(log n) trung bình</td><td>không nhận null</td></tr>
+</table>
+
+<h2>Các con số của HashMap</h2>
+<p>Capacity 16 (luỹ thừa của 2) · load factor 0.75 → resize khi đạt 12, tăng gấp đôi · hash = <code>h ^ (h &gt;&gt;&gt; 16)</code> · index = <code>(n − 1) &amp; hash</code> · bin chuyển thành cây khi có 8 node nếu table ≥ 64, trở lại list khi còn 6 · cho phép một key null · đặt sẵn kích thước: <code>HashMap.newHashMap(n)</code> (JDK 19+) hoặc <code>new HashMap&lt;&gt;((int)(n / 0.75f) + 1)</code>. Nguồn: <code>HashMap.java</code> của OpenJDK 21.</p>
+
+<h2>Null</h2>
+<table>
+<tr><th>Cho phép null</th><th>Từ chối null</th></tr>
+<tr><td><code>ArrayList</code>, <code>LinkedList</code>, <code>HashMap</code> (một key), <code>HashSet</code>, <code>LinkedHashMap</code>, <code>Arrays.asList</code>, <code>IdentityHashMap</code></td><td><code>List/Set/Map.of</code>, <code>copyOf</code>, <code>ArrayDeque</code>, <code>PriorityQueue</code>, <code>ConcurrentHashMap</code>, <code>ConcurrentSkipListMap</code>, <code>BlockingQueue</code>, key của <code>EnumMap</code>, key của <code>TreeMap</code> (thứ tự tự nhiên)</td></tr>
+</table>
+
+<h2>Những cái bẫy</h2>
+<ul>
+<li><code>list.remove(x)</code> bên trong for-each → <code>ConcurrentModificationException</code> (hoặc âm thầm bỏ qua phần tử). Dùng <code>removeIf</code> / <code>Iterator.remove</code>.</li>
+<li>Comparator chỉ so một field trong <code>TreeSet</code>/<code>TreeMap</code> sẽ loại bỏ các phần tử bị coi là "trùng". Hãy thêm tiêu chí phụ (tie-breaker).</li>
+<li><code>(a, b) -&gt; a - b</code> bị tràn số. Dùng <code>Integer.compare</code> / <code>Comparator.comparingInt</code>.</li>
+<li><code>unmodifiableList</code> là một view; <code>List.copyOf</code> là một bản copy; cả hai đều không đóng băng được các phần tử mutable.</li>
+<li><code>Integer</code> <code>==</code> chỉ đúng với các hằng trong khoảng -128..127. Dùng <code>equals</code>.</li>
+<li><code>List&lt;Integer&gt;.remove(1)</code> xoá phần tử ở index 1.</li>
+<li><code>putIfAbsent(k, expensive())</code> luôn chạy <code>expensive()</code>. Dùng <code>computeIfAbsent</code>.</li>
+<li>Không sửa map bên trong chính function <code>compute*</code> của nó (HashMap có thể ném CME).</li>
+<li>In ra một <code>PriorityQueue</code> hay <code>HashSet</code> không cho thấy thứ tự có ý nghĩa nào.</li>
+<li>Duyệt một <code>synchronizedList</code> cần <code>synchronized (list) { ... }</code>.</li>
+</ul>
+
+<h2>JDK nào bổ sung</h2>
+<table>
+<tr><th>JDK</th><th>Tính năng collection</th></tr>
+<tr><td>8</td><td><code>Map.getOrDefault/putIfAbsent/computeIfAbsent/compute/merge/replaceAll</code>, <code>Collection.removeIf</code>, <code>Comparator.comparing/thenComparing/nullsFirst</code>, stream và <code>Collectors</code>, bin của HashMap chuyển thành cây</td></tr>
+<tr><td>9 / 10</td><td><code>List/Set/Map.of</code>, <code>Map.ofEntries</code> (9); <code>List/Set/Map.copyOf</code> (10)</td></tr>
+<tr><td>16</td><td><code>Stream.toList()</code> (unmodifiable)</td></tr>
+<tr><td>19</td><td><code>HashMap.newHashMap(n)</code>, <code>HashSet.newHashSet(n)</code></td></tr>
+<tr><td>21</td><td><code>SequencedCollection/Set/Map</code>: <code>getFirst</code>, <code>getLast</code>, <code>reversed</code>, <code>putFirst</code> (<a href="../java/lessons/0016-sequenced-collections.vi.html">bài 0016</a>)</td></tr>
+</table>
+<footer><p>Tóm tắt từ chuỗi bài <a href="../java/index.vi.html">collection chuyên sâu của Java</a>; mỗi bài đều dẫn nguồn Javadoc JDK 21 hoặc mã nguồn OpenJDK. <a href="../RESOURCES.md">Tất cả tài nguyên</a></p></footer>
+</main>
+</body>
+</html>

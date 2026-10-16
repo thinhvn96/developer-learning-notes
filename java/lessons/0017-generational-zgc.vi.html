@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 17: Generational ZGC (JDK 21)</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Generational ZGC: pause siêu ngắn, giờ có thêm young và old (JDK 21)</h1>
+<p class="subtitle">Vì sao ZGC học cách đối xử khác với object mới, cách bật nó trên JDK 21, và cách đọc log của nó.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0017 · bước 45/46 · Senior · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0017-generational-zgc.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Khi một service có mục tiêu latency chặt ("99% request dưới 50 ms"), các lần pause của garbage collection có thể phá vỡ nó. Interview senior hay hỏi <em>"Bạn chọn GC nào, và vì sao?"</em> Hiểu generational ZGC là gì, và khi nào nó hơn G1 mặc định, giúp bạn trả lời dựa trên đo đạc thay vì truyền miệng.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> nói được generational ZGC là gì, cách bật nó trên JDK 21, và nó nhắm tới loại workload nào.</div>
+
+<dl class="words">
+  <dt>heap</dt><dd>Vùng nhớ nơi Java giữ các object của bạn (bài 0007).</dd>
+  <dt>garbage collector (GC)</dt><dd>Phần của JVM tìm những object không còn ai dùng và giải phóng bộ nhớ của chúng.</dd>
+  <dt>pause</dt><dd>Khoảnh khắc GC dừng tất cả thread của bạn. Trong lúc pause, service không trả lời ai cả.</dd>
+  <dt>concurrent</dt><dd>"Đồng thời": việc của GC chạy trong khi các thread của bạn vẫn tiếp tục chạy.</dd>
+  <dt>generation</dt><dd>Một phần của heap dành cho object ở một độ tuổi: <em>young</em> cho object mới, <em>old</em> cho object đã sống lâu.</dd>
+  <dt>allocation stall</dt><dd>Thread của bạn cần bộ nhớ cho object mới, nhưng GC chưa giải phóng đủ, nên thread phải chờ.</dd>
+  <dt>G1</dt><dd>Collector mặc định trên máy server-class từ JDK 9: cân bằng giữa throughput và pause ngắn.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói thành tiếng: <em>"Trong một web service, object nào chết nhanh, object nào sống lâu?"</em> Hãy nghĩ tới object request, một chuỗi JSON, một cache, một connection pool tới database. Câu trả lời của bạn chính là ý tưởng của cả bài này.</p>
+
+<h2>1. Ý tưởng: hầu hết object chết khi còn trẻ</h2>
+<p>Hãy nghĩ tới căn bếp nhà bạn. Thùng rác đầy mỗi ngày với vỏ bánh, vỏ trái cây, giấy: bạn đổ nó hằng ngày, mất một phút. Gác xép chứa những thứ bạn giữ nhiều năm: có lẽ mỗi năm dọn một lần, và mất cả buổi chiều. Thật vô lý nếu cứ mỗi lần thùng rác bếp đầy lại đi lục cả gác xép.</p>
+<p>Object Java cũng vậy. "Giả thuyết thế hệ yếu (weak generational hypothesis) nói rằng object trẻ thường chết sớm, còn object già thì thường ở lại lâu."<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> Chuỗi JSON của một request, các DTO và list tạm của nó chết khi request kết thúc. Một cache hay connection pool sống cùng ứng dụng.</p>
+<p>Vì vậy một GC tách riêng object trẻ và object già có thể dọn phần trẻ thường xuyên với chi phí thấp, và hầu như để yên phần già. G1 đã làm điều này (bài 0007). ZGC trước JDK 21 thì không.</p>
+
+<h2>2. Cách cũ: ZGC không có generation</h2>
+<p>ZGC là collector có pause thấp. Nó trở thành tính năng chính thức (product feature) từ JDK 15<a class="src" href="https://openjdk.org/jeps/377">JEP 377</a>, nên JDK 17 cũng có. Bí quyết của nó là làm gần như toàn bộ công việc một cách concurrent, trong khi thread của bạn vẫn chạy.</p>
+<p>Nhưng nó có một điểm yếu. JEP 439: "ZGC hiện lưu mọi object chung một chỗ, bất kể tuổi, nên mỗi lần chạy nó phải thu gom tất cả object." Cách đó "chạy tốt miễn là có đủ tài nguyên (tức bộ nhớ và CPU)".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> Theo hình ảnh căn bếp: mỗi lần thùng rác đầy, bạn lục luôn cả gác xép.</p>
+<p>Mình đã chạy demo GC của khoá học với ZGC không generational trên JDK 21, cố tình dùng heap nhỏ 64 MB:</p>
+<pre><code>$ java -XX:+UseZGC -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.018s][info][gc] Using The Z Garbage Collector
+[0.138s][info][gc] GC(0) Garbage Collection (Warmup) 8M(12%)->6M(9%)
+[0.344s][info][gc] GC(1) Garbage Collection (Warmup) 20M(31%)->12M(19%)
+max heap (MB): 64
+<span class="hl">[0.390s][info][gc] Allocation Stall (main) 9.720ms</span>
+[0.391s][info][gc] GC(2) Garbage Collection (Allocation Stall) 64M(100%)->12M(19%)
+<span class="hl">[0.404s][info][gc] Allocation Stall (main) 7.194ms</span>
+[0.405s][info][gc] GC(3) Garbage Collection (Allocation Stall) 64M(100%)->12M(19%)</code></pre>
+<p>Mỗi chu kỳ là một lần "Garbage Collection" toàn bộ heap. Heap chạm 100%, và thread main phải chờ gần 10 ms để có bộ nhớ: một <span class="term">allocation stall</span>. Pause của ZGC rất nhỏ, nhưng stall vẫn bắt code của bạn phải chờ.</p>
+
+<h2>3. Cách mới: generation young và old (JDK 21)</h2>
+<p>JEP 439 nhằm "cải thiện hiệu năng ứng dụng bằng cách mở rộng Z Garbage Collector để duy trì các generation riêng cho object trẻ và object già".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> "Young generation dành cho object mới được cấp phát, còn old generation dành cho object sống lâu", và "mỗi generation được thu gom độc lập với generation kia, nên ZGC có thể tập trung thu gom các object trẻ, nơi thu được nhiều nhất".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Heap được chia thành young generation, nơi đa số object mới chết, và old generation cho object sống lâu. Object sống sót chuyển từ young sang old. Con trỏ từ một object old tới một object young được ghi vào remembered set. Minor collection chỉ dọn young; major collection dọn cả hai.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="24" y="22" font-size="11" opacity=".75">heap</text>
+    <rect x="20" y="30" width="640" height="174" rx="6" fill="none" stroke="currentColor" opacity=".6"/>
+    <rect x="36" y="46" width="270" height="138" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="374" y="46" width="270" height="138" rx="4" fill="none" stroke="currentColor"/>
+    <text x="171" y="68" text-anchor="middle" fill="var(--accent)">young generation</text>
+    <text x="509" y="68" text-anchor="middle">old generation</text>
+    <g fill="none" stroke="currentColor" opacity=".45">
+      <rect x="56" y="84" width="36" height="22" rx="3"/>
+      <rect x="102" y="84" width="36" height="22" rx="3"/>
+      <rect x="194" y="84" width="36" height="22" rx="3"/>
+      <rect x="56" y="118" width="36" height="22" rx="3"/>
+      <rect x="148" y="118" width="36" height="22" rx="3"/>
+      <rect x="194" y="118" width="36" height="22" rx="3"/>
+    </g>
+    <g text-anchor="middle" font-size="12" opacity=".55">
+      <text x="74" y="100">×</text><text x="120" y="100">×</text><text x="212" y="100">×</text>
+      <text x="74" y="134">×</text><text x="166" y="134">×</text><text x="212" y="134">×</text>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <rect x="148" y="84" width="36" height="22" rx="3"/>
+      <rect x="240" y="118" width="36" height="22" rx="3"/>
+      <rect x="394" y="84" width="36" height="22" rx="3"/>
+      <rect x="450" y="84" width="36" height="22" rx="3"/>
+      <rect x="506" y="84" width="36" height="22" rx="3"/>
+      <rect x="562" y="84" width="36" height="22" rx="3"/>
+      <rect x="394" y="118" width="36" height="22" rx="3"/>
+      <rect x="450" y="118" width="36" height="22" rx="3"/>
+    </g>
+    <text x="171" y="170" text-anchor="middle" font-size="11">đa số chết sớm (×)</text>
+    <text x="509" y="170" text-anchor="middle" font-size="11">sống lâu: cache, pool</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M306 95h62M362 90l6 5-6 5"/>
+    </g>
+    <text x="340" y="86" text-anchor="middle" font-size="10" opacity=".8">sống sót</text>
+    <text x="340" y="114" text-anchor="middle" font-size="10" opacity=".8">chuyển</text>
+    <g fill="none" stroke="var(--accent)" stroke-dasharray="4 3">
+      <path d="M394 135C350 150 320 150 282 135"/>
+    </g>
+    <path d="M290 131l-8 4 8 4" fill="none" stroke="var(--accent)"/>
+    <text x="340" y="198" text-anchor="middle" font-size="10" fill="var(--accent)">con trỏ old → young: lưu trong remembered set</text>
+    <text x="20" y="232" font-size="12">minor collection = chỉ young  <tspan opacity=".7">(thường xuyên, rẻ)</tspan></text>
+    <text x="20" y="254" font-size="12">major collection = young + old  <tspan opacity=".7">(ít hơn)</tspan></text>
+  </g>
+</svg>
+<figcaption>Generational ZGC dọn phần young thường xuyên. Để làm vậy mà không quét phần old, nó ghi nhớ object old nào trỏ vào young.</figcaption>
+</figure>
+
+<p>Mục tiêu của JEP: ứng dụng "sẽ được hưởng" rủi ro allocation stall thấp hơn, chi phí bộ nhớ heap thấp hơn và chi phí CPU cho GC thấp hơn, "mà không giảm throughput đáng kể so với ZGC không generational". Các đặc tính cốt lõi được giữ nguyên: "thời gian pause không được vượt quá 1 mili giây", hỗ trợ heap "từ vài trăm megabyte tới nhiều terabyte", và "cần cấu hình thủ công tối thiểu".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> Bạn không phải đặt kích thước các generation hay thời gian object ở lại young.<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+
+<h2>4. Bật nó trên JDK 21</h2>
+<pre><code>java -XX:+UseZGC -XX:+ZGenerational -jar app.jar</code></pre>
+<p>Dùng cả hai flag cùng lúc để bật chế độ generational trên JDK 21.<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> Đây là cái bẫy kinh điển: trên JDK 21, "option dòng lệnh <code>-XX:+UseZGC</code> sẽ chọn ZGC không generational"; chế độ generational được cung cấp "song song với ZGC không generational".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+<table>
+<tr><th>Bạn viết (trên JDK 21)</th><th>Bạn nhận được</th></tr>
+<tr><td>không có flag GC</td><td>mặc định: G1 trên máy server-class, Serial trong các trường hợp khác<a class="src" href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC tuning guide</a></td></tr>
+<tr><td><code>-XX:+UseZGC</code></td><td>ZGC không generational</td></tr>
+<tr><td><code>-XX:+UseZGC -XX:+ZGenerational</code></td><td><strong>generational ZGC</strong></td></tr>
+</table>
+<p class="muted">Sau 21: JEP 474, có trong JDK 23, biến generational thành chế độ mặc định của ZGC, nên ở đó chỉ cần <code>-XX:+UseZGC</code> và <code>ZGenerational</code> bị deprecated.<a class="src" href="https://openjdk.org/jeps/474">JEP 474</a> Nếu sau này nâng cấp, hãy bỏ flag thừa đi.</p>
+
+<h3>JDK 8, 17 và 21</h3>
+<ul>
+  <li><strong>JDK 8:</strong> không có ZGC. Mặc định trên server là Parallel GC; G1 chỉ trở thành mặc định từ JDK 9.<a class="src" href="https://openjdk.org/jeps/248">JEP 248</a></li>
+  <li><strong>JDK 17:</strong> mặc định G1; có ZGC, nhưng chỉ không generational.</li>
+  <li><strong>JDK 21:</strong> mặc định G1; ZGC có cả hai chế độ, generational khi thêm flag.</li>
+</ul>
+
+<h2>5. Chạy thử và đọc log</h2>
+<pre><code>java -XX:+UseZGC -XX:+ZGenerational -Xmx64m -Xlog:gc java/examples/GcDemo.java</code></pre>
+<p>Demo cấp phát hai triệu mảng 1 KB chết ngay lập tức: toàn là "rác trẻ". Lần chạy của mình trên JDK 21 (các dòng đầu):</p>
+<pre><code>[0.019s][info][gc] Using The Z Garbage Collector
+[0.156s][info][gc] GC(0) Major Collection (Warmup)
+[0.184s][info][gc] GC(0) Major Collection (Warmup) 8M(12%)->8M(12%) 0.028s
+...
+max heap (MB): 64
+<span class="hl">[0.407s][info][gc] GC(3) Minor Collection (Allocation Rate)</span>
+[0.417s][info][gc] Allocation Stall (main) 4.328ms
+[0.420s][info][gc] GC(3) Minor Collection (Allocation Rate) 44M(69%)->58M(91%) 0.013s</code></pre>
+<p>Đọc từng dòng:</p>
+<ol class="steps">
+  <li><strong>Major Collection:</strong> young và old cùng lúc. Mấy lần đầu là chu kỳ "Warmup" trong lúc JVM khởi động.</li>
+  <li><strong>Minor Collection:</strong> chỉ young generation. Nguyên nhân: "Allocation Rate", chương trình tạo object rất nhanh.</li>
+  <li><strong>Con số cuối</strong> (<code>0.013s</code>) là thời gian của cả chu kỳ. Phần lớn chạy <em>concurrent</em>; nó <strong>không</strong> phải là pause.</li>
+  <li><strong>Allocation Stall</strong> vẫn xuất hiện: 64 MB là quá nhỏ cho tốc độ cấp phát này. ZGC cần dư địa (headroom).</li>
+</ol>
+<p>Để thấy pause thật, thêm tag <code>gc+phases</code>. Lần này mình cho 256 MB:</p>
+<pre><code>$ java -XX:+UseZGC -XX:+ZGenerational -Xmx256m -Xlog:gc,gc+phases java/examples/GcDemo.java
+[0.437s][info][gc       ] GC(3) Minor Collection (Allocation Rate)
+[0.437s][info][gc,phases] GC(3) y: Young Generation
+[0.437s][info][gc,phases] GC(3) y: <span class="hl">Pause Mark Start 0.007ms</span>
+[0.439s][info][gc,phases] GC(3) y: Concurrent Mark 1.514ms
+[0.439s][info][gc,phases] GC(3) y: <span class="hl">Pause Mark End 0.006ms</span>
+...
+[0.442s][info][gc       ] GC(3) Minor Collection (Allocation Rate) 78M(30%)->64M(25%) 0.005s</code></pre>
+<p>Pause chỉ khoảng 0,007 ms, thấp hơn rất nhiều so với mục tiêu 1 ms; 1,5 ms marking chạy concurrent. Với 256 MB, cả lần chạy không in ra allocation stall nào. Để so sánh, G1 mặc định trên cùng demo với 64 MB:</p>
+<pre><code>$ java -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.001s][info][gc] Using G1
+max heap (MB): 64
+[0.348s][info][gc] GC(0) <span class="hl">Pause Young (Normal)</span> (G1 Evacuation Pause) 24M->3M(64M) 3.235ms
+[0.356s][info][gc] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 38M->3M(64M) 2.563ms</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="Hai dòng thời gian. G1: ứng dụng chạy thành từng khối, xen giữa là các pause khoảng 2 mili giây. Generational ZGC: ứng dụng chạy gần như liền mạch, pause khoảng 0,007 mili giây, trong khi các GC thread làm việc concurrent bên dưới.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="49">G1</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="120" y="32" width="110" height="26"/>
+      <rect x="250" y="32" width="120" height="26"/>
+      <rect x="390" y="32" width="120" height="26"/>
+      <rect x="530" y="32" width="120" height="26"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="230" y="32" width="20" height="26"/>
+      <rect x="370" y="32" width="20" height="26"/>
+      <rect x="510" y="32" width="20" height="26"/>
+    </g>
+    <text x="175" y="49" text-anchor="middle" font-size="11">app chạy</text>
+    <text x="380" y="78" text-anchor="middle" font-size="11" fill="var(--accent)">pause ~2–3 ms: mọi thread đều dừng</text>
+    <text x="20" y="129">gen. ZGC</text>
+    <rect x="120" y="112" width="530" height="26" fill="none" stroke="currentColor"/>
+    <g stroke="var(--accent)" stroke-width="2">
+      <path d="M240 108v34M380 108v34M520 108v34"/>
+    </g>
+    <text x="175" y="129" text-anchor="middle" font-size="11">app chạy</text>
+    <rect x="245" y="148" width="120" height="16" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7"/>
+    <rect x="385" y="148" width="120" height="16" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7"/>
+    <text x="305" y="160" text-anchor="middle" font-size="10" opacity=".8">GC threads</text>
+    <text x="445" y="160" text-anchor="middle" font-size="10" opacity=".8">GC threads</text>
+    <text x="385" y="190" text-anchor="middle" font-size="11" fill="var(--accent)">pause ~0,007 ms; mark và di chuyển chạy song song với app</text>
+  </g>
+</svg>
+<figcaption>Không theo tỉ lệ: số liệu lấy từ các lần chạy ở trên. G1 dừng app ở mỗi lần thu gom young; ZGC chỉ dừng trong những khoảnh khắc cực ngắn.</figcaption>
+</figure>
+
+<h2>6. Làm sao không có pause dài? (chi tiết Senior)</h2>
+<p>Di chuyển object trong khi thread của bạn đang dùng chúng nghe như bất khả thi. ZGC giải quyết bằng những đoạn code nhỏ chèn vào chương trình của bạn. "Load barrier là một đoạn code được ZGC chèn vào ứng dụng" khi nó đọc một reference, và ZGC dùng <em>colored pointer</em>: "colored pointer là một con trỏ tới object trong heap" có thêm vài bit cho barrier biết object đang ở trạng thái nào.<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+<p>Generation mang tới một vấn đề mới: để dọn riêng phần young, ZGC phải biết object old nào trỏ tới object young (mũi tên nét đứt ở sơ đồ đầu). Vì vậy "Generational ZGC còn dùng store barrier": "remembered set chứa mọi địa chỉ bộ nhớ trong old generation có thể chứa con trỏ tới object trong young generation", và "store barrier thêm entry vào remembered set".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a> Khác với chế độ cũ, nó không còn cần multi-mapped memory: "Generational ZGC thay vào đó dùng code tường minh trong load barrier và store barrier".<a class="src" href="https://openjdk.org/jeps/439">JEP 439</a></p>
+<h3>Bẫy: "ZGC lúc nào cũng tốt hơn"</h3>
+<p>Barrier tốn một chút CPU ở mỗi lần đọc và ghi reference, và ZGC cần heap trống để làm việc concurrent (bạn đã thấy stall ở 64 MB). Với một batch job chỉ quan tâm tổng throughput, G1 hoặc Parallel có thể xong sớm hơn. Hãy chọn theo mục tiêu của bạn, và đo đạc.</p>
+<div class="aside">Khung câu trả lời phỏng vấn: "Mặc định dùng G1 cho throughput cân bằng. Nếu SLA đòi pause dưới một mili giây trên heap lớn, em sẽ đánh giá generational ZGC trên JDK 21, đo bằng GC log của chính workload của mình, chứ không dựa vào truyền miệng."</div>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">JDK 21 thêm gì vào ZGC?</p>
+  <div class="options">
+    <button class="opt" data-correct>Các generation young và old riêng biệt</button>
+    <button class="opt">Một trình biên dịch JIT mới dành riêng</button>
+    <button class="opt">OS thread native cho công việc của GC</button>
+    <button class="opt">Pause stop-the-world cho dữ liệu young</button>
+  </div>
+  <div class="why">Generational ZGC duy trì các generation riêng cho object trẻ và object già (JEP 439).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bật generational ZGC trên JDK 21 thế nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>-XX:+UseZGC -XX:+ZGenerational</button>
+    <button class="opt">Chỉ cần -XX:+UseZGC là đủ</button>
+    <button class="opt">-XX:+UseG1GC -XX:+ZGenerational</button>
+    <button class="opt">-Xmx với kích thước heap lớn hơn</button>
+  </div>
+  <div class="why">Cả hai flag cùng lúc. Trên JDK 21, chỉ <code>-XX:+UseZGC</code> thì chọn ZGC không generational.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Generational ZGC giữ mục tiêu pause nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Dưới một mili giây</button>
+    <button class="opt">Dưới mười mili giây</button>
+    <button class="opt">Dưới một giây</button>
+    <button class="opt">Không có mục tiêu pause</button>
+  </div>
+  <div class="why">"Thời gian pause không được vượt quá 1 mili giây" là một đặc tính được giữ lại. Các lần chạy của mình cho pause khoảng 0,007 ms.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trên máy server-class, JDK 21 dùng collector nào khi bạn không truyền flag GC?</p>
+  <div class="options">
+    <button class="opt" data-correct>G1</button>
+    <button class="opt">ZGC</button>
+    <button class="opt">Serial</button>
+    <button class="opt">Parallel</button>
+  </div>
+  <div class="why">G1 trên máy server-class, Serial trong các trường hợp khác. G1 là mặc định trên server từ JDK 9; trước đó là Parallel.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao thu gom young generation thường xuyên hơn old lại có lợi?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đa số object mới chết sớm, nên giải phóng được nhiều mà rẻ</button>
+    <button class="opt">Object già nhỏ hơn, nên bỏ qua chúng cũng rẻ</button>
+    <button class="opt">Object trẻ không bao giờ bị object già trỏ tới</button>
+    <button class="opt">Old generation không thể thu gom concurrent được</button>
+  </div>
+  <div class="why">Giả thuyết thế hệ yếu: "object trẻ thường chết sớm". Object già vẫn có thể trỏ tới object trẻ; đó chính là thứ remembered set theo dõi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong log ZGC có <code>Minor Collection ... 0.013s</code>. 0,013 s là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Cả chu kỳ, phần lớn chạy concurrent</button>
+    <button class="opt">Một lần pause mà mọi thread đều dừng</button>
+    <button class="opt">Thời gian dành cho old generation</button>
+    <button class="opt">Thời gian JVM cần để khởi động</button>
+  </div>
+  <div class="why">Con số là thời gian của chu kỳ; phần lớn chạy song song với ứng dụng. Pause thật hiện ra với <code>-Xlog:gc+phases</code> dưới dạng "Pause Mark Start" và tương tự, ở đây khoảng 0,007 ms.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Generational ZGC là gì, và khi nào bạn dùng nó thay cho G1?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> ZGC là collector pause thấp; nó làm gần như mọi việc concurrent, pause dưới 1 ms.</label></li>
+      <li><label><input type="checkbox"> Trước 21 nó không có generation: mỗi chu kỳ thu gom toàn bộ heap.</label></li>
+      <li><label><input type="checkbox"> JDK 21 (JEP 439) thêm generation young và old: object trẻ chết sớm, nên thu gom young thường xuyên.</label></li>
+      <li><label><input type="checkbox"> Lợi ích: ít rủi ro allocation stall hơn, ít tốn heap hơn, ít tốn CPU cho GC hơn.</label></li>
+      <li><label><input type="checkbox"> Trên 21 bật bằng <code>-XX:+UseZGC -XX:+ZGenerational</code>; chỉ <code>UseZGC</code> là bản không generational.</label></li>
+      <li><label><input type="checkbox"> G1 vẫn là mặc định; chọn ZGC khi cần latency chặt trên heap lớn, và quyết định dựa vào GC log.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"ZGC là collector low-latency: nó mark và di chuyển object một cách concurrent, dùng load barrier và colored pointer, nên pause luôn dưới một mili giây kể cả với heap rất lớn. Tới trước JDK 21 nó không có generation, nên mỗi chu kỳ phải thu gom cả heap, cần nhiều bộ nhớ và CPU dư, và có thể gây allocation stall. JEP 439 ở JDK 21 thêm young generation và old generation, dựa trên ý tưởng đa số object chết sớm: nó thu gom young thường xuyên với chi phí thấp, và dùng store barrier cùng remembered set để theo dõi các con trỏ từ old sang young. Trên 21 em bật bằng <code>-XX:+UseZGC -XX:+ZGenerational</code>, vì chỉ <code>UseZGC</code> thì vẫn là chế độ cũ. Với đa số service em giữ G1 mặc định, và đánh giá generational ZGC khi SLA đòi pause rất ngắn trên heap lớn, so sánh bằng GC log từ chính workload của mình."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0017-compare-g1-and-zgc.vi.md">Bài tập 0017: so sánh G1 và ZGC</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code. So sánh log của bạn với lần chạy G1 ở <a href="0007-heap-and-garbage-collection.vi.html">bài 7</a>.</p>
+<p>Ví dụ chạy được: <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi: <em>"Latency p99 của bạn tăng vọt vài giây một lần. Làm sao biết GC có phải nguyên nhân không? Bạn sẽ đổi gì trước?"</em> Bắt đầu với <code>-Xlog:gc</code>, khớp thời gian pause với các lần latency tăng vọt, kiểm tra dư địa heap, rồi mới thử collector khác. Ôn lại heap sizing và G1 ở <a href="0007-heap-and-garbage-collection.vi.html">bài 0007</a>. Bạn đã tới cuối phần JDK 21: tự kiểm tra trong bài ôn tập, rồi thử <a href="../interview.vi.html">Hỏi đáp phỏng vấn Java</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a>. Đọc phần Summary, Goals và 'Description'.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Load barrier chính xác làm gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0006-virtual-threads.vi.html">← Virtual thread: mở rộng quy mô, không phải tốc độ</a> &nbsp;|&nbsp; <a href="0046-review-jdk17-21.vi.html">Ôn tập 7: JDK 17 và 21 đã thêm gì →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với JEP 439, JEP 474, JEP 377, JEP 248, GC tuning guide và các lần chạy trên JDK 21.0.12, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/439">JEP 439: Generational ZGC</a> · <a href="https://docs.oracle.com/en/java/javase/25/gctuning/ergonomics.html">GC Tuning Guide: Ergonomics</a> · <a href="https://openjdk.org/jeps/474">JEP 474: ZGC: Generational Mode by Default</a> · <a href="https://openjdk.org/jeps/377">JEP 377: ZGC: A Scalable Low-Latency Garbage Collector (Production)</a> · <a href="https://openjdk.org/jeps/248">JEP 248: Make G1 the Default Garbage Collector</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

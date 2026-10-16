@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 7: Override và hiding</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Override và hiding</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0007 · bước 7/22 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-overriding-and-hiding.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nói được trong instance method, static method và field, cái nào override và cái nào hide (che khuất), và vì sao <code>@Override</code> quan trọng.</div>
+
+<h2>Các quy tắc</h2>
+<ul><li>Một instance method có cùng signature và kiểu trả về với instance method của superclass sẽ <strong>override</strong> nó; nó được phép trả về một subtype (gọi là <em>covariant return type</em>).</li>
+<li><code>@Override</code> khiến compiler báo lỗi nếu thực ra không có gì được override cả.</li>
+<li>Một static method có cùng signature sẽ <strong>hide</strong> method của superclass; phiên bản nào chạy phụ thuộc vào việc nó được gọi từ superclass hay subclass.</li>
+<li>Method override có thể cho phép truy cập <em>rộng hơn, nhưng không được hẹp hơn</em>; đổi từ instance sang static hoặc ngược lại là lỗi compile.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></li></ul>
+<table><tr><th></th><th>Instance ở superclass</th><th>Static ở superclass</th></tr>
+<tr><td><strong>Instance ở subclass</strong></td><td>override</td><td>lỗi compile</td></tr>
+<tr><td><strong>Static ở subclass</strong></td><td>lỗi compile</td><td>hide</td></tr></table>
+<p><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+<pre><code>java oop/examples/OverridingVsHiding.java
+instance method : woof
+static method   : Animal.kind / Dog.kind
+static via ref  : Animal.kind
+field           : animal (static type) vs dog (cast)
+covariant return: Dog</code></pre>
+<p>Instance method dùng kiểu lúc runtime (<code>woof</code>), còn lời gọi static và field thì được chọn theo <em>kiểu tĩnh</em> (static type, ở đây là <code>Animal</code>): hiding không mang tính đa hình. Mã nguồn: <a href="../examples/OverridingVsHiding.java"><code>OverridingVsHiding.java</code></a>. Liên quan: xung đột default method (<a href="../../java/lessons/0009-default-methods-and-conflicts.vi.html">bài JDK 8</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một instance method cùng signature ở subclass sẽ...?</p>
+  <button>Overload</button>
+  <button>Hide</button>
+  <button data-correct>Override</button>
+  <button>Luôn lỗi</button>
+  <p class="explain">Nó override method của superclass.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một static method cùng signature sẽ...?</p>
+  <button data-correct>Hide</button>
+  <button>Override</button>
+  <button>Được kế thừa nguyên vẹn</button>
+  <button>Bị xoá</button>
+  <p class="explain">Static method thì hide.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. @Override đảm bảo điều gì?</p>
+  <button>Thread safety</button>
+  <button data-correct>Lỗi compile nếu không override gì cả</button>
+  <button>Gọi nhanh hơn</button>
+  <button>Quyền truy cập public</button>
+  <p class="explain">Compiler báo lỗi khi method đó không tồn tại ở superclass.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Mức truy cập của method override có thể...?</p>
+  <button>Hẹp hơn, không rộng hơn</button>
+  <button>Mức nào cũng được</button>
+  <button>Luôn là private</button>
+  <button data-correct>Rộng hơn, không hẹp hơn</button>
+  <p class="explain">Nó có thể cho phép truy cập rộng hơn, nhưng không được hẹp hơn.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-predict-the-output.vi.md">Bài tập 7: dự đoán output</a></p>
+<p>Ví dụ chạy được: <a href="../examples/OverridingVsHiding.java"><code>OverridingVsHiding.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">Java Tutorials: Overriding and Hiding Methods</a>. Instance method, static method, access modifier.</p>
+<p><a href="0005-initialization-order.vi.html">← Thứ tự khởi tạo: static block, field, constructor</a> &nbsp;|&nbsp; <a href="0008-polymorphism.vi.html">Polymorphism và cơ chế gọi virtual method →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/override.html">Java Tutorials: Overriding and Hiding Methods</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

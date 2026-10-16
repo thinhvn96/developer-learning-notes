@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 2: Class, instance và constructor</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Class, instance và constructor</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0002 · bước 2/22 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-classes-and-instances.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được sự khác nhau giữa class và instance, giữa reference và object, và cách nối constructor (constructor chaining) bằng <code>this(...)</code>.</div>
+
+<h2>Bản thiết kế và các instance</h2>
+<p>"Class là bản thiết kế (blueprint) để từ đó tạo ra từng object cụ thể." Chiếc xe đạp của bạn là một <em>instance</em> của class xe đạp: mỗi instance có giá trị field riêng (state của nó), còn method thì đến từ class.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">[1]</a></p>
+<h2>Reference</h2>
+<p>Một biến giữ <em>reference</em> (tham chiếu) tới object, chứ không phải chính object đó. Hai biến có thể cùng trỏ tới một object (gọi là alias), nên thay đổi state qua biến này sẽ thấy được qua biến kia.</p>
+<pre><code>java oop/examples/ClassAndInstances.java
+gear=1 speed=10
+gear=3 speed=25
+a after alias.speedUp(1): 11   b unchanged: 25
+a == alias: true, a == b: false</code></pre>
+<p><code>a</code> và <code>b</code> là hai object riêng biệt với state riêng; <code>alias</code> là reference thứ hai trỏ tới object của <code>a</code> (<code>a == alias</code> là true). Constructor không tham số ủy quyền bằng <code>this(1, 0)</code>, nên logic khởi tạo chỉ nằm ở một chỗ. Mã nguồn: <a href="../examples/ClassAndInstances.java"><code>ClassAndInstances.java</code></a>. Đây cũng chính là vấn đề reference so với equality nằm sau bài <a href="../../java/lessons/0001-hashmap-equals-hashcode.vi.html">equals và hashCode</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Class là...?</p>
+  <button>Một địa chỉ bộ nhớ</button>
+  <button data-correct>Bản thiết kế cho object</button>
+  <button>Một bản sao object</button>
+  <button>Một chương trình đang chạy</button>
+  <p class="explain">Class là bản thiết kế để từ đó tạo ra từng object cụ thể.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Hai reference trỏ tới một object. Đổi qua một cái thì sao?</p>
+  <button>Ném ra lỗi</button>
+  <button>Chỉ cái bị đổi thấy</button>
+  <button>Sao chép object</button>
+  <button data-correct>Cả hai đều thấy</button>
+  <p class="explain">Chúng là alias của cùng một object; demo cho thấy speed của a thay đổi qua alias.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. <code>this(1, 0)</code> trong constructor làm gì?</p>
+  <button data-correct>Gọi một constructor khác</button>
+  <button>Gọi một method</button>
+  <button>Tạo một class mới</button>
+  <button>Sao chép các field</button>
+  <p class="explain">Constructor chaining ủy quyền cho một constructor khác của cùng class.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Các instance có dùng chung giá trị field không?</p>
+  <button data-correct>Không, mỗi cái có riêng</button>
+  <button>Chỉ field static</button>
+  <button>Chỉ field kiểu int</button>
+  <button>Có, tất cả các field</button>
+  <p class="explain">Mỗi instance có state riêng; trong demo b vẫn là 25 trong khi a thay đổi.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-alias-bug.vi.md">Bài tập 2: một bug do alias</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ClassAndInstances.java"><code>ClassAndInstances.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">Java Tutorials: What Is a Class?</a>. Trang ngắn.</p>
+<p><a href="0001-objects-state-and-behavior.vi.html">← Object: state, behavior và encapsulation</a> &nbsp;|&nbsp; <a href="0003-access-levels.vi.html">Access level: che giấu những gì cần che giấu →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/concepts/class.html">Java Tutorials: What Is a Class?</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

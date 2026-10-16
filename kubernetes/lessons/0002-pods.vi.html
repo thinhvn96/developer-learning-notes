@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 2: Pod: đơn vị deploy nhỏ nhất</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pod: đơn vị deploy nhỏ nhất</h1>
+<p class="meta">Kubernetes · Bài 0002 · bước 2/15 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-pods.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích Pod là gì, vì sao Pod là thứ dùng xong bỏ, và vì sao bạn hiếm khi tạo Pod trực tiếp.</div>
+
+<h2>Định nghĩa</h2>
+<p>"Pod là đơn vị tính toán deploy được nhỏ nhất mà bạn có thể tạo và quản lý trong Kubernetes." Một Pod "là một nhóm gồm một hoặc nhiều container, dùng chung storage và tài nguyên mạng, cùng với một đặc tả về cách chạy các container đó. Nội dung của một Pod luôn được đặt cùng chỗ, được lập lịch cùng nhau, và chạy trong một ngữ cảnh dùng chung."<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a> Phần lớn Pod chỉ chứa một container; Pod nhiều container dành cho các helper gắn chặt với nhau.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+<h2>Dùng xong bỏ</h2>
+<p>Pod là những "thực thể tương đối ngắn hạn, dùng xong bỏ". Một Pod nằm trên node của nó cho tới khi chạy xong, bị xoá, bị evict vì thiếu tài nguyên, hoặc node đó gặp sự cố.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a> Không có gì khởi động lại một Pod trần (bare Pod) bị mất trên một node khác.</p>
+<h2>Vì vậy hãy dùng workload resource</h2>
+<p>"Bạn hiếm khi tạo Pod trực tiếp." Hãy dùng Deployment (ứng dụng có nhiều bản sao), Job (batch) hoặc StatefulSet (ứng dụng có trạng thái).<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a> Đây là ví dụ trong tài liệu, lưu thành <a href="../examples/pod.yaml"><code>pod.yaml</code></a>:</p>
+<pre><code>apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    ports:
+    - containerPort: 80</code></pre>
+<p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Đơn vị deploy nhỏ nhất trong Kubernetes?</p>
+  <button data-correct>Một Pod</button>
+  <button>Một node</button>
+  <button>Một Service</button>
+  <button>Một container</button>
+  <p class="explain">Pod là đơn vị deploy được nhỏ nhất.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Các container trong cùng một Pod dùng chung gì?</p>
+  <button data-correct>Storage và network</button>
+  <button>Chỉ chung image</button>
+  <button>Một node pool</button>
+  <button>Một JVM heap</button>
+  <p class="explain">Một Pod có storage và tài nguyên mạng dùng chung.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao không tạo Pod trần cho production?</p>
+  <button>Chúng tốn tiền hơn</button>
+  <button data-correct>Không gì thay thế chúng</button>
+  <button>Pod không chạy được Java</button>
+  <button>YAML cấm làm vậy</button>
+  <p class="explain">Pod là thứ dùng xong bỏ; hãy dùng Deployment, Job hoặc StatefulSet.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cách bố trí Pod phổ biến nhất?</p>
+  <button>Mỗi node một Pod</button>
+  <button>Không có container</button>
+  <button data-correct>Một container</button>
+  <button>Mười container</button>
+  <p class="explain">Pod một container là pattern phổ biến nhất.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-pod-lifecycle.vi.md">Bài tập 0002: vòng đời của Pod</a></p>
+<p>Ví dụ chạy được: <a href="../examples/pod.yaml"><code>pod.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Kubernetes Docs: Pods</a>. Đọc phần 'What is a Pod?' và 'Pod lifecycle'.</p>
+<p><a href="0001-cluster-components.vi.html">← Các thành phần của cluster: ai làm việc gì</a> &nbsp;|&nbsp; <a href="0008-namespaces.vi.html">Namespace: cô lập các nhóm tài nguyên →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Kubernetes Docs: Pods</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

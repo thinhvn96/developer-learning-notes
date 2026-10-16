@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 10: Bean Validation và response 400</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bean Validation và response 400</h1>
+<p class="meta">Spring Boot · Bài 0010 · bước 8/13 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-validation-and-400-errors.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> validate request body bằng Bean Validation và biết client sẽ nhận status nào.</div>
+
+<h2>Constraint trên model</h2>
+<p>Bean Validation cho phép bạn khai báo constraint trên model và thực thi chúng lúc runtime: <code>@NotNull</code>, <code>@Size(max = 64)</code>, <code>@Min(0)</code> và nhiều thứ khác.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+<pre><code>public record PersonRequest(@NotBlank String name, @Min(0) int age) { }
+
+@PostMapping
+@ResponseStatus(HttpStatus.CREATED)
+public PersonRequest add(@Valid @RequestBody PersonRequest person) { return person; }</code></pre>
+<h2>Client nhìn thấy gì</h2>
+<p>Trong Spring MVC, "các lỗi validation được báo dưới dạng <code>MethodArgumentNotValidException</code>", và thường dẫn tới HTTP <strong>400 Bad Request</strong>. Validation ở cấp method dùng <code>@Validated</code> trên class.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+<pre><code>RESULT POST valid body -&gt; 201 Created
+RESULT POST invalid body (blank name, age -1) -&gt; 400 Bad Request</code></pre>
+<p>Code: <a href="../examples/demo-app/src/main/java/com/example/demo/web/PersonRequest.java"><code>PersonRequest.java</code></a>, <a href="../examples/demo-app/src/main/java/com/example/demo/web/PersonController.java"><code>PersonController.java</code></a>, <a href="../examples/demo-app/src/test/java/com/example/demo/PersonControllerTest.java"><code>PersonControllerTest.java</code></a>. Nội dung body của response 400 và các định dạng lỗi tuỳ biến nằm ngoài các trang đã đọc; tài liệu về error response của MVC được link ở trên có đề cập.</p>
+<div class="aside">Hãy validate ở tầng biên (controller) và cả trong database bằng constraint: <a href="../../postgresql/lessons/0001-tables-and-constraints.vi.html">database là tuyến phòng thủ cuối cùng</a>.</div><p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Annotation nào kích hoạt validation cho body?</p>
+  <button>@Scope</button>
+  <button>@Lazy</button>
+  <button>@Profile</button>
+  <button data-correct>@Valid</button>
+  <p class="explain">@Valid trên tham số bật validation.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Exception khi validate thất bại trong Spring MVC?</p>
+  <button>IOException</button>
+  <button>ClassCastException</button>
+  <button>SQLException</button>
+  <button data-correct>MethodArgumentNotValidException</button>
+  <p class="explain">Lỗi validation được báo dưới dạng MethodArgumentNotValidException.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Status thường gặp cho input không hợp lệ?</p>
+  <button>200</button>
+  <button>500</button>
+  <button data-correct>400</button>
+  <button>204</button>
+  <p class="explain">Thường nó dẫn tới HTTP 400 (test trả về 400).<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Constraint nào cấm null?</p>
+  <button>@Min</button>
+  <button>@Past</button>
+  <button data-correct>@NotNull</button>
+  <button>@Size</button>
+  <p class="explain">@NotNull là một constraint annotation có sẵn.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-validate-an-order.vi.md">Bài tập 0010: validate một đơn hàng</a></p>
+<p>Ví dụ chạy được: <a href="../examples/demo-app/src/main/java/com/example/demo/web/PersonController.java"><code>demo-app/src/main/java/com/example/demo/web/PersonController.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">Spring Framework Reference: Bean Validation</a>. Phần tổng quan và phần tích hợp với Spring MVC.</p>
+<p><a href="0004-rest-controllers.vi.html">← REST controller và request mapping</a> &nbsp;|&nbsp; <a href="0005-transactional-proxies-and-rollback.vi.html">@Transactional: proxy và quy tắc rollback →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html">Spring Framework Reference: Bean Validation</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

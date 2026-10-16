@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 7: Kích thước heap và garbage collection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Object của bạn sống ở đâu, và ai dọn dẹp chúng</h1>
+<p class="subtitle">Heap, các thế hệ (generation) của nó, kích thước mặc định, và cách đọc một dòng GC log.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0007 · bước 35/46 · Senior · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-heap-and-garbage-collection.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> "Service bị kill vì OutOfMemoryError", "latency vọt lên vài phút một lần", "pod cứ restart liên tục": đó là các vấn đề bộ nhớ, và một kỹ sư Senior được kỳ vọng suy luận được về chúng. Interviewer hỏi <em>"Garbage collection trong Java hoạt động thế nào?"</em> và <em>"Heap mặc định lớn bao nhiêu?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> nói được kích thước heap mặc định và quy tắc chọn collector, đọc được một dòng GC log, và biết nên vặn núm nào trước.</div>
+
+<dl class="words">
+  <dt>heap</dt><dd>Vùng nhớ lớn nơi Java lưu mọi object bạn tạo bằng <code>new</code>. Mọi thread dùng chung nó.</dd>
+  <dt>garbage</dt><dd>Rác: một object mà không đoạn code đang chạy nào còn với tới được, nên không ai dùng được nó nữa.</dd>
+  <dt>garbage collector (GC)</dt><dd>Phần của JVM tìm rác và trả lại bộ nhớ của nó, nên bạn không bao giờ phải tự giải phóng bộ nhớ.</dd>
+  <dt>generation</dt><dd>Thế hệ: một phần của heap dành cho object ở một độ tuổi nhất định: <em>young</em> cho object mới, <em>old</em> cho object đã sống lâu.</dd>
+  <dt>pause</dt><dd>Khoảnh khắc ngắn GC dừng các thread của ứng dụng để làm việc. Người dùng cảm nhận pause dài thành latency.</dd>
+  <dt><code>-Xmx</code></dt><dd>Một option dòng lệnh của <code>java</code> đặt kích thước heap tối đa, ví dụ <code>-Xmx512m</code>.</dd>
+  <dt>GC log</dt><dd>Các dòng JVM in ra về mỗi lần thu gom khi bạn khởi động nó với <code>-Xlog:gc</code>.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Bạn chạy <code>java -jar app.jar</code> không có option bộ nhớ nào trên một máy 16 GB RAM. Heap có thể lớn tới đâu?"</em> Đưa ra một con số. Mục 3 có quy tắc trong tài liệu, và kiểm tra trên một máy thật.</p>
+
+<h2>1. Heap và garbage collector</h2>
+<p>Hãy nghĩ heap là một <strong>nhà kho</strong> lớn dùng chung. Mỗi <code>new Order(...)</code> đặt một chiếc hộp lên kệ. Code của bạn giữ các <strong>nhãn</strong> (reference, nằm trong biến và field) chỉ tới các hộp. Khi không còn nhãn nào chỉ tới một hộp, không ai tìm lại được nó nữa: nó là rác.</p>
+<p>Đặc tả JVM: heap "được dùng chung bởi mọi thread của Java Virtual Machine" và là "vùng dữ liệu lúc chạy nơi cấp phát bộ nhớ cho mọi instance của class và mọi array". Bộ nhớ của nó "được thu hồi bởi một hệ thống quản lý bộ nhớ tự động (gọi là <em>garbage collector</em>); object không bao giờ được giải phóng một cách tường minh."<a class="src" href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3">JVMS 2.5.3</a></p>
+<p>Garbage collector cấp phát bộ nhớ, giao nó cho ứng dụng, "xác định phần bộ nhớ nào vẫn đang được dùng", và thu hồi phần còn lại.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC tuning: introduction</a> "Một object được coi là rác và bộ nhớ của nó có thể được VM dùng lại khi nó không còn được với tới từ bất kỳ reference nào của bất kỳ object còn sống nào khác trong chương trình đang chạy."<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC tuning: implementation</a></p>
+<pre><code>static Object sink;
+for (int i = 0; i &lt; 2_000_000; i++) {
+    sink = new byte[1024];   <span class="c">// the previous array loses its only label → garbage</span>
+}</code></pre>
+<p>Vòng lặp đó trong <code>GcDemo.java</code> tạo tổng cộng khoảng 2 GB array, vậy mà vẫn chạy ổn trong heap 64 MB, vì mỗi array trở thành rác ngay ở bước sau.</p>
+
+<h2>2. Đa số object chết trẻ: các thế hệ</h2>
+<p>Mỗi lần đều kiểm tra hết mọi hộp trong kho thì sẽ mất cả đời. Nên HotSpot (JVM trong OpenJDK và Oracle JDK) dựa vào một quan sát gọi là <strong>weak generational hypothesis</strong>, "phát biểu rằng đa số object chỉ sống trong một khoảng thời gian ngắn". Ví dụ, "các object iterator thường chỉ sống trong thời gian của một vòng lặp."<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC tuning: implementation</a> Các collector của HotSpot dùng "generational scavenging kết hợp với aging" để tập trung công sức vào nơi có nhiều khả năng thu hồi được bộ nhớ nhất.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC tuning: introduction</a></p>
+
+<figure>
+<svg viewBox="0 0 680 290" role="img" aria-label="Heap Java chia thành young generation (eden và hai survivor space) và old generation. Object mới vào eden; minor GC chép các object còn sống sang một survivor space; object sống sót qua vài lần chép được đưa lên old generation.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="135" y="18" text-anchor="middle" font-size="12" fill="var(--accent)">object mới</text>
+    <path d="M135 24v58M130 76l5 6 5-6" fill="none" stroke="var(--accent)"/>
+    <rect x="20" y="36" width="640" height="232" rx="6" fill="none" stroke="currentColor" opacity=".5"/>
+    <rect x="30" y="46" width="395" height="190" rx="4" fill="none" stroke="currentColor"/>
+    <text x="300" y="66" font-size="12" opacity=".8">young generation</text>
+    <rect x="40" y="84" width="190" height="90" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="135" y="122" text-anchor="middle" fill="var(--accent)">eden</text>
+    <text x="135" y="142" text-anchor="middle" font-size="11">đa số object</text>
+    <text x="135" y="157" text-anchor="middle" font-size="11">chết ở đây</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="245" y="84" width="80" height="90" rx="4"/>
+      <rect x="335" y="84" width="80" height="90" rx="4"/>
+      <rect x="445" y="46" width="205" height="190" rx="4"/>
+      <path d="M135 174v26h152v-20M282 186l5-6 5 6"/>
+      <path d="M375 174v36h64M433 205l6 5-6 5"/>
+    </g>
+    <text x="285" y="124" text-anchor="middle">S0</text>
+    <text x="285" y="142" text-anchor="middle" font-size="11">survivor</text>
+    <text x="375" y="124" text-anchor="middle">S1</text>
+    <text x="375" y="142" text-anchor="middle" font-size="11">survivor</text>
+    <text x="210" y="216" text-anchor="middle" font-size="11">minor GC: chép object sống</text>
+    <text x="320" y="228" font-size="11">lên đời (aging)</text>
+    <text x="547" y="100" text-anchor="middle">old generation</text>
+    <text x="547" y="118" text-anchor="middle" font-size="11" opacity=".8">(tenured)</text>
+    <text x="547" y="150" text-anchor="middle" font-size="11">object sống lâu:</text>
+    <text x="547" y="166" text-anchor="middle" font-size="11">cache, singleton</text>
+    <text x="547" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">đầy → major GC (chậm)</text>
+    <text x="30" y="258" font-size="11" opacity=".8">Java heap: kích thước tối đa đặt bằng -Xmx (mặc định 1/4 RAM vật lý)</text>
+  </g>
+</svg>
+<figcaption>Các thế hệ trong cách bố trí cổ điển. Đa số object được tạo trong eden và chết ở đó; object sống sót được chép qua lại giữa S0 và S1, và sau đủ số lần chép thì chuyển sang old generation.</figcaption>
+</figure>
+
+<p>Đi theo một object trong suốt đời nó:</p>
+<pre><code><span class="c">Bước 1  new byte[1024]           → cấp phát trong eden ("Đa số object ban đầu được cấp phát trong eden")</span>
+<span class="c">Bước 2  eden đầy                 → một minor collection: chỉ thu gom young generation</span>
+<span class="c">Bước 3  object còn với tới được? → chép sang survivor space đang trống; eden giờ trống</span>
+<span class="c">Bước 4  các minor GC tiếp theo   → lại chép S0 ↔ S1, mỗi lần "già" thêm một chút</span>
+<span class="c">Bước 5  chép đủ số lần           → chuyển sang old generation ("aging")</span>
+<span class="c">Bước 6  old generation đầy       → một major collection trên toàn bộ heap: chậm hơn nhiều</span></code></pre>
+<p>Tất cả đều từ GC tuning guide: "một young generation đầy object chết được thu gom rất nhanh", trong khi major collection "thường kéo dài lâu hơn nhiều so với minor collection vì liên quan tới số object lớn hơn đáng kể".<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC tuning: implementation</a> Ý quan trọng: chi phí của một minor GC phụ thuộc vào các object <em>sống sót</em>, không phải vào rác. Object chết gần như không tốn gì.</p>
+<p class="muted">G1, collector mặc định, giữ nguyên ý tưởng này nhưng chia heap thành nhiều vùng bằng nhau: "G1 chia heap thành một tập các heap region có kích thước bằng nhau", và young generation là một tập các region eden và survivor.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">GC tuning: G1</a></p>
+
+<h2>3. Các giá trị mặc định nên thuộc lòng</h2>
+<ul>
+<li>Collector: G1 trên "máy server-class" (từ hai bộ xử lý trở lên và ít nhất 1792 MB bộ nhớ vật lý), ngược lại là Serial collector.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC tuning: ergonomics</a></li>
+<li>Heap ban đầu: 1/64 bộ nhớ vật lý. Heap tối đa: 1/4 bộ nhớ vật lý.<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC tuning: ergonomics</a></li>
+<li><code>-XX:MaxRAMPercentage</code> đặt heap tối đa theo phần trăm của lượng bộ nhớ tối đa mà JVM thấy; mặc định 25 phần trăm.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html">java command</a></li>
+</ul>
+<p>Kiểm tra trên một máy thật. Chiếc laptop này (JDK 21) có 15.716 MB RAM và 12 CPU:</p>
+<pre><code>$ java -XX:+PrintFlagsFinal -version | grep -E " MaxHeapSize | UseG1GC "
+   size_t MaxHeapSize = <span class="hl">4120903680</span>   {product} {ergonomic}
+     bool UseG1GC     = true         {product} {ergonomic}</code></pre>
+<p>4.120.903.680 byte là khoảng 3.930 MB: một phần tư của 15.716 MB. Và G1 đang bật, vì máy là "server-class". (Khoảng trắng trong output đã được rút gọn.)</p>
+<p class="muted">JDK 8 vs 17 vs 21: ở JDK 8 mặc định là Parallel collector, thiên về thông lượng; JEP 248 đưa G1 thành mặc định từ JDK 9<a class="src" href="https://openjdk.org/jeps/248">JEP 248</a>, nên JDK 17 và 21 đều mặc định dùng G1. JDK 21 còn có thêm Generational ZGC (<a href="0017-generational-zgc.vi.html">bài 0017</a>).</p>
+<p><strong>Bẫy: container.</strong> Trong container, "bộ nhớ vật lý" nghĩa là lượng bộ nhớ JVM nhìn thấy, thường là giới hạn của container. Mặc định chỉ 25% trong đó thành heap, và heap chỉ là một phần bộ nhớ của process (thread, metaspace, buffer cũng chiếm một ít). Các bài Docker và Kubernetes sẽ quay lại chuyện này.</p>
+
+<h2>4. Đọc một dòng GC log</h2>
+<p>Chạy demo với heap 64 MB và bật GC log:</p>
+<pre><code>$ java -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.002s][info][gc] Using G1
+max heap (MB): 64
+[0.361s][info][gc] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 24M-&gt;3M(64M) 3.213ms
+[0.369s][info][gc] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 38M-&gt;3M(64M) 2.740ms
+[0.376s][info][gc] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 38M-&gt;3M(64M) 2.086ms
+...                                                  <span class="c">(55 collections in total, all young)</span>
+[0.592s][info][gc] GC(54) Pause Young (Normal) (G1 Evacuation Pause) 40M-&gt;3M(64M) 0.228ms
+done</code></pre>
+<p class="muted">Timestamp và thời gian pause thay đổi mỗi lần chạy và trên mỗi máy; hình dạng thì vẫn vậy.</p>
+
+<figure>
+<svg viewBox="0 0 680 130" role="img" aria-label="Một dòng log G1 được tách thành từng phần: số thứ tự lần thu gom, loại pause, nguyên nhân, heap trước và sau, tổng kích thước heap, và thời gian pause.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="34">GC(0)</text>
+    <text x="80" y="34">Pause Young</text>
+    <text x="180" y="34" opacity=".75">(Normal) (G1 Evacuation Pause)</text>
+    <rect x="404" y="18" width="62" height="24" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="410" y="34" fill="var(--accent)">24M-&gt;3M</text>
+    <text x="470" y="34">(64M)</text>
+    <text x="520" y="34">3.213ms</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <path d="M38 44v16"/>
+      <path d="M120 44v48"/>
+      <path d="M288 44v16"/>
+      <path d="M487 44v16"/>
+      <path d="M545 44v48"/>
+    </g>
+    <path d="M435 44v48" fill="none" stroke="var(--accent)"/>
+    <g font-size="11">
+      <text x="20" y="74">lần thu gom #0</text>
+      <text x="288" y="74" text-anchor="middle">nguyên nhân</text>
+      <text x="487" y="74" text-anchor="middle">cỡ heap</text>
+      <text x="120" y="106" text-anchor="middle">pause của young</text>
+      <text x="435" y="106" text-anchor="middle" fill="var(--accent)">đã dùng: trước → sau</text>
+      <text x="565" y="106" text-anchor="middle">thời gian pause</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Một dòng, sáu thông tin. Phần được tô cho bạn biết bao nhiêu là rác: trước dùng 24 MB, sau còn 3 MB.</figcaption>
+</figure>
+
+<p>Cách đọc: lần thu gom số 0, một pause của young generation, mức chiếm dụng heap đi từ 24 MB xuống 3 MB trên tổng 64 MB, mất khoảng 3 ms. Demo cấp phát các array sống ngắn, nên gần như tất cả đều được thu hồi. (Định dạng log lấy từ việc chạy ví dụ trên máy này với JDK 21.)</p>
+<p>Điều gì đáng lo? Giá trị "sau" (3M) cứ <strong>tăng dần</strong> từ dòng này sang dòng khác (dữ liệu sống chất đống: rò rỉ bộ nhớ hoặc cache không giới hạn), pause ngày càng dài, hoặc xuất hiện các dòng "Pause Full". Nếu dữ liệu sống cuối cùng cần nhiều hơn heap, JVM bỏ cuộc: "Nếu một phép tính cần nhiều heap hơn mức hệ thống quản lý bộ nhớ tự động có thể cung cấp, Java Virtual Machine ném ra <code>OutOfMemoryError</code>."<a class="src" href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3">JVMS 2.5.3</a> Bài tập 0007 cố ý gây ra chuyện này.</p>
+<p>Cùng chương trình với Serial collector, để so sánh (chỉ vài dòng đầu):</p>
+<pre><code>$ java -XX:+UseSerialGC -Xmx64m -Xlog:gc java/examples/GcDemo.java
+[0.002s][info][gc] Using Serial
+[0.349s][info][gc] GC(0) Pause Young (Allocation Failure) 18M-&gt;4M(61M) 7.715ms
+max heap (MB): 61</code></pre>
+<p>Collector khác, nguyên nhân khác ("Allocation Failure": eden đã đầy), và cách tính heap hơi khác (61 MB). Cách đọc dòng log thì vẫn y như vậy.</p>
+
+<h2>5. Nước đi trong interview</h2>
+<div class="aside">Nước đi trong interview: trước khi đụng tới flag của collector, hãy đặt kích thước heap một cách có chủ đích (<code>-Xmx</code> hoặc <code>MaxRAMPercentage</code>) và bật GC log. Các bài Docker và Kubernetes sẽ quay lại chuyện này: heap chỉ là một phần bộ nhớ của container.</div>
+<p>Chính GC tuning guide nói nên dùng các giá trị mặc định "trước khi dùng các điều khiển chi tiết hơn được mô tả trong các phần sau".<a class="src" href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC tuning: ergonomics</a> Vậy thứ tự là: đo (GC log), đặt kích thước heap, rồi mới tính tới collector khác hoặc flag của nó.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Không có flag heap nào, kích thước heap tối đa mặc định là bao nhiêu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một phần tư bộ nhớ vật lý</button>
+    <button class="opt">Một phần tám bộ nhớ vật lý</button>
+    <button class="opt">Một nửa bộ nhớ vật lý</button>
+    <button class="opt">Toàn bộ bộ nhớ vật lý</button>
+  </div>
+  <div class="why">Heap tối đa mặc định là 1/4 bộ nhớ vật lý (heap ban đầu: 1/64). <code>MaxRAMPercentage</code> mặc định 25 phần trăm.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Collector nào là mặc định trên máy server-class trong JDK 17 và 21?</p>
+  <div class="options">
+    <button class="opt" data-correct>Garbage-First (G1)</button>
+    <button class="opt">Shenandoah low-pause</button>
+    <button class="opt">Epsilon no-op</button>
+    <button class="opt">Serial collector</button>
+  </div>
+  <div class="why">G1 trên máy server-class, ngược lại là Serial. (JDK 8 mặc định là Parallel; G1 thành mặc định từ JDK 9.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Thế nào được tính là máy "server-class" cho các giá trị mặc định này?</p>
+  <div class="options">
+    <button class="opt" data-correct>Từ hai CPU trở lên và ít nhất 1792 MB</button>
+    <button class="opt">Từ hai CPU trở lên và ít nhất 4 GB</button>
+    <button class="opt">Từ một CPU trở lên và ít nhất 512 MB</button>
+    <button class="opt">Từ bốn CPU trở lên và ít nhất 8 GB</button>
+  </div>
+  <div class="why">Từ hai bộ xử lý trở lên và bộ nhớ vật lý ít nhất 1792 MB.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một dòng log kết thúc bằng <code>24M-&gt;3M(64M) 3.213ms</code>. <code>64M</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Tổng kích thước heap</button>
+    <button class="opt">Độ dài của lần pause</button>
+    <button class="opt">Các object sống còn lại</button>
+    <button class="opt">Số byte đã được thu hồi</button>
+  </div>
+  <div class="why">Trước → sau (tổng dung lượng heap), rồi tới thời gian pause.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao minor GC trên một young generation đầy object chết lại nhanh như vậy?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chi phí phụ thuộc object sống, không phụ thuộc object chết</button>
+    <button class="opt">Nó chạy trên một CPU core riêng đang rảnh rỗi</button>
+    <button class="opt">Nó bỏ qua eden và chỉ quét old generation</button>
+    <button class="opt">Nó xóa từng object chết một cách rất nhanh</button>
+  </div>
+  <div class="why">Chi phí minor collection gần như tỉ lệ với số object sống được thu gom; object chết chỉ bị bỏ lại và eden được dùng lại.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong GC log, giá trị "sau" tăng sau mỗi lần thu gom: 3M, 9M, 20M, 41M… Điều đó gợi ý gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Dữ liệu sống đang chất đống, như rò rỉ</button>
+    <button class="opt">GC làm việc nhanh hơn sau mỗi lần chạy</button>
+    <button class="opt">Heap đang co lại để tiết kiệm bộ nhớ</button>
+    <button class="opt">Mỗi giây tạo ra nhiều rác hơn trước</button>
+  </div>
+  <div class="why">"Sau" là phần sống sót. Nếu nó cứ leo lên, object vẫn còn được với tới (rò rỉ hoặc cache không giới hạn), và <code>OutOfMemoryError</code> có thể tới.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Garbage collection trong Java hoạt động thế nào, và bạn chọn kích thước heap ra sao?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Object sống trong heap dùng chung; GC giải phóng object không còn với tới được.</label></li>
+      <li><label><input type="checkbox"> Đa số object chết trẻ, nên heap được chia thành young và old generation.</label></li>
+      <li><label><input type="checkbox"> Minor GC: thu gom young (eden + survivor), chép object sống, đưa object già lên; major GC chậm hơn.</label></li>
+      <li><label><input type="checkbox"> Mặc định: G1 trên máy server-class, heap tối đa 1/4 RAM (MaxRAMPercentage 25).</label></li>
+      <li><label><input type="checkbox"> Đọc dòng log: trước → sau (tổng), thời gian pause.</label></li>
+      <li><label><input type="checkbox"> Bước đầu: đặt -Xmx hoặc MaxRAMPercentage có chủ đích và bật -Xlog:gc, trước khi động tới flag của collector.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Mọi object nằm trong heap, mà mọi thread dùng chung. Garbage collector tìm những object không còn với tới được từ các reference còn sống và dùng lại bộ nhớ của chúng. Các collector của HotSpot là generational, vì đa số object chết trẻ: object mới vào eden; khi eden đầy, một minor GC chép số ít object còn sống sang survivor space, và object nào sống sót vài lần thì được promote lên old generation. Minor GC rẻ vì nó chỉ trả giá cho object sống; major GC trên toàn heap thì chậm hơn nhiều. Từ JDK 9, mặc định là G1 trên máy server-class, và heap tối đa mặc định là một phần tư bộ nhớ vật lý, con số mà trong container thường quá nhỏ hoặc bị hiểu sai. Nên việc đầu tiên em làm là đặt kích thước heap có chủ đích bằng -Xmx hoặc MaxRAMPercentage và bật -Xlog:gc. Trong log em nhìn trước → sau và thời gian pause; nếu giá trị sau cứ tăng, dữ liệu sống đang chất đống, tức là dấu hiệu leak, chứ không phải do cấu hình GC."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-gc-log-reading.vi.md">Bài tập 0007: hai collector, một chương trình</a>. Hãy gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/GcDemo.java"><code>GcDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior có thể hỏi tiếp: <em>"Pause của G1 quá dài với hệ thống của chúng tôi. Bạn sẽ thử gì?"</em> <a href="0017-generational-zgc.vi.html">Bài 0017</a> nói về Generational ZGC trong JDK 21. Trước đó, hãy khép lại phần này với <a href="0045-review-concurrency-jvm.vi.html">Ôn tập 6: concurrency và JVM</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a>, sau đó là chương <a href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">Ergonomics</a> và chương <a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">Garbage Collector Implementation</a> (có biểu đồ tuổi thọ object).</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"-Xms và -Xmx khác nhau thế nào?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0026-deadlock-and-lock-ordering.vi.html">← Khi hai thread chờ nhau mãi mãi: deadlock</a> &nbsp;|&nbsp; <a href="0045-review-concurrency-jvm.vi.html">Ôn tập 6: concurrency và JVM →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với HotSpot GC Tuning Guide của Java 21, tài liệu lệnh java, JVM Specification (Java SE 21) và JEP 248, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html">GC Tuning Guide: Introduction</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/ergonomics1.html">GC Tuning Guide: Ergonomics</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-collector-implementation1.html">GC Tuning Guide: Garbage Collector Implementation</a> · <a href="https://docs.oracle.com/en/java/javase/21/gctuning/garbage-first-g1-garbage-collector1.html">GC Tuning Guide: G1</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html">java command reference</a> · <a href="https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-2.html#jvms-2.5.3">JVMS 2.5.3: Heap</a> · <a href="https://openjdk.org/jeps/248">JEP 248</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

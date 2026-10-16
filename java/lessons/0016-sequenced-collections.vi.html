@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 16: Đầu, cuối và đảo ngược (JDK 21)</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Đầu, cuối và đảo ngược: sequenced collection (JDK 21)</h1>
+<p class="subtitle">Một bộ method chung cho "phần tử đầu", "phần tử cuối" và "đi ngược", trên mọi collection có thứ tự.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0016 · bước 43/46 · Core · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0016-sequenced-collections.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> "Lấy đơn hàng mới nhất", "hiện tin nhắn mới nhất lên đầu": bạn cần phần tử đầu hoặc cuối suốt ngày. Trước JDK 21, mỗi loại collection làm việc này một kiểu. Người phỏng vấn hỏi <em>"Sequenced collection trong Java 21 là gì?"</em> để xem bạn có theo kịp API hiện đại không. Sau bài này bạn trả lời được, và thôi viết <code>list.get(list.size() - 1)</code>.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng <code>getFirst</code>, <code>getLast</code> và <code>reversed</code> trên list, deque, set và map có thứ tự, và kể tên ba interface mới.</div>
+
+<dl class="words">
+  <dt>collection</dt><dd>Một object chứa một nhóm phần tử, ví dụ <code>List</code> hoặc <code>Set</code>.</dd>
+  <dt>interface</dt><dd>Danh sách các method mà một class hứa sẽ có. <code>List</code> là interface; <code>ArrayList</code> là class giữ lời hứa đó.</dd>
+  <dt>encounter order</dt><dd>Thứ tự bạn gặp các phần tử khi duyệt qua chúng. List có thứ tự này; <code>HashSet</code> không hứa thứ tự nào.</dd>
+  <dt>generic <code>&lt;E&gt;</code></dt><dd>Chỗ giữ cho "kiểu của các phần tử". <code>SequencedCollection&lt;String&gt;</code> chứa các string.</dd>
+  <dt>view</dt><dd>Một "cửa sổ" thứ hai nhìn vào cùng dữ liệu. Nó không copy gì cả; dữ liệu thay đổi thì view thấy ngay.</dd>
+  <dt>deque</dt><dd>Đọc là "đéc": một hàng đợi dùng được từ cả hai đầu, ví dụ <code>ArrayDeque</code>.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói thành tiếng: <em>"Làm sao lấy phần tử cuối của một <code>ArrayList</code>? Còn của một <code>LinkedHashSet</code> thì sao?"</em> Nếu câu thứ hai thấy lúng túng thì tốt: chính sự lúng túng đó là lý do có bài này.</p>
+
+<h2>1. Cách cũ: bốn kiểu, bốn câu trả lời</h2>
+<p>Hãy nghĩ tới hàng người xếp hàng ở ngân hàng. Ai cũng hiểu "người đầu tiên" và "người cuối cùng". Chẳng ai cần một từ khác chỉ vì hàng đó xếp trong hay ngoài toà nhà.</p>
+<p>Java trước 21 thì lại cần những từ khác nhau. JEP 431 liệt kê chúng:<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+<table>
+<tr><th>Kiểu</th><th>Phần tử đầu</th><th>Phần tử cuối</th></tr>
+<tr><td><code>List</code></td><td><code>list.get(0)</code></td><td><code>list.get(list.size() - 1)</code></td></tr>
+<tr><td><code>Deque</code></td><td><code>deque.getFirst()</code></td><td><code>deque.getLast()</code></td></tr>
+<tr><td><code>SortedSet</code></td><td><code>sortedSet.first()</code></td><td><code>sortedSet.last()</code></td></tr>
+<tr><td><code>LinkedHashSet</code></td><td><code>linkedHashSet.iterator().next()</code></td><td>không có</td></tr>
+</table>
+<p>Ô cuối là tệ nhất: "Cách duy nhất để lấy phần tử cuối của một <code>LinkedHashSet</code> là duyệt toàn bộ set."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Duyệt ngược cũng lộn xộn y như vậy. Và vì không có kiểu chung, bạn không thể viết một method nhận "bất kỳ collection nào có thứ tự".</p>
+
+<h2>2. Cách mới: một interface, cả hai đầu</h2>
+<p>JEP 431 giới thiệu "các interface mới để biểu diễn collection có encounter order xác định". Một collection như vậy "có phần tử đầu tiên, phần tử thứ hai, cứ thế cho tới phần tử cuối cùng, đều được xác định rõ".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Đây là interface chính, đúng như JEP trình bày:<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+<pre><code>interface SequencedCollection&lt;E&gt; extends Collection&lt;E&gt; {
+    <span class="c">// new method</span>
+    SequencedCollection&lt;E&gt; reversed();
+    <span class="c">// methods promoted from Deque</span>
+    void addFirst(E);
+    void addLast(E);
+    E getFirst();
+    E getLast();
+    E removeFirst();
+    E removeLast();
+}</code></pre>
+<p>Để ý chữ "promoted from Deque": các tên này không mới. <code>Deque</code> đã có chúng từ trước; JDK 21 chỉ đưa chúng lên cao hơn để mọi collection có thứ tự dùng chung.</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Một list a, b, c. Đầu bên trái: getFirst trả về a, addFirst và removeFirst. Đầu bên phải: getLast trả về c, addLast và removeLast. Bên dưới, reversed() hiện c, b, a như một view của cùng các phần tử.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="250" y="60" width="60" height="44" rx="4"/>
+      <rect x="310" y="60" width="60" height="44" rx="4"/>
+      <rect x="370" y="60" width="60" height="44" rx="4"/>
+    </g>
+    <text x="280" y="87" text-anchor="middle">a</text>
+    <text x="340" y="87" text-anchor="middle">b</text>
+    <text x="400" y="87" text-anchor="middle">c</text>
+    <text x="340" y="40" text-anchor="middle" font-size="11" opacity=".75">list = [a, b, c]</text>
+    <g font-size="12" fill="var(--accent)">
+      <text x="40" y="62">getFirst() → a</text>
+      <text x="40" y="84">addFirst(x)</text>
+      <text x="40" y="106">removeFirst()</text>
+      <text x="470" y="62">getLast() → c</text>
+      <text x="470" y="84">addLast(x)</text>
+      <text x="470" y="106">removeLast()</text>
+    </g>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M180 82h64M238 77l6 5-6 5"/>
+      <path d="M460 82h-24M442 77l-6 5 6 5"/>
+    </g>
+    <text x="340" y="146" text-anchor="middle" font-size="12">list.reversed()</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 3">
+      <rect x="250" y="160" width="60" height="40" rx="4"/>
+      <rect x="310" y="160" width="60" height="40" rx="4"/>
+      <rect x="370" y="160" width="60" height="40" rx="4"/>
+    </g>
+    <text x="280" y="185" text-anchor="middle">c</text>
+    <text x="340" y="185" text-anchor="middle">b</text>
+    <text x="400" y="185" text-anchor="middle">a</text>
+    <text x="470" y="178" font-size="11" opacity=".8">một view: cùng phần tử,</text>
+    <text x="470" y="194" font-size="11" opacity=".8">đọc ngược, không copy</text>
+  </g>
+</svg>
+<figcaption>Mọi sequenced collection có hai đầu với cùng sáu method, cộng thêm <code>reversed()</code>, một view đọc ngược.</figcaption>
+</figure>
+
+<p>Chạy ví dụ của khoá học trên JDK 21:</p>
+<pre><code>$ java java/examples/jdk21/Jdk21Features.java
+circle r=5.0 at 1,2
+huge circle at 0,0
+rect width 4 height 3
+null handled inside the switch | blank string | string x | int 7
+<span class="hl">a c [c, b, a]</span>
+<span class="hl">one=1 two=2 {two=2, one=1}</span></code></pre>
+<p>Dòng tô sáng đầu tiên là <code>list.getFirst()</code>, <code>list.getLast()</code> và <code>list.reversed()</code> trên <code>["a", "b", "c"]</code>. Dòng thứ hai là một map, xem mục 5.</p>
+
+<h2>3. <code>reversed()</code> là view, không phải bản copy</h2>
+<p>View giống như nhìn con phố qua kính hậu của ô tô: vẫn là con phố đó, chỉ là nhìn theo chiều ngược lại. Nếu có cửa hàng mới mở, bạn thấy nó ở cả hai cửa kính.</p>
+<p>JEP 431: "Method <code>reversed()</code> mới cung cấp một view theo thứ tự ngược của collection gốc." Thay đổi trên bản gốc hiện ra trong view, và "nếu được phép, thay đổi trên view sẽ ghi xuyên xuống collection gốc".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Mình đã chạy các dòng này trên JDK 21:</p>
+<pre><code>var list = new ArrayList&lt;&gt;(List.of("a", "b", "c"));
+var rev = list.reversed();
+list.add("d");
+System.out.println(rev);
+<span class="c">Step 1  rev is created: it remembers "read list backwards"</span>
+<span class="c">Step 2  list becomes [a, b, c, d]</span>
+<span class="c">Step 3  printing rev reads list backwards now</span>
+<span class="hl">[d, c, b, a]</span></code></pre>
+<p>Vì thế <code>reversed()</code> rất rẻ: không copy phần tử nào. Nó cũng giúp bạn duyệt ngược bằng for-each bình thường: <code>for (var x : list.reversed())</code>. Ở JDK 8 bạn phải dùng <code>ListIterator</code> đi từ cuối, hoặc <code>Collections.reverse</code> trên một bản copy.</p>
+
+<h2>4. Collection nào là sequenced?</h2>
+<p>JDK 21 thêm ba interface và gắn chúng vào họ collection có sẵn. <code>List</code> và <code>Deque</code> giờ extend <code>SequencedCollection</code>; <code>LinkedHashSet</code> và <code>LinkedHashMap</code> thêm <code>SequencedSet</code> và <code>SequencedMap</code>; <code>SortedSet</code> và <code>SortedMap</code> cũng extend chúng.<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Họ interface. Collection được SequencedCollection extend, SequencedCollection được List, Deque và SequencedSet extend. SequencedSet được SortedSet extend và LinkedHashSet implement. Map được SequencedMap extend, SequencedMap được SortedMap extend và LinkedHashMap implement. HashSet và HashMap không phải sequenced.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="90" y="16" width="160" height="32" rx="4"/>
+      <rect x="20" y="152" width="80" height="32" rx="4"/>
+      <rect x="110" y="152" width="80" height="32" rx="4"/>
+      <rect x="170" y="220" width="100" height="32" rx="4"/>
+      <rect x="280" y="220" width="130" height="32" rx="4"/>
+      <rect x="460" y="16" width="160" height="32" rx="4"/>
+      <rect x="440" y="152" width="100" height="32" rx="4"/>
+      <rect x="550" y="152" width="120" height="32" rx="4"/>
+      <path d="M170 48v36M170 116L60 152M170 116L150 152M170 116L270 152M270 184L220 220M270 184L345 220M540 48v36M540 116L490 152M540 116L610 152"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="60" y="84" width="220" height="32" rx="4"/>
+      <rect x="200" y="152" width="140" height="32" rx="4"/>
+      <rect x="440" y="84" width="200" height="32" rx="4"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="170" y="37">Collection</text>
+      <text x="170" y="105" fill="var(--accent)">SequencedCollection</text>
+      <text x="60" y="173">List</text>
+      <text x="150" y="173">Deque</text>
+      <text x="270" y="173" fill="var(--accent)">SequencedSet</text>
+      <text x="220" y="241">SortedSet</text>
+      <text x="345" y="241">LinkedHashSet</text>
+      <text x="540" y="37">Map</text>
+      <text x="540" y="105" fill="var(--accent)">SequencedMap</text>
+      <text x="490" y="173">SortedMap</text>
+      <text x="610" y="173">LinkedHashMap</text>
+    </g>
+    <text x="555" y="222" text-anchor="middle" font-size="11" opacity=".6">HashSet, HashMap:</text>
+    <text x="555" y="240" text-anchor="middle" font-size="11" opacity=".6">không có thứ tự,</text>
+    <text x="555" y="258" text-anchor="middle" font-size="11" opacity=".6">không sequenced</text>
+  </g>
+</svg>
+<figcaption>Ba interface mới (tô sáng) nằm xen giữa các interface cũ. Chỉ những kiểu có thứ tự xác định mới tham gia.</figcaption>
+</figure>
+
+<p>Hãy để ý cái <strong>không</strong> có trong hình: <code>HashSet</code> và <code>HashMap</code>. Chúng không có thứ tự xác định, nên không phải sequenced. Mình đã kiểm tra: <code>new HashSet&lt;&gt;() instanceof SequencedCollection</code> in ra <code>false</code>.</p>
+<p><code>SequencedSet</code> chỉ thêm một thứ: "<code>SequencedSet&lt;E&gt; reversed();    // covariant override</code>".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> "Covariant" nghĩa là view đảo ngược của một set vẫn là set, không chỉ là collection.</p>
+<p>Set không chứa cùng một phần tử hai lần, vậy <code>addFirst</code> làm gì với phần tử đã có sẵn? "Nếu phần tử đã có trong set thì nó được chuyển tới vị trí tương ứng."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Lần chạy của mình:</p>
+<pre><code>var set = new LinkedHashSet&lt;&gt;(List.of("x", "y", "z"));
+set.addFirst("z");
+System.out.println(set + " last=" + set.getLast());
+<span class="hl">[z, x, y] last=y</span></code></pre>
+<p>Một dòng để lấy phần tử cuối của <code>LinkedHashSet</code>, đúng cái ô "không có" trong bảng cũ.</p>
+
+<h2>5. Map có thứ tự: <code>SequencedMap</code></h2>
+<p>Trong Java, map không phải collection (<code>Map</code> không extend <code>Collection</code>), nên nó có interface riêng:<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+<pre><code>interface SequencedMap&lt;K,V&gt; extends Map&lt;K,V&gt; {
+    <span class="c">// new methods</span>
+    SequencedMap&lt;K,V&gt; reversed();
+    SequencedSet&lt;K&gt; sequencedKeySet();
+    SequencedCollection&lt;V&gt; sequencedValues();
+    SequencedSet&lt;Entry&lt;K,V&gt;&gt; sequencedEntrySet();
+    V putFirst(K, V);
+    V putLast(K, V);
+    <span class="c">// methods promoted from NavigableMap</span>
+    Entry&lt;K, V&gt; firstEntry();
+    Entry&lt;K, V&gt; lastEntry();
+    Entry&lt;K, V&gt; pollFirstEntry();
+    Entry&lt;K, V&gt; pollLastEntry();
+}</code></pre>
+<p>Từ ví dụ của khoá học:</p>
+<pre><code>var map = new LinkedHashMap&lt;String, Integer&gt;();
+map.put("one", 1); map.put("two", 2);
+System.out.println(map.firstEntry() + " " + map.lastEntry() + " " + map.reversed());
+<span class="hl">one=1 two=2 {two=2, one=1}</span></code></pre>
+<p>"Poll" nghĩa là "lấy ra và xoá": <code>pollFirstEntry()</code> rút entry cũ nhất ra khỏi một <code>LinkedHashMap</code>. Rất tiện cho một cache đơn giản bỏ phần tử cũ nhất (bạn sẽ tự xây LRU cache ở <a href="0033-hashset-linkedhashmap-and-lru.vi.html">bài 0033</a>).</p>
+
+<h2>6. Bẫy: collection rỗng và "không thêm vào đó được"</h2>
+<p><strong>Bẫy 1: rỗng.</strong> "Các method <code>get*()</code> và <code>remove*()</code> ném <code>NoSuchElementException</code> nếu collection rỗng."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Lưu ý exception khác với cách cũ: <code>list.get(0)</code> trên list rỗng ném <code>IndexOutOfBoundsException</code>, còn <code>list.getFirst()</code> ném <code>NoSuchElementException</code>. Hãy kiểm tra <code>isEmpty()</code> trước.</p>
+<p><strong>Bẫy 2: không phải lúc nào cũng thêm vào một đầu được.</strong> "Các method <code>add*(E)</code> và <code>remove*()</code> là tuỳ chọn, chủ yếu để hỗ trợ collection không thể sửa đổi (unmodifiable)." Với collection đã sắp xếp, vị trí do việc so sánh phần tử quyết định, nên "các method này có thể ném <code>UnsupportedOperationException</code>".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Lần chạy của mình trên JDK 21:</p>
+<pre><code>new TreeSet&lt;&gt;(List.of(3, 1, 2)).getFirst()    <span class="c">→ 1        (reading is fine)</span>
+new TreeSet&lt;&gt;(List.of(3, 1, 2)).reversed()    <span class="c">→ [3, 2, 1]</span>
+new TreeSet&lt;&gt;(List.of(3, 1, 2)).addFirst(0)   <span class="hl">→ UnsupportedOperationException</span>
+List.of(1).addFirst(0)                        <span class="hl">→ UnsupportedOperationException</span>
+new ArrayList&lt;String&gt;().getFirst()            <span class="hl">→ NoSuchElementException</span></code></pre>
+<p class="muted">JDK 21 cũng thêm <code>Collections.unmodifiableSequencedCollection</code>, <code>unmodifiableSequencedSet</code> và <code>unmodifiableSequencedMap</code>, các wrapper chỉ đọc vẫn giữ kiểu sequenced.<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+
+<h3>JDK 8, 17 và 21</h3>
+<p>Sequenced collection chỉ chính thức từ JDK 21. Ở 8 và 17 bạn dùng bảng cũ phía trên: trên JDK 17 bạn viết <code>list.get(list.size() - 1)</code>. Đây là lý do <a href="0002-choosing-a-list.vi.html">bài 2</a> nhắc tới <code>getFirst</code> và <code>getLast</code> trong Javadoc của ArrayList: các method đó được ghi trong API hiện tại.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Interface nào thêm <code>putFirst</code> và <code>putLast</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>SequencedMap</button>
+    <button class="opt">SequencedSet</button>
+    <button class="opt">Deque</button>
+    <button class="opt">Collection</button>
+  </div>
+  <div class="why"><code>SequencedMap</code> có <code>putFirst</code>, <code>putLast</code>, <code>firstEntry</code>, <code>lastEntry</code> và các method liên quan.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Method nào trả về một view theo thứ tự ngược?</p>
+  <div class="options">
+    <button class="opt" data-correct>reversed()</button>
+    <button class="opt">reverse()</button>
+    <button class="opt">flip()</button>
+    <button class="opt">backwards()</button>
+  </div>
+  <div class="why"><code>reversed()</code> trả về một view đảo ngược. (<code>Collections.reverse</code> là method static cũ, đảo thứ tự ngay trên list.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>rev = list.reversed()</code> trên <code>[a, b, c]</code>, rồi <code>list.add("d")</code>. <code>rev</code> in ra gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>[d, c, b, a]</button>
+    <button class="opt">[c, b, a]</button>
+    <button class="opt">[a, b, c, d]</button>
+    <button class="opt">[c, b, a, d]</button>
+  </div>
+  <div class="why"><code>reversed()</code> là view, không phải copy, nên nó thấy phần tử mới, đọc theo chiều ngược.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>HashSet</code> thường có phải là <code>SequencedCollection</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, nó không có thứ tự xác định</button>
+    <button class="opt">Có, nó giữ thứ tự lúc thêm vào</button>
+    <button class="opt">Có, nó giữ các phần tử đã sắp xếp</button>
+    <button class="opt">Chỉ sau khi bạn gọi reversed()</button>
+  </div>
+  <div class="why">Chỉ collection có encounter order xác định mới là sequenced. <code>HashSet</code> thì không; <code>LinkedHashSet</code> thì có.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>new ArrayList&lt;String&gt;().getFirst()</code> làm gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ném NoSuchElementException</button>
+    <button class="opt">Ném IndexOutOfBoundsException</button>
+    <button class="opt">Trả về null, không báo lỗi gì</button>
+    <button class="opt">Trả về một Optional rỗng</button>
+  </div>
+  <div class="why">Các method <code>get*()</code> và <code>remove*()</code> ném <code>NoSuchElementException</code> khi collection rỗng. <code>get(0)</code> kiểu cũ ném <code>IndexOutOfBoundsException</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>treeSet.addFirst(0)</code> ném <code>UnsupportedOperationException</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Set đã sắp xếp tự quyết vị trí bằng so sánh</button>
+    <button class="opt">TreeSet hoàn toàn không phải sequenced collection</button>
+    <button class="opt">addFirst chỉ chạy trên list, không bao giờ trên set</button>
+    <button class="opt">Vì 0 nhỏ hơn các phần tử đang có trong set</button>
+  </div>
+  <div class="why">Trong collection đã sắp xếp, thứ tự đến từ việc so sánh, nên bạn không thể chọn "đầu". Các method <code>add*</code> là tuỳ chọn và ném exception ở đó.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Sequenced collection trong Java 21 là gì, và vì sao được thêm vào?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Trước 21, lấy đầu/cuối và duyệt ngược khác nhau theo từng kiểu (<code>get(size()-1)</code>, <code>last()</code>, LinkedHashSet thì không có cách).</label></li>
+      <li><label><input type="checkbox"> JDK 21 (JEP 431) thêm <code>SequencedCollection</code>, <code>SequencedSet</code> và <code>SequencedMap</code> cho các kiểu có encounter order xác định.</label></li>
+      <li><label><input type="checkbox"> Method: <code>getFirst/getLast</code>, <code>addFirst/addLast</code>, <code>removeFirst/removeLast</code>, và <code>reversed()</code>; map có <code>firstEntry</code>, <code>putFirst</code>, <code>pollFirstEntry</code>…</label></li>
+      <li><label><input type="checkbox"> <code>reversed()</code> là view, không phải copy.</label></li>
+      <li><label><input type="checkbox"> List, Deque, LinkedHashSet/Map và SortedSet/Map là sequenced; HashSet và HashMap thì không.</label></li>
+      <li><label><input type="checkbox"> Rỗng → <code>NoSuchElementException</code>; đã sắp xếp hoặc unmodifiable → <code>add*</code> ném <code>UnsupportedOperationException</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Trước Java 21, lấy phần tử đầu hay cuối tuỳ vào từng kiểu: list thì <code>get(0)</code> và <code>get(size() - 1)</code>, sorted set thì <code>first()</code> và <code>last()</code>, còn <code>LinkedHashSet</code> thì không có cách lấy phần tử cuối nếu không duyệt hết. JEP 431 ở JDK 21 thêm ba interface <code>SequencedCollection</code>, <code>SequencedSet</code> và <code>SequencedMap</code> cho mọi collection có encounter order xác định. Chúng cho cùng một bộ method ở mọi nơi: <code>getFirst</code>, <code>getLast</code>, <code>addFirst</code>, <code>removeLast</code>... cộng thêm <code>reversed()</code>, là một view rất rẻ chứ không phải bản copy. List, Deque, LinkedHashSet, LinkedHashMap và các kiểu sorted là sequenced; HashSet và HashMap thì không vì chúng không có thứ tự. Có hai chỗ cần để ý: collection rỗng thì <code>getFirst</code> ném <code>NoSuchElementException</code>, và collection sorted hoặc unmodifiable thì <code>addFirst</code> ném <code>UnsupportedOperationException</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0016-last-element-refactor.vi.md">Bài tập 0016: refactor lấy phần tử cuối</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi tiếp: <em>"<code>reversed()</code> có phải bản copy không? Gọi <code>addFirst</code> trên <code>TreeSet</code> thì sao? Thêm method vào <code>List</code> có làm hỏng code cũ không?"</em> Hai câu đầu giờ bạn đã trả lời được. Câu thứ ba: theo JEP, "mọi method mới khai báo trong các interface này đều có default implementation" (<a href="0009-default-methods-and-conflicts.vi.html">bài 0009</a> giải thích default method), nhưng JEP vẫn cảnh báo rằng thêm method mới "ở tầng cao trong cây kế thừa" có rủi ro "xung đột với những tên method hiển nhiên".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Tiếp theo là thay đổi lớn nhất của JDK 21 cho server: <a href="0006-virtual-threads.vi.html">virtual thread</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a>. Đọc phần Summary và Description; sơ đồ các interface mới rất đáng xem.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"View chính xác là gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0015-pattern-matching-switch-and-record-patterns.vi.html">← switch &quot;mở hộp&quot; object như thế nào (JDK 21)</a> &nbsp;|&nbsp; <a href="0006-virtual-threads.vi.html">Virtual thread: mở rộng quy mô, không phải tốc độ →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với JEP 431 và các lần chạy trên JDK 21.0.12, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

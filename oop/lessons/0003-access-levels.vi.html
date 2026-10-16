@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 3: Access level: che giấu những gì cần che giấu</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Access level: che giấu những gì cần che giấu</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0003 · bước 3/22 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-access-levels.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn được access level (mức truy cập) chặt nhất có thể, và đọc thuộc lòng bảng truy cập bốn dòng.</div>
+
+<h2>Bảng truy cập</h2>
+<table><tr><th>Modifier</th><th>Class</th><th>Package</th><th>Subclass</th><th>Bên ngoài</th></tr>
+<tr><td><code>public</code></td><td>Y</td><td>Y</td><td>Y</td><td>Y</td></tr>
+<tr><td><code>protected</code></td><td>Y</td><td>Y</td><td>Y</td><td>N</td></tr>
+<tr><td>(không có, package-private)</td><td>Y</td><td>Y</td><td>N</td><td>N</td></tr>
+<tr><td><code>private</code></td><td>Y</td><td>N</td><td>N</td><td>N</td></tr></table>
+<p><a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a> Lời khuyên của tutorial: "Hãy dùng access level chặt nhất mà vẫn hợp lý cho từng member. Dùng <code>private</code> trừ khi bạn có lý do chính đáng để không làm vậy." và "Tránh field <code>public</code>, trừ hằng số": field public "có xu hướng trói bạn vào một cách hiện thực cụ thể và làm giảm sự linh hoạt khi bạn muốn thay đổi code."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+<h2>Vì sao điều này quan trọng</h2>
+<pre><code>java oop/examples/AccessLevels.java
+celsius=25.0 fahrenheit=77.0
+rejected: below absolute zero: -300.0</code></pre>
+<p>Vì <code>celsius</code> là private, quy tắc "không thấp hơn độ không tuyệt đối" chỉ nằm trong một setter, và <code>fahrenheit()</code> được tính ra chứ không lưu lại, nên nó không bao giờ bị lỗi thời. Mã nguồn: <a href="../examples/AccessLevels.java"><code>AccessLevels.java</code></a>. (Muốn minh hoạ mức truy cập package thì cần nhiều package; bảng ở trên lấy từ tutorial.)</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mức nào chỉ nhìn thấy được bên trong class?</p>
+  <button>public</button>
+  <button data-correct>private</button>
+  <button>package-private</button>
+  <button>protected</button>
+  <p class="explain">private: chỉ trong class.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. protected có cho subclass ở ngoài package truy cập không?</p>
+  <button data-correct>Có</button>
+  <button>Chỉ với static</button>
+  <button>Chỉ trong test</button>
+  <button>Không</button>
+  <p class="explain">Bảng ghi Y ở cột subclass cho protected.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Nguyên tắc chọn modifier?</p>
+  <button>Luôn là protected</button>
+  <button data-correct>Chặt nhất mà vẫn chạy được</button>
+  <button>Luôn là public</button>
+  <button>Chọn ngẫu nhiên</button>
+  <p class="explain">Dùng private trừ khi bạn có lý do chính đáng để không làm vậy.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Field public chấp nhận được cho...?</p>
+  <button>Mật khẩu</button>
+  <button>Bộ đếm</button>
+  <button data-correct>Hằng số</button>
+  <button>State thay đổi được</button>
+  <p class="explain">Tránh field public, trừ hằng số.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-tighten-a-class.vi.md">Bài tập 3: siết chặt một class</a></p>
+<p>Ví dụ chạy được: <a href="../examples/AccessLevels.java"><code>AccessLevels.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">Java Tutorials: Controlling Access</a>. Bảng và các lời khuyên.</p>
+<p><a href="0002-classes-and-instances.vi.html">← Class, instance và constructor</a> &nbsp;|&nbsp; <a href="0004-static-members.vi.html">Static member: state dùng chung và hằng số →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/accesscontrol.html">Java Tutorials: Controlling Access to Members of a Class</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

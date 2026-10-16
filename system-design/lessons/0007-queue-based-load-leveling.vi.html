@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 7: Queue-based load leveling</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Queue-based load leveling</h1>
+<p class="meta">System Design · Bài 0007 · bước 6/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-queue-based-load-leveling.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được cách một queue san phẳng tải (load leveling) giữa producer và service, cùng các giới hạn của nó.</div>
+
+<h2>Ý tưởng</h2>
+<p>Đặt một queue giữa task và service: "Queue đóng vai trò bộ đệm và lưu message cho tới khi service lấy nó ra." Task và service chạy bất đồng bộ; service xử lý message "theo nhịp của riêng nó, ngay cả khi các task đồng thời sinh ra một lượng request lớn". Lợi ích: tính sẵn sàng (service chậm không ảnh hưởng ngay tới ứng dụng), khả năng mở rộng, kiểm soát chi phí (cấp tài nguyên theo tải trung bình, không phải tải đỉnh).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+<pre><code>java system-design/examples/LoadLevelingDemo.java
+burst of 100 accepted in 0 ms; queue length now ~98
+all processed after 5015 ms; max concurrent work at the service = 2</code></pre>
+<p>Đợt burst được nhận ngay lập tức; hai worker (100 ms mỗi task) rút cạn queue theo nhịp của mình và service không bao giờ phải xử lý quá 2 task đồng thời. Mã nguồn: <a href="../examples/LoadLevelingDemo.java"><code>LoadLevelingDemo.java</code></a>.</p>
+<h2>Các điểm cần cân nhắc</h2>
+<ul><li>Nếu tốc độ trung bình của producer vượt tốc độ của consumer, queue sẽ phình ra và latency tăng: hãy giám sát độ sâu queue và mở rộng trong giới hạn an toàn, hoặc bỏ bớt việc (shed load).</li>
+<li>Queue là một chiều; caller cần nhận phản hồi thì phải có cơ chế khác.</li>
+<li>Độ bền dữ liệu quan trọng: một broker không lưu xuống đĩa có thể làm mất việc đã đưa vào queue.</li>
+<li>Giao at-least-once nghĩa là consumer phải idempotent; đẩy poison message (message độc) sang dead-letter queue.</li>
+<li>Thứ tự không được giữ khi có nhiều consumer song song.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></li></ul>
+<p>Không dành cho các response đồng bộ cần latency thấp.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a> Các bản hiện thực trong khóa học này: <a href="../../rabbitmq/index.vi.html">RabbitMQ</a> và <a href="../../kafka/index.vi.html">Kafka</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Queue làm bộ đệm giữa hai thứ nào?</p>
+  <button data-correct>Task và service</button>
+  <button>Đĩa và bộ nhớ</button>
+  <button>Hai database</button>
+  <button>Client và DNS</button>
+  <p class="explain">Nó nằm giữa một task và service mà task đó gọi.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Producer trung bình nhanh hơn consumer. Kết quả?</p>
+  <button>Message biến mất</button>
+  <button>Consumer tự nhanh lên</button>
+  <button>Không có gì thay đổi</button>
+  <button data-correct>Queue và latency tăng</button>
+  <p class="explain">Queue tiếp tục phình ra và latency tăng lên.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Không phù hợp khi...?</p>
+  <button>Consumer mở rộng được</button>
+  <button>Tải dồn theo đợt</button>
+  <button>Service chạy chậm</button>
+  <button data-correct>Cần phản hồi latency thấp</button>
+  <p class="explain">Nó không phù hợp khi caller cần một response đồng bộ với latency thấp.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lợi ích về chi phí?</p>
+  <button>Không cần server</button>
+  <button>Cấp tài nguyên theo tải đỉnh</button>
+  <button>Queue miễn phí</button>
+  <button data-correct>Cấp tài nguyên theo tải trung bình</button>
+  <p class="explain">Bạn chỉ cần đủ instance cho tải trung bình thay vì tải đỉnh.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-size-a-queue.vi.md">Bài tập 0007: định cỡ một queue</a></p>
+<p>Ví dụ chạy được: <a href="../examples/LoadLevelingDemo.java"><code>LoadLevelingDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">Azure: Queue-Based Load Leveling</a>. Phần giải pháp và các điểm cần cân nhắc.</p>
+<p><a href="0006-rate-limiting.vi.html">← Rate limiting và token bucket</a> &nbsp;|&nbsp; <a href="0008-competing-consumers.vi.html">Competing consumers →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/queue-based-load-leveling">Azure: Queue-Based Load Leveling</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

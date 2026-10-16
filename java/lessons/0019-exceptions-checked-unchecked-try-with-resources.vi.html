@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 19: Exception: checked vs unchecked và try-with-resources</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Chuyện gì xảy ra khi code Java gặp lỗi</h1>
+<p class="subtitle">Exception checked và unchecked, và cách try-with-resources tự đóng tài nguyên giúp bạn.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0019 · bước 2/46 · Foundation · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0019-exceptions-checked-unchecked-try-with-resources.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Backend nào cũng đọc file, gọi database và nói chuyện với service khác, và tất cả đều có thể hỏng. Interviewer hỏi <em>"Checked và unchecked exception khác nhau thế nào?"</em> và <em>"try-with-resources hoạt động ra sao?"</em> để xem bạn có viết được code hỏng một cách gọn gàng và không bao giờ rò rỉ connection hay không.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> nói được exception nào phải catch hoặc khai báo, và dùng try-with-resources trong khi giải thích được thứ tự đóng và suppressed exception.</div>
+
+<dl class="words">
+  <dt>exception</dt><dd>Một object mô tả sự cố. Java "ném" (throw) nó để dừng luồng chạy bình thường của code.</dd>
+  <dt>throw / catch</dt><dd><code>throw</code> khởi phát sự cố; khối <code>catch</code> là nơi xử lý nó.</dd>
+  <dt>call stack</dt><dd>Danh sách các method đang chạy lúc này: <code>main</code> gọi <code>a</code>, <code>a</code> gọi <code>b</code>, cứ thế.</dd>
+  <dt>checked</dt><dd>Exception mà compiler bắt buộc bạn xử lý: phải catch nó hoặc ghi <code>throws</code> trên method.</dd>
+  <dt>unchecked</dt><dd>Exception mà compiler không bắt bạn xử lý: <code>RuntimeException</code>, <code>Error</code> và các lớp con của chúng.</dd>
+  <dt>interface</dt><dd>Danh sách các method mà một class hứa sẽ có. Class "implement" interface bằng cách viết các method đó.</dd>
+  <dt>resource</dt><dd>Tài nguyên: thứ bạn phải đóng khi dùng xong, như file, socket hay connection tới database.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Nếu code của mình mở hai file bằng try-with-resources, chúng được đóng theo thứ tự nào? Và nếu phần thân ném lỗi mà <code>close()</code> cũng ném lỗi, mình sẽ thấy exception nào?"</em> Đoán ngay bây giờ. Phần 5 có output thật.</p>
+
+<h2>1. Hình dung: chuông báo cháy chạy lên từng tầng</h2>
+<p>Hãy tưởng tượng một tòa nhà. Tầng trệt là <code>main</code>. Nó nhờ tầng 1 làm việc, tầng 1 nhờ tầng 2, cứ thế. Bỗng tầng 3 bốc cháy. Chuông báo động truyền lên, từng tầng một, cho tới khi có người biết phải làm gì nhấc máy. Nếu không ai nhấc, cả tòa nhà phải sơ tán.</p>
+<p>Đó chính là exception. Tutorial định nghĩa nó là "một sự kiện, xảy ra trong lúc chương trình chạy, làm gián đoạn luồng lệnh bình thường của chương trình." Runtime tìm dọc call stack một handler phù hợp; nếu không có, chương trình kết thúc.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">Tutorial: what is an exception</a></p>
+<pre><code>void main() {
+    try { service(); } catch (IOException e) { log(e); }
+}
+void service() throws IOException { repository(); }
+void repository() throws IOException {
+    throw new IOException("disk");
+}
+<span class="c">Bước 1  repository() ném lỗi: code bình thường của nó dừng ngay</span>
+<span class="c">Bước 2  repository không có catch → exception đi lên service()</span>
+<span class="c">Bước 3  service không có catch → nó đi lên main()</span>
+<span class="c">Bước 4  main có catch phù hợp → log(e) chạy, chương trình chạy tiếp</span></code></pre>
+
+<h2>2. Cây gia phả</h2>
+<p>Exception nào cũng là object, và tất cả đều đi ra từ một class. "Class Throwable là lớp cha của mọi error và exception trong ngôn ngữ Java."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable javadoc</a> Bên dưới nó có hai nhánh, và một nhánh lại tách đôi:</p>
+
+<figure>
+<svg viewBox="0 0 680 345" role="img" aria-label="Cây class: Throwable có hai con là Error và Exception. Exception có hai con là RuntimeException và IOException. Nhánh Error và RuntimeException là unchecked; phần còn lại của Exception là checked.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="270" y="20" width="140" height="36" rx="6"/>
+      <rect x="60" y="100" width="140" height="36" rx="6"/>
+      <rect x="30" y="180" width="200" height="36" rx="6"/>
+      <rect x="260" y="180" width="180" height="36" rx="6"/>
+      <rect x="260" y="250" width="180" height="36" rx="6"/>
+      <path d="M340 56V78H130V100M340 78H450V100"/>
+      <path d="M130 136V180"/>
+      <path d="M450 136V158H350V180M450 158H560V180"/>
+      <path d="M350 216V250M560 216V250"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="380" y="100" width="140" height="36" rx="6"/>
+      <rect x="470" y="180" width="180" height="36" rx="6"/>
+      <rect x="470" y="250" width="180" height="36" rx="6"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="340" y="43">Throwable</text>
+      <text x="130" y="123">Error</text>
+      <text x="130" y="203">OutOfMemoryError</text>
+      <text x="350" y="203">RuntimeException</text>
+      <text x="350" y="273" font-size="12">NullPointerException</text>
+    </g>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="450" y="123">Exception</text>
+      <text x="560" y="203">IOException</text>
+      <text x="560" y="273" font-size="12">FileNotFoundException</text>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="130" y="306" opacity=".75">unchecked</text>
+      <text x="350" y="306" opacity=".75">unchecked</text>
+      <text x="560" y="306" fill="var(--accent)">checked</text>
+    </g>
+    <text x="340" y="333" text-anchor="middle" font-size="11" fill="var(--accent)">checked = compiler bắt bạn catch hoặc khai báo bằng throws</text>
+  </g>
+</svg>
+<figcaption>Các ô được tô màu là checked. Mọi thứ nằm dưới <code>RuntimeException</code> hoặc <code>Error</code> là unchecked.</figcaption>
+</figure>
+
+<p>Java Language Specification nêu quy tắc chính xác: "Các <em>unchecked exception class</em> là các run-time exception class và các error class." Mọi thứ khác là checked.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-11.html#jls-11.1.1">JLS §11.1.1</a></p>
+<ul>
+  <li><strong>Error</strong>: sự cố nghiêm trọng của chính JVM, như hết bộ nhớ. JLS gọi chúng là các exception "mà các chương trình thông thường không được kỳ vọng sẽ phục hồi."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-11.html#jls-11.1.1">JLS §11.1.1</a> Bình thường bạn không catch chúng.</li>
+  <li><strong>RuntimeException</strong>: thường là bug trong code, như dùng <code>null</code> hoặc ép kiểu sai.</li>
+  <li><strong>Các Exception còn lại</strong> (checked): sự cố bên ngoài code của bạn mà bên gọi có thể xử lý, như thiếu file.</li>
+</ul>
+
+<h2>3. Checked exception: catch hoặc khai báo</h2>
+<p>Với exception <strong>checked</strong>, compiler đòi một trong hai: bạn <em>catch</em> nó, hoặc <em>khai báo</em> nó bằng <code>throws</code> để bên gọi phải lo. Tutorial gọi đây là "catch or specify". Runtime exception và error là unchecked: không cần catch hay khai báo.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Tutorial: unchecked exceptions</a></p>
+<pre><code>static void mayFail() throws IOException {   <span class="c">// "I may throw this"</span>
+    throw new IOException("checked");
+}
+
+public static void main(String[] a) {
+    mayFail();          <span class="hl">// does not compile</span>
+}</code></pre>
+<p><code>javac</code> của JDK 21 từ chối đoạn này với thông báo rất rõ:</p>
+<pre><code>A.java:4: error: unreported exception IOException; must be caught or declared to be thrown</code></pre>
+<p>Chương trình ví dụ cho thấy cả hai loại. Phép ép kiểu hỏng với <code>ClassCastException</code> unchecked, và không ai phải khai báo nó. Cái checked chỉ compile được vì nó được catch:</p>
+<pre><code>$ java java/examples/ExceptionsDemo.java
+...
+--- unchecked exceptions need no catch or declaration
+ClassCastException
+caught checked: checked</code></pre>
+
+<h3>Exception <em>của bạn</em> nên là loại nào?</h3>
+<p>Hướng dẫn của tutorial: "Nếu có thể kỳ vọng hợp lý rằng client sẽ phục hồi được từ một exception, hãy làm nó checked. Nếu client không làm được gì để phục hồi, hãy làm nó unchecked."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Tutorial: unchecked exceptions</a></p>
+<h3>Bẫy và cách sửa</h3>
+<ul>
+  <li><strong>Dùng <code>RuntimeException</code> chỉ để khỏi phải viết <code>throws</code>.</strong> Tutorial nói đừng làm vậy.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Tutorial: unchecked exceptions</a></li>
+  <li><strong>Làm mất lỗi gốc khi bọc lại.</strong> Nếu bạn đổi một checked exception thành exception của riêng mình, hãy truyền lỗi gốc làm <em>cause</em>: <code>throw new OrderException("save failed", e);</code>. Java giữ lại "chuỗi" các cause, nên stack trace vẫn chỉ ra sự cố thật.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable javadoc</a></li>
+  <li><strong>Khối <code>catch</code> rỗng.</strong> Nó che giấu sự cố; chương trình chạy tiếp với dữ liệu sai. Ít nhất hãy log lại, hoặc để nó đi lên.</li>
+</ul>
+
+<h2>4. Đóng tài nguyên: <code>finally</code>, rồi đến try-with-resources</h2>
+<p>Hãy nghĩ tới một cuốn sách mượn thư viện. Dù chuyện gì xảy ra trong lúc đọc, bạn vẫn phải trả. Kể cả khi bạn ngủ quên, kể cả khi chuông báo cháy reo. File hay connection tới database cũng thế: bạn phải đóng nó, nếu không server sẽ dần dần cạn kiệt.</p>
+<p>Công cụ cũ là <code>finally</code>: "Khối finally <em>luôn luôn</em> chạy khi khối try kết thúc."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/finally.html">Tutorial: finally</a> Nhưng cùng trang đó viết thêm: "Hãy dùng câu lệnh try-with-resources thay cho khối finally khi đóng file hoặc thu hồi tài nguyên."</p>
+<p>Một <span class="term">resource</span> là "một object phải được đóng sau khi chương trình dùng xong nó", và bất cứ thứ gì implement interface <code>AutoCloseable</code> đều được.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Tutorial: try-with-resources</a> Bạn khai báo nó trong ngoặc sau <code>try</code>, và Java gọi <code>close()</code> giúp bạn:</p>
+<pre><code>try (Res first = new Res("first", false);
+     Res second = new Res("second", false)) {
+    System.out.println("body");
+}   <span class="c">// no finally needed: both are closed here</span></code></pre>
+<p>Các quy tắc trong tutorial:<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Tutorial: try-with-resources</a></p>
+<ol class="steps">
+  <li><strong>Thứ tự ngược.</strong> "các method close của resource được gọi theo thứ tự <em>ngược</em> với lúc chúng được tạo." Giống chồng đĩa: cái đặt lên sau cùng được lấy ra đầu tiên.</li>
+  <li><strong>Đóng trước đã.</strong> "mọi khối catch hoặc finally đều chạy sau khi các resource đã khai báo được đóng."</li>
+  <li><strong>Exception của phần thân thắng.</strong> Nếu phần thân ném lỗi và <code>close()</code> cũng ném, các exception từ close bị <em>suppressed</em> (nén lại), và bạn đọc được chúng bằng <code>getSuppressed()</code>.</li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 680 245" role="img" aria-label="Hàng 1: open first, open second, body, close second, close first, rồi catch hoặc finally. Hàng 2: open r, phần thân ném body failed, close ném close failed, exception bắt được là body failed kèm exception của close dưới dạng suppressed.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="34" font-size="11" opacity=".75">1. hai resource, phần thân chạy tốt</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="46" width="95" height="40" rx="6"/>
+      <rect x="128" y="46" width="95" height="40" rx="6"/>
+      <rect x="236" y="46" width="95" height="40" rx="6"/>
+      <rect x="560" y="46" width="100" height="40" rx="6"/>
+      <path d="M115 66h7M118 62l4 4-4 4M223 66h7M226 62l4 4-4 4M331 66h7M334 62l4 4-4 4M439 66h7M442 62l4 4-4 4M547 66h7M550 62l4 4-4 4"/>
+      <path d="M20 96v6H223v-6" opacity=".6"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="344" y="46" width="95" height="40" rx="6"/>
+      <rect x="452" y="46" width="95" height="40" rx="6"/>
+    </g>
+    <path d="M344 96v6H547v-6" fill="none" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="67" y="70">open first</text>
+      <text x="175" y="66" font-size="11">open</text><text x="175" y="79" font-size="11">second</text>
+      <text x="283" y="70">body</text>
+      <text x="610" y="66" font-size="11">catch /</text><text x="610" y="79" font-size="11">finally</text>
+      <text x="121" y="118" font-size="11" opacity=".75">mở: first, second</text>
+    </g>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="391" y="66" font-size="11">close</text><text x="391" y="79" font-size="11">second</text>
+      <text x="499" y="66" font-size="11">close</text><text x="499" y="79" font-size="11">first</text>
+      <text x="445" y="118" font-size="11">đóng: thứ tự ngược</text>
+    </g>
+    <text x="20" y="152" font-size="11" opacity=".75">2. phần thân ném lỗi, rồi close() cũng ném</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="164" width="140" height="50" rx="6"/>
+      <rect x="340" y="164" width="140" height="50" rx="6"/>
+      <path d="M160 189h14M170 185l4 4-4 4M320 189h14M330 185l4 4-4 4M480 189h14M490 185l4 4-4 4"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="180" y="164" width="140" height="50" rx="6"/>
+      <rect x="500" y="164" width="160" height="50" rx="6"/>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="90" y="193">open r</text>
+      <text x="250" y="184" fill="var(--accent)">body throws</text>
+      <text x="250" y="201" fill="var(--accent)">"body failed"</text>
+      <text x="410" y="184">close() throws</text>
+      <text x="410" y="201">"close failed: r"</text>
+      <text x="580" y="184" fill="var(--accent)">caught: body failed</text>
+      <text x="580" y="201" fill="var(--accent)">+ 1 suppressed</text>
+      <text x="410" y="234" opacity=".75">gắn vào exception của phần thân</text>
+    </g>
+  </g>
+</svg>
+<figcaption>Resource được đóng theo thứ tự ngược trước khi <code>catch</code> nào chạy. Nếu cả phần thân lẫn <code>close()</code> đều hỏng, bạn catch được exception của phần thân, còn exception của close đi kèm dưới dạng "suppressed".</figcaption>
+</figure>
+
+<h2>5. Chạy thử và đọc output</h2>
+<p>Ví dụ có một class resource nhỏ tên <code>Res</code>, in ra mỗi khi mở và đóng. Resource thứ hai được cố tình làm hỏng trong <code>close()</code>.</p>
+<pre><code>$ java java/examples/ExceptionsDemo.java
+--- close order is the reverse of opening
+open  first
+open  second
+body
+close second
+close first
+--- an exception from close() is suppressed when the body already threw
+open  r
+close r
+caught: body failed
+suppressed: close failed: r
+...</code></pre>
+<p>Lần theo khối thứ hai:</p>
+<pre><code>try (Res r = new Res("r", true)) {
+    throw new IllegalStateException("body failed");
+} catch (Exception e) { ... }
+<span class="c">Bước 1  mở r</span>
+<span class="c">Bước 2  phần thân ném "body failed"</span>
+<span class="c">Bước 3  Java vẫn gọi r.close(): in ra "close r",</span>
+<span class="c">        rồi close() ném "close failed: r"</span>
+<span class="c">Bước 4  "close failed" được gắn vào "body failed" dạng suppressed</span>
+<span class="c">Bước 5  giờ catch mới chạy, với e = "body failed"</span>
+<span class="c">Bước 6  e.getSuppressed() trả về exception của close</span></code></pre>
+<p>Vì sao thiết kế này tốt? Exception của phần thân thường là nguyên nhân thật. Với kiểu cũ <code>finally { r.close(); }</code>, một <code>close()</code> hỏng sẽ ném exception mới và exception gốc bị mất. Method <code>getSuppressed()</code> trả về các exception "đã bị nén lại, thường là bởi câu lệnh try-with-resources, để chuyển giao exception này".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable javadoc</a></p>
+
+<h3>JDK 8 so với 9+</h3>
+<p>Trên JDK 8, mọi resource phải được khai báo bên trong ngoặc (<code>try (Res r = ...)</code>).<a class="src" href="https://docs.oracle.com/javase/specs/jls/se8/html/jls-14.html#jls-14.20.3">JLS 8 §14.20.3</a> Từ JDK 9 bạn còn có thể ghi tên một biến có sẵn, miễn nó là final hoặc "effectively final" (không bao giờ bị gán lại):<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.20.3">JLS 21 §14.20.3</a></p>
+<pre><code>Res r = new Res("r", false);
+try (r) {               <span class="c">// JDK 9+, r must be effectively final</span>
+    ...
+}</code></pre>
+<p class="muted">Liên hệ với Spring: checked exception mặc định không rollback <code>@Transactional</code>, điều này làm nhiều người bất ngờ. Xem <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.vi.html">bài Spring về @Transactional</a>.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Những exception nào bạn bắt buộc phải catch hoặc khai báo bằng <code>throws</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Loại checked, như IOException</button>
+    <button class="opt">Loại runtime, như NullPointerException</button>
+    <button class="opt">Loại error, như OutOfMemoryError</button>
+    <button class="opt">Không loại nào: compiler không kiểm tra</button>
+  </div>
+  <div class="why">Catch-or-specify chỉ áp dụng cho checked exception. Runtime exception và error là unchecked.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một method gọi <code>mayFail()</code>, vốn khai báo <code>throws IOException</code>, mà không có try và không có throws. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không compile được: unreported exception</button>
+    <button class="opt">Compile được, chỉ crash nếu nó thật sự ném</button>
+    <button class="opt">Compile được, và Java âm thầm bỏ qua nó</button>
+    <button class="opt">Compile được, và Java tự bọc nó giúp bạn</button>
+  </div>
+  <div class="why"><code>IOException</code> là checked, nên javac báo "must be caught or declared to be thrown".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">try-with-resources mở <code>first</code>, rồi <code>second</code>. Chúng được đóng theo thứ tự nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>second, rồi first</button>
+    <button class="opt">first, rồi second</button>
+    <button class="opt">cả hai cùng một lúc</button>
+    <button class="opt">theo thứ tự chữ cái</button>
+  </div>
+  <div class="why">Các method close chạy theo thứ tự ngược với lúc tạo; demo in <code>close second</code> trước <code>close first</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Phần thân ném <code>"body failed"</code> và <code>close()</code> ném <code>"close failed"</code>. <code>catch</code> nhận được gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>"body failed", bên trong có "close failed" dạng suppressed</button>
+    <button class="opt">"close failed", bên trong có "body failed" dạng suppressed</button>
+    <button class="opt">Chỉ "close failed"; exception của phần thân bị mất</button>
+    <button class="opt">Hai lần catch riêng biệt, mỗi exception một lần</button>
+  </div>
+  <div class="why">Exception của phần thân được truyền đi; exception của close bị nén lại và lấy được qua <code>getSuppressed()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một class phải implement interface nào để dùng được trong try-with-resources?</p>
+  <div class="options">
+    <button class="opt" data-correct>AutoCloseable</button>
+    <button class="opt">Serializable</button>
+    <button class="opt">Cloneable</button>
+    <button class="opt">Comparable</button>
+  </div>
+  <div class="why">Bất kỳ object nào implement <code>AutoCloseable</code> đều có thể làm resource.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bug trong <code>catch (SQLException e) { throw new RuntimeException("save failed"); }</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Exception gốc không được truyền vào làm cause</button>
+    <button class="opt">Không được ném RuntimeException từ khối catch</button>
+    <button class="opt">SQLException là unchecked nên không catch được</button>
+    <button class="opt">Message phải giống hệt message của lỗi gốc</button>
+  </div>
+  <div class="why">Thiếu <code>e</code> làm cause, stack trace không còn chỉ ra lỗi SQL thật. Hãy viết <code>new RuntimeException("save failed", e)</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Checked và unchecked exception khác nhau thế nào, và try-with-resources hoạt động ra sao?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Mọi exception đều kế thừa <code>Throwable</code>; hai nhánh là <code>Error</code> và <code>Exception</code>.</label></li>
+      <li><label><input type="checkbox"> <code>RuntimeException</code>, <code>Error</code> và lớp con của chúng là unchecked; các exception khác là checked.</label></li>
+      <li><label><input type="checkbox"> Checked exception phải được catch hoặc khai báo bằng <code>throws</code> (catch or specify).</label></li>
+      <li><label><input type="checkbox"> Hướng dẫn: checked nếu bên gọi có thể phục hồi hợp lý, unchecked nếu không.</label></li>
+      <li><label><input type="checkbox"> try-with-resources đóng mọi <code>AutoCloseable</code>, theo thứ tự ngược, trước khi <code>catch</code>/<code>finally</code> chạy.</label></li>
+      <li><label><input type="checkbox"> Nếu phần thân và <code>close()</code> đều ném, exception của phần thân thắng, cái kia nằm trong <code>getSuppressed()</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Trong Java mọi exception đều kế thừa <code>Throwable</code>. Bên dưới có <code>Error</code>, cho mấy sự cố nghiêm trọng của JVM như hết bộ nhớ, và <code>Exception</code>. <code>RuntimeException</code> và <code>Error</code>, cùng các lớp con, là unchecked; còn lại là checked. Với checked exception như <code>IOException</code>, compiler bắt em hoặc catch, hoặc khai báo bằng <code>throws</code>. Nguyên tắc thường dùng: nếu bên gọi có thể phục hồi hợp lý thì làm checked, còn nếu là bug lập trình thì unchecked. Khi bọc exception lại em luôn truyền lỗi gốc làm cause. Để đóng file hay connection thì em dùng try-with-resources: cái gì implement <code>AutoCloseable</code> đều được đóng tự động, theo thứ tự ngược với lúc mở, và trước khi khối catch chạy. Nếu phần thân ném lỗi mà <code>close</code> cũng ném, em nhận exception của phần thân, còn exception của close được gắn vào dạng suppressed, nên không mất gì cả."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0019-design-an-exception-hierarchy.vi.md">Bài tập 0019: thiết kế exception</a>. Quyết định checked hay unchecked cho từng trường hợp trước, rồi giải thích lý do cho giáo viên.</p>
+<p>Ví dụ chạy được: <a href="../examples/ExceptionsDemo.java"><code>ExceptionsDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior có thể hỏi: <em>"Vì sao nhiều framework hiện đại dùng chủ yếu unchecked exception? Checked exception có rollback transaction của Spring không? Xử lý exception ném ra bên trong lambda thế nào?"</em> Câu về Spring có trong <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.vi.html">bài @Transactional</a>; lambda có ở <a href="0008-lambdas-and-functional-interfaces.vi.html">bài 0008</a>. Bài tiếp theo trong lộ trình: generic, ở <a href="0020-generics-basics-and-invariance.vi.html">bài 0020</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/index.html">Java Tutorials: Exceptions trail</a>. Đọc "The Catch or Specify Requirement" và "The try-with-resources Statement".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Khi nào nên tự tạo exception class riêng?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0018-strings-immutability-and-stringbuilder.vi.html">← Vì sao String trong Java không bao giờ thay đổi</a> &nbsp;|&nbsp; <a href="0020-generics-basics-and-invariance.vi.html">Vì sao List không phải là List →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Java Tutorials, tài liệu Java 21 và Java Language Specification, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/runtime.html">Java Tutorials: Three kinds of exceptions</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Java Tutorials: try-with-resources</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/definition.html">Java Tutorials: What is an exception</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/finally.html">Java Tutorials: finally</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Throwable.html">Throwable Javadoc</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-11.html">JLS §11 Exceptions</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.20.3">JLS §14.20.3</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 7: Filebeat: harvester, registry và đảm bảo giao nhận</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Filebeat: harvester, registry và đảm bảo giao nhận</h1>
+<p class="meta">ELK Stack · Bài 0007 · bước 11/14 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-filebeat-delivery-and-backpressure.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được Filebeat đọc tiếp thế nào sau khi restart, nó đảm bảo giao nhận kiểu gì, và chuyện gì xảy ra khi output bị chặn.</div>
+
+<h2>Các thành phần</h2>
+<p>"Một harvester chịu trách nhiệm đọc nội dung của một file duy nhất", từng dòng một, và gửi tới output. "Một input chịu trách nhiệm quản lý các harvester và tìm mọi nguồn cần đọc."<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+<h2>Registry</h2>
+<p>"Filebeat giữ state của từng file và thường xuyên flush state đó xuống đĩa trong file registry": offset đọc cuối cùng cùng các định danh để nhận ra file, nhờ vậy sau khi restart nó đọc tiếp đúng chỗ đã dừng.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+<h2>Giao nhận</h2>
+<p>"Filebeat đảm bảo event sẽ được giao tới output đã cấu hình ít nhất một lần và không mất dữ liệu." Khi output bị chặn và chưa xác nhận event, Filebeat "sẽ tiếp tục thử gửi event cho tới khi output xác nhận đã nhận được". Những event chưa được xác nhận trước khi tắt sẽ được gửi lại khi khởi động lại, việc này có thể tạo ra bản trùng.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+<div class="aside">So sánh với các hệ thống khác trong khoá học: Filebeat, persistent queue của Logstash, consumer ack của RabbitMQ và consumer commit của Kafka đều cho <em>at-least-once</em>, nên tất cả đều đẩy bạn tới việc ghi idempotent. Xem <a href="../../system-design/lessons/0002-retries-and-idempotency.vi.html">retry và idempotency</a>.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Filebeat nhớ tiến độ đọc file ở đâu?</p>
+  <button>Queue của Logstash</button>
+  <button>Index của Kibana</button>
+  <button data-correct>File registry</button>
+  <button>Topic Kafka</button>
+  <p class="explain">State được flush xuống file registry.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Filebeat đảm bảo giao nhận kiểu gì?</p>
+  <button data-correct>At least once</button>
+  <button>Best effort</button>
+  <button>At most once</button>
+  <button>Exactly once</button>
+  <p class="explain">Event được giao ít nhất một lần và không mất dữ liệu.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Output bị chặn. Filebeat làm gì?</p>
+  <button>Xoá file</button>
+  <button data-correct>Tiếp tục retry</button>
+  <button>Dừng hẳn</button>
+  <button>Bỏ các event</button>
+  <p class="explain">Nó tiếp tục thử cho tới khi output xác nhận đã nhận.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao có thể xuất hiện bản trùng sau restart?</p>
+  <button data-correct>Event chưa ack bị gửi lại</button>
+  <button>Mapping thay đổi</button>
+  <button>File bị đọc hai lần</button>
+  <button>Shard bị nhân bản</button>
+  <p class="explain">Những event đã gửi nhưng chưa được xác nhận trước khi tắt sẽ được gửi lại.<a class="cite" href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-lose-no-logs.vi.md">Bài tập 0007: không để mất log nào</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat Docs: How Filebeat works</a>. Đọc toàn bộ trang.</p>
+<p><a href="0006-logstash-grok-and-persistent-queues.vi.html">← Logstash: pipeline, grok và persistent queue</a> &nbsp;|&nbsp; <a href="0012-ingest-pipelines.vi.html">Ingest pipeline: parse ngay bên trong Elasticsearch →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/reference/beats/filebeat/how-filebeat-works">Filebeat Docs: How Filebeat works</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

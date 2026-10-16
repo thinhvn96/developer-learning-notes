@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 5: Abstract Factory</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Abstract Factory</h1>
+<p class="meta">Design Patterns · Bài 0005 · bước 5/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-abstract-factory.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tạo các họ object liên quan luôn khớp với nhau, mà không phải gọi tên class cụ thể.</div>
+
+<h2>Mục đích</h2>
+<p>Abstract Factory là "một creational design pattern cho phép bạn tạo ra các họ object liên quan mà không cần chỉ rõ class cụ thể của chúng." Hãy dùng nó khi code phải làm việc với nhiều họ product liên quan khác nhau, hoặc khi một class có nhiều factory method khiến trách nhiệm chính của nó bị mờ đi.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+<h2>Ví dụ</h2><p>Một <code>GuiFactory</code> tạo ra một button và một checkbox. Mỗi factory tạo một cặp khớp nhau, nên thông qua interface thì không bao giờ ghép được button tối với checkbox sáng.</p><pre><code>java design-patterns/examples/AbstractFactoryDemo.java
+dark-button + dark-checkbox
+light-button + light-checkbox</code></pre><p>Mã nguồn: <a href="../examples/AbstractFactoryDemo.java"><code>AbstractFactoryDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Các product từ cùng một factory tương thích với nhau</li><li>Code phía client tách khỏi các product cụ thể</li><li>Có lợi về Single Responsibility và Open/Closed</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Phức tạp đáng kể: nhiều interface và class</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a> Abstract Factory dựa trên một tập Factory Method, đi cùng Bridge rất hợp, và các factory của nó thường là Singleton; nó là một lựa chọn thay cho Facade khi bạn chỉ muốn giấu đi việc tạo object.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Abstract Factory tạo ra...?</p>
+  <button>Các iterator</button>
+  <button>Các bản sao</button>
+  <button data-correct>Họ các object liên quan</button>
+  <button>Một product duy nhất</button>
+  <p class="explain">Các họ object liên quan.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Nó đảm bảo điều gì?</p>
+  <button data-correct>Các product tương thích</button>
+  <button>Các product được clone</button>
+  <button>Các product là immutable</button>
+  <button>Các product được tạo lazy</button>
+  <p class="explain">Các product từ một factory khớp với nhau.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cái giá phải trả?</p>
+  <button data-correct>Thêm interface và class</button>
+  <button>Trạng thái static</button>
+  <button>JVM chạy chậm hơn</button>
+  <button>Mất đa hình</button>
+  <p class="explain">Nó thêm độ phức tạp đáng kể.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Client phụ thuộc vào...?</p>
+  <button>Reflection</button>
+  <button data-correct>Chỉ interface</button>
+  <button>Thread</button>
+  <button>Class cụ thể</button>
+  <p class="explain">Code phía client tách khỏi các product cụ thể.<a class="cite" href="https://refactoring.guru/design-patterns/abstract-factory">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-add-a-family.vi.md">Bài tập 5: thêm một họ</a></p>
+<p>Ví dụ chạy được: <a href="../examples/AbstractFactoryDemo.java"><code>AbstractFactoryDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/abstract-factory">Abstract Factory (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0004-factory-method.vi.html">← Factory Method</a> &nbsp;|&nbsp; <a href="0006-builder.vi.html">Builder →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/abstract-factory">Abstract Factory (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

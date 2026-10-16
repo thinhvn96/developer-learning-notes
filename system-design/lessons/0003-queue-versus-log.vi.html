@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 3: Queue hay log: chọn RabbitMQ hay Kafka</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Queue hay log: chọn RabbitMQ hay Kafka</h1>
+<p class="meta">System Design · Bài 0003 · bước 8/11 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-queue-versus-log.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn được RabbitMQ hoặc Kafka cho một yêu cầu cụ thể và bảo vệ lựa chọn đó bằng hành vi đã được tài liệu hóa.</div>
+
+<h2>Hai mô hình khác nhau</h2>
+<table>
+<tr><th></th><th>RabbitMQ</th><th>Kafka</th></tr>
+<tr><td>Hình dạng</td><td>Publisher gửi tới <strong>exchange</strong>, exchange định tuyến bản sao message tới các <strong>queue</strong> theo binding; consumer lấy message từ queue<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></td><td>Event được append vào các <strong>partition</strong> của một topic; consumer đọc tại một offset<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a><a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+<tr><td>Sau khi tiêu thụ</td><td>Consumer ack từng delivery; message chưa ack sẽ được requeue nếu consumer chết<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a></td><td>"Event không bị xóa sau khi được tiêu thụ"; retention được cấu hình theo từng topic<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></td></tr>
+<tr><td>Thứ tự</td><td>Giao message tới consumer ở cấp queue (xem tài liệu RabbitMQ để biết chính xác các đảm bảo khi có xử lý đồng thời)</td><td>Theo từng partition; cùng key thì vào cùng partition<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></td></tr>
+<tr><td>Vị trí đọc</td><td>Broker theo dõi ack của từng delivery<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a></td><td>Vị trí của consumer là "một số nguyên duy nhất, offset của message tiếp theo cần tiêu thụ", nên consumer có thể tua lại và xử lý lại<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+<tr><td>Định tuyến</td><td>Phong phú: exchange kiểu direct, fanout, topic, headers<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></td><td>Theo topic và partition key</td></tr>
+<tr><td>Mở rộng consumer</td><td>Thêm competing consumer trên một queue</td><td>Tối đa một consumer cho mỗi partition trong một group<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+<tr><td>Xử lý sự cố</td><td>Dead letter exchange, giới hạn số lần giao trên quorum queue</td><td>Consumer tự quyết: thứ tự commit cho ra at-most-once hoặc at-least-once<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></td></tr>
+</table>
+<h2>Kinh nghiệm chọn nhanh (mình tự tổng hợp từ các hàng ở trên)</h2>
+<ul>
+<li>Chọn <strong>RabbitMQ</strong> cho task queue và định tuyến linh hoạt, khi mỗi message là một đơn vị công việc cần xử lý một lần rồi biến mất, kèm retry và dead-letter theo từng message.</li>
+<li>Chọn <strong>Kafka</strong> khi bản thân luồng dữ liệu là tài sản: nhiều consumer độc lập, replay lại sau khi sửa bug, thông lượng cao, thứ tự theo key, event sourcing.</li>
+<li>Cả hai đều cho at-least-once ở cấu hình thông dụng, nên dù chọn bên nào cũng phải làm consumer idempotent (<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a>, <a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a>).</li>
+</ul>
+<div class="aside">Phần "kinh nghiệm chọn nhanh" là diễn giải, không phải trích dẫn. Khi interview, hãy nêu hành vi đã được tài liệu hóa trước (retention so với ack-rồi-xóa, offset so với ack), rồi mới đến kết luận của bạn. Các khẳng định về thông lượng cần benchmark của chính bạn; ở đây mình không trích dẫn con số nào.</div>
+<p>So sánh bằng thực hành: <a href="../../kafka/index.vi.html">Lộ trình Kafka</a> và <a href="../../rabbitmq/index.vi.html">Lộ trình RabbitMQ</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Hệ thống nào giữ lại event sau khi đã đọc?</p>
+  <button>Queue đã ack</button>
+  <button>Default exchange</button>
+  <button data-correct>Topic của Kafka</button>
+  <button>Bản sao fanout</button>
+  <p class="explain">Trong Kafka, event không bị xóa sau khi tiêu thụ; retention cấu hình theo topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Bạn có quy tắc định tuyến phong phú ở đâu?</p>
+  <button>Consumer group</button>
+  <button>Retention của Kafka</button>
+  <button>Offset của Kafka</button>
+  <button data-correct>Exchange của RabbitMQ</button>
+  <p class="explain">Exchange định tuyến bản sao tới queue qua binding và nhiều loại exchange khác nhau.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Replay sau khi sửa bug consumer thì dễ nhất với?</p>
+  <button>Direct exchange</button>
+  <button>Nack rồi bỏ</button>
+  <button>Queue auto-ack</button>
+  <button data-correct>Offset của Kafka</button>
+  <p class="explain">Consumer Kafka có thể tua lại vì vị trí đọc chỉ là một offset.<a class="cite" href="https://kafka.apache.org/43/design/design/">[4]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cả hai thường giao at-least-once. Consumer cần gì?</p>
+  <button>Fanout exchange</button>
+  <button>Thêm partition</button>
+  <button>Mạng nhanh hơn</button>
+  <button data-correct>Xử lý idempotent</button>
+  <p class="explain">Giao lại message là chuyện bình thường ở cả hai, nên xử lý lặp lại phải an toàn.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-choose-a-broker.vi.md">Bài tập 0003: chọn broker</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka Introduction</a>. Sau đó đọc trang mô hình AMQP của RabbitMQ; tự so sánh bằng lời của bạn.</p>
+<p><a href="0008-competing-consumers.vi.html">← Competing consumers</a> &nbsp;|&nbsp; <a href="0009-saga.vi.html">Pattern saga: xử lý phân tán không cần distributed transaction →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Kafka Introduction</a> · [2] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model</a> · [3] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Acknowledgements and Confirms</a> · [4] <a href="https://kafka.apache.org/43/design/design/">Kafka Design</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

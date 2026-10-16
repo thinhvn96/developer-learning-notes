@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 14: Immutability và defensive copy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Immutability và defensive copy</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0014 · bước 14/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0014-immutability.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> biến một class mutable thành immutable (bất biến) và giải thích được defensive copy (sao chép phòng thủ).</div>
+
+<h2>Vì sao cần immutability</h2>
+<p>Một object immutable không thể thay đổi sau khi được tạo, nên có thể chia sẻ thoải mái (kể cả giữa các thread) và dùng làm key của map mà không gặp bất ngờ: cùng lý do với giá trị hằng của <code>String</code> (<a href="../../java/lessons/0018-strings-immutability-and-stringbuilder.vi.html">bài về string</a>).</p>
+<h2>Chỗ rò rỉ, và cách sửa</h2>
+<pre><code>java oop/examples/ImmutabilityDemo.java
+MutableTeam after outside change   : [ann, intruder]
+ImmutableTeam after outside change : [ann]
+cannot modify the exposed list
+Point[x=1, y=2] equals another Point(1,2): true, moved copy: Point[x=9, y=2]</code></pre>
+<p><code>MutableTeam</code> có field <code>final</code> nhưng giữ nguyên list mà phía gọi truyền vào, nên thay đổi từ bên ngoài lọt vào trong: <code>final</code> chỉ làm cho <em>reference</em> không đổi, chứ không phải object. <code>ImmutableTeam</code> là một class <code>final</code> có field <code>final</code> và một bản defensive copy (<code>List.copyOf</code>), đồng thời trả ra một list không sửa được. Một <code>record</code> cho bạn một đối tượng mang dữ liệu immutable chỉ bằng một dòng: nhưng chỉ "immutable ở mức nông (shallowly immutable)", nên với thành phần là collection vẫn cần bước sao chép tương tự.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[2]</a> Checklist (thực hành chuẩn, đã minh hoạ ở trên): class final, field final, không có setter, defensive copy cả khi nhận vào lẫn khi trả ra. Mã nguồn: <a href="../examples/ImmutabilityDemo.java"><code>ImmutabilityDemo.java</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Field final có làm object trở nên immutable không?</p>
+  <button>Chỉ với list</button>
+  <button>Chỉ với int</button>
+  <button>Có, hoàn toàn</button>
+  <button data-correct>Không, chỉ reference</button>
+  <p class="explain">MutableTeam có reference list là final mà vẫn bị thay đổi.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Defensive copy bảo vệ khỏi...?</p>
+  <button>Code chậm</button>
+  <button>Giá trị null</button>
+  <button>Tràn số</button>
+  <button data-correct>Thay đổi từ bên ngoài</button>
+  <p class="explain">Nhờ bản sao, thay đổi từ bên ngoài không lọt vào trong.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Record là...?</p>
+  <button>Mutable</button>
+  <button data-correct>Immutable ở mức nông</button>
+  <button>Immutable ở mức sâu</button>
+  <button>Abstract</button>
+  <p class="explain">Record là đối tượng mang dữ liệu shallowly immutable.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Trả ra một list nội bộ một cách an toàn?</p>
+  <button>Trả thẳng field</button>
+  <button>Cho nó là static</button>
+  <button>Cho nó là public</button>
+  <button data-correct>Unmodifiable hoặc bản sao</button>
+  <p class="explain">Demo trả về một list unmodifiable và từ chối add.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0014-immutable-money.vi.md">Bài tập 14: Money immutable</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ImmutabilityDemo.java"><code>ImmutabilityDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a>. Phần mô tả class.</p>
+<p><a href="0013-enums-as-classes.vi.html">← Enum cũng là class</a> &nbsp;|&nbsp; <a href="0015-coupling-and-cohesion.vi.html">Coupling và cohesion →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">Java Tutorials: Enum/class members (fields)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html">Record Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

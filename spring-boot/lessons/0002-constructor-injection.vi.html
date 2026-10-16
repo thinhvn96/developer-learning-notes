@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Boot 2: Constructor injection so với setter injection</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Constructor injection so với setter injection</h1>
+<p class="meta">Spring Boot · Bài 0002 · bước 2/13 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Spring Boot</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-constructor-injection.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> lập luận cho việc dùng constructor injection với các dependency bắt buộc, dựa trên chính lý do của đội Spring.</div>
+
+<h2>Hai biến thể</h2>
+<p>DI <strong>dựa trên constructor</strong>: container gọi một constructor có tham số chính là các dependency. DI <strong>dựa trên setter</strong>: container gọi các setter sau khi gọi constructor không tham số.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+<h2>Khuyến nghị</h2>
+<p>"Dùng constructor cho các dependency bắt buộc, và setter method hoặc configuration method cho các dependency tuỳ chọn." Đội Spring nhìn chung ủng hộ constructor injection vì nó cho phép bạn xây dựng component dưới dạng <em>object bất biến (immutable)</em>, đảm bảo các dependency bắt buộc không bị null, và trả về component ở trạng thái đã khởi tạo đầy đủ.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+<pre><code>@Service
+public class OrderService {
+    private final PaymentGateway payments;
+    public OrderService(PaymentGateway payments) { this.payments = payments; }
+}</code></pre>
+<p>File: <a href="../examples/OrderService.java"><code>OrderService.java</code></a>. Setter injection dành cho các dependency tuỳ chọn có giá trị mặc định hợp lý, hoặc các class bên thứ ba mà bạn không ràng buộc được.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+<h2>Dependency vòng tròn</h2>
+<p>Chúng có thể xảy ra với constructor injection và gây ra <code>BeanCurrentlyInCreationException</code>; dùng setter injection cho một trong các bean có thể gỡ được vòng này.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a> Nhưng tốt hơn là thiết kế lại để bỏ hẳn vòng tròn.</p>
+<p class="aside">Đã kiểm chứng: project trong <code>examples/demo-app</code> (Spring Boot 4.1.1, JDK 21, tạo bằng Spring Initializr) đã được build và chạy test trong một Maven container; các dòng đánh dấu RESULT lấy từ chính những test đó. Tự chạy thử: <code>cd spring-boot/examples/demo-app &amp;&amp; ./mvnw test</code> (hoặc dùng image <code>maven:3-eclipse-temurin-21</code>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Kiểu injection nào được khuyên dùng cho dependency bắt buộc?</p>
+  <button>Reflection vào field</button>
+  <button>Lookup tĩnh</button>
+  <button data-correct>Constructor injection</button>
+  <button>Setter injection</button>
+  <p class="explain">Dùng constructor cho các dependency bắt buộc.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Constructor injection cho phép bạn làm gì?</p>
+  <button>Bỏ qua container</button>
+  <button data-correct>Dùng field final</button>
+  <button>Tắt kiểm tra lúc khởi động</button>
+  <button>Tránh dùng interface</button>
+  <p class="explain">Nó cho phép bạn hiện thực component dưới dạng object bất biến.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Dependency vòng tròn qua constructor gây ra gì?</p>
+  <button>ClassCastException</button>
+  <button data-correct>BeanCurrentlyInCreationException</button>
+  <button>NullPointerException</button>
+  <button>OutOfMemoryError</button>
+  <p class="explain">Dependency vòng tròn với constructor injection sẽ ném BeanCurrentlyInCreationException.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Setter injection hợp với trường hợp nào?</p>
+  <button>Mọi dependency</button>
+  <button>Các utility tĩnh</button>
+  <button>Dependency bắt buộc</button>
+  <button data-correct>Dependency tuỳ chọn</button>
+  <p class="explain">Setter dành cho các dependency tuỳ chọn có thể có giá trị mặc định hợp lý.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-refactor-to-constructor.vi.md">Bài tập 0002: refactor sang constructor injection</a></p>
+<p>Ví dụ chạy được: <a href="../examples/OrderService.java"><code>OrderService.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring Framework Reference: Dependency Injection</a>. Các phần về DI dựa trên constructor và dựa trên setter.</p>
+<p><a href="0001-ioc-and-beans.vi.html">← Inversion of control và bean</a> &nbsp;|&nbsp; <a href="0007-bean-scopes.vi.html">Bean scope: singleton và prototype →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/dependencies/factory-collaborators.html">Spring Framework Reference: Dependency Injection</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

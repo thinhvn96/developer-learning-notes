@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 11: Producer và consumer Java đầu tiên</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Producer và consumer Java đầu tiên</h1>
+<p class="meta">Kafka · Bài 0011 · bước 3/23 · Foundation · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-java-producer-and-consumer.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết và chạy được một producer và một consumer Java thuần với <code>kafka-clients</code>, và giải thích được poll loop, callback và các quy tắc thread-safety mà interviewer sẽ hỏi.</div>
+
+<h2>Producer: send là bất đồng bộ</h2>
+<p>"Method send() là bất đồng bộ. Khi được gọi, nó thêm record vào một buffer các record đang chờ gửi" rồi trả về ngay; một I/O thread chạy nền sẽ đẩy các batch tới broker.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a> Bạn biết kết quả qua <code>Future</code> được trả về hoặc qua một <code>Callback</code>. Callback "thường sẽ chạy trên I/O thread của producer nên cần chạy đủ nhanh".<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a></p>
+<pre><code>try (Producer&lt;String, String&gt; producer = new KafkaProducer&lt;&gt;(props)) {
+    producer.send(new ProducerRecord&lt;&gt;("orders", "u1", "created"), (meta, ex) -&gt; {
+        if (ex != null) log.error("send failed", ex);       // after retries + delivery.timeout.ms
+        else log.info("p{} offset {}", meta.partition(), meta.offset());
+    });
+    producer.flush();   // block until buffered records are sent
+}</code></pre>
+<p>"Producer là thread safe, và dùng chung một instance producer giữa các thread nhìn chung sẽ nhanh hơn" so với mỗi thread một instance.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a> Hãy tạo một instance cho mỗi ứng dụng và close nó khi shutdown, nếu không các record còn trong buffer sẽ bị mất.</p>
+<h2>Consumer: poll loop</h2>
+<pre><code>consumer.subscribe(List.of("orders"));
+while (running) {
+    ConsumerRecords&lt;String, String&gt; records = consumer.poll(Duration.ofMillis(500));
+    for (var r : records) process(r);
+    consumer.commitSync();          // process, then commit: at-least-once
+}</code></pre>
+<p>Ở đây quy tắc ngược lại: "Consumer không thread-safe."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a> Mỗi thread một consumer. <code>poll()</code> cũng là cách consumer duy trì tư cách thành viên trong group: nếu khoảng cách giữa hai lần poll dài hơn <code>max.poll.interval.ms</code> (mặc định 5 phút), consumer bị coi là đã hỏng và các partition của nó bị gán lại.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+<h2>Chạy thử</h2>
+<p><a href="../examples/java-clients/run.sh"><code>java-clients/run.sh</code></a> copy <code>kafka-clients 4.3.1</code> từ image Kafka và chạy hai chương trình một-file bằng JDK 21. Output thật:</p>
+<pre><code>=== producer
+sent key=u2 value=created  -&gt; partition 0 offset 0
+sent key=u2 value=paid     -&gt; partition 0 offset 1
+sent key=u1 value=created  -&gt; partition 1 offset 0
+sent key=u1 value=paid     -&gt; partition 1 offset 1
+sent key=u3 value=created  -&gt; partition 1 offset 2
+sent key=u1 value=shipped  -&gt; partition 1 offset 3
+=== consumer, classic protocol
+[classic] p0@0 u2=created
+[classic] p0@1 u2=paid
+[classic] p1@0 u1=created
+...</code></pre>
+<p>Nhìn các dòng của producer: code gửi <code>u1</code> trước, vậy mà callback của <code>u2</code> lại in ra trước. Thứ tự chỉ được đảm bảo trong từng partition ("Callback của các record gửi tới cùng một partition được đảm bảo chạy theo thứ tự"<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a>), không phải giữa các partition. Mọi event <code>u1</code> vẫn giữ đúng thứ tự bên trong partition 1.</p>
+<div class="aside">Câu trả lời phỏng vấn: "Mỗi service dùng chung một <code>KafkaProducer</code>, gửi async kèm callback để log hoặc ghi metric khi lỗi, gọi <code>flush</code>/<code>close</code> khi shutdown. Mỗi thread một <code>KafkaConsumer</code>, giữ thời gian xử lý trong giới hạn <code>max.poll.interval.ms</code>, và commit sau khi xử lý xong."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Nhiều thread có dùng chung một KafkaProducer được không?</p>
+  <button>Không, mỗi thread một cái</button>
+  <button data-correct>Được, nó thread-safe</button>
+  <button>Chỉ khi acks bằng 0</button>
+  <button>Chỉ khi bọc trong lock</button>
+  <p class="explain">Javadoc nói producer là thread safe và dùng chung một instance nhìn chung nhanh hơn.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. producer.send() làm gì khi được gọi?</p>
+  <button data-correct>Đưa vào buffer, trả về ngay</button>
+  <button>Mở một socket mới</button>
+  <button>Chặn tới khi ghi xong</button>
+  <button>Commit một offset</button>
+  <p class="explain">send() thêm record vào buffer các lần gửi đang chờ và trả về ngay lập tức.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Nhiều thread có dùng chung một KafkaConsumer được không?</p>
+  <button data-correct>Không, mỗi thread một cái</button>
+  <button>Chỉ với các lần gọi poll</button>
+  <button>Chỉ khi đang pause</button>
+  <button>Được, nó thread-safe</button>
+  <p class="explain">Consumer không thread-safe.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Xử lý lâu hơn max.poll.interval.ms. Kết quả?</p>
+  <button>Producer chậm lại</button>
+  <button>Record bị xoá</button>
+  <button data-correct>Partition bị gán lại</button>
+  <button>Không có gì xảy ra</button>
+  <p class="explain">Consumer bị coi là đã hỏng và group rebalance lại các partition của nó.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-write-a-java-client.vi.md">Bài tập 0011: viết một Java client</a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-clients/run.sh"><code>run.sh</code></a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-clients/OrderProducer.java"><code>OrderProducer.java</code></a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-clients/OrderConsumer.java"><code>OrderConsumer.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a>. Đọc phần mô tả class, sau đó đọc các mục về poll loop và xử lý đa luồng trong Javadoc của KafkaConsumer.</p>
+<p><a href="0002-producers-keys-and-acks.vi.html">← Producer, key và acks</a> &nbsp;|&nbsp; <a href="0007-retention-and-topic-configs.vi.html">Retention và cấu hình topic →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a> · [2] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [3] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

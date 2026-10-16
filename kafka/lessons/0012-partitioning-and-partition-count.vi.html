@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 12: Partitioning: key, partitioner và số partition</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Partitioning: key, partitioner và số partition</h1>
+<p class="meta">Kafka · Bài 0012 · bước 7/23 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-partitioning-and-partition-count.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dự đoán được một record sẽ vào partition nào, chọn được key, và giải thích được vì sao thêm partition về sau sẽ phá vỡ thứ tự theo key.</div>
+
+<h2>Ai chọn partition</h2>
+<p>"Client kiểm soát việc nó publish message vào partition nào"; Kafka cung cấp "semantic partitioning bằng cách cho phép người dùng chỉ định một key để phân vùng theo đó".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> Partitioner mặc định trong producer 4.3:<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+<ul>
+<li><strong>Record có key:</strong> hash của key, chia lấy dư cho số partition. Cùng key thì cùng partition, nên cùng thứ tự.</li>
+<li><strong>Không có key:</strong> một partition "dính" (sticky), chỉ đổi sau khi đã produce <code>batch.size</code> byte vào nó, để batch luôn đầy. Với <code>partitioner.adaptive.partitioning.enable=true</code> (mặc định), nó gửi nhiều hơn tới các partition nằm trên broker nhanh hơn.</li>
+<li><code>partitioner.class</code> cho phép bạn cắm partitioner của riêng mình; <code>partitioner.ignore.keys=true</code> thì bỏ qua key.</li>
+</ul>
+<h2>Cái bẫy: thêm partition</h2>
+<p>Vì cách map phụ thuộc vào số partition, operations guide cảnh báo rằng "logic map của partitioner mặc định sẽ thay đổi khi số partition tăng lên", và "Kafka sẽ không cố tự động phân bổ lại dữ liệu hiện có".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a> Bạn cũng không quay lui được: "Kafka hiện chưa hỗ trợ giảm số partition của một topic."<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+<pre><code>$ ./05-add-partitions.sh
+=== 3 partitions          === 6 partitions (same keys)
+  u1 -&gt; Partition:1         u1 -&gt; Partition:4
+  u2 -&gt; Partition:0         u2 -&gt; Partition:0
+  u3 -&gt; Partition:1         u3 -&gt; Partition:4
+  u5 -&gt; Partition:2         u5 -&gt; Partition:5
+=== try to shrink back to 3
+Error ... The topic users currently has 6 partition(s); 3 would not be an increase.</code></pre>
+<p>Sau thay đổi, các event <code>u1</code> cũ nằm ở partition 1 còn event mới nằm ở partition 4. Lúc này hai consumer có thể xử lý event của <code>u1</code> song song, sai thứ tự.</p>
+<h2>Chọn key và số partition</h2>
+<ul>
+<li>Chọn key theo thực thể mà event của nó phải giữ đúng thứ tự (<code>orderId</code>, <code>accountId</code>). Key là UUID ngẫu nhiên không cho thứ tự nào có ích; key có ít giá trị (quốc gia) sẽ tạo ra partition nóng.</li>
+<li>Số partition là trần cho mức song song của consumer trong một group (một partition, một consumer). Hãy định cỡ theo throughput đỉnh bạn dự kiến trong suốt vòng đời topic, vì tăng về sau sẽ xáo trộn lại key.</li>
+<li>Nếu buộc phải mở rộng một topic có key, con đường an toàn là tạo topic mới với nhiều partition hơn, kèm một đợt chuyển đổi có kiểm soát cho producer và consumer.</li>
+</ul>
+<div class="aside">Quy tắc định cỡ "lên kế hoạch cho mức đỉnh tương lai" là phán đoán kỹ thuật dựa trên hai sự thật đã được ghi trong tài liệu ở trên (cách map thay đổi, không thể giảm), chứ không phải một công thức từ tài liệu.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Partitioner mặc định, record có key. Vào partition nào?</p>
+  <button>Luôn partition 0</button>
+  <button data-correct>Theo hash của key</button>
+  <button>Chọn xoay vòng</button>
+  <button>Cái ít tải nhất</button>
+  <p class="explain">Partitioner mặc định hash key khi record có key.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Partitioner mặc định, record không có key. Vào partition nào?</p>
+  <button>Ngẫu nhiên mỗi record</button>
+  <button>Theo hash của value</button>
+  <button>Luôn partition 0</button>
+  <button data-correct>Dính tới khi batch đầy</button>
+  <p class="explain">Record không key dùng một partition sticky, chỉ đổi sau batch.size byte.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bạn thêm partition cho một topic có key. Dữ liệu hiện có thì sao?</p>
+  <button>Được copy sang tất cả</button>
+  <button>Được hash lại sang cái mới</button>
+  <button>Bị broker xoá đi</button>
+  <button data-correct>Vẫn nằm nguyên chỗ cũ</button>
+  <p class="explain">Kafka không phân bổ lại dữ liệu hiện có; chỉ record mới dùng cách map mới.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Bạn có giảm được số partition của một topic không?</p>
+  <button data-correct>Không, chưa hỗ trợ</button>
+  <button>Được, với --alter</button>
+  <button>Chỉ khi dùng KRaft</button>
+  <button>Chỉ khi topic rỗng</button>
+  <p class="explain">Việc giảm số partition không được hỗ trợ.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[3]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-pick-keys-and-partitions.vi.md">Bài tập 0012: chọn key và số partition</a></p>
+<p>Ví dụ chạy được: <a href="../examples/05-add-partitions.sh"><code>05-add-partitions.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a>. Đọc phần 'Modifying topics' và 'Expanding your cluster'.</p>
+<p><a href="0004-delivery-semantics.vi.html">← Delivery semantics: at most, at least, exactly once</a> &nbsp;|&nbsp; <a href="0013-spring-kafka.vi.html">Spring Kafka: KafkaTemplate, @KafkaListener và commit →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · [3] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

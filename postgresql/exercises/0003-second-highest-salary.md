@@ -1,5 +1,7 @@
 # Exercise 0003: second highest per department
 
+[Tiếng Việt](0003-second-highest-salary.vi.md)
+
 Companion to [lesson 3](../lessons/0003-window-functions.html).
 
 1. On `empsalary` from the example, return the second highest salary per department.

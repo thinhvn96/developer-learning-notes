@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 13: Facade</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Facade</h1>
+<p class="meta">Design Patterns · Bài 0013 · bước 13/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-facade.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> đặt một cửa vào đơn giản trước một subsystem phức tạp, và tránh để nó biến thành god object.</div>
+
+<h2>Mục đích</h2>
+<p>Facade là "một structural design pattern cung cấp một interface đơn giản hóa cho một library, một framework, hoặc bất kỳ tập class phức tạp nào khác." Hãy dùng nó khi cần một interface hạn chế nhưng dễ dùng cho một subsystem phức tạp, hoặc để tổ chức một subsystem thành các tầng.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/FacadeDemo.java
+lights dim 10%
+amp on
+amp volume 7
+projector on
+playing Alien
+---
+projector off
+amp off
+lights full</code></pre><p><code>watchMovie</code> che đi sáu lời gọi được phối hợp trên ba class của subsystem. Mã nguồn: <a href="../examples/FacadeDemo.java"><code>FacadeDemo.java</code></a>. Một service layer phía trên các repository, hay một client library bọc một REST API, thường đóng đúng vai trò này. Dòng nhược điểm dẫn ngược về bài <a href="../../oop/lessons/0022-god-objects-and-refactoring.vi.html">God object</a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Cô lập code của bạn khỏi độ phức tạp của subsystem</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Facade có thể biến thành god object dính chặt với mọi class trong ứng dụng</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a> Adapter thường bọc một object còn Facade làm việc với cả subsystem; Abstract Factory là lựa chọn thay thế khi bạn chỉ muốn giấu việc tạo object; Mediator chủ động tập trung hóa việc giao tiếp, còn Facade chỉ đơn giản hóa việc truy cập; facade thường là một Singleton.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Facade cung cấp...?</p>
+  <button>Một stack</button>
+  <button data-correct>Một interface đơn giản hóa</button>
+  <button>Một bản sao</button>
+  <button>Một cây</button>
+  <p class="explain">Một interface đơn giản hóa cho một tập class phức tạp.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Rủi ro?</p>
+  <button data-correct>Biến thành god object</button>
+  <button>JIT chậm</button>
+  <button>Chỉ trạng thái toàn cục</button>
+  <button>Thiếu interface</button>
+  <p class="explain">Nó có thể biến thành god object dính chặt với mọi class.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Facade so với Mediator?</p>
+  <button data-correct>Facade không thêm chức năng mới</button>
+  <button>Không cái nào</button>
+  <button>Như nhau</button>
+  <button>Mediator không thêm gì</button>
+  <p class="explain">Facade đơn giản hóa việc truy cập; Mediator tập trung hóa việc giao tiếp.<a class="cite" href="https://refactoring.guru/design-patterns/facade">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Số lời gọi cho watchMovie trong demo?</p>
+  <button>Client gọi sáu lần</button>
+  <button>Không lời gọi nào</button>
+  <button data-correct>Một lời gọi che nhiều lời gọi</button>
+  <button>Hai lời gọi</button>
+  <p class="explain">Client gọi một method; facade thực hiện năm lời gọi xuống subsystem.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-api-client-facade.vi.md">Bài tập 13: một facade cho API client</a></p>
+<p>Ví dụ chạy được: <a href="../examples/FacadeDemo.java"><code>FacadeDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/facade">Facade (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0012-decorator.vi.html">← Decorator</a> &nbsp;|&nbsp; <a href="0014-flyweight.vi.html">Flyweight →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/facade">Facade (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

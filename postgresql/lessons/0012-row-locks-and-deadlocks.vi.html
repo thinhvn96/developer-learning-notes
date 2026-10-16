@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 12: Row lock, SELECT FOR UPDATE và deadlock</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Row lock, SELECT FOR UPDATE và deadlock</h1>
+<p class="meta">PostgreSQL · Bài 0012 · bước 12/13 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-row-locks-and-deadlocks.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng <code>SELECT ... FOR UPDATE</code>, giải thích deadlock hình thành giữa hai transaction thế nào, và cách phòng tránh nó.</div>
+
+<h2>Row lock</h2>
+<p><code>SELECT ... FOR UPDATE</code> lock các dòng được chọn "như thể sắp update chúng": các transaction khác cố <code>UPDATE</code>, <code>DELETE</code> hoặc lock những dòng đó sẽ bị chặn cho tới khi transaction này kết thúc.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+<h2>Deadlock</h2>
+<p>Deadlock xảy ra khi hai transaction mỗi bên giữ lock mà bên kia cần. PostgreSQL phát hiện ra và hủy (abort) một trong hai transaction. Cách phòng thủ tốt nhất là "lấy lock trên nhiều đối tượng theo một thứ tự nhất quán trong tất cả các ứng dụng"; nếu không thì retry transaction bị hủy.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./11-locking.sh
+=== 1. SELECT ... FOR UPDATE makes another writer wait
+second session UPDATE waited about 2.1 s for the row lock
+=== 2. deadlock: opposite update order
+ERROR:  deadlock detected
+final balances: 1|91   2|110      # one transaction committed, one was aborted</code></pre>
+<p>So sánh với <a href="../../java/lessons/0026-deadlock-and-lock-ordering.vi.html">bài về deadlock</a> bên Java: cùng nguyên nhân, cùng cách chữa. Trong Spring, transaction bị hủy sẽ hiện ra dưới dạng một exception mà bạn nên retry ở bên ngoài ranh giới transaction. Source: <a href="../examples/11-locking.sh"><code>11-locking.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. FOR UPDATE ảnh hưởng gì tới các bên ghi khác?</p>
+  <button>Copy các dòng</button>
+  <button data-correct>Chặn họ tới khi kết thúc</button>
+  <button>Phớt lờ họ</button>
+  <button>Hủy lệnh của họ</button>
+  <p class="explain">Các transaction khác cố UPDATE hoặc DELETE những dòng đó sẽ bị chặn.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Hai transaction chờ lẫn nhau. PostgreSQL...?</p>
+  <button>Phớt lờ</button>
+  <button data-correct>Hủy một bên</button>
+  <button>Chờ mãi mãi</button>
+  <button>Hủy cả hai</button>
+  <p class="explain">Nó phát hiện deadlock và hủy một trong các transaction.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cách phòng tránh tốt nhất?</p>
+  <button>Table lớn hơn</button>
+  <button>Nhiều connection hơn</button>
+  <button>Sleep lâu hơn</button>
+  <button data-correct>Lock theo thứ tự nhất quán</button>
+  <p class="explain">Lấy lock theo một thứ tự nhất quán giữa các ứng dụng.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Sau lỗi deadlock, ứng dụng nên làm gì?</p>
+  <button>Drop table đi</button>
+  <button data-correct>Retry transaction</button>
+  <button>Cứ commit tiếp</button>
+  <button>Tăng isolation level</button>
+  <p class="explain">Xử lý deadlock bằng cách retry transaction bị hủy.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-avoid-the-deadlock.vi.md">Bài tập 0012: tránh deadlock</a></p>
+<p>Ví dụ chạy được: <a href="../examples/11-locking.sh"><code>11-locking.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL Docs: Explicit Locking</a>. Đọc 'Row-Level Locks' và 'Deadlocks'.</p>
+<p><a href="0006-mvcc-and-isolation-levels.vi.html">← MVCC và isolation level</a> &nbsp;|&nbsp; <a href="0013-vacuum-and-dead-tuples.vi.html">VACUUM, dead tuple và autovacuum →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL Docs: Explicit Locking</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

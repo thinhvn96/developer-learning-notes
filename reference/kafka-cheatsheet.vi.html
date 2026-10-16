@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka: tóm tắt nhanh</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main style="max-width:52rem">
+<h1>Kafka: tóm tắt nhanh</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Tra cứu · <a href="../kafka/index.vi.html">Lộ trình Kafka</a> · <a href="../kafka/interview.vi.html">Hỏi đáp phỏng vấn</a> · giá trị mặc định của Apache Kafka 4.3 · tiện để in · <a class="lang" href="kafka-cheatsheet.html" hreflang="en" lang="en">English</a></p>
+
+<h2>Thuật ngữ</h2>
+<table>
+<tr><th>Thuật ngữ</th><th>Một dòng giải thích</th><th>Bài</th></tr>
+<tr><td>topic / partition</td><td>luồng có tên / log có thứ tự, chỉ ghi nối; thứ tự chỉ có trong từng partition</td><td><a href="../kafka/lessons/0001-events-topics-partitions.vi.html">0001</a></td></tr>
+<tr><td>offset</td><td>vị trí của một record trong partition; offset của consumer = record tiếp theo cần đọc</td><td><a href="../kafka/lessons/0003-consumers-groups-and-offsets.vi.html">0003</a></td></tr>
+<tr><td>consumer group</td><td>các consumer dùng chung <code>group.id</code>; mỗi partition thuộc về đúng một thành viên</td><td><a href="../kafka/lessons/0003-consumers-groups-and-offsets.vi.html">0003</a></td></tr>
+<tr><td>share group</td><td>group kiểu queue: nhiều consumer trên một partition, lock và ack theo từng record, không giữ thứ tự</td><td><a href="../kafka/lessons/0021-share-groups.vi.html">0021</a></td></tr>
+<tr><td>leader / follower / ISR</td><td>leader nhận ghi; follower sao chép; ISR = các replica đã theo kịp</td><td><a href="../kafka/lessons/0005-replication-isr-and-durability.vi.html">0005</a></td></tr>
+<tr><td>committed (message)</td><td>đã ghi vào mọi thành viên ISR; chỉ dữ liệu đã commit mới được trả cho consumer</td><td><a href="../kafka/lessons/0005-replication-isr-and-durability.vi.html">0005</a></td></tr>
+<tr><td>lag</td><td>log-end offset − committed offset, tính theo từng partition</td><td><a href="../kafka/lessons/0020-monitoring-and-operations.vi.html">0020</a></td></tr>
+<tr><td>rebalance</td><td>chia lại partition khi thành viên của group thay đổi</td><td><a href="../kafka/lessons/0015-rebalancing-and-group-protocols.vi.html">0015</a></td></tr>
+<tr><td>compaction / tombstone</td><td>giữ giá trị mới nhất cho mỗi key / giá trị <code>null</code> dùng để xoá một key</td><td><a href="../kafka/lessons/0008-log-compaction.vi.html">0008</a></td></tr>
+<tr><td>KRaft / controller</td><td>metadata quorum dùng Raft thay thế ZooKeeper / node nắm giữ quorum đó</td><td><a href="../kafka/lessons/0019-kraft-and-controllers.vi.html">0019</a></td></tr>
+<tr><td>DLT</td><td>dead letter topic cho các record không xử lý được</td><td><a href="../kafka/lessons/0016-error-handling-and-dead-letter-topics.vi.html">0016</a></td></tr>
+<tr><td>subject / compatibility</td><td>tên trong Schema Registry cho một lịch sử schema / quy tắc về các thay đổi được phép</td><td><a href="../kafka/lessons/0017-schemas-and-schema-registry.vi.html">0017</a></td></tr>
+</table>
+
+<h2>Công thức cấu hình</h2>
+<table>
+<tr><th>Mục tiêu</th><th>Cấu hình</th></tr>
+<tr><td>Không mất lần ghi nào đã được ack khi một broker gặp sự cố</td><td>RF 3 · topic <code>min.insync.replicas=2</code> · producer <code>acks=all</code> (mặc định) · <code>enable.idempotence=true</code> (mặc định) · <code>unclean.leader.election.enable=false</code> (mặc định)</td></tr>
+<tr><td>Consumer at-least-once</td><td><code>enable.auto.commit=false</code> · xử lý xong rồi mới <code>commitSync()</code> · xử lý idempotent</td></tr>
+<tr><td>Exactly-once bên trong Kafka</td><td>producer transactional (<code>transactional.id</code>) + consumer với <code>isolation.level=read_committed</code>; Streams: <code>processing.guarantee=exactly_once_v2</code></td></tr>
+<tr><td>Thứ tự theo từng thực thể</td><td>key = id của thực thể · không bao giờ tăng số partition của một topic có key đang chạy</td></tr>
+<tr><td>Throughput</td><td>tăng <code>linger.ms</code> và <code>batch.size</code> · <code>compression.type=lz4</code> hoặc <code>zstd</code></td></tr>
+<tr><td>Ít rebalance hơn</td><td><code>group.protocol=consumer</code> (KIP-848), hoặc classic với <code>CooperativeStickyAssignor</code> + <code>group.instance.id</code></td></tr>
+<tr><td>Giá trị mới nhất cho mỗi key, giữ mãi mãi</td><td><code>cleanup.policy=compact</code></td></tr>
+</table>
+
+<h2>Giá trị mặc định nên thuộc lòng</h2>
+<table>
+<tr><th>Config</th><th>Mặc định</th><th>Config</th><th>Mặc định</th></tr>
+<tr><td><code>acks</code></td><td>all</td><td><code>enable.auto.commit</code></td><td>true (Spring: false)</td></tr>
+<tr><td><code>enable.idempotence</code></td><td>true</td><td><code>auto.offset.reset</code></td><td>latest</td></tr>
+<tr><td><code>linger.ms</code></td><td>5 (trước 4.0 là 0)</td><td><code>max.poll.records</code></td><td>500</td></tr>
+<tr><td><code>batch.size</code></td><td>16384 B</td><td><code>max.poll.interval.ms</code></td><td>300000 (5 phút)</td></tr>
+<tr><td><code>compression.type</code></td><td>none</td><td><code>session.timeout.ms</code></td><td>45000 (chỉ classic)</td></tr>
+<tr><td><code>delivery.timeout.ms</code></td><td>120000</td><td><code>heartbeat.interval.ms</code></td><td>3000 (chỉ classic)</td></tr>
+<tr><td><code>buffer.memory</code></td><td>32 MB</td><td><code>group.protocol</code></td><td>classic</td></tr>
+<tr><td><code>max.block.ms</code></td><td>60000</td><td><code>isolation.level</code></td><td>read_uncommitted</td></tr>
+<tr><td><code>min.insync.replicas</code> (broker)</td><td>1</td><td><code>share.record.lock.duration.ms</code></td><td>30000</td></tr>
+<tr><td><code>auto.create.topics.enable</code></td><td>true</td><td><code>share.delivery.count.limit</code></td><td>5</td></tr>
+</table>
+<p class="aside">Nguồn: config của <a href="https://kafka.apache.org/43/configuration/producer-configs/">producer</a>, <a href="https://kafka.apache.org/43/configuration/consumer-configs/">consumer</a>, <a href="https://kafka.apache.org/43/configuration/broker-configs/">broker</a> và <a href="https://kafka.apache.org/43/configuration/group-configs/">group</a> (4.3).</p>
+
+<h2>CLI</h2>
+<pre><code>kafka-topics.sh --bootstrap-server B --create --topic T --partitions 6 --replication-factor 3
+kafka-topics.sh --bootstrap-server B --describe --topic T
+kafka-topics.sh --bootstrap-server B --alter --topic T --partitions 12      # remaps keys!
+kafka-configs.sh --bootstrap-server B --alter --entity-type topics --entity-name T --add-config retention.ms=604800000
+kafka-consumer-groups.sh --bootstrap-server B --describe --group G           # offsets, lag
+kafka-consumer-groups.sh --bootstrap-server B --group G --reset-offsets --to-earliest --topic T --execute
+kafka-share-groups.sh --bootstrap-server B --describe --group G
+kafka-metadata-quorum.sh --bootstrap-server B describe --status
+kafka-acls.sh --bootstrap-server B --add --allow-principal User:svc --consumer --topic T --group G
+kafka-producer-perf-test.sh --topic T --num-records 500000 --throughput -1 --record-size 100 \
+  --command-property bootstrap.servers=B acks=all linger.ms=20 compression.type=zstd</code></pre>
+
+<h2>Lựa chọn</h2>
+<table>
+<tr><th>Câu hỏi</th><th>Chọn</th></tr>
+<tr><td>Cần thứ tự theo key, replay được?</td><td>consumer group</td></tr>
+<tr><td>Các job độc lập, cần mở rộng vượt số partition, retry theo từng record?</td><td>share group (4.2+)</td></tr>
+<tr><td>Routing phong phú, TTL theo từng message, độ ưu tiên?</td><td>RabbitMQ (<a href="../system-design/lessons/0003-queue-versus-log.vi.html">queue và log</a>)</td></tr>
+<tr><td>Biến đổi từ topic sang topic, có state?</td><td>Kafka Streams</td></tr>
+<tr><td>Đưa dữ liệu vào/ra database hoặc search engine?</td><td>Kafka Connect</td></tr>
+<tr><td>Sống sót khi mất một region?</td><td>MirrorMaker 2 (bất đồng bộ, RPO nhỏ)</td></tr>
+</table>
+<footer><p>Tóm gọn từ <a href="../kafka/index.vi.html">Lộ trình Kafka</a>; trích dẫn nằm trong từng bài. <a href="../RESOURCES.md">Tất cả tài nguyên</a></p></footer>
+</main>
+</body>
+</html>

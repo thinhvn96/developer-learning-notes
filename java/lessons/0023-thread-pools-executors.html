@@ -8,76 +8,277 @@
 </head>
 <body>
 <main>
-<h1>Thread pools: core, max, queue and rejection</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0023 · step 16 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>How a thread pool decides: run, queue or reject</h1>
+<p class="subtitle">Core size, queue, max size and the rejection policy, traced one task at a time.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0023 · step 33 of 46 · Advanced · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0023-thread-pools-executors.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Almost every Java service runs its work on thread pools: web request handlers, <code>@Async</code> methods, Kafka consumers, scheduled jobs. A badly configured pool gives you out-of-memory errors or requests that wait forever. Interviewers ask <em>"Explain corePoolSize, maximumPoolSize and the queue"</em> and <em>"What happens when the pool is full?"</em></div>
 
 <div class="win"><b>Today's win:</b> predict when a <code>ThreadPoolExecutor</code> creates threads, queues tasks or rejects them.</div>
 
-<h2>The rules</h2>
-<ol><li>Fewer than <code>corePoolSize</code> threads running: start a new thread, even if others are idle.</li>
-<li><code>corePoolSize</code> or more running: prefer to queue the task.</li>
-<li>Queue full and fewer than <code>maximumPoolSize</code>: start another thread.</li>
-<li>Otherwise: the task is rejected.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></li></ol>
-<h2>Queue choices</h2>
-<ul><li><strong>Direct handoff</strong> (<code>SynchronousQueue</code>): a good default; needs an unbounded max size to avoid rejection; risk of unbounded thread growth.</li>
-<li><strong>Unbounded queue</strong>: never more than core threads, so max has no effect; risk of unbounded queue growth.</li>
-<li><strong>Bounded queue</strong>: helps prevent resource exhaustion but is harder to tune.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></li></ul>
-<h2>Rejection</h2>
-<p>Default <code>AbortPolicy</code> throws <code>RejectedExecutionException</code>. <code>CallerRunsPolicy</code> makes the submitting thread run the task, "a simple feedback control mechanism that slows down the rate that new tasks are submitted".<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a> <code>DiscardPolicy</code> and <code>DiscardOldestPolicy</code> silently drop work and are rarely acceptable.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></p>
-<pre><code>java java/examples/PoolDemo.java     # core 2, max 4, queue 2, seven blocking tasks
-task 1-2: accepted, pool 1..2      (core threads)
-task 3-4: accepted, queue 1..2     (queued)
-task 5-6: accepted, pool 3..4      (extra threads up to max)
-task 7  : REJECTED</code></pre>
-<p>Source: <a href="../examples/PoolDemo.java"><code>PoolDemo.java</code></a>. Compare with <a href="0006-virtual-threads.html">virtual threads</a>, where you do not pool at all.</p>
+<dl class="words">
+  <dt>task</dt><dd>A small piece of work to run, usually a <code>Runnable</code> (code with a <code>run()</code> method) or a lambda.</dd>
+  <dt>thread pool</dt><dd>A group of threads that are created once and reused for many tasks, instead of starting a new thread for every task.</dd>
+  <dt>executor</dt><dd>The Java object you hand tasks to; it decides which thread runs them. <code>ThreadPoolExecutor</code> is the main one.</dd>
+  <dt>corePoolSize</dt><dd>The number of threads the pool tries to keep, even when they have nothing to do.</dd>
+  <dt>work queue</dt><dd>A waiting line for tasks when the core threads are busy.</dd>
+  <dt>maximumPoolSize</dt><dd>The hard upper limit on the number of threads.</dd>
+  <dt>rejection</dt><dd>What happens to a task the pool cannot take: by default an exception.</dd>
+</dl>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Core threads busy, queue has room. What happens?</p>
-  <button>Caller runs it</button>
-  <button>Task is rejected</button>
-  <button>New thread starts</button>
-  <button data-correct>Task is queued</button>
-  <p class="explain">At or above core size the executor prefers queuing.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Unbounded queue with max 10. Threads created?</p>
-  <button>Up to ten</button>
-  <button>Zero threads</button>
-  <button data-correct>At most core</button>
-  <button>Unlimited threads</button>
-  <p class="explain">With an unbounded queue no more than core threads are created.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Default rejection policy?</p>
-  <button data-correct>AbortPolicy</button>
-  <button>CallerRunsPolicy</button>
-  <button>DiscardPolicy</button>
-  <button>DiscardOldest</button>
-  <p class="explain">AbortPolicy throws RejectedExecutionException.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Which policy slows down the submitter?</p>
-  <button data-correct>CallerRunsPolicy</button>
-  <button>DiscardPolicy</button>
-  <button>No policy</button>
-  <button>AbortPolicy</button>
-  <p class="explain">The submitting thread runs the task itself.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">[1]</a></p>
-</div>
+<h2>Before you start</h2>
+<p>Say out loud: <em>"A pool has core 2, max 4, and a queue that holds 2 tasks. Seven slow tasks arrive at once. How many threads start, how many tasks wait, and what happens to task 7?"</em> Write your numbers down. Section 3 runs it.</p>
+
+<h2>1. The picture: a bank with tellers</h2>
+<p>A bank has <strong>2 regular tellers</strong> (the core threads), a <strong>waiting area with 2 chairs</strong> (the queue), and <strong>2 extra tellers</strong> who come in only on very busy days (up to max 4). When all 4 tellers are busy and all chairs are taken, the guard at the door turns new customers away (rejection).</p>
+<p>The surprising part: the bank calls the extra tellers <strong>only after the chairs are full</strong>, not before. Many people expect the pool to grow to max first and queue later. It is the other way round.</p>
+<p>Why pool at all? Creating a platform thread is expensive, so you create a few and reuse them. (With virtual threads in JDK 21 the trade-off changes; see <a href="0006-virtual-threads.html">lesson 0006</a>.)</p>
+<pre><code>ThreadPoolExecutor pool = new ThreadPoolExecutor(
+        2,                               <span class="c">// corePoolSize</span>
+        4,                               <span class="c">// maximumPoolSize</span>
+        1, TimeUnit.SECONDS,             <span class="c">// extra threads die after 1 s idle</span>
+        new ArrayBlockingQueue&lt;&gt;(2),     <span class="c">// bounded queue: 2 places</span>
+        new ThreadPoolExecutor.AbortPolicy());  <span class="c">// what to do when full</span>
+pool.execute(() -&gt; doWork());            <span class="c">// hand over a task</span></code></pre>
+
+<h2>2. The rules, in order</h2>
+<p>Every time you call <code>execute(task)</code>, the pool asks these questions in this order:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a></p>
+<ol class="steps">
+  <li>Fewer than <code>corePoolSize</code> threads running: start a new thread, even if others are idle.</li>
+  <li><code>corePoolSize</code> or more running: prefer to queue the task.</li>
+  <li>Queue full and fewer than <code>maximumPoolSize</code>: start another thread.</li>
+  <li>Otherwise: the task is rejected.</li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Decision flow for execute: if running threads are fewer than core, start a thread. Else if the queue has room, queue the task. Else if running threads are fewer than max, start an extra thread. Else reject the task.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="20" width="150" height="44" rx="6"/>
+      <rect x="210" y="20" width="250" height="44" rx="22"/>
+      <rect x="210" y="100" width="250" height="44" rx="22"/>
+      <rect x="210" y="180" width="250" height="44" rx="22"/>
+      <rect x="510" y="20" width="150" height="44" rx="6"/>
+      <rect x="510" y="100" width="150" height="44" rx="6"/>
+      <rect x="510" y="180" width="150" height="44" rx="6"/>
+      <path d="M170 42h34M198 37l6 5-6 5"/>
+      <path d="M460 42h44M498 37l6 5-6 5"/>
+      <path d="M460 122h44M498 117l6 5-6 5"/>
+      <path d="M460 202h44M498 197l6 5-6 5"/>
+      <path d="M335 64v30M330 88l5 6 5-6"/>
+      <path d="M335 144v30M330 168l5 6 5-6"/>
+      <path d="M335 224v32M330 250l5 6 5-6" stroke="var(--accent)"/>
+    </g>
+    <rect x="160" y="258" width="350" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="95" y="47" text-anchor="middle">execute(task)</text>
+    <text x="335" y="47" text-anchor="middle">running &lt; core ?</text>
+    <text x="335" y="127" text-anchor="middle">queue has room ?</text>
+    <text x="335" y="207" text-anchor="middle">running &lt; max ?</text>
+    <text x="585" y="47" text-anchor="middle">new thread</text>
+    <text x="585" y="127" text-anchor="middle">wait in queue</text>
+    <text x="585" y="207" text-anchor="middle">extra thread</text>
+    <text x="335" y="280" text-anchor="middle" fill="var(--accent)">REJECT → RejectedExecutionHandler</text>
+    <text x="335" y="298" text-anchor="middle" font-size="11" fill="var(--accent)">default AbortPolicy throws an exception</text>
+    <g font-size="11" opacity=".8">
+      <text x="482" y="36" text-anchor="middle">yes</text>
+      <text x="482" y="116" text-anchor="middle">yes</text>
+      <text x="482" y="196" text-anchor="middle">yes</text>
+      <text x="345" y="84">no</text>
+      <text x="345" y="164">no</text>
+      <text x="345" y="244">no</text>
+    </g>
+  </g>
+</svg>
+<figcaption>The order is core → queue → max → reject. Extra threads (above core) are created only when the queue is full.</figcaption>
+</figure>
+
+<h2>3. Trace seven tasks</h2>
+<p>The example <code>PoolDemo.java</code> builds exactly the pool above (core 2, max 4, queue 2). Each task blocks until the end, so no thread becomes free during the test. Follow the rules:</p>
+<pre><code><span class="c">Task 1  running 0 &lt; core 2      → new thread (pool = 1)</span>
+<span class="c">Task 2  running 1 &lt; core 2      → new thread (pool = 2)</span>
+<span class="c">Task 3  core full, queue 0/2    → queued     (queue = 1)</span>
+<span class="c">Task 4  core full, queue 1/2    → queued     (queue = 2)</span>
+<span class="c">Task 5  queue full, 2 &lt; max 4   → extra thread (pool = 3)</span>
+<span class="c">Task 6  queue full, 3 &lt; max 4   → extra thread (pool = 4)</span>
+<span class="c">Task 7  queue full, pool = max  → <span class="hl">REJECTED</span></span></code></pre>
+<pre><code>$ java java/examples/PoolDemo.java
+=== AbortPolicy (core 2, max 4, queue 2)
+task 1: accepted  pool=1 queue=0
+task 2: accepted  pool=2 queue=0
+task 3: accepted  pool=2 queue=1
+task 4: accepted  pool=2 queue=2
+task 5: accepted  pool=3 queue=2
+task 6: accepted  pool=4 queue=2
+<span class="hl">task 7: REJECTED (RejectedExecutionException)</span>
+  task 1 ran on pool-1-thread-1
+  task 5 ran on pool-1-thread-3
+  task 2 ran on pool-1-thread-2
+  task 6 ran on pool-1-thread-4
+  task 3 ran on pool-1-thread-1
+  task 4 ran on pool-1-thread-3
+</code></pre>
+<p class="muted">The "accepted" lines are always the same. The "ran on" lines come from four threads at once, so their order and thread names change from run to run.</p>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Snapshot after seven tasks: four threads running tasks 1, 2, 5 and 6; tasks 3 and 4 wait in the queue of capacity 2; task 7 is rejected.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="13">threads (max 4)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="36" width="145" height="50" rx="4"/>
+      <rect x="180" y="36" width="145" height="50" rx="4"/>
+    </g>
+    <g fill="none" stroke="currentColor" stroke-dasharray="5 4">
+      <rect x="340" y="36" width="145" height="50" rx="4"/>
+      <rect x="500" y="36" width="145" height="50" rx="4"/>
+    </g>
+    <text x="92" y="57" text-anchor="middle">thread-1</text>
+    <text x="92" y="75" text-anchor="middle" font-size="11" opacity=".75">task 1 · core</text>
+    <text x="252" y="57" text-anchor="middle">thread-2</text>
+    <text x="252" y="75" text-anchor="middle" font-size="11" opacity=".75">task 2 · core</text>
+    <text x="412" y="57" text-anchor="middle">thread-3</text>
+    <text x="412" y="75" text-anchor="middle" font-size="11" opacity=".75">task 5 · extra</text>
+    <text x="572" y="57" text-anchor="middle">thread-4</text>
+    <text x="572" y="75" text-anchor="middle" font-size="11" opacity=".75">task 6 · extra</text>
+    <text x="20" y="128" font-size="13">queue (capacity 2)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="180" y="108" width="145" height="34" rx="4"/>
+      <rect x="340" y="108" width="145" height="34" rx="4"/>
+    </g>
+    <text x="252" y="130" text-anchor="middle">task 3</text>
+    <text x="412" y="130" text-anchor="middle">task 4</text>
+    <rect x="500" y="108" width="145" height="34" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="572" y="130" text-anchor="middle" fill="var(--accent)">task 7: rejected</text>
+    <text x="340" y="180" text-anchor="middle" font-size="12">room for 4 running + 2 waiting = 6 tasks at once</text>
+    <text x="340" y="200" text-anchor="middle" font-size="11" opacity=".75">dashed = extra threads, removed again after keepAliveTime idle</text>
+  </g>
+</svg>
+<figcaption>The pool after task 7. Note that tasks 5 and 6 started <em>before</em> tasks 3 and 4, which still wait in the queue.</figcaption>
+</figure>
+<p><strong>Trap:</strong> a new extra thread takes the task that caused it to be created ("a new thread is created to handle the request"<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a>), not the oldest waiting task. So a pool is not strictly first-in, first-out.</p>
+
+<h2>4. Choosing the queue</h2>
+<p>The Javadoc describes three strategies:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a></p>
+<ul><li><strong>Direct handoff</strong> (<code>SynchronousQueue</code>): no waiting chairs at all; each task goes straight to a thread. A good default; needs an unbounded max size to avoid rejection; risk of unbounded thread growth.</li>
+<li><strong>Unbounded queue</strong> (for example <code>LinkedBlockingQueue</code> without a capacity): never more than core threads, so max has no effect; risk of unbounded queue growth.</li>
+<li><strong>Bounded queue</strong> (for example <code>ArrayBlockingQueue</code>): helps prevent resource exhaustion but is harder to tune.</li></ul>
+<h3>Trap: the "fixed" pool from <code>Executors</code></h3>
+<p><code>Executors.newFixedThreadPool(n)</code> "reuses a fixed number of threads operating off a shared unbounded queue".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors javadoc</a> If tasks arrive faster than <code>n</code> threads finish them, the queue keeps growing until memory runs out. It never rejects. <code>newCachedThreadPool()</code> is the opposite: it "creates new threads as needed", so a burst can create a huge number of threads.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors javadoc</a> For a production service, build a <code>ThreadPoolExecutor</code> with a bounded queue and a chosen rejection policy, so the limits are written down.</p>
+
+<h2>5. When the pool is full: rejection policies</h2>
+<p>Back at the bank: what does the guard do with the customer who cannot get in?</p>
+<ul>
+  <li><strong><code>AbortPolicy</code></strong> (default): throws <code>RejectedExecutionException</code>. "Sorry, come back later," and your code must handle it.</li>
+  <li><strong><code>CallerRunsPolicy</code></strong>: the thread that called <code>execute</code> runs the task itself, "a simple feedback control mechanism that will slow down the rate that new tasks are submitted". The guard serves the customer personally, and while he does, he can't let anyone else in.</li>
+  <li><strong><code>DiscardPolicy</code></strong> and <strong><code>DiscardOldestPolicy</code></strong>: silently drop work and are rarely acceptable.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a></li>
+</ul>
+<p>Tasks are also rejected after the pool "has been shut down".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor javadoc</a> <code>shutdown()</code> lets already submitted tasks finish but accepts no new ones, and it "does not wait"; call <code>awaitTermination</code> for that, as the demo does.</p>
+<p class="muted">JDK 8 vs 17 vs 21: <code>ThreadPoolExecutor</code> works the same in all three. JDK 21 adds <code>Executors.newVirtualThreadPerTaskExecutor()</code>, which "starts a new virtual Thread for each task" with no pool and no queue<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors javadoc</a>; lesson 0006 compares the two.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">All core threads are busy and the queue has room. A new task arrives. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>The task waits in the queue</button>
+    <button class="opt">An extra thread starts at once</button>
+    <button class="opt">The task is rejected right away</button>
+    <button class="opt">The calling thread runs the task</button>
+  </div>
+  <div class="why">At or above core size the executor prefers queuing. Extra threads come only when the queue is full.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Core 2, max 10, unbounded <code>LinkedBlockingQueue</code>. Under heavy load, how many threads do you get?</p>
+  <div class="options">
+    <button class="opt" data-correct>At most 2: the queue never fills up</button>
+    <button class="opt">Up to 10 once the load gets heavy</button>
+    <button class="opt">Zero until the queue holds 10 tasks</button>
+    <button class="opt">An unlimited number of threads</button>
+  </div>
+  <div class="why">With an unbounded queue no more than core threads are ever created, so max has no effect. The queue grows instead.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Core 2, max 4, queue 2, all tasks slow. Which task number is the first one rejected?</p>
+  <div class="options">
+    <button class="opt" data-correct>Task 7</button>
+    <button class="opt">Task 5</button>
+    <button class="opt">Task 3</button>
+    <button class="opt">Task 9</button>
+  </div>
+  <div class="why">2 core threads + 2 queued + 2 extra threads = 6 tasks. The 7th has nowhere to go.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the default rejection policy of <code>ThreadPoolExecutor</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>AbortPolicy, which throws an exception</button>
+    <button class="opt">CallerRunsPolicy, which runs it inline</button>
+    <button class="opt">DiscardPolicy, which silently drops it</button>
+    <button class="opt">DiscardOldestPolicy, which drops the head</button>
+  </div>
+  <div class="why">The default <code>AbortPolicy</code> throws <code>RejectedExecutionException</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which policy slows down the code that submits tasks, giving natural back-pressure?</p>
+  <div class="options">
+    <button class="opt" data-correct>CallerRunsPolicy</button>
+    <button class="opt">DiscardPolicy</button>
+    <button class="opt">AbortPolicy</button>
+    <button class="opt">DiscardOldestPolicy</button>
+  </div>
+  <div class="why">The submitting thread runs the task itself, so it cannot submit more while it is busy.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A service uses <code>Executors.newFixedThreadPool(8)</code> and slowly runs out of memory under load. What is the most likely cause?</p>
+  <div class="options">
+    <button class="opt" data-correct>Its unbounded queue keeps growing</button>
+    <button class="opt">It keeps creating new threads forever</button>
+    <button class="opt">Its rejected tasks are kept in memory</button>
+    <button class="opt">Its eight threads leak after each task</button>
+  </div>
+  <div class="why">The fixed pool works off an unbounded queue: it never rejects, so waiting tasks pile up when work arrives faster than it is done.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"How does a ThreadPoolExecutor handle a new task? What happens when it's full?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Below core size: start a new thread, even if others are idle.</label></li>
+      <li><label><input type="checkbox"> At core size: put the task in the queue.</label></li>
+      <li><label><input type="checkbox"> Queue full: add threads up to max; beyond that, reject.</label></li>
+      <li><label><input type="checkbox"> With an unbounded queue, max never matters (and memory can blow up).</label></li>
+      <li><label><input type="checkbox"> Rejection: AbortPolicy by default; CallerRunsPolicy for back-pressure; discard policies lose work.</label></li>
+      <li><label><input type="checkbox"> In production: bounded queue + explicit policy, rather than newFixedThreadPool's unbounded queue.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"When I submit a task, if fewer than corePoolSize threads are running, the pool starts a new thread for it, even if other threads are idle. Once core is reached, it prefers to put the task in the work queue. Only when the queue is full does it add threads, up to maximumPoolSize. If it's at max and the queue is full, the task is rejected. The default AbortPolicy throws RejectedExecutionException; CallerRunsPolicy makes the submitting thread run the task, which slows the producer down, so it's a simple back-pressure. A common trap is newFixedThreadPool: it uses an unbounded queue, so it never rejects and max is irrelevant, and under load the queue can grow until we run out of memory. In a real service I'd use a ThreadPoolExecutor with a bounded queue and an explicit rejection policy, and monitor the queue size."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0023-size-a-pool.md">Exercise 0023: size a pool</a></p>
+<p><a href="../exercises/0023-size-a-pool.md">Exercise 0023: size a pool</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/PoolDemo.java"><code>PoolDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor Javadoc</a>. 'Core and maximum pool sizes', 'Queuing', 'Rejected tasks'.</p>
-<p><a href="0025-concurrenthashmap.html">← ConcurrentHashMap: atomic updates and weak consistency</a> &nbsp;|&nbsp; <a href="0026-deadlock-and-lock-ordering.html">Deadlock and lock ordering →</a></p>
+<h2>What's next</h2>
+<p>More threads also means more locks, and locks taken in the wrong order can freeze a service completely. A senior interviewer asks: <em>"What is a deadlock, how do you find one in production, and how do you prevent it?"</em> <a href="0026-deadlock-and-lock-ordering.html">Lesson 0026</a> creates one and fixes it. Compare also with <a href="0006-virtual-threads.html">virtual threads</a>, where you do not pool at all.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor Javadoc</a>: the sections "Core and maximum pool sizes", "Queuing" and "Rejected tasks".</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"How many threads should my pool have for database calls?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0025-concurrenthashmap.html">← Sharing a map between threads: ConcurrentHashMap</a> &nbsp;|&nbsp; <a href="0026-deadlock-and-lock-ordering.html">When two threads wait for each other forever: deadlock →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html">ThreadPoolExecutor Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Executors.html">Executors Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

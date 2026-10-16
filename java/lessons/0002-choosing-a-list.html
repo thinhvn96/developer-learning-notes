@@ -3,75 +3,252 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 2: Choosing between ArrayList, LinkedList and ArrayDeque</title>
+<title>Java 2: ArrayList, LinkedList or ArrayDeque?</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>Choosing between ArrayList, LinkedList and ArrayDeque</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0002 · step 4 of 27 · Foundation · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>ArrayList, LinkedList or ArrayDeque?</h1>
+<p class="subtitle">Three ways to keep things in a row, and why one of them is almost always the answer.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0002 · step 7 of 46 · Foundation · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0002-choosing-a-list.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> answer 'ArrayList or LinkedList?' with the documented facts instead of folklore, and name the better queue/stack.</div>
+<div class="mission"><strong>Why this lesson?</strong> "ArrayList or LinkedList?" is one of the most common Java interview questions, and many people answer with folklore ("LinkedList is faster for inserts"). This lesson gives you the answer the documentation actually supports, and a picture to explain it.</div>
 
-<h2>What the Javadoc actually promises</h2>
-<p><strong>ArrayList</strong> is backed by an array with a capacity that grows automatically. <code>size</code>, <code>isEmpty</code>, <code>get</code>, <code>set</code> and <code>iterator</code> run in constant time; <code>add</code> runs in <em>amortized</em> constant time; "all of the other operations run in linear time". The Javadoc adds: "The constant factor is low compared to that for the <code>LinkedList</code> implementation."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a></p>
-<p><strong>LinkedList</strong>: "Operations that index into the list will traverse the list from the beginning or the end, whichever is closer to the specified index."<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">[2]</a> So <code>get(i)</code> is a walk, not a jump.</p>
-<p><strong>ArrayDeque</strong>: "likely to be faster than <code>Stack</code> when used as a stack, and faster than <code>LinkedList</code> when used as a queue." Null elements are prohibited.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a></p>
-<div class="aside">Interview shape: default to <code>ArrayList</code>. For a stack or queue, reach for <code>ArrayDeque</code>. A <code>LinkedList</code> answer needs a specific reason. Note the docs claim "amortized" for <code>add</code>: one add occasionally copies the array, but n adds cost O(n) overall.</div>
-<h2>Three pitfalls, one run</h2>
-<pre><code>java java/examples/ListPitfalls.java
+<div class="win"><b>Today's win:</b> explain how ArrayList and LinkedList store elements, pick the right one (and ArrayDeque for queues and stacks) using the documented costs, and avoid three common bugs.</div>
+
+<dl class="words">
+  <dt>list</dt><dd>An ordered sequence of elements. Each element has a position called an <em>index</em>, starting at 0.</dd>
+  <dt>array</dt><dd>A fixed-size block of slots side by side in memory. Java can jump straight to slot <code>i</code>.</dd>
+  <dt>node</dt><dd>A small object that holds one element plus links (references) to the previous and next node.</dd>
+  <dt>capacity</dt><dd>How many slots the hidden array of an ArrayList has. It is always at least the list's size.</dd>
+  <dt>queue / stack</dt><dd>A queue is first in, first out (like a line at the bank). A stack is last in, first out (like a pile of plates).</dd>
+  <dt>deque</dt><dd>"Double-ended queue", pronounced "deck": you can add and remove at both ends.</dd>
+  <dt>amortized O(1)</dt><dd>Usually constant time; once in a while slower, but on average still constant per operation.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Why would <code>list.get(500_000)</code> be slow on one kind of list and fast on another?"</em> Guess, even if you are unsure. You will check your guess in section 1.</p>
+
+<h2>1. The picture: a row of lockers vs a treasure hunt</h2>
+<p><strong>ArrayList</strong> is a row of numbered lockers. To open locker 3 you walk straight to it; you don't open lockers 0, 1 and 2 first. Inside, ArrayList is "backed by an array" whose capacity "grows automatically".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+<p><strong>LinkedList</strong> is a treasure hunt. Each clue (a <span class="term">node</span>) tells you where the next clue is. To reach clue 3 you must follow clues 0, 1 and 2. The Javadoc says it plainly: "Operations that index into the list will traverse the list from the beginning or the end, whichever is closer to the specified index."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedList.html">LinkedList javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 300" role="img" aria-label="ArrayList get(3) jumps straight to slot 3 of an array. LinkedList get(3) follows next links from node 0 through node 3.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="30" font-weight="600">ArrayList: one array, slots side by side</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="50" width="90" height="44"/><rect x="110" y="50" width="90" height="44"/>
+      <rect x="200" y="50" width="90" height="44"/><rect x="380" y="50" width="90" height="44"/>
+      <rect x="470" y="50" width="90" height="44" stroke-dasharray="4 3" opacity=".5"/>
+      <rect x="560" y="50" width="90" height="44" stroke-dasharray="4 3" opacity=".5"/>
+    </g>
+    <rect x="290" y="50" width="90" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="65" y="77" text-anchor="middle">"a"</text><text x="155" y="77" text-anchor="middle">"b"</text>
+    <text x="245" y="77" text-anchor="middle">"c"</text><text x="335" y="77" text-anchor="middle" fill="var(--accent)">"d"</text>
+    <text x="425" y="77" text-anchor="middle">"e"</text>
+    <text x="515" y="77" text-anchor="middle" font-size="11" opacity=".6">empty</text>
+    <text x="605" y="77" text-anchor="middle" font-size="11" opacity=".6">empty</text>
+    <g font-size="10" opacity=".7"><text x="24" y="110">0</text><text x="114" y="110">1</text><text x="204" y="110">2</text><text x="294" y="110">3</text><text x="384" y="110">4</text><text x="474" y="110">5</text><text x="564" y="110">6</text></g>
+    <text x="335" y="130" text-anchor="middle" font-size="11" fill="var(--accent)">get(3): jump straight here, 1 step</text>
+    <text x="560" y="130" text-anchor="middle" font-size="10" opacity=".7">spare capacity</text>
+
+    <text x="20" y="175" font-weight="600">LinkedList: separate nodes joined by links</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="195" width="100" height="44" rx="6"/><rect x="160" y="195" width="100" height="44" rx="6"/>
+      <rect x="300" y="195" width="100" height="44" rx="6"/><rect x="580" y="195" width="80" height="44" rx="6"/>
+      <path d="M120 211h34M148 206l6 5-6 5"/><path d="M260 211h34M288 206l6 5-6 5"/><path d="M400 211h34M428 206l6 5-6 5"/><path d="M540 211h34M568 206l6 5-6 5"/>
+      <path d="M154 225h-34M126 220l-6 5 6 5" opacity=".5"/><path d="M294 225h-34M266 220l-6 5 6 5" opacity=".5"/><path d="M434 225h-34M406 220l-6 5 6 5" opacity=".5"/><path d="M574 225h-34M546 220l-6 5 6 5" opacity=".5"/>
+    </g>
+    <rect x="440" y="195" width="100" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="70" y="222" text-anchor="middle">"a"</text><text x="210" y="222" text-anchor="middle">"b"</text>
+    <text x="350" y="222" text-anchor="middle">"c"</text><text x="490" y="222" text-anchor="middle" fill="var(--accent)">"d"</text>
+    <text x="620" y="222" text-anchor="middle">"e"</text>
+    <text x="340" y="270" text-anchor="middle" font-size="11" fill="var(--accent)">get(3): start at the head, follow next, next, next → 4 nodes visited</text>
+    <text x="340" y="288" text-anchor="middle" font-size="10" opacity=".7">(next → and previous ← links; it starts from whichever end is closer)</text>
+  </g>
+</svg>
+<figcaption>Same five elements, two layouts. The array lets Java compute where slot 3 is; the linked nodes must be walked.</figcaption>
+</figure>
+
+<p>So for <code>get(i)</code>: ArrayList is constant time, LinkedList is a walk that grows with the list. That answers the "Before you start" question.</p>
+
+<h2>2. What each operation costs (the documented facts)</h2>
+<p>The ArrayList Javadoc lists the costs directly: "The <code>size</code>, <code>isEmpty</code>, <code>get</code>, <code>set</code>, <code>iterator</code>, and <code>listIterator</code> operations run in constant time. The <code>add</code> operation runs in amortized constant time ... All of the other operations run in linear time (roughly speaking). The constant factor is low compared to that for the <code>LinkedList</code> implementation."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+<table>
+<tr><th>Operation</th><th>ArrayList</th><th>LinkedList</th><th>ArrayDeque</th></tr>
+<tr><td><code>get(i)</code>, <code>set(i, x)</code></td><td>constant</td><td>walk to i (linear)</td><td>no index access</td></tr>
+<tr><td>add at the end</td><td>amortized constant</td><td>constant</td><td>constant</td></tr>
+<tr><td>add / remove at the front</td><td>linear (shifts everything)</td><td>constant</td><td>constant</td></tr>
+<tr><td>add / remove in the middle at index i</td><td>linear (shifts the rest)</td><td>linear (walks to i first)</td><td>not supported</td></tr>
+<tr><td>memory per element</td><td>one array slot</td><td>one node object with two links</td><td>one array slot</td></tr>
+</table>
+<p>Look at the middle row. LinkedList's "fast insert" only happens once you are already standing on the node. To insert at index 500,000 it must first <em>walk</em> there. That is why "LinkedList is faster for inserts" is folklore, not a rule.</p>
+
+<h3>Why "amortized" for add?</h3>
+<p>The hidden array has spare slots. Most <code>add</code> calls just fill the next empty slot. When the array is full, ArrayList creates a bigger array and copies everything over, which is one slow call. The documentation only promises that "adding an element has constant amortized time cost".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a> In the OpenJDK source the array grows by about 1.5× each time, so copies get rarer as the list grows (details in <a href="0038-capacity-boxing-and-memory.html">lesson 0038</a>).</p>
+<pre><code>List&lt;String&gt; names = new ArrayList&lt;&gt;();
+names.add("a");   <span class="c">// fills slot 0 (first add creates the array)</span>
+names.add("b");   <span class="c">// fills slot 1, cheap</span>
+...               <span class="c">// full? bigger array + copy: one slow call</span>
+names.add("z");   <span class="c">// cheap again</span></code></pre>
+
+<h2>3. Queues and stacks: use ArrayDeque</h2>
+<p>For "take from one end, add at the other" you don't need indexes at all. <code>ArrayDeque</code> is an array used as a ring: a <em>head</em> and a <em>tail</em> position move around it, so adding or removing at either end never shifts other elements. The Javadoc: it is "likely to be faster than <code>Stack</code> when used as a stack, and faster than <code>LinkedList</code> when used as a queue."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque javadoc</a></p>
+
+<figure>
+<svg viewBox="0 0 680 210" role="img" aria-label="ArrayDeque as a ring buffer: head points at the oldest element, tail at the next free slot. poll takes from head, offer adds at tail, push adds before head.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="40" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/>
+      <rect x="415" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/><rect x="490" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/>
+      <rect x="565" y="70" width="75" height="44" opacity=".5" stroke-dasharray="4 3"/>
+    </g>
+    <rect x="115" y="70" width="75" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g fill="none" stroke="currentColor"><rect x="190" y="70" width="75" height="44"/><rect x="265" y="70" width="75" height="44"/><rect x="340" y="70" width="75" height="44"/></g>
+    <text x="152" y="97" text-anchor="middle" fill="var(--accent)">job1</text><text x="227" y="97" text-anchor="middle">job2</text>
+    <text x="302" y="97" text-anchor="middle">job3</text><text x="377" y="97" text-anchor="middle">job4</text>
+    <g fill="none" stroke="var(--accent)"><path d="M152 44v20M147 58l5 6 5-6"/></g>
+    <text x="152" y="36" text-anchor="middle" font-size="11" fill="var(--accent)">head: poll() takes here</text>
+    <g fill="none" stroke="currentColor"><path d="M452 44v20M447 58l5 6 5-6"/></g>
+    <text x="452" y="36" text-anchor="middle" font-size="11">tail: offer() adds here</text>
+    <g fill="none" stroke="currentColor" opacity=".6"><path d="M640 136c0 40-600 40-600 0M44 142l-4-6-4 6"/></g>
+    <text x="340" y="190" text-anchor="middle" font-size="11" opacity=".8">when the tail reaches the last slot it wraps around to slot 0: nothing is shifted</text>
+  </g>
+</svg>
+<figcaption>ArrayDeque: two moving positions over one array. Both ends are constant time, with no node objects.</figcaption>
+</figure>
+
+<pre><code>Deque&lt;String&gt; queue = new ArrayDeque&lt;&gt;();     <span class="c">// FIFO: line at the bank</span>
+queue.offer("job1"); queue.offer("job2");
+queue.poll();                                  <span class="hl">// "job1"</span>
+
+Deque&lt;String&gt; stack = new ArrayDeque&lt;&gt;();     <span class="c">// LIFO: pile of plates</span>
+stack.push("a"); stack.push("b");
+stack.pop();                                   <span class="hl">// "b"</span></code></pre>
+<p class="muted">The old <code>Stack</code> class (from JDK 1.0) still exists, but the Javadoc points you to <code>Deque</code> instead. Prefer <code>ArrayDeque</code> on JDK 8, 17 and 21 alike.</p>
+
+<h2>4. Three bugs, one run</h2>
+<pre><code>$ java java/examples/ListPitfalls.java
 ArrayDeque rejects null: NullPointerException
 for-each + list.remove: ConcurrentModificationException
 removeIf result: [1, 3]</code></pre>
-<p>None of the three is synchronized<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">[2]</a><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a>, and <code>ArrayList</code>'s iterators are fail-fast<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a>. Use <code>removeIf</code> or the iterator's own <code>remove</code> to delete while looping.</p>
+<ol class="steps">
+  <li><strong>ArrayDeque refuses <code>null</code>.</strong> "Null elements are prohibited."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque javadoc</a> <code>poll()</code> returns <code>null</code> to mean "empty", so a stored null would be ambiguous.</li>
+  <li><strong>Removing inside a for-each loop</strong> throws <code>ConcurrentModificationException</code>, even with one thread. The iterator notices the list changed behind its back (ArrayList's iterators are "fail-fast").<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a> <a href="0029-iterators-and-fail-fast.html">Lesson 0029</a> explains how.</li>
+  <li><strong>The fix:</strong> <code>list.removeIf(x -&gt; x % 2 == 0)</code> (JDK 8+) or the iterator's own <code>remove()</code>.</li>
+</ol>
+<p>And one more fact for interviews: none of the three classes is synchronized. If several threads change the same list, you must protect it yourself (for example <code>Collections.synchronizedList</code>), or use a concurrent collection (<a href="0039-concurrent-collections.html">lesson 0039</a>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. What does the ArrayList Javadoc say about <code>get(i)</code>?</p>
-  <button>It runs in random time</button>
-  <button>It runs in linear time</button>
-  <button>It runs in log time</button>
-  <button data-correct>It runs in constant time</button>
-  <p class="explain">get, set, size, isEmpty and iterator are constant time.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Best default class for a FIFO queue or a stack?</p>
-  <button>Stack with generics</button>
-  <button>Vector with locks</button>
-  <button data-correct>ArrayDeque here</button>
-  <button>LinkedList by habit</button>
-  <p class="explain">The ArrayDeque Javadoc says it is likely faster than Stack as a stack and than LinkedList as a queue.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. What happens on <code>arrayDeque.addFirst(null)</code>?</p>
-  <button>It clears the deque</button>
-  <button data-correct>It throws an NPE</button>
-  <button>It ignores the call</button>
-  <button>It stores the null</button>
-  <p class="explain">Null elements are prohibited in ArrayDeque.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">[3]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. You need thread-safe access to a plain ArrayList. What do the docs say?</p>
-  <button>Call ensureCapacity first</button>
-  <button>Use it single-threaded</button>
-  <button>It is already safe</button>
-  <button data-correct>Synchronize it externally</button>
-  <p class="explain">Implementations are not synchronized; concurrent structural modification requires external synchronization, e.g. Collections.synchronizedList.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">[1]</a></p>
-</div>
+<h2>5. The decision in one line</h2>
+<div class="win">Need a list? <strong>ArrayList</strong>. Need a queue or a stack? <strong>ArrayDeque</strong>. LinkedList only with a specific, measured reason.</div>
+<p class="muted">A specific reason could be: you already hold a <code>ListIterator</code> in the middle of a long list and insert or remove many elements right there. Even then, measure first.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Why is <code>get(i)</code> fast on an ArrayList but slow on a LinkedList?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayList jumps to slot i; LinkedList walks node by node</button>
+    <button class="opt">ArrayList keeps its elements sorted, LinkedList does not</button>
+    <button class="opt">LinkedList copies the whole list on every get call</button>
+    <button class="opt">ArrayList caches the last element you asked for</button>
+  </div>
+  <div class="why">An array slot's position can be computed directly. LinkedList "will traverse the list from the beginning or the end".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You insert one element at index 500,000 of a LinkedList with 1,000,000 elements. What is slow?</p>
+  <div class="options">
+    <button class="opt" data-correct>Walking to index 500,000 before linking the node</button>
+    <button class="opt">Linking the new node into its two neighbours</button>
+    <button class="opt">Shifting the other 500,000 elements one place right</button>
+    <button class="opt">Nothing; LinkedList inserts are always constant time</button>
+  </div>
+  <div class="why">Linking is cheap, but LinkedList must first walk to the position. ArrayList would shift elements instead; both are linear.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which class should you use for a FIFO queue of jobs?</p>
+  <div class="options">
+    <button class="opt" data-correct>ArrayDeque, with offer and poll</button>
+    <button class="opt">Stack, with push and pop</button>
+    <button class="opt">ArrayList, removing index 0</button>
+    <button class="opt">Vector, with add and remove</button>
+  </div>
+  <div class="why">ArrayDeque is documented as likely faster than LinkedList as a queue and than Stack as a stack. Removing index 0 of an ArrayList shifts every element.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>new ArrayDeque&lt;String&gt;().offer(null)</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>It throws a NullPointerException</button>
+    <button class="opt">It stores null as a normal element</button>
+    <button class="opt">It silently ignores the call</button>
+    <button class="opt">It returns false and stores nothing</button>
+  </div>
+  <div class="why">"Null elements are prohibited" in ArrayDeque, because null is what poll() returns for "empty".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why is ArrayList's <code>add</code> called "amortized" constant time?</p>
+  <div class="options">
+    <button class="opt" data-correct>Most adds fill a spare slot; rarely the array is copied</button>
+    <button class="opt">Every add copies the whole array into a new one</button>
+    <button class="opt">Adds are slow at first and get faster with time</button>
+    <button class="opt">It depends on how many threads call add together</button>
+  </div>
+  <div class="why">When the hidden array is full, one add creates a bigger array and copies. On average each add is still constant.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Two threads add to the same plain ArrayList. What do the docs say?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is not synchronized; you must add synchronization</button>
+    <button class="opt">It is safe because add is a single method call</button>
+    <button class="opt">It throws an exception as soon as a second thread joins</button>
+    <button class="opt">It becomes a LinkedList automatically under load</button>
+  </div>
+  <div class="why">None of ArrayList, LinkedList or ArrayDeque is synchronized. Lesson 0039 shows updates silently lost.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"ArrayList or LinkedList? When would you use each?"</strong> Start a timer, answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> ArrayList is backed by an array; LinkedList is a chain of nodes with links.</label></li>
+      <li><label><input type="checkbox"> <code>get(i)</code>: constant on ArrayList, a walk (linear) on LinkedList.</label></li>
+      <li><label><input type="checkbox"> Add at the end is amortized constant on ArrayList (occasional copy).</label></li>
+      <li><label><input type="checkbox"> Inserting in the middle is linear for both (shift vs walk), so "LinkedList is faster for inserts" is a myth.</label></li>
+      <li><label><input type="checkbox"> For a queue or stack, use ArrayDeque.</label></li>
+      <li><label><input type="checkbox"> None of them is thread-safe.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"By default I use ArrayList. It's backed by an array, so <code>get</code> and <code>set</code> by index are constant time, and adding at the end is amortized constant: it occasionally copies into a bigger array. LinkedList is a chain of nodes, so getting by index means walking the list. People say LinkedList is better for inserts, but inserting in the middle still means walking to that position, so both are linear, and ArrayList's constant factor is lower. If I need a queue or a stack I use ArrayDeque, which the docs say is faster than LinkedList as a queue and faster than Stack. And none of these is thread-safe, so for shared access I'd synchronize or use a concurrent collection."</em></p>
+  </div>
+</div>
 
 <h2>Now do the exercise</h2>
 <p><a href="../exercises/0002-list-choice.md">Exercise 0002: pick the collection</a></p>
 <p>Runnable example: <a href="../examples/ListPitfalls.java"><code>ListPitfalls.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc, class description</a>. Five minutes; then skim ArrayList's class description.</p>
-<p><a href="0001-hashmap-equals-hashcode.html">← HashMap, equals and hashCode</a> &nbsp;|&nbsp; <a href="0020-generics-basics-and-invariance.html">Generics: why List of Integer is not List of Number →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may follow up with: <em>"Why exactly does removing inside a for-each loop throw?"</em> (<a href="0029-iterators-and-fail-fast.html">lesson 0029</a>) or <em>"How much memory does a LinkedList of a million Integers use?"</em> (<a href="0038-capacity-boxing-and-memory.html">lesson 0038</a>).</p>
+<p><strong>Read more:</strong> the class descriptions of <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList</a> and <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque</a>, five minutes each.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What is a reference exactly?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0028-collections-framework-map.html">← A map of Java collections</a> &nbsp;|&nbsp; <a href="0029-iterators-and-fail-fast.html">Why removing items in a loop crashes →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/LinkedList.html">LinkedList Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/LinkedList.html">LinkedList Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayDeque.html">ArrayDeque Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

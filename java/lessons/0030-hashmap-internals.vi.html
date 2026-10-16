@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 30: Bên trong HashMap: bucket, resize và tree</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bên trong HashMap: bucket, resize và tree</h1>
+<p class="subtitle">98262 biến thành hộp thư 7 như thế nào, chuyện gì xảy ra ở entry thứ 13, và vì sao một bucket quá dài lại biến thành cây.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0030 · bước 11/46 · Core · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0030-hashmap-internals.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Ở <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a> bạn đã học hình ảnh bức tường hộp thư. Người phỏng vấn senior sẽ đào sâu thêm một tầng: <em>"Đi qua giúp tôi lệnh <code>put</code>. Bucket được chọn thế nào? Khi nào nó resize? Java 8 đã thay đổi gì?"</em> Bài này trả lời từng câu bằng những con số thật mà bạn có thể nói ra thành lời.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> dẫn người phỏng vấn đi qua lệnh <code>put</code> trong HashMap từ JDK 8 trở đi: trộn bit của hash, chỉ số bucket, resize bằng cách nhân đôi, và khi nào một bucket biến thành cây.</div>
+
+<dl class="words">
+  <dt>bit</dt><dd>Một chữ số nhị phân, 0 hoặc 1. Một <code>int</code> trong Java có 32 bit.</dd>
+  <dt>bin</dt><dd>Tên khác của bucket, dùng trong mã nguồn OpenJDK. Một ô trong mảng của HashMap.</dd>
+  <dt>capacity</dt><dd>Số lượng bucket, ký hiệu <code>n</code>. Trong HashMap nó luôn là lũy thừa của 2: 16, 32, 64, …</dd>
+  <dt>load factor</dt><dd>Mức đầy tối đa của map trước khi nó lớn lên. Mặc định 0.75 nghĩa là "lớn lên khi số entry vượt 75% số bucket".</dd>
+  <dt>resize</dt><dd>Tạo một mảng mới lớn gấp đôi và chuyển mọi entry sang đó.</dd>
+  <dt>red-black tree</dt><dd>Một cây có thứ tự tự giữ cân bằng, nên tìm một phần tử trong k phần tử chỉ mất khoảng log k bước thay vì k bước.</dd>
+  <dt><code>&amp;</code>, <code>^</code>, <code>&gt;&gt;&gt;</code></dt><dd>Toán tử bit: AND chỉ giữ bit 1 ở chỗ cả hai đều là 1; XOR cho 1 ở chỗ hai bit khác nhau; <code>&gt;&gt;&gt; 16</code> dời mọi bit sang phải 16 vị trí.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành lời: <em>"Một HashMap mới có 16 bucket. Mình liên tục gọi <code>put</code> với key mới. Khi nào nó lớn lên, và các entry đang có bên trong sẽ ra sao?"</em> Đoán một con số. Bạn sẽ kiểm tra lại ở phần 4.</p>
+
+<h2>1. Bức tường hộp thư, với số liệu thật</h2>
+<p>Bài 0001 vẽ một bức tường 16 hộp thư. Đây là các quy tắc thật đằng sau nó. HashMap là một mảng các bucket ("bin"). Capacity mặc định là 16, và mã nguồn ghi rằng nó "BẮT BUỘC phải là lũy thừa của 2". Load factor mặc định là 0.75.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+<p>Khi số entry vượt quá capacity × load factor (16 × 0.75 = <strong>12</strong> với giá trị mặc định), map được "rehash ... để bảng băm có số bucket xấp xỉ gấp đôi".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<p class="muted">Một chi tiết nhỏ trong mã nguồn OpenJDK: <code>new HashMap&lt;&gt;()</code> chưa tạo mảng ngay. Lệnh <code>put</code> đầu tiên gọi <code>resize()</code>, và chính nó tạo ra 16 bucket.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<h2>2. Từ hash code tới số hộp thư</h2>
+<p>Hãy nghĩ tới mã bưu điện. Bưu cục của một thị trấn nhỏ chỉ đọc <strong>chữ số cuối</strong> để chọn kệ. Nếu thị trấn lớn lên tới 100 kệ, họ đọc <strong>hai</strong> chữ số cuối. HashMap làm y như vậy với bit: với 16 bucket nó đọc 4 bit cuối của hash; với 32 bucket, 5 bit cuối.</p>
+<p>Việc này diễn ra trong hai bước:</p>
+<ol class="steps">
+  <li><strong>Trộn hash.</strong> <code>(h = key.hashCode()) ^ (h &gt;&gt;&gt; 16)</code>: theo mã nguồn, nó "trộn (XOR) các bit cao của hash xuống các bit thấp", vì chỉ các bit thấp mới chọn bucket.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> Không có bước này, hai key chỉ khác nhau ở bit cao sẽ luôn va chạm. Key null có hash là 0, đó là lý do HashMap cho phép một key null.</li>
+  <li><strong>Chọn bucket.</strong> <code>index = (n - 1) &amp; hash</code>. Khi <code>n</code> là lũy thừa của 2, phép này bằng <code>hash % n</code>, nhưng rẻ hơn.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> <code>n - 1 = 15</code> là <code>1111</code> ở dạng nhị phân, nên <code>&amp; 15</code> giữ đúng 4 bit cuối.</li>
+</ol>
+<p>Đây là key <code>"cat"</code> từ bài 0001, từng bit một:</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="cat có hash code 98262. XOR với chính nó dời phải 16 bit làm đổi bit cuối, cho hash kết thúc bằng 0111. AND với 15 giữ 4 bit cuối, chỉ số 7. AND với 31 giữ 5 bit cuối, chỉ số 23.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="34">"cat".hashCode()</text>
+    <text x="210" y="34">0000 0000 0000 0001 0111 1111 1101 0110</text>
+    <text x="580" y="34" opacity=".75">= 98262</text>
+    <text x="20" y="58" opacity=".75">h &gt;&gt;&gt; 16</text>
+    <text x="210" y="58" opacity=".75">0000 0000 0000 0000 0000 0000 0000 0001</text>
+    <path d="M210 68h340" stroke="currentColor" opacity=".4"/>
+    <text x="20" y="88">hash = h ^ (h&gt;&gt;&gt;16)</text>
+    <text x="210" y="88">0000 0000 0000 0001 0111 1111 110<tspan fill="var(--accent)">1 0111</tspan></text>
+
+    <rect x="14" y="108" width="652" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="20" y="130" opacity=".8">n - 1 = 15</text>
+    <text x="210" y="130" opacity=".8">0000 0000 0000 0000 0000 0000 0000 1111</text>
+    <text x="20" y="154" fill="var(--accent)">hash &amp; 15</text>
+    <text x="210" y="154">0000 0000 0000 0000 0000 0000 0000 <tspan fill="var(--accent)">0111</tspan></text>
+    <text x="580" y="154" fill="var(--accent)">= hộp 7</text>
+
+    <text x="20" y="194" opacity=".8">n - 1 = 31</text>
+    <text x="210" y="194" opacity=".8">0000 0000 0000 0000 0000 0000 0001 1111</text>
+    <text x="20" y="218">hash &amp; 31</text>
+    <text x="210" y="218">0000 0000 0000 0000 0000 0000 000<tspan fill="var(--accent)">1 0111</tspan></text>
+    <text x="580" y="218">= hộp 23</text>
+    <text x="340" y="242" text-anchor="middle" font-size="11" opacity=".75">16 bucket đọc 4 bit; 32 bucket đọc 5 bit. Bit thứ 5 là 1, nên 7 + 16 = 23.</text>
+  </g>
+</svg>
+<figcaption>Cùng một hash cho ra hộp 7 trong bảng 16 bucket và hộp 23 trong bảng 32 bucket. Chỉ các bit thấp được đọc.</figcaption>
+</figure>
+
+<p>Bạn có thể kiểm tra phép tính bucket bằng ví dụ chạy được. Nó chép lại đúng phép <code>spread</code> và mask của HashMap:</p>
+<pre><code>$ java java/examples/collections/HashMapInternals.java
+=== bucket index = (n - 1) &amp; spread(hashCode), table size n = 16
+apple   hashCode=   93029210  index= 1
+banana  hashCode=-1396355227  index= 0
+cherry  hashCode=-1361513063  index= 1
+Aa      hashCode=       2112  index= 0
+BB      hashCode=       2112  index= 0
+('Aa' and 'BB' have the same String hashCode: a real collision)</code></pre>
+<p>Để ý: <code>apple</code> và <code>cherry</code> có hash code khác nhau nhưng rơi vào cùng bucket 1, vì 4 bit cuối của chúng trùng nhau. <code>Aa</code> và <code>BB</code> có cùng hash code, nên luôn chung một bucket.</p>
+
+<h2>3. put(key, value), từng bước một</h2>
+<pre><code>map.put("cat", 1);
+<span class="c">Step 1  spread:  hash = 98262 ^ (98262 &gt;&gt;&gt; 16)        → 98263</span>
+<span class="c">Step 2  index:   (16 - 1) &amp; 98263                     → 7</span>
+<span class="c">Step 3  walk bucket 7: for each node, same hash? then == or equals()?</span>
+<span class="c">          found    → replace the value, return the old one</span>
+<span class="c">          not found → append a new node at the end of the chain</span>
+<span class="c">Step 4  ++size &gt; threshold (12)?                      → if yes, resize()</span></code></pre>
+<p>Bước 3 chính là thứ bài 0001 đã vẽ: so sánh hash trước, rồi <code>==</code> hoặc <code>equals</code>. Tìm thấy: thay value. Không thấy: nối thêm một node. Trong mã nguồn, <code>putVal</code> chỉ kiểm tra size sau khi thêm một key <em>mới</em>; thay value không bao giờ kích hoạt resize.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<h2>4. Khi bức tường đầy: resize lên 32</h2>
+<p>Key mới thứ 13 làm <code>size</code> thành 13, lớn hơn 12. Vì vậy map xây một bức tường 32 hộp thư và chuyển mọi lá thư sang. Java có tính lại mọi hash code không? Không. Khi resize, theo mã nguồn, "các phần tử của mỗi bin hoặc ở nguyên chỉ số cũ, hoặc dời đi một khoảng bằng lũy thừa của 2".<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> Không phải rehash toàn bộ hash code: chỉ một bit thêm vào quyết định.</p>
+<p>Quay lại mã bưu điện: bưu cục giờ đọc thêm một chữ số. Lá thư nào có chữ số mới là 0 thì ở nguyên kệ; lá thư nào có chữ số mới là 1 thì chuyển sang "kệ cũ + 16". Trong mã nguồn, phép kiểm tra đó đúng nghĩa đen là <code>(e.hash &amp; oldCap) == 0</code>.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Trước: 16 bucket, banana ở 0, apple và cherry ở 1, cat ở 7. Sau khi resize lên 32: banana ở lại 0, cherry ở lại 1, apple sang 17, cat sang 23, ngay bên dưới cột cũ của chúng.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="22" font-size="11" opacity=".75">trước: n = 16</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="80" y="30" width="36" height="40"/><rect x="116" y="30" width="36" height="40"/><rect x="152" y="30" width="36" height="40"/><rect x="188" y="30" width="36" height="40"/>
+      <rect x="224" y="30" width="36" height="40"/><rect x="260" y="30" width="36" height="40"/><rect x="296" y="30" width="36" height="40"/><rect x="332" y="30" width="36" height="40"/>
+      <rect x="368" y="30" width="36" height="40"/><rect x="404" y="30" width="36" height="40"/><rect x="440" y="30" width="36" height="40"/><rect x="476" y="30" width="36" height="40"/>
+      <rect x="512" y="30" width="36" height="40"/><rect x="548" y="30" width="36" height="40"/><rect x="584" y="30" width="36" height="40"/><rect x="620" y="30" width="36" height="40"/>
+    </g>
+    <g font-size="10" opacity=".6">
+      <text x="83" y="41">0</text><text x="119" y="41">1</text><text x="155" y="41">2</text><text x="191" y="41">3</text><text x="227" y="41">4</text><text x="263" y="41">5</text><text x="299" y="41">6</text><text x="335" y="41">7</text>
+      <text x="371" y="41">8</text><text x="407" y="41">9</text><text x="443" y="41">10</text><text x="479" y="41">11</text><text x="515" y="41">12</text><text x="551" y="41">13</text><text x="587" y="41">14</text><text x="623" y="41">15</text>
+    </g>
+    <text x="98" y="62" text-anchor="middle">b</text>
+    <text x="134" y="62" text-anchor="middle">a c</text>
+    <text x="350" y="62" text-anchor="middle">t</text>
+
+    <g fill="none" stroke="currentColor"><path d="M40 78v58M35 130l5 6 5-6"/></g>
+    <text x="52" y="102" font-size="11">resize(): đọc thêm một bit, hash &amp; 16</text>
+    <text x="52" y="118" font-size="11" opacity=".75">bit 0 → ở lại i</text>
+    <text x="220" y="118" font-size="11" opacity=".75">bit 1 → sang i + 16</text>
+
+    <text x="20" y="152" font-size="11" opacity=".75">0..15</text>
+    <text x="20" y="200" font-size="11" opacity=".75">16..31</text>
+    <g fill="none" stroke="currentColor" opacity=".6">
+      <rect x="80" y="140" width="36" height="40"/><rect x="116" y="140" width="36" height="40"/><rect x="152" y="140" width="36" height="40"/><rect x="188" y="140" width="36" height="40"/>
+      <rect x="224" y="140" width="36" height="40"/><rect x="260" y="140" width="36" height="40"/><rect x="296" y="140" width="36" height="40"/><rect x="332" y="140" width="36" height="40"/>
+      <rect x="368" y="140" width="36" height="40"/><rect x="404" y="140" width="36" height="40"/><rect x="440" y="140" width="36" height="40"/><rect x="476" y="140" width="36" height="40"/>
+      <rect x="512" y="140" width="36" height="40"/><rect x="548" y="140" width="36" height="40"/><rect x="584" y="140" width="36" height="40"/><rect x="620" y="140" width="36" height="40"/>
+      <rect x="80" y="188" width="36" height="40"/><rect x="152" y="188" width="36" height="40"/><rect x="188" y="188" width="36" height="40"/>
+      <rect x="224" y="188" width="36" height="40"/><rect x="260" y="188" width="36" height="40"/><rect x="296" y="188" width="36" height="40"/>
+      <rect x="368" y="188" width="36" height="40"/><rect x="404" y="188" width="36" height="40"/><rect x="440" y="188" width="36" height="40"/><rect x="476" y="188" width="36" height="40"/>
+      <rect x="512" y="188" width="36" height="40"/><rect x="548" y="188" width="36" height="40"/><rect x="584" y="188" width="36" height="40"/><rect x="620" y="188" width="36" height="40"/>
+    </g>
+    <rect x="116" y="188" width="36" height="40" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="332" y="188" width="36" height="40" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g font-size="10" opacity=".6">
+      <text x="83" y="151">0</text><text x="119" y="151">1</text><text x="155" y="151">2</text><text x="191" y="151">3</text><text x="227" y="151">4</text><text x="263" y="151">5</text><text x="299" y="151">6</text><text x="335" y="151">7</text>
+      <text x="371" y="151">8</text><text x="407" y="151">9</text><text x="443" y="151">10</text><text x="479" y="151">11</text><text x="515" y="151">12</text><text x="551" y="151">13</text><text x="587" y="151">14</text><text x="623" y="151">15</text>
+      <text x="83" y="199">16</text><text x="155" y="199">18</text><text x="191" y="199">19</text><text x="227" y="199">20</text><text x="263" y="199">21</text><text x="299" y="199">22</text>
+      <text x="371" y="199">24</text><text x="407" y="199">25</text><text x="443" y="199">26</text><text x="479" y="199">27</text><text x="515" y="199">28</text><text x="551" y="199">29</text><text x="587" y="199">30</text><text x="623" y="199">31</text>
+    </g>
+    <text x="119" y="199" font-size="10" fill="var(--accent)">17</text>
+    <text x="335" y="199" font-size="10" fill="var(--accent)">23</text>
+    <text x="98" y="172" text-anchor="middle">b</text>
+    <text x="134" y="172" text-anchor="middle">c</text>
+    <text x="134" y="220" text-anchor="middle" fill="var(--accent)">a</text>
+    <text x="350" y="220" text-anchor="middle" fill="var(--accent)">t</text>
+    <text x="340" y="250" text-anchor="middle" font-size="11" opacity=".8">a = apple, b = banana, c = cherry, t = cat. Mỗi entry vẫn ở đúng cột của nó.</text>
+  </g>
+</svg>
+<figcaption>Sau khi resize, mọi entry hoặc ở nguyên hộp cũ, hoặc dời xa đúng 16 hộp (vẽ ngay bên dưới). Không entry nào nhảy đi chỗ khác.</figcaption>
+</figure>
+
+<p>Ví dụ in ra đúng điều đó:</p>
+<pre><code>=== after resize to n = 32 an entry stays at i or moves to i + 16
+apple   n=16 -&gt;  1   n=32 -&gt; 17
+banana  n=16 -&gt;  0   n=32 -&gt;  0
+cherry  n=16 -&gt;  1   n=32 -&gt;  1</code></pre>
+<p>Vậy câu trả lời cho câu hỏi đầu bài: một map mặc định resize khi key thứ 13 được thêm vào (16 → 32), và lần nữa sau key thứ 24 (32 × 0.75 = 24, nên ở key thứ 25, 32 → 64). Mỗi entry ở lại <code>i</code> hoặc dời sang <code>i + n cũ</code>.</p>
+
+<h2>5. Khi một hộp thư tràn: tree bin (JDK 8+)</h2>
+<p>Tưởng tượng có người chơi khăm: ghi cùng một mã bưu điện lên hàng nghìn lá thư. Tất cả dồn vào một hộp thư, và muốn tìm lá thư của bạn thì phải đọc từng lá một. Một bucket dài làm việc tra cứu chậm dần về mức tuyến tính.</p>
+<p>Từ JDK 8, một bin được chuyển thành red-black tree gồm các <code>TreeNode</code> khi nó đạt <code>TREEIFY_THRESHOLD = 8</code> node (mã nguồn ghi: bin được chuyển đổi "khi thêm một phần tử vào bin đã có ít nhất chừng này node"), nhưng chỉ khi bảng có ít nhất <code>MIN_TREEIFY_CAPACITY = 64</code> bucket; nếu không, nó resize thay vào đó. Một tree bin quay về dạng list khi một lần resize chia nó xuống còn <code>UNTREEIFY_THRESHOLD = 6</code> node hoặc ít hơn.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> Các con số này là chi tiết cài đặt của OpenJDK, không phải lời hứa trong Javadoc.</p>
+<p>Điều này cho "trường hợp xấu nhất O(log n)" trong mỗi bucket. Với hash code ngẫu nhiên, số node trong bin tuân theo phân phối Poisson với trung bình khoảng 0.5, nên trong map khỏe mạnh thì cây rất hiếm.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a></p>
+
+<h3>Cây sắp xếp các key có cùng hash bằng cách nào?</h3>
+<p>Cây sắp key theo hash và, theo tài liệu, "khi key là <code>Comparable</code>", dùng phép so sánh để "giúp phân định khi hòa".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Nếu key không phải <code>Comparable</code>, cây không phân biệt được chúng và thường phải tìm cả hai nhánh. Ví dụ put 20.000 key đều trả về <code>hashCode() == 42</code>, rồi tra lại từng key:</p>
+<pre><code>=== 20000 keys that ALL share hashCode 42, then 20000 lookups
+not Comparable :  3529 ms
+Comparable     :    88 ms</code></pre>
+<p class="muted">Thời gian thay đổi theo máy và theo lần chạy (một lần chạy trước đo được 3658 ms so với 69 ms). Điều quan trọng là khoảng cách cỡ 40 lần.</p>
+
+<h3>Cái bẫy: một hashCode tồi</h3>
+<p>Theo tài liệu, một <code>hashCode</code> tồi là "cách chắc chắn để làm chậm hiệu năng của bất kỳ bảng băm nào".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Implement <code>Comparable</code> giúp hạn chế thiệt hại; một hash tốt thì tránh được nó. <strong>Cách sửa:</strong> xây <code>hashCode()</code> từ tất cả các field dùng trong <code>equals()</code>, bằng <code>Objects.hash(...)</code> hoặc một record.</p>
+
+<h2>6. Định cỡ map từ đầu</h2>
+<p>Nếu bạn biết trước kích thước, hãy tạo map đủ lớn: "Nếu initial capacity lớn hơn số entry tối đa chia cho load factor, sẽ không bao giờ có thao tác rehash nào xảy ra."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<pre><code><span class="c">// expect 1,000 entries, never resize</span>
+<span class="c">// JDK 19+, so JDK 21:</span>
+Map&lt;String, Order&gt; a = HashMap.newHashMap(1000);
+<span class="c">// JDK 8 / 17:</span>
+Map&lt;String, Order&gt; b = new HashMap&lt;&gt;((int) (1000 / 0.75f) + 1);
+<span class="c">// trap: 1024 buckets × 0.75 = 768, still resizes</span>
+Map&lt;String, Order&gt; c = new HashMap&lt;&gt;(1000);   <span class="hl">// wrong</span></code></pre>
+<p><code>HashMap.newHashMap(numMappings)</code> (JDK 19+) làm phép chia giúp bạn.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">HashMap.java</a> Dòng thứ ba là lỗi hay gặp: con số bạn truyền vào là <em>capacity</em>, không phải số entry. Mã nguồn làm tròn nó lên lũy thừa của 2 (<code>tableSizeFor</code>), nên 1000 thành 1024 bucket và map resize sau 768 entry.</p>
+<p>Cũng đừng đặt quá lớn: chi phí duyệt bằng capacity cộng size.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> Một map có một triệu bucket rỗng thì lặp qua rất chậm.</p>
+
+<h3>JDK 8, 17 và 21</h3>
+<ul>
+  <li><strong>JDK 8:</strong> tree bin và cách trộn <code>hash()</code> hiện tại xuất hiện. Mọi thứ trong bài này đều áp dụng.</li>
+  <li><strong>JDK 17:</strong> cấu trúc bên trong giống hệt.</li>
+  <li><strong>JDK 21:</strong> cấu trúc bên trong giống hệt, thêm <code>HashMap.newHashMap(n)</code> (có từ bản 19).</li>
+</ul>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">HashMap có capacity <code>n</code> tính chỉ số bucket như thế nào?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>(n - 1) &amp; hash</code></button>
+    <button class="opt"><code>hash &gt;&gt;&gt; n</code></button>
+    <button class="opt"><code>n % hashCode</code></button>
+    <button class="opt"><code>hash / n</code></button>
+  </div>
+  <div class="why"><code>putVal</code> dùng <code>tab[(n - 1) &amp; hash]</code>. Vì <code>n</code> là lũy thừa của 2, phép này giữ các bit thấp, giống <code>hash % n</code> nhưng rẻ hơn.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao HashMap XOR hash code với <code>h &gt;&gt;&gt; 16</code> trước?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chỉ bit thấp chọn bucket, nên trộn bit cao xuống</button>
+    <button class="opt">Để hash code của mọi key là duy nhất trong map</button>
+    <button class="opt">Để biến hash code âm thành chỉ số dương hợp lệ</button>
+    <button class="opt">Để mã hóa key cho thread khác không đọc được</button>
+  </div>
+  <div class="why">Mask chỉ đọc vài bit cuối. Trộn bit giúp các bit cao ảnh hưởng tới bucket, nên các key chỉ khác nhau ở bit cao không bị dồn vào cùng chỗ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một <code>new HashMap&lt;&gt;()</code> nhận lần lượt các key mới. Lệnh <code>put</code> thứ mấy kích hoạt lần resize đầu tiên?</p>
+  <div class="options">
+    <button class="opt" data-correct>Thứ 13, vì 16 × 0.75 = 12</button>
+    <button class="opt">Thứ 17, khi cả 16 bucket đều đã dùng</button>
+    <button class="opt">Thứ 9, khi một bucket có 8 node</button>
+    <button class="opt">Thứ 16, khi mảng đã đầy hoàn toàn</button>
+  </div>
+  <div class="why">Ngưỡng là capacity × load factor = 12. Sau key mới thứ 13, <code>++size &gt; threshold</code> là true, nên bảng nhân đôi lên 32.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Khi resize từ 16 lên 32, entry ở chỉ số <code>i</code> đi đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ở lại i hoặc dời sang i + 16</button>
+    <button class="opt">Luôn dời sang chỉ số i × 2</button>
+    <button class="opt">Sang một chỉ số ngẫu nhiên mới</button>
+    <button class="opt">Luôn quay về chỉ số 0</button>
+  </div>
+  <div class="why">Mask mới đọc thêm một bit. Bit đó là 0 thì entry ở lại; là 1 thì dời đi đúng bằng capacity cũ. <code>"cat"</code>: 7 → 23.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trong OpenJDK, khi nào một bin trở thành red-black tree?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ở 8 node, nếu bảng có ít nhất 64 bucket</button>
+    <button class="opt">Ngay lần collision đầu tiên trong bucket đó</button>
+    <button class="opt">Ở 4 node, bất kể bảng lớn hay nhỏ</button>
+    <button class="opt">Ở mỗi lần resize, cho mọi bucket trong bảng</button>
+  </div>
+  <div class="why"><code>TREEIFY_THRESHOLD</code> là 8 và <code>MIN_TREEIFY_CAPACITY</code> là 64. Dưới 64 bucket thì map resize thay vào đó.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">20.000 key đều trả về <code>hashCode() == 42</code>. Điều gì làm việc tra cứu nhanh hơn nhiều?</p>
+  <div class="options">
+    <button class="opt" data-correct>Cho class của key implement Comparable</button>
+    <button class="opt">Gọi map.clear() trước mỗi lần tra cứu</button>
+    <button class="opt">Dùng load factor lớn hơn, ví dụ 2.0</button>
+    <button class="opt">Cho class của key override toString()</button>
+  </div>
+  <div class="why">Cây dùng <code>compareTo</code> để phân định các hash bằng nhau: 3529 ms giảm còn 88 ms trong lần chạy của chúng ta. Một <code>hashCode</code> tốt thì tránh được hẳn vấn đề.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn dự kiến 1.000 entry và viết <code>new HashMap&lt;&gt;(1000)</code>. Bug ở đâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó thành 1024 bucket và vẫn resize sau 768</button>
+    <button class="opt">Nó ném exception vì 1000 không phải lũy thừa của 2</button>
+    <button class="opt">Nó bỏ qua con số và bắt đầu với 16 bucket</button>
+    <button class="opt">Không có bug: nó không bao giờ resize với 1.000 key</button>
+  </div>
+  <div class="why">Tham số là capacity, được làm tròn lên lũy thừa của 2. 1024 × 0.75 = 768. Dùng <code>HashMap.newHashMap(1000)</code> trên JDK 19+.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Chuyện gì xảy ra khi tôi gọi <code>map.put(k, v)</code> trên một HashMap?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Nó trộn hash code: <code>h ^ (h &gt;&gt;&gt; 16)</code>, để bit cao cũng có tác dụng.</label></li>
+      <li><label><input type="checkbox"> Index = <code>(n - 1) &amp; hash</code>; <code>n</code> là lũy thừa của 2 (mặc định 16).</label></li>
+      <li><label><input type="checkbox"> Nó duyệt bucket: so hash, rồi <code>equals</code>; thay value hoặc nối thêm node.</label></li>
+      <li><label><input type="checkbox"> Khi size vượt capacity × 0.75 (mặc định 12), bảng nhân đôi.</label></li>
+      <li><label><input type="checkbox"> Khi resize, mỗi entry ở lại <code>i</code> hoặc dời sang <code>i + n cũ</code>.</label></li>
+      <li><label><input type="checkbox"> Từ JDK 8, bin có từ 8 node trở lên thành red-black tree nếu bảng có từ 64 bucket.</label></li>
+      <li><label><input type="checkbox"> Định cỡ trước bằng <code>HashMap.newHashMap(n)</code> trên JDK 19+.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Đầu tiên Java gọi <code>hashCode()</code> trên key rồi trộn nó bằng cách XOR 16 bit cao xuống các bit thấp, vì chỉ các bit thấp mới chọn bucket. Index là <code>(n - 1) &amp; hash</code>, và cách này đúng được vì kích thước bảng luôn là lũy thừa của 2, mặc định là 16. Sau đó nó duyệt bucket đó: so hash trước, rồi <code>equals</code>. Nếu key đã có thì thay value; không thì nối thêm một node. Sau khi thêm một key mới, nếu size vượt capacity nhân load factor, tức 12 với map mặc định, thì bảng nhân đôi. Mỗi entry khi đó hoặc ở nguyên index, hoặc dời đi đúng bằng capacity cũ, nên không phải rehash thật sự. Từ Java 8, nếu một bucket đạt 8 node và bảng có ít nhất 64 bucket thì bucket đó thành red-black tree, nên trường hợp xấu nhất là O(log n) thay vì O(n). Nếu biết trước kích thước, em dùng <code>HashMap.newHashMap</code> để tránh resize."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0030-trace-a-put.vi.md">Bài tập 0030: lần theo một lệnh put</a>. Tự tính các chỉ số bằng tay trước, rồi chạy chương trình để kiểm tra.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/HashMapInternals.java"><code>HashMapInternals.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior giờ có thể hỏi: <em>"HashMap có thread safe không? Chuyện gì có thể hỏng nếu hai thread cùng <code>put</code>?"</em> (không; xem <a href="0039-concurrent-collections.vi.html">bài 0039</a>), hoặc <em>"TreeMap quyết định hai key là một bằng cách nào?"</em> Đó là <a href="0031-comparable-comparator-and-ordering.vi.html">bài 0031</a>, bài tiếp theo.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">Mã nguồn OpenJDK 21: HashMap.java</a>. Đọc phần chú thích 'Implementation notes' ở đầu class, rồi đến <code>putVal</code> và <code>resize</code>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Bạn minh họa bước XOR với một key khác được không?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0041-review-collections-basics.vi.html">← Ôn tập 2: collection cơ bản và HashMap</a> &nbsp;|&nbsp; <a href="0031-comparable-comparator-and-ordering.vi.html">Java sắp xếp mọi thứ theo thứ tự như thế nào →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21 và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/HashMap.java">Mã nguồn OpenJDK 21: HashMap.java</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

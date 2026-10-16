@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 1: Design pattern là gì?</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Design pattern là gì?</h1>
+<p class="meta">Design Patterns · Bài 0001 · bước 1/30 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-what-is-a-design-pattern.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> định nghĩa được design pattern, nói được nó không phải là gì, và kể tên các phần trong một bản mô tả pattern.</div>
+
+<h2>Định nghĩa</h2>
+<p>"Design pattern là những giải pháp điển hình cho các vấn đề thường gặp trong thiết kế phần mềm." Chúng là những bản thiết kế có thể tùy biến, không phải code dựng sẵn để bạn copy. Khác với thuật toán, thứ "luôn định nghĩa một tập hành động rõ ràng để đạt được mục tiêu nào đó", "pattern là một mô tả giải pháp ở mức cao hơn": cùng một pattern có thể trông rất khác nhau ở các chương trình khác nhau.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+<h2>Một pattern được mô tả thế nào</h2>
+<ul><li><strong>Intent</strong> (mục đích): tóm tắt vấn đề và giải pháp.</li><li><strong>Motivation</strong> (động cơ): vấn đề được phân tích sâu và cách pattern giải quyết nó.</li><li><strong>Structure</strong> (cấu trúc): các class và quan hệ giữa chúng.</li><li><strong>Code example</strong> (ví dụ code) bằng một ngôn ngữ thật.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></li></ul>
+<p>Khóa học này đi theo đúng khung đó: mỗi bài nêu intent, một ví dụ Java chạy được (đã kiểm tra trên JDK 21), ưu và nhược điểm, các pattern liên quan, và chỗ bạn gặp nó trong JDK.</p>
+<h2>Kiến thức cần có</h2>
+<p>Pattern được xây từ những nền tảng OOP: interface, đa hình, composition, đóng gói. Nếu bạn thấy mấy thứ này còn lung lay, hãy làm <a href="../../oop/index.vi.html">lộ trình OOP</a> trước, nhất là các bài về <a href="../../oop/lessons/0010-interfaces-as-contracts.vi.html">interface</a>, <a href="../../oop/lessons/0011-composition-over-inheritance.vi.html">composition</a> và <a href="../../oop/lessons/0017-single-responsibility-principle.vi.html">SOLID</a>.</p>
+<div class="aside">Thử bản đồ JDK trước: chạy <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a> để thấy mười hai pattern bạn vẫn đang dùng hằng ngày.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Design pattern là...?</p>
+  <button>Một quy tắc cú pháp</button>
+  <button>Một thuật toán hoàn chỉnh</button>
+  <button data-correct>Giải pháp điển hình cho vấn đề hay gặp</button>
+  <button>Một library</button>
+  <p class="explain">Giải pháp điển hình cho các vấn đề thường gặp trong thiết kế phần mềm.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Có thể copy một pattern như code dựng sẵn không?</p>
+  <button>Có, luôn luôn</button>
+  <button data-correct>Không, nó là bản thiết kế</button>
+  <button>Chỉ trong Java</button>
+  <button>Chỉ với GUI</button>
+  <p class="explain">Pattern là bản thiết kế có thể tùy biến.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Pattern so với thuật toán?</p>
+  <button>Ở mức thấp hơn</button>
+  <button>Chỉ lúc runtime</button>
+  <button data-correct>Mô tả ở mức cao hơn</button>
+  <button>Giống hệt nhau</button>
+  <p class="explain">Pattern là mô tả giải pháp ở mức cao hơn.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Phần nào thể hiện các class và quan hệ giữa chúng?</p>
+  <button data-correct>Structure</button>
+  <button>Motivation</button>
+  <button>Code example</button>
+  <button>Intent</button>
+  <p class="explain">Structure là phần biểu diễn trực quan các class và quan hệ giữa chúng.<a class="cite" href="https://refactoring.guru/design-patterns/what-is-pattern">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-spot-patterns.vi.md">Bài tập 1: nhận diện pattern</a></p>
+<p>Ví dụ chạy được: <a href="../examples/PatternsInJdkDemo.java"><code>PatternsInJdkDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern? (Refactoring.Guru)</a>. Trang ngắn.</p>
+<p> &nbsp;|&nbsp; <a href="0002-classification-and-catalog.vi.html">Danh mục: creational, structural, behavioral →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/what-is-pattern">What is a design pattern? (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

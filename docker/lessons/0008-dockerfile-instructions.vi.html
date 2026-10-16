@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 8: Các lệnh trong Dockerfile: ENV vs ARG, COPY vs ADD, EXPOSE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Các lệnh trong Dockerfile: ENV vs ARG, COPY vs ADD, EXPOSE</h1>
+<p class="meta">Docker · Bài 0008 · bước 3/12 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-dockerfile-instructions.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> biết chọn giữa ENV và ARG, giữa COPY và ADD, và biết rằng EXPOSE không publish port.</div>
+
+<h2>Các lệnh, mỗi lệnh một dòng</h2>
+<table><tr><th>Lệnh</th><th>Ý nghĩa<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></th></tr>
+<tr><td><code>FROM</code></td><td>tạo một build stage mới từ một base image; là lệnh đầu tiên (sau <code>ARG</code> nếu có)</td></tr>
+<tr><td><code>RUN</code></td><td>chạy các lệnh lúc build; tạo ra một layer</td></tr>
+<tr><td><code>COPY</code> / <code>ADD</code></td><td>COPY chuyển file từ build context vào image; ADD tương tự nhưng còn xử lý được URL từ xa và giải nén file tar</td></tr>
+<tr><td><code>ENV</code></td><td>biến môi trường được giữ lại trong image cuối cùng và dùng được ở các lệnh phía sau</td></tr>
+<tr><td><code>ARG</code></td><td>biến lúc build, truyền vào bằng <code>--build-arg</code>; không được nhúng vào image cuối cùng</td></tr>
+<tr><td><code>EXPOSE</code></td><td>mô tả ứng dụng lắng nghe trên những port nào; chỉ để ghi chú, không publish</td></tr>
+<tr><td><code>USER</code>, <code>WORKDIR</code>, <code>VOLUME</code>, <code>HEALTHCHECK</code></td><td>user/group, thư mục làm việc, điểm mount, health probe</td></tr></table>
+<h2>Kiểm chứng</h2>
+<pre><code>cd docker/examples &amp;&amp; ./05-cmd-entrypoint-arg-env.sh
+ARG is not visible at runtime, ENV is
+APP_MODE=prod BUILD_ID=&lt;unset&gt;</code></pre>
+<p>Quy tắc thực tế: ưu tiên <code>COPY</code>, trừ khi bạn cần đúng những gì <code>ADD</code> làm thêm (đây là khuyến nghị phổ biến; trang reference chỉ nêu sự khác biệt). Đừng bao giờ truyền secret qua <code>ARG</code> hay <code>ENV</code> nếu image được chia sẻ (tôi suy ra từ câu "được giữ lại trong image cuối cùng"). File: <a href="../examples/entrypoint-demo/Dockerfile"><code>entrypoint-demo/Dockerfile</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Biến nào chỉ tồn tại lúc build?</p>
+  <button>USER</button>
+  <button>PATH</button>
+  <button>ENV</button>
+  <button data-correct>ARG</button>
+  <p class="explain">Giá trị ARG được truyền vào lúc build và không được nhúng vào image cuối cùng.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. EXPOSE làm gì?</p>
+  <button>Publish port ra ngoài</button>
+  <button>Mở port trên firewall</button>
+  <button>Khởi động service</button>
+  <button data-correct>Ghi chú về một port</button>
+  <p class="explain">Nó mô tả các port ứng dụng lắng nghe, nhưng không publish chúng.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. COPY vs ADD: ADD xử lý thêm được gì?</p>
+  <button>Symbolic link</button>
+  <button>Tạo user</button>
+  <button>Biến môi trường</button>
+  <button data-correct>URL và file tar</button>
+  <p class="explain">ADD còn xử lý được URL từ xa và giải nén file tar.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. FROM phải đặt ở đâu?</p>
+  <button>Ở đâu cũng được</button>
+  <button>Dòng cuối cùng</button>
+  <button>Sau RUN</button>
+  <button data-correct>Đầu tiên, sau ARG</button>
+  <p class="explain">FROM là lệnh đầu tiên, ngoại trừ ARG hoặc parser directive (nếu có).<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-review-a-dockerfile.vi.md">Bài tập 0008: review một Dockerfile</a></p>
+<p>Ví dụ chạy được: <a href="../examples/entrypoint-demo/Dockerfile"><code>entrypoint-demo/Dockerfile</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a>. Đọc phần tóm tắt của các lệnh FROM, RUN, CMD, ENTRYPOINT, COPY, ENV, ARG, EXPOSE.</p>
+<p><a href="0007-run-flags-and-container-lifecycle.vi.html">← docker run: các flag và vòng đời của container</a> &nbsp;|&nbsp; <a href="0002-layer-cache-and-dockerfile-order.vi.html">Layer cache và thứ tự lệnh trong Dockerfile →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

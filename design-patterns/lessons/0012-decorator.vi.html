@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 12: Decorator</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Decorator</h1>
+<p class="meta">Design Patterns · Bài 0012 · bước 12/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-decorator.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> thêm hành vi bằng cách bọc một object trong một object khác có cùng interface, và nhận ra các decorator trong JDK.</div>
+
+<h2>Mục đích</h2>
+<p>Decorator là "một structural design pattern cho phép bạn gắn thêm hành vi mới cho object bằng cách đặt object đó vào trong những wrapper object đặc biệt chứa các hành vi này." Hãy dùng nó để gán thêm hành vi lúc runtime mà không làm hỏng code có sẵn, và khi mở rộng bằng kế thừa thì vướng víu hoặc không thể (class final).<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/DecoratorDemo.java
+espresso + sugar + milk = 4
+espresso + sugar + sugar = 3
+BufferedReader: line1 | line2
+unmodifiable view reads through: [a, b]
+writes rejected by the wrapper</code></pre><p>Mỗi decorator implement <code>Coffee</code> và giữ một <code>Coffee</code>, bổ sung vào phần mô tả và giá; các lớp bọc có thể lặp lại. Decorator trong JDK: <code>BufferedReader</code> bọc bất kỳ reader nào ("đọc văn bản từ một character-input stream, có đệm các ký tự"),<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/BufferedReader.html">[2]</a> và <code>Collections.unmodifiableList</code> trả về một wrapper mà thao tác đọc "đọc xuyên qua" tới list phía sau, còn thao tác sửa thì ném <code>UnsupportedOperationException</code><a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Collections.html">[3]</a> (đây là wrapper/view: tôi xếp nó vào loại wrapper kiểu decorator). Mã nguồn: <a href="../examples/DecoratorDemo.java"><code>DecoratorDemo.java</code></a>.</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Mở rộng hành vi mà không cần subclass mới</li><li>Thêm hoặc bỏ trách nhiệm lúc runtime</li><li>Kết hợp hành vi bằng cách chồng nhiều wrapper</li><li>Class nhỏ, tập trung</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Khó gỡ một wrapper cụ thể ra khỏi chồng</li><li>Hành vi có thể phụ thuộc vào thứ tự chồng</li><li>Code cấu hình có thể trở nên lộn xộn</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a> Adapter thay đổi interface, Decorator giữ nguyên hoặc mở rộng nó, Proxy giữ y hệt; Strategy thay đổi "ruột" của object, Decorator thay đổi "vỏ".</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một decorator implement...?</p>
+  <button>Một interface khác</button>
+  <button>Không interface nào</button>
+  <button>Chỉ Runnable</button>
+  <button data-correct>Cùng interface với object được bọc</button>
+  <p class="explain">Nó bọc một object mà vẫn giữ nguyên interface.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Decorator so với Strategy?</p>
+  <button>Không cái nào</button>
+  <button>Như nhau</button>
+  <button>Decorator đổi ruột</button>
+  <button data-correct>Decorator đổi vỏ</button>
+  <p class="explain">Strategy đổi phần ruột; Decorator đổi phần vỏ.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Decorator trong JDK?</p>
+  <button data-correct>BufferedReader</button>
+  <button>Thread</button>
+  <button>Integer</button>
+  <button>Object</button>
+  <p class="explain">BufferedReader bọc một reader khác.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/BufferedReader.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Nhược điểm?</p>
+  <button>Chỉ dùng static</button>
+  <button>Cần thread</button>
+  <button>Mất đa hình</button>
+  <button data-correct>Thứ tự chồng có ý nghĩa</button>
+  <p class="explain">Hành vi có thể phụ thuộc vào thứ tự các wrapper.<a class="cite" href="https://refactoring.guru/design-patterns/decorator">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-logging-decorator.vi.md">Bài tập 12: một logging decorator</a></p>
+<p>Ví dụ chạy được: <a href="../examples/DecoratorDemo.java"><code>DecoratorDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/decorator">Decorator (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0011-composite.vi.html">← Composite</a> &nbsp;|&nbsp; <a href="0013-facade.vi.html">Facade →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/decorator">Decorator (Refactoring.Guru)</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/BufferedReader.html">BufferedReader Javadoc</a> · [3] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/Collections.html">Collections Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

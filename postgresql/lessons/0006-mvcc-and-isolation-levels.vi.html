@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 6: MVCC và isolation level</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>MVCC và isolation level</h1>
+<p class="meta">PostgreSQL · Bài 0006 · bước 11/13 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-mvcc-and-isolation-levels.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích MVCC trong một câu và chỉ ra khác biệt giữa READ COMMITTED và REPEATABLE READ bằng hai session chạy thật.</div>
+
+<h2>MVCC</h2>
+<p>Với Multiversion Concurrency Control, "đọc không bao giờ chặn ghi và ghi không bao giờ chặn đọc": lock lấy để query không xung đột với lock lấy để ghi. Mỗi câu lệnh nhìn thấy một snapshot của dữ liệu.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[1]</a></p>
+<h2>Bốn mức trong PostgreSQL</h2>
+<table>
+<tr><th>Mức</th><th>Dirty</th><th>Non-repeatable</th><th>Phantom</th><th>Serialization anomaly</th></tr>
+<tr><td>Read uncommitted</td><td>không có trong PG</td><td>có thể xảy ra</td><td>có thể xảy ra</td><td>có thể xảy ra</td></tr>
+<tr><td>Read committed</td><td>không</td><td>có thể xảy ra</td><td>có thể xảy ra</td><td>có thể xảy ra</td></tr>
+<tr><td>Repeatable read</td><td>không</td><td>không</td><td>không có trong PG</td><td>có thể xảy ra</td></tr>
+<tr><td>Serializable</td><td>không</td><td>không</td><td>không</td><td>không</td></tr>
+</table>
+<p>Read committed là mức mặc định. Read uncommitted của PostgreSQL "hoạt động giống Read Committed", và Repeatable read của nó không cho phép phantom read.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a> Transaction Serializable có thể thất bại với lỗi "could not serialize access"; ứng dụng "phải sẵn sàng retry transaction".<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+<h2>Hai session chạy thật</h2>
+<pre><code>cd postgresql/examples &amp;&amp; ./06-isolation.sh
+=== session A isolation level: READ COMMITTED
+A first read : 100
+A second read: 200       # B committed in between: a non-repeatable read
+=== session A isolation level: REPEATABLE READ
+A first read : 100
+A second read: 100       # A keeps its snapshot</code></pre>
+<p>Source: <a href="../examples/06-isolation.sh"><code>06-isolation.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Nguyên tắc MVCC trong PostgreSQL?</p>
+  <button data-correct>Đọc không chặn ghi</button>
+  <button>Đọc thì lock table</button>
+  <button>Ghi chặn mọi lần đọc</button>
+  <button>Chỉ một session chạy</button>
+  <p class="explain">Đọc không bao giờ chặn ghi và ghi không bao giờ chặn đọc.<a class="cite" href="https://www.postgresql.org/docs/current/mvcc-intro.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Isolation level mặc định của PostgreSQL?</p>
+  <button>Serializable</button>
+  <button data-correct>Read committed</button>
+  <button>Repeatable read</button>
+  <button>Read uncommitted</button>
+  <p class="explain">Read committed là mức mặc định.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Đọc lại thì thấy thay đổi đã commit của session khác. Gọi là gì?</p>
+  <button data-correct>Non-repeatable read</button>
+  <button>Lost update</button>
+  <button>Deadlock</button>
+  <button>Dirty read</button>
+  <p class="explain">Non-repeatable read là khi đọc lại thấy dữ liệu đã bị sửa bởi một transaction commit sau lần đọc đầu tiên.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Transaction Serializable gặp serialization error. Làm gì?</p>
+  <button data-correct>Retry transaction</button>
+  <button>Hạ isolation level</button>
+  <button>Drop table đi</button>
+  <button>Bỏ qua lỗi</button>
+  <p class="explain">Ứng dụng phải sẵn sàng retry khi gặp serialization failure.<a class="cite" href="https://www.postgresql.org/docs/current/transaction-iso.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-two-sessions.vi.md">Bài tập 0006: hai session</a></p>
+<p>Ví dụ chạy được: <a href="../examples/06-isolation.sh"><code>06-isolation.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL Docs: Transaction Isolation</a>. Đọc phần giới thiệu và các mục con Read Committed, Repeatable Read.</p>
+<p><a href="0005-reading-explain.vi.html">← Đọc EXPLAIN và EXPLAIN ANALYZE</a> &nbsp;|&nbsp; <a href="0012-row-locks-and-deadlocks.vi.html">Row lock, SELECT FOR UPDATE và deadlock →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/mvcc-intro.html">PostgreSQL Docs: Introduction to concurrency control (MVCC)</a> · [2] <a href="https://www.postgresql.org/docs/current/transaction-iso.html">PostgreSQL Docs: Transaction Isolation</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

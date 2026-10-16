@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 12: Restart policy</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Restart policy</h1>
+<p class="meta">Docker · Bài 0012 · bước 11/12 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0012-restart-policies.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn restart policy cho một service và chỉ ra Docker restart một container bị lỗi bao nhiêu lần.</div>
+
+<h2>Bốn policy</h2>
+<ul><li><code>no</code> (mặc định): không restart.</li>
+<li><code>on-failure[:max-retries]</code>: restart nếu container thoát với mã khác 0; có thể giới hạn số lần thử.</li>
+<li><code>always</code>: luôn restart; nếu bạn đã stop thủ công thì nó chỉ restart khi daemon khởi động lại hoặc khi bạn tự restart.</li>
+<li><code>unless-stopped</code>: giống <code>always</code>, nhưng container đã bị stop thì vẫn nằm yên, kể cả sau khi daemon khởi động lại.<a class="cite" href="https://docs.docker.com/engine/containers/start-containers-automatically/">[1]</a></li></ul>
+<p>Đặt bằng <code>docker run --restart ...</code>.<a class="cite" href="https://docs.docker.com/reference/cli/docker/container/run/">[2]</a></p>
+<h2>Quan sát</h2>
+<pre><code>cd docker/examples &amp;&amp; ./06-restart-policies.sh
+/r-no-...   policy=no         restarts=0 state=exited exit=1
+/r-fail-... policy=on-failure restarts=3 state=exited exit=1</code></pre>
+<p>Cả hai container đều chạy <code>exit 1</code>. Với <code>on-failure:3</code>, Docker thử lại ba lần rồi bỏ cuộc. Source: <a href="../examples/06-restart-policies.sh"><code>06-restart-policies.sh</code></a>.</p>
+<div class="aside">Restart policy chỉ restart container khi nó thoát; nó không biết container có đang chạy nhưng không healthy hay không. Đó là việc của health check và, trong Kubernetes, của liveness probe (<a href="../../kubernetes/lessons/0006-probes.vi.html">bài về probe</a>).</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Restart policy mặc định là gì?</p>
+  <button data-correct>no</button>
+  <button>always</button>
+  <button>unless-stopped</button>
+  <button>on-failure</button>
+  <p class="explain">no là mặc định.<a class="cite" href="https://docs.docker.com/engine/containers/start-containers-automatically/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Policy nào chỉ restart khi thoát với mã khác 0?</p>
+  <button>always</button>
+  <button data-correct>on-failure</button>
+  <button>no</button>
+  <button>unless-stopped</button>
+  <p class="explain">on-failure restart khi container thoát do lỗi.<a class="cite" href="https://docs.docker.com/engine/containers/start-containers-automatically/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Đã stop thủ công, rồi daemon khởi động lại. always làm gì?</p>
+  <button>Xóa container</button>
+  <button>Pull lại image</button>
+  <button data-correct>Restart container</button>
+  <button>Để nguyên trạng thái dừng</button>
+  <p class="explain">always restart khi daemon khởi động lại, kể cả khi container đã bị stop thủ công.<a class="cite" href="https://docs.docker.com/engine/containers/start-containers-automatically/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. on-failure:3 với một app liên tục crash. Thấy bao nhiêu lần restart?</p>
+  <button>Một</button>
+  <button>Không giới hạn</button>
+  <button data-correct>Ba</button>
+  <button>Không</button>
+  <p class="explain">Bản demo ghi nhận restarts=3 rồi container nằm ở trạng thái exited.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0012-choose-policies.vi.md">Bài tập 0012: chọn policy</a></p>
+<p>Ví dụ chạy được: <a href="../examples/06-restart-policies.sh"><code>06-restart-policies.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/engine/containers/start-containers-automatically/">Start containers automatically</a>. Trang ngắn.</p>
+<p><a href="0005-memory-cpu-limits-and-the-jvm.vi.html">← Giới hạn memory và CPU, và JVM nhìn thấy gì</a> &nbsp;|&nbsp; <a href="0006-pinning-nonroot-and-signals.vi.html">Image được pin phiên bản, chạy non-root và xử lý signal đúng →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/engine/containers/start-containers-automatically/">Start containers automatically</a> · [2] <a href="https://docs.docker.com/reference/cli/docker/container/run/">docker container run reference</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

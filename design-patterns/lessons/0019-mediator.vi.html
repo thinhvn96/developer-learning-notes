@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 19: Mediator</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Mediator</h1>
+<p class="meta">Design Patterns · Bài 0019 · bước 19/30 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0019-mediator.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> tập trung cách các object giao tiếp về một chỗ, để chúng phụ thuộc vào mediator chứ không phụ thuộc lẫn nhau.</div>
+
+<h2>Mục đích</h2>
+<p>Mediator là "một behavioral design pattern cho phép bạn giảm bớt các phụ thuộc chằng chịt giữa các object." Hãy dùng nó khi các class dính chặt vào nhau và khó thay đổi, khi component không thể tái sử dụng vì vướng phụ thuộc, hoặc khi bạn phải tạo cả đống subclass chỉ để tái sử dụng hành vi.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/MediatorDemo.java
+ann says: hi all
+  bob got &#x27;hi all&#x27; from ann
+  cy got &#x27;hi all&#x27; from ann
+bob says: hello ann
+  ann got &#x27;hello ann&#x27; from bob
+  cy got &#x27;hello ann&#x27; from bob
+each user knows only the room, not the other 2 users</code></pre><p>Các user chỉ biết <code>ChatRoom</code>; thêm một user không làm thay đổi user nào khác. Mã nguồn: <a href="../examples/MediatorDemo.java"><code>MediatorDemo.java</code></a>. So sánh với Observer: mục đích của mediator "là loại bỏ phụ thuộc qua lại giữa một nhóm component trong hệ thống" bằng cách bắt chúng cùng phụ thuộc vào một mediator, còn Observer thiết lập các subscription một chiều, linh động.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Việc giao tiếp được gom về một chỗ</li><li>Thêm mediator mới mà không sửa component</li><li>Giảm phụ thuộc; component tái sử dụng được</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Mediator có thể biến thành God object</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a> Mediator có thể được cài đặt bằng Observer; Facade chỉ đơn giản hóa việc truy cập, còn Mediator tập trung hóa việc giao tiếp.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mediator giảm bớt...?</p>
+  <button>Bộ nhớ</button>
+  <button>Chỉ số lượng class</button>
+  <button>Thread</button>
+  <button data-correct>Phụ thuộc chằng chịt</button>
+  <p class="explain">Nó giảm bớt các phụ thuộc chằng chịt giữa các object.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Các component nói chuyện với...?</p>
+  <button>Nhau</button>
+  <button data-correct>Mediator</button>
+  <button>Không ai cả</button>
+  <button>Database</button>
+  <p class="explain">Các user chỉ gọi ChatRoom.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Rủi ro?</p>
+  <button>Trạng thái static</button>
+  <button>Không có interface</button>
+  <button data-correct>God object</button>
+  <button>Khởi động chậm</button>
+  <p class="explain">Mediator có thể biến thành God object.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Mediator so với Observer?</p>
+  <button>Observer loại bỏ chúng</button>
+  <button>Không cái nào</button>
+  <button data-correct>Mediator loại bỏ phụ thuộc qua lại</button>
+  <button>Như nhau</button>
+  <p class="explain">Mediator loại bỏ phụ thuộc qua lại giữa các component.<a class="cite" href="https://refactoring.guru/design-patterns/mediator">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0019-air-traffic-control.vi.md">Bài tập 19: điều khiển không lưu</a></p>
+<p>Ví dụ chạy được: <a href="../examples/MediatorDemo.java"><code>MediatorDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/mediator">Mediator (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0018-iterator.vi.html">← Iterator</a> &nbsp;|&nbsp; <a href="0020-memento.vi.html">Memento →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/mediator">Mediator (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

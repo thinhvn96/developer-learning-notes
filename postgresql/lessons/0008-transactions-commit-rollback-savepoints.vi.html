@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 8: Transaction: COMMIT, ROLLBACK và savepoint</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Transaction: COMMIT, ROLLBACK và savepoint</h1>
+<p class="meta">PostgreSQL · Bài 0008 · bước 4/13 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-transactions-commit-rollback-savepoints.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> gói các bước vào một transaction, dự đoán được chuyện gì xảy ra khi có lỗi, và dùng savepoint để rollback một phần.</div>
+
+<h2>Tất cả hoặc không gì cả</h2>
+<p>Transaction "gói nhiều bước thành một thao tác duy nhất, hoặc tất cả hoặc không gì cả". Các trạng thái trung gian không hiển thị với transaction khác, và nếu có sự cố khiến transaction không hoàn tất được thì không bước nào ảnh hưởng tới database.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a> Dùng <code>BEGIN ... COMMIT</code>, hoặc <code>ROLLBACK</code> để hủy. Không có <code>BEGIN</code> thì mỗi câu lệnh là một transaction riêng.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+<h2>Savepoint</h2>
+<p>Savepoint "cho phép bạn chọn lọc hủy bỏ một phần của transaction trong khi vẫn commit phần còn lại": <code>SAVEPOINT s</code>, rồi <code>ROLLBACK TO s</code>. Savepoint vẫn còn được định nghĩa sau khi rollback về nó.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+<pre><code>./run.sh 08-transactions.sql
+BEGIN; UPDATE Alice -30; UPDATE Bob +30; COMMIT;        -&gt; Alice 70, Bob 80
+BEGIN; ...second UPDATE violates CHECK...; COMMIT;
+   ERROR: new row for relation "accounts" violates check constraint
+   (the COMMIT was answered with ROLLBACK)               -&gt; balances unchanged
+SAVEPOINT s1; ...; ROLLBACK TO s1; ...; COMMIT;          -&gt; Alice 60, Bob 80, Wally 10</code></pre>
+<p>Chú ý trường hợp ở giữa: sau khi có lỗi bên trong một transaction block, PostgreSQL hủy toàn bộ transaction; câu <code>COMMIT</code> phía sau rốt cuộc thành rollback (đã quan sát trong lần chạy). Source: <a href="../examples/08-transactions.sql"><code>08-transactions.sql</code></a>. Đây chính là thứ <code>@Transactional</code> của Spring tự động hóa (<a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.vi.html">bài học</a>), và propagation <code>NESTED</code> tương ứng với savepoint.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Transaction là...?</p>
+  <button>Chỉ đọc</button>
+  <button>Một câu lệnh</button>
+  <button data-correct>Tất cả hoặc không</button>
+  <button>Cố gắng hết sức</button>
+  <p class="explain">Nó gói các bước thành một thao tác hoặc tất cả hoặc không gì cả.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một câu lệnh nằm ngoài BEGIN thì...?</p>
+  <button>Không có transaction</button>
+  <button>Bị rollback</button>
+  <button data-correct>Là một transaction riêng</button>
+  <button>Bị hoãn lại</button>
+  <p class="explain">Mọi câu lệnh đều được ngầm bọc trong một transaction.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. ROLLBACK TO s1 làm gì?</p>
+  <button>Commit công việc</button>
+  <button>Kết thúc transaction</button>
+  <button>Xóa table</button>
+  <button data-correct>Hủy phần làm sau s1</button>
+  <p class="explain">Nó chỉ hủy những gì đã xảy ra sau savepoint.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Sau ROLLBACK TO, s1 còn được định nghĩa không?</p>
+  <button>Không, bị xóa rồi</button>
+  <button data-correct>Có, vẫn còn</button>
+  <button>Chỉ dùng được một lần</button>
+  <button>Chỉ cho thao tác đọc</button>
+  <p class="explain">Savepoint vẫn còn được định nghĩa sau khi rollback về nó.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-transactions.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-transfer-money.vi.md">Bài tập 0008: chuyển tiền</a></p>
+<p>Ví dụ chạy được: <a href="../examples/08-transactions.sql"><code>08-transactions.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-transactions.html">PostgreSQL Tutorial: Transactions</a>. Mục 3.4.</p>
+<p><a href="0002-joins-inner-and-left.vi.html">← Inner join, left join và cái bẫy WHERE</a> &nbsp;|&nbsp; <a href="0003-window-functions.vi.html">Window function →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/tutorial-transactions.html">PostgreSQL Tutorial: Transactions</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

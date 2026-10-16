@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 20: Monitoring and operating a cluster</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Monitoring and operating a cluster</h1>
+<p class="meta">Kafka · Lesson 0020 · step 20 of 23 · Senior · ~13 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0020-monitoring-and-operations.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> name the handful of metrics that tell you a Kafka cluster or consumer is unhealthy, and the CLI steps for lag, partition moves and safe restarts.</div>
+
+<h2>Broker health: the alert list</h2>
+<table>
+<tr><th>Metric<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></th><th>Healthy</th><th>Means when bad</th></tr>
+<tr><td><code>UnderReplicatedPartitions</code></td><td>0</td><td>a follower fell out of the ISR: less redundancy</td></tr>
+<tr><td><code>UnderMinIsrPartitionCount</code></td><td>0</td><td>ISR below <code>min.insync.replicas</code>: <code>acks=all</code> writes fail</td></tr>
+<tr><td><code>OfflinePartitionsCount</code></td><td>0</td><td>no leader: partition unavailable</td></tr>
+<tr><td><code>ActiveControllerCount</code></td><td>1 on exactly one node</td><td>no controller, or split brain</td></tr>
+<tr><td><code>IsrShrinksPerSec</code></td><td>0 except during restarts</td><td>flapping followers, slow disks or network</td></tr>
+<tr><td><code>RequestHandlerAvgIdlePercent</code>, <code>NetworkProcessorAvgIdlePercent</code></td><td>above 0.3</td><td>broker threads saturated</td></tr>
+</table>
+<p>Request latency is <code>TotalTimeMs</code> per request type, broken into queue, local, remote and response-send time, which tells you <em>where</em> the time goes.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a> Remote JMX is off by default and unauthenticated when enabled, so secure it.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></p>
+<h2>Consumer health: lag</h2>
+<p>Lag is log-end offset minus committed offset per partition. Watch it from outside with <code>kafka-consumer-groups.sh --describe --group &lt;g&gt;</code>, which shows "how far behind the end of the log they are".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a> From inside, the client metric <code>records-lag-max</code> is the max lag in the window, based on the current position.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a> Alert on lag that keeps growing, not on a fixed number: a short spike after a deploy is normal.</p>
+<h2>Day-2 operations</h2>
+<ul>
+<li><strong>Safe restarts:</strong> <code>controlled.shutdown.enable=true</code> moves leadership off a broker before it stops; it "will only succeed if all the partitions hosted on the broker have replicas".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a> Roll one broker at a time and wait for under-replicated = 0.</li>
+<li><strong>Leader balance:</strong> Kafka restores leadership to preferred replicas by default; otherwise run <code>kafka-leader-election.sh --election-type preferred</code>.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a></li>
+<li><strong>Adding brokers:</strong> new brokers get no existing partitions. Move them with <code>kafka-reassign-partitions.sh</code> (<code>--generate</code>, <code>--execute</code>, <code>--verify</code>); "the admin has to figure out which topics or partitions should be moved".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a> Throttle the move so replication traffic does not starve clients.</li>
+</ul>
+<div class="aside">Interview answer: "Four alerts first: under-replicated, under-min-ISR, offline partitions, active controller count. Then thread idle ratios and request latency breakdown. For apps, consumer lag trend per group. Rolling restarts one broker at a time, waiting for full ISR between each."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. UnderMinIsrPartitionCount above zero means?</p>
+  <button>Topic is compacted</button>
+  <button data-correct>acks=all writes fail</button>
+  <button>Disk is almost full</button>
+  <button>Consumers are idle</button>
+  <p class="explain">ISR is below min.insync.replicas, so writes needing that many replicas are rejected.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Request handler idle ratio should stay above?</p>
+  <button>About 0.9</button>
+  <button>Exactly 1.0</button>
+  <button>About 0.01</button>
+  <button data-correct>About 0.3</button>
+  <p class="explain">The docs give an ideal of above 0.3.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. You add a broker. Existing partitions?</p>
+  <button>Double in count</button>
+  <button data-correct>Stay; reassign them</button>
+  <button>Move automatically</button>
+  <button>Get deleted</button>
+  <p class="explain">You must move partitions with the reassignment tool yourself.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Best consumer lag alert?</p>
+  <button>Lag never checked</button>
+  <button data-correct>Lag growing steadily</button>
+  <button>Lag below ten</button>
+  <button>Any lag above zero</button>
+  <p class="explain">Lag naturally spikes and recovers; sustained growth means consumers cannot keep up.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0020-on-call-runbook.md">Exercise 0020: write an on-call runbook</a></p>
+<p>Runnable example: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka Operations: Monitoring</a>. Read the broker metrics table and the 'Consumer monitoring' section.</p>
+<p><a href="0019-kraft-and-controllers.html">← KRaft: controllers and the metadata quorum</a> &nbsp;|&nbsp; <a href="0021-share-groups.html">Share groups: queues for Kafka →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka Operations: Monitoring</a> · [2] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -3,76 +3,306 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 12: JDK 10 and 15: var and text blocks (in JDK 17)</title>
+<title>Java 12: var and text blocks</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 10 and 15: var and text blocks (in JDK 17)</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0012 · step 19 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>var and text blocks: less typing, same types</h1>
+<p class="subtitle">Two small JDK 10 and JDK 15 features you will see in every modern Java codebase.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0012 · step 37 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0012-var-and-text-blocks.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> use <code>var</code> and text blocks correctly, and state where <code>var</code> is not allowed.</div>
+<div class="mission"><strong>Why this lesson?</strong> When a team moves from JDK 8 to 17 or 21, <code>var</code> and text blocks appear in code reviews on day one. Interviewers like to ask <em>"Does <code>var</code> make Java dynamically typed?"</em> The answer is no, and this lesson shows you why.</div>
 
-<h2>var (delivered in JDK 10, so present in 17 and 21)</h2>
-<p>JEP 286 "extend[s] type inference to declarations of local variables with initializers."<a class="cite" href="https://openjdk.org/jeps/286">[1]</a> It applies to local variables with initializers and for-loop indexes. It is <em>not</em> available for method parameters, constructor parameters, return types, fields or catch parameters; nor for variables without an initializer.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a> It stays statically typed: <code>var list = new ArrayList&lt;String&gt;();</code> is still an <code>ArrayList&lt;String&gt;</code>.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a></p>
-<h2>Text blocks (final in JDK 15)</h2>
-<p>"A text block is a multi-line string literal that avoids the need for most escape sequences, automatically formats the string in a predictable way, and gives the developer control over the format when desired."<a class="cite" href="https://openjdk.org/jeps/378">[2]</a> It opens with <code>"""</code> followed by a line terminator. Double quotes inside need no escaping. Leading indentation common to all lines is stripped, and trailing whitespace is removed.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a> Two escapes arrived with the feature: <code>\&lt;line-terminator&gt;</code> suppresses a newline and <code>\s</code> is a space.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a></p>
-<pre><code>var json = """
+<div class="win"><b>Today's win:</b> rewrite a JDK 8 local variable and a JDK 8 multi-line JSON string with <code>var</code> and a text block, and name four places where <code>var</code> is <strong>not</strong> allowed.</div>
+
+<dl class="words">
+  <dt>local variable</dt><dd>A variable declared inside a method. It lives only while that method runs.</dd>
+  <dt>initializer</dt><dd>The value after the <code>=</code> sign when you declare a variable: in <code>int n = 5;</code> the initializer is <code>5</code>.</dd>
+  <dt>type inference</dt><dd>The compiler works out a type by itself, by looking at the code around it, so you don't have to write it.</dd>
+  <dt>static typing</dt><dd>Every variable has one fixed type, checked when you compile. Java has always worked this way.</dd>
+  <dt>compiler (javac)</dt><dd>The program that turns your <code>.java</code> file into bytecode before it runs. Many mistakes are caught here.</dd>
+  <dt>escape sequence</dt><dd>A backslash code inside a string, like <code>\n</code> (new line) or <code>\"</code> (a quote character).</dd>
+  <dt>string literal</dt><dd>Text written directly in code between quotes, like <code>"hello"</code>.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"After <code>var x = "hi";</code>, can I write <code>x = 42;</code> on the next line?"</em> Commit to yes or no and give a reason. You will check your answer in section 2.</p>
+
+<h2>1. var: let the compiler copy the type for you</h2>
+<p>Think of a form at the bank. One box says "Name", and the next box says "Name again, for the receipt". Writing the same thing twice is boring, and it adds nothing. The clerk could copy it for you.</p>
+<p>JDK 8 code is often like that form. The type is written on the left, and the same type is written again on the right:</p>
+<pre><code><span class="c">// JDK 8: the type appears twice</span>
+ArrayList&lt;String&gt; names = new ArrayList&lt;String&gt;();
+Map&lt;String, List&lt;Order&gt;&gt; byCustomer = new HashMap&lt;String, List&lt;Order&gt;&gt;();
+
+<span class="c">// JDK 10+: the compiler copies the type from the right side</span>
+var names = new ArrayList&lt;String&gt;();
+var byCustomer = new HashMap&lt;String, List&lt;Order&gt;&gt;();</code></pre>
+<p>JEP 286, delivered in JDK 10, was written to "extend type inference to declarations of local variables with initializers".<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> In plain words: if a <span class="term">local variable</span> has an <span class="term">initializer</span>, you may write <code>var</code> and the compiler fills in the type. JDK 17 and 21 include it, because each release keeps everything from the releases before it.</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="You write var list equals new ArrayList of String. The compiler reads the right side and turns it into ArrayList of String list, exactly the JDK 8 code. Below, four lines that fail: null, no initializer, array initializer, lambda.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="165" y="26" text-anchor="middle" font-size="11" opacity=".75">you write (JDK 10+)</text>
+    <text x="515" y="26" text-anchor="middle" font-size="11" opacity=".75">the compiler sees (same as JDK 8)</text>
+    <rect x="20" y="36" width="290" height="64" rx="6" fill="none" stroke="currentColor"/>
+    <text x="36" y="73"><tspan fill="var(--accent)">var</tspan> list = new ArrayList&lt;String&gt;();</text>
+    <g fill="none" stroke="var(--accent)"><path d="M310 68h56M360 63l6 5-6 5"/></g>
+    <text x="338" y="58" text-anchor="middle" font-size="11" fill="var(--accent)">javac</text>
+    <rect x="370" y="36" width="290" height="64" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="386" y="62"><tspan fill="var(--accent)">ArrayList&lt;String&gt;</tspan> list =</text>
+    <text x="386" y="84">&#160;&#160;&#160;&#160;new ArrayList&lt;String&gt;();</text>
+    <text x="340" y="126" text-anchor="middle" font-size="11" opacity=".8">The type is fixed at compile time. At runtime nothing is different.</text>
+    <text x="20" y="156" font-size="11" opacity=".75">no type to copy, so the compiler refuses:</text>
+    <text x="36" y="180">var x = null;</text><text x="250" y="180" fill="var(--accent)">✗ initializer is 'null'</text>
+    <text x="36" y="198">var y;</text><text x="250" y="198" fill="var(--accent)">✗ no initializer</text>
+    <text x="36" y="216">var a = {1, 2};</text><text x="250" y="216" fill="var(--accent)">✗ array initializer</text>
+    <text x="36" y="234">var f = () -&gt; 1;</text><text x="250" y="234" fill="var(--accent)">✗ lambda</text>
+  </g>
+</svg>
+<figcaption><code>var</code> does not create a new kind of variable. The compiler reads the right side and writes the type in for you.</figcaption>
+</figure>
+
+<h2>2. Follow the compiler, step by step</h2>
+<pre><code>var names = new ArrayList&lt;String&gt;();
+<span class="c">Step 1  javac reads the right side: new ArrayList&lt;String&gt;()</span>
+<span class="c">Step 2  its type is ArrayList&lt;String&gt;</span>
+<span class="c">Step 3  javac gives names that type, for ever: ArrayList&lt;String&gt; names</span>
+
+names.add("ann");   <span class="c">// fine</span>
+names.add(42);      <span class="hl">// compile error: 42 is not a String</span>
+names = "hello";    <span class="hl">// compile error: a String is not an ArrayList</span></code></pre>
+<p>So the answer to "Before you start" is <strong>no</strong>. After <code>var x = "hi";</code> the variable <code>x</code> is a <code>String</code>, and <code>x = 42;</code> does not compile. JEP 286's own example is <code>var list = new ArrayList&lt;String&gt;();</code>, which "infers ArrayList&lt;String&gt;".<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> Java stays <span class="term">statically typed</span>; <code>var</code> only saves typing.</p>
+<p class="muted">Notice the type is <code>ArrayList&lt;String&gt;</code>, not <code>List&lt;String&gt;</code>. The compiler copies the exact type on the right.</p>
+
+<h3>Where var is not allowed</h3>
+<p><code>var</code> works for local variables with an initializer and for the index of a <code>for</code> loop. It does <strong>not</strong> work for method parameters, constructor parameters, return types, fields or catch parameters, and not for a variable without an initializer.<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> The JEP also says that an initializer of the null type is an error, and that an array initializer or a lambda will "trigger an error", because there is no type on the right to copy.<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> I ran all four through <code>javac</code> 21:</p>
+<pre><code>var x = null;
+<span class="c">  error: cannot infer type for local variable x</span>
+<span class="c">    (variable initializer is 'null')</span>
+var y;
+<span class="c">    (cannot use 'var' on variable without initializer)</span>
+var a = {1, 2};
+<span class="c">    (array initializer needs an explicit target-type)</span>
+var f = () -&gt; 1;
+<span class="c">    (lambda expression needs an explicit target-type)</span></code></pre>
+<p>A fun detail: "The identifier <code>var</code> is not a keyword; instead it is a reserved type name."<a class="src" href="https://openjdk.org/jeps/286">JEP 286</a> That is why old code with a variable called <code>var</code> still compiles. In JDK 11 you may also write <code>var</code> on lambda parameters, mainly so you can put annotations on them: <code>(@Nonnull var x, @Nullable var y) -&gt; x.process(y)</code>.<a class="src" href="https://openjdk.org/jeps/323">JEP 323</a></p>
+
+<h3>Trap: var with the diamond <code>&lt;&gt;</code></h3>
+<pre><code>var list = new ArrayList&lt;&gt;();   <span class="hl">// ArrayList&lt;Object&gt;, not what you wanted</span>
+list.add(1);
+list.add("a");                   <span class="c">// compiles: anything goes in</span></code></pre>
+<p>The diamond <code>&lt;&gt;</code> normally takes its type from the left side. With <code>var</code> the left side is empty, so the compiler has nothing to copy. The OpenJDK style guide marks this exact case "DANGEROUS: infers as PriorityQueue&lt;Object&gt;".<a class="src" href="https://openjdk.org/projects/amber/guides/lvti-style-guide">LVTI style guide</a> The same guide warns about number literals: with <code>var</code>, <code>17</code> becomes an <code>int</code>, even if you meant a <code>long</code>.<a class="src" href="https://openjdk.org/projects/amber/guides/lvti-style-guide">LVTI style guide</a></p>
+<p><strong>The fix:</strong> with <code>var</code>, always write the type argument on the right (<code>new ArrayList&lt;String&gt;()</code>), and use <code>var</code> only when the right side makes the type obvious to a reader.</p>
+
+<h2>3. Text blocks: paste the text as it looks</h2>
+<p>Imagine copying a poem by hand, but every line break must be written as the word "NEWLINE" and every quote mark as "QUOTE". You would make mistakes, and nobody could read the result. That is a JSON string in JDK 8:</p>
+<pre><code><span class="c">// JDK 8: escapes and + everywhere</span>
+String json = "{\n" +
+              "  \"name\": \"orders\",\n" +
+              "  \"port\": 8080\n" +
+              "}\n";
+
+<span class="c">// JDK 15+: a text block</span>
+var json = """
         {
           "name": "orders",
           "port": 8080
         }
         """;</code></pre>
-<p>Run it via <a href="../examples/jdk17/Jdk17Features.java"><code>Jdk17Features.java</code></a> (compiled with <code>--release 17</code>).</p>
-<div class="aside">JDK 8 to 17 migration note: neither feature exists on 8. Code using them compiles only at <code>--release 10</code>+ (var) or <code>15</code>+ (text blocks).</div>
+<p>JEP 378 defines it: "A text block is a multi-line string literal that avoids the need for most escape sequences, automatically formats the string in a predictable way, and gives the developer control over the format when desired."<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> It became final in JDK 15, after previews in JDK 13 and 14.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></p>
+<p>The rules you need:</p>
+<ol class="steps">
+  <li>It opens with <code>"""</code> followed by a line break. Text on the same line as the opening <code>"""</code> is not allowed.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></li>
+  <li>Double quotes inside need no escaping.</li>
+  <li>The indentation that all lines share is stripped, and trailing spaces at the end of each line are removed.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></li>
+  <li>The result is a normal <code>String</code>: the JEP calls it "a constant expression of type <code>String</code>, just like a string literal".<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></li>
+</ol>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Where is <code>var</code> NOT allowed?</p>
-  <button>For-loop indexes</button>
-  <button data-correct>Method parameters</button>
-  <button>Local variables</button>
-  <button>Initialized locals</button>
-  <p class="explain">It is not available for method formals, fields, return types or catch formals.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. A var-declared list is typed how?</p>
-  <button>Dynamically at runtime</button>
-  <button>As raw ArrayList</button>
-  <button>As Object always</button>
-  <button data-correct>Statically inferred</button>
-  <p class="explain">Type safety is kept; the compiler infers the static type.<a class="cite" href="https://openjdk.org/jeps/286">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Text blocks open with what?</p>
-  <button>Single quote pair</button>
-  <button>Backtick and newline</button>
-  <button data-correct>Triple quote and newline</button>
-  <button>Double quote and tab</button>
-  <p class="explain">The opening delimiter must be followed by a line terminator.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Release that made text blocks final?</p>
-  <button data-correct>JDK 15</button>
-  <button>JDK 11</button>
-  <button>JDK 8</button>
-  <button>JDK 21</button>
-  <p class="explain">Text blocks became permanent in Java 15 after previews in 13 and 14.<a class="cite" href="https://openjdk.org/jeps/378">[2]</a></p>
-</div>
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="A text block in source code. The first 8 columns of every line are shaded as incidental indentation and removed. The closing triple quote sets the left edge. The resulting string has no leading spaces before the brace.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="175" y="22" text-anchor="middle" font-size="11" opacity=".75">source code</text>
+    <text x="520" y="22" text-anchor="middle" font-size="11" opacity=".75">the String you get</text>
+    <rect x="20" y="32" width="310" height="140" rx="6" fill="none" stroke="currentColor"/>
+    <rect x="36" y="64" width="54" height="98" fill="var(--accent-soft)"/>
+    <text x="36" y="56">var json = """</text>
+    <text x="36" y="76">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;{</text>
+    <text x="36" y="96">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;"name": "orders",</text>
+    <text x="36" y="116">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;"port": 8080</text>
+    <text x="36" y="136">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;}</text>
+    <text x="36" y="156">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<tspan fill="var(--accent)">"""</tspan>;</text>
+    <path d="M90 64v100" stroke="var(--accent)" stroke-dasharray="3 3"/>
+    <g fill="none" stroke="currentColor"><path d="M330 102h40M364 97l6 5-6 5"/></g>
+    <rect x="374" y="62" width="290" height="100" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="390" y="86">{\n</text>
+    <text x="390" y="104">&#160;&#160;"name": "orders",\n</text>
+    <text x="390" y="122">&#160;&#160;"port": 8080\n</text>
+    <text x="390" y="140">}\n</text>
+    <text x="36" y="196" font-size="11" fill="var(--accent)">shaded = shared indentation, removed</text>
+    <text x="36" y="214" font-size="11" opacity=".8">the closing """ sits at column 8, so 8 spaces go from every line</text>
+  </g>
+</svg>
+<figcaption>The compiler removes the indentation that every line shares. The position of the closing <code>"""</code> decides how much.</figcaption>
+</figure>
+
+<h2>4. How the compiler cleans a text block</h2>
+<p>JEP 378 processes the content in three steps.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> Follow them on the example above:</p>
+<pre><code><span class="c">Step 1  Line breaks become \n, whatever your editor used (Windows \r\n too).</span>
+<span class="c">Step 2  Find the smallest indentation of the non-blank lines and of the</span>
+<span class="c">        closing """ line: 8 spaces. Remove 8 spaces from every line.</span>
+<span class="c">        Remove trailing spaces at the end of each line.</span>
+<span class="c">Step 3  Turn escape sequences like \n, \t, \s into real characters.</span>
+<span class="hl">Result  "{\n  \"name\": \"orders\",\n  \"port\": 8080\n}\n"</span></code></pre>
+<p>The opening <code>"""</code> has no effect on the indentation, "but the position of the closing <code>"""</code> characters does have an effect if placed on its own line".<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> Move it left and you keep some indentation. I ran both versions:</p>
+<pre><code>String t1 = """
+        &lt;p&gt;
+          hi
+        &lt;/p&gt;
+        """;               <span class="c">// closing """ in line with &lt;p&gt;</span>
+
+String t2 = """
+        &lt;p&gt;
+          hi
+        &lt;/p&gt;
+    """;                   <span class="c">// closing """ 4 columns further left</span>
+
+<span class="c">t1 prints:</span>
+&lt;p&gt;
+  hi
+&lt;/p&gt;
+<span class="c">t2 prints:</span>
+<span class="hl">    &lt;p&gt;</span>
+<span class="hl">      hi</span>
+<span class="hl">    &lt;/p&gt;</span></code></pre>
+<p>Also: when the closing <code>"""</code> is on its own line, the string ends with a <code>\n</code>. Put it right after the last word if you don't want that final newline.<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></p>
+
+<h3>Two new escapes and one new method</h3>
+<p>Two escapes arrived with the feature. <code>\&lt;line-terminator&gt;</code> (a backslash at the very end of a line) "explicitly suppresses the insertion of a newline character", and <code>\s</code> "simply translates to a single space".<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a> <code>\s</code> is useful because trailing spaces are otherwise removed. The JEP also added <code>String::formatted(Object... args)</code> to fill in values:<a class="src" href="https://openjdk.org/jeps/378">JEP 378</a></p>
+<pre><code>String sql = """
+    SELECT id, name \
+    FROM users""";                       <span class="c">// "SELECT id, name FROM users" on one line</span>
+String hi = """
+    Hello, %s!""".formatted("Ann");       <span class="hl">// "Hello, Ann!"</span></code></pre>
+
+<h3>Run the real example</h3>
+<p>The course example uses <code>var</code>, a text block and a switch expression (next lesson). It compiles with <code>--release 17</code>:</p>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+{
+  "name": "orders",
+  "port": 8080
+}
+weekend, weekday, invalid: 9
+3.14 4.00 6.00</code></pre>
+<p>The first four lines come from the text block: the 16 spaces of source indentation are gone, and only the 2 spaces you meant are left.</p>
+<div class="aside"><strong>JDK 8 to 17 migration note:</strong> neither feature exists on JDK 8. Code using them compiles only at <code>--release 10</code>+ (<code>var</code>) or <code>--release 15</code>+ (text blocks). If your library must still run on JDK 8, you cannot use them there.</div>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">After <code>var x = "hi";</code>, what happens with <code>x = 42;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>It does not compile: x is a String</button>
+    <button class="opt">It compiles and x becomes an Integer</button>
+    <button class="opt">It compiles but throws at runtime</button>
+    <button class="opt">It compiles and x becomes an Object</button>
+  </div>
+  <div class="why">The compiler fixes the type of <code>x</code> to <code>String</code> from its initializer. Java stays statically typed; <code>var</code> only saves typing.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Where is <code>var</code> allowed?</p>
+  <div class="options">
+    <button class="opt" data-correct>A local variable with an initializer</button>
+    <button class="opt">A method parameter of a public method</button>
+    <button class="opt">A field declared inside a class body</button>
+    <button class="opt">The return type of a static method</button>
+  </div>
+  <div class="why"><code>var</code> is for local variables with initializers and for-loop indexes. Not for parameters, fields, return types or catch parameters.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the bug in <code>var ids = new ArrayList&lt;&gt;(); ids.add("x");</code> when you meant a list of <code>Long</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is ArrayList&lt;Object&gt;, so "x" is accepted</button>
+    <button class="opt">It is ArrayList&lt;Long&gt;, so "x" fails at runtime</button>
+    <button class="opt">It does not compile: var needs a type argument</button>
+    <button class="opt">It is a raw list that throws on the first add</button>
+  </div>
+  <div class="why">With <code>var</code> there is no left side for the diamond to copy from, so it falls back to <code>Object</code>. Write <code>new ArrayList&lt;Long&gt;()</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which line is a valid start of a text block?</p>
+  <div class="options">
+    <button class="opt" data-correct>Three quotes, then a line break</button>
+    <button class="opt">Three quotes, then the first word</button>
+    <button class="opt">A backtick, then a line break</button>
+    <button class="opt">Two quotes, then a line break</button>
+  </div>
+  <div class="why">The opening <code>"""</code> must be followed by a line break; the content starts on the next line.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You move the closing <code>"""</code> of a text block four columns to the left. What changes?</p>
+  <div class="options">
+    <button class="opt" data-correct>Every line keeps four more spaces</button>
+    <button class="opt">Nothing: only the opening quotes matter</button>
+    <button class="opt">It no longer compiles at all</button>
+    <button class="opt">The final newline is removed</button>
+  </div>
+  <div class="why">The closing delimiter on its own line takes part in finding the shared indentation. Further left means less is stripped.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In which release did text blocks become a final (non-preview) feature?</p>
+  <div class="options">
+    <button class="opt" data-correct>JDK 15</button>
+    <button class="opt">JDK 10</button>
+    <button class="opt">JDK 8</button>
+    <button class="opt">JDK 21</button>
+  </div>
+  <div class="why">Text blocks were previews in 13 and 14 and final in 15. <code>var</code> came earlier, in JDK 10.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is <code>var</code> in Java, and does it make Java dynamically typed? Also, what are text blocks?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>var</code> (JDK 10) is local-variable type inference: the compiler takes the type from the initializer.</label></li>
+      <li><label><input type="checkbox"> Java stays statically typed: the type is fixed at compile time and cannot change.</label></li>
+      <li><label><input type="checkbox"> Only for locals with an initializer and loop indexes: not fields, parameters, return types; not <code>null</code>, lambdas or array initializers.</label></li>
+      <li><label><input type="checkbox"> Trap: <code>var</code> with <code>&lt;&gt;</code> gives <code>Object</code>; use it when the right side makes the type obvious.</label></li>
+      <li><label><input type="checkbox"> Text blocks (JDK 15) are multi-line <code>"""</code> strings with no escaping of quotes.</label></li>
+      <li><label><input type="checkbox"> Shared indentation is stripped, and the closing <code>"""</code> controls how much.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"<code>var</code> came in JDK 10. It's local-variable type inference: I write <code>var</code> and the compiler takes the type from the right side. It does not make Java dynamic. If I write <code>var names = new ArrayList&lt;String&gt;()</code>, <code>names</code> is an <code>ArrayList&lt;String&gt;</code> for ever, and assigning a number to it doesn't compile. It only works for local variables with an initializer and loop indexes, not for fields, parameters or return types, and not with <code>null</code> or a lambda, because there's no type to copy. One trap: <code>var</code> with the diamond gives <code>ArrayList&lt;Object&gt;</code>. I use it when the type is obvious from the right side. Text blocks are final since JDK 15: a multi-line string between triple quotes. I don't need <code>\n</code> or <code>\"</code>, the compiler strips the common indentation, and the closing quotes decide how much. It's great for JSON, SQL and test data."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0012-var-and-text-block-review.md">Exercise 0012: review with var and text blocks</a></p>
+<p><a href="../exercises/0012-var-and-text-block-review.md">Exercise 0012: review with var and text blocks</a>. Write your review comments to the teacher first, then compile the code to check them.</p>
 <p>Runnable example: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a>. JEPs are the primary source for what each release changed.</p>
-<p><a href="0007-heap-and-garbage-collection.html">← Heap sizing and garbage collection</a> &nbsp;|&nbsp; <a href="0013-switch-expressions-and-instanceof-patterns.html">JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17) →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may ask: <em>"When would you <strong>not</strong> use <code>var</code> in a code review?"</em> Good answer: when the right side hides the type (<code>var result = service.process();</code>), and with the diamond or number literals. The next lesson shows two more JDK 8 → 17 changes that clean up everyday code: <a href="0013-switch-expressions-and-instanceof-patterns.html">switch expressions and <code>instanceof</code> patterns</a>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a> (the Description section has many small examples), and the OpenJDK <a href="https://openjdk.org/projects/amber/guides/lvti-style-guide">style guidelines for <code>var</code></a>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why is var not allowed on fields?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0045-review-concurrency-jvm.html">← Review 6: concurrency and the JVM</a> &nbsp;|&nbsp; <a href="0013-switch-expressions-and-instanceof-patterns.html">switch that returns a value, instanceof that casts for you →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a> · [2] <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the OpenJDK JEPs and the OpenJDK style guide, and compiled with JDK 21, October 2026.</p>
+  <p>References: <a href="https://openjdk.org/jeps/286">JEP 286: Local-Variable Type Inference</a> · <a href="https://openjdk.org/jeps/323">JEP 323: Local-Variable Syntax for Lambda Parameters</a> · <a href="https://openjdk.org/jeps/378">JEP 378: Text Blocks</a> · <a href="https://openjdk.org/projects/amber/guides/lvti-style-guide">LVTI Style Guidelines</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 39: Concurrent collections: synchronized, copy-on-write, blocking queues</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Concurrent collections: synchronized, copy-on-write, blocking queues</h1>
+<p class="subtitle">Four threads, one ArrayList, 40,000 adds, and about 27,000 of them vanish without a single error. Here is what to use instead.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0039 · step 21 of 46 · Senior · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0039-concurrent-collections.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Every backend service shares data between threads: request handlers, listeners, worker pools. Picking the wrong collection gives bugs that only appear under load. <em>"Which thread-safe collection would you use here, and why?"</em> is a standard senior question, and the answer is never "just synchronize everything".</div>
+
+<div class="win"><b>Today's win:</b> choose between a synchronized wrapper, CopyOnWriteArrayList, ConcurrentHashMap, ConcurrentSkipListMap and a BlockingQueue, and use each safely.</div>
+
+<dl class="words">
+  <dt>thread</dt><dd>One path of execution inside your program. Several threads run at the same time and can touch the same objects.</dd>
+  <dt>thread-safe</dt><dd>Still correct when many threads use it at once, without extra locking by the caller.</dd>
+  <dt>lock</dt><dd>A "one at a time" rule: while one thread holds it, other threads that want it must wait. <code>synchronized</code> is Java's built-in lock.</dd>
+  <dt>contention</dt><dd>Many threads wanting the same lock at the same time, so they spend time waiting.</dd>
+  <dt>snapshot</dt><dd>A frozen copy of the data at one moment; later changes do not appear in it.</dd>
+  <dt>producer / consumer</dt><dd>One side creates work items, the other side processes them. A queue between them is the hand-off point.</dd>
+  <dt>backpressure</dt><dd>Slowing down the producer when the consumer cannot keep up, instead of letting work pile up until memory runs out.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Predict: four threads each call <code>list.add(i)</code> 10,000 times on one shared <code>ArrayList</code>. What is <code>list.size()</code> at the end? Pick one: exactly 40,000; less than 40,000; more than 40,000; it always throws. Say why.</p>
+
+<h2>1. Why plain collections break</h2>
+<p>Imagine two cashiers sharing one paper notebook of sales. Both look at the notebook: "the next empty line is 5". Both write on line 5. One sale overwrites the other, and nobody notices.</p>
+<p>That is what happens inside <code>ArrayList.add</code>. Simplified, it reads the current size, writes the element at that index, then stores size + 1. Two threads can read the same size at the same moment:</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Two thread timelines. Thread A reads size 5, Thread B reads size 5. A writes x into slot 5 and sets size 6. B writes y into slot 5, overwriting x, and sets size 6. Two adds, but size grew by one.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="40">Thread A</text>
+    <text x="20" y="130">Thread B</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M100 36H660"/><path d="M100 126H660"/>
+    </g>
+    <g fill="none" stroke="currentColor">
+      <rect x="110" y="20" width="130" height="32" rx="4"/>
+      <rect x="350" y="20" width="150" height="32" rx="4"/>
+      <rect x="510" y="20" width="140" height="32" rx="4"/>
+      <rect x="170" y="110" width="130" height="32" rx="4"/>
+      <rect x="510" y="110" width="140" height="32" rx="4"/>
+    </g>
+    <rect x="350" y="110" width="150" height="32" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="175" y="41">read size: 5</text>
+      <text x="425" y="41">slot[5] = x</text>
+      <text x="580" y="41">size = 6</text>
+      <text x="235" y="131">read size: 5</text>
+      <text x="425" y="131" fill="var(--accent)">slot[5] = y</text>
+      <text x="580" y="131">size = 6</text>
+    </g>
+    <text x="425" y="168" text-anchor="middle" font-size="11" fill="var(--accent)">overwrites x</text>
+    <path d="M100 196H660" stroke="currentColor" opacity=".4" fill="none"/>
+    <text x="640" y="214" text-anchor="end" font-size="11" opacity=".75">time →</text>
+    <text x="20" y="240" font-size="12">Result: two add() calls, one element, size 6 instead of 7. No exception.</text>
+  </g>
+</svg>
+<figcaption>A simplified "lost update". The real interleavings vary; sometimes a thread even hits <code>ArrayIndexOutOfBoundsException</code> during a resize.</figcaption>
+</figure>
+
+<pre><code>$ java java/examples/collections/ConcurrentCollections.java
+ArrayList, 4 threads x 10,000 adds   : size=12481
+synchronizedList, same work          : size=40000
+CopyOnWriteArrayList iterate+add     : saw 2, list now [a, b, a2, b2]
+offer on full queue                  : true true false
+producer/consumer sum 1..100         : 5050
+ConcurrentSkipListMap first/last key : 2 / 996  ceilingKey(500)=500</code></pre>
+<p>Over 27,000 adds vanished with no exception in this run; the number changes every run (an earlier run gave 13,243), and on some runs the example also reports an exception. Unsynchronized collections do not fail loudly. The ArrayList Javadoc warns: "Note that this implementation is not synchronized."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList javadoc</a></p>
+
+<h2>2. The options</h2>
+<table>
+<tr><th>Use</th><th>When</th><th>Watch out</th></tr>
+<tr><td><code>Collections.synchronizedList/Map</code></td><td>low contention, simple</td><td>one lock for everything; you "must manually synchronize on the returned list when traversing it" via iterator or stream<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a></td></tr>
+<tr><td><code>CopyOnWriteArrayList</code></td><td>reads "vastly outnumber mutations" (listeners, config)</td><td>every write copies the whole array<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList javadoc</a></td></tr>
+<tr><td><code>ConcurrentHashMap</code></td><td>shared map, high contention</td><td>use atomic methods (<a href="0025-concurrenthashmap.html">lesson 0025</a>)</td></tr>
+<tr><td><code>ConcurrentSkipListMap/Set</code></td><td>shared <em>sorted</em> map, ranges</td><td>log(n); null keys not allowed<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentSkipListMap.html">ConcurrentSkipListMap javadoc</a></td></tr>
+<tr><td><code>BlockingQueue</code></td><td>producer-consumer hand-off</td><td>choose bounded for backpressure<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></td></tr>
+</table>
+
+<h3>The synchronized wrapper and its iteration trap</h3>
+<p>A synchronized wrapper is like a single key to a shared room: every method (<code>add</code>, <code>get</code>, <code>size</code>) takes the key, does its job and gives it back. That fixed the run: <code>size=40000</code>. But a loop is many calls in a row, and between them another thread can grab the key and change the list. So for iteration you must hold the key yourself:</p>
+<pre><code>List&lt;String&gt; list = Collections.synchronizedList(new ArrayList&lt;&gt;());
+synchronized (list) {                 <span class="c">// required for iteration</span>
+    for (String s : list) process(s);
+}</code></pre>
+<p>Without the block the loop can throw <code>ConcurrentModificationException</code> (<a href="0029-iterators-and-fail-fast.html">lesson 0029</a>). With it, every other thread waits for the whole loop: that is the price of one lock.</p>
+
+<h3>ConcurrentSkipListMap: the sorted one</h3>
+<p>For a shared <em>sorted</em> map (<a href="0034-treemap-and-navigable-maps.html">lesson 0034</a>), four threads put random prices into a <code>ConcurrentSkipListMap</code>, and <code>firstKey</code>, <code>lastKey</code> and <code>ceilingKey</code> still work: <code>2 / 996 ceilingKey(500)=500</code> in this run (the keys are random, so yours will differ).</p>
+
+<h2>3. CopyOnWriteArrayList: snapshots</h2>
+<p>Think of a restaurant menu board. Changing the menu means printing a whole new board and swapping it in. Customers already reading the old board keep reading it, undisturbed. Reprinting is expensive, but menus change rarely and are read all day.</p>
+<p>The Javadoc: "A thread-safe variant of ArrayList in which all mutative operations (add, set, and so on) are implemented by making a fresh copy of the underlying array. This is ordinarily too costly, but may be more efficient than alternatives when traversal operations vastly outnumber mutations".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList javadoc</a></p>
+<p>Iterators use the array "at the point that the iterator was created", so they never throw <code>ConcurrentModificationException</code> and "will not reflect additions, removals, or changes" made after; <code>iterator.remove()</code> is unsupported.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList javadoc</a></p>
+<pre><code>List&lt;String&gt; listeners = new CopyOnWriteArrayList&lt;&gt;(List.of("a", "b"));
+for (String l : listeners) { listeners.add(l + "2"); seen++; }
+<span class="c">Step 1  The loop starts on snapshot [a, b]</span>
+<span class="c">Step 2  add("a2") makes a new array [a, b, a2]; the loop still reads [a, b]</span>
+<span class="c">Step 3  add("b2") makes another new array [a, b, a2, b2]</span>
+<span class="c">Step 4  The loop ends after 2 elements → </span><span class="hl">saw 2, list now [a, b, a2, b2]</span></code></pre>
+<p>With a plain <code>ArrayList</code> that same loop would throw <code>ConcurrentModificationException</code>, or never end. Typical uses: event listener lists, routing tables, feature flags. <strong>Trap:</strong> a list that is written often (a log, a queue of tasks) turns every add into a full copy.</p>
+
+<h2>4. BlockingQueue: the producer-consumer hand-off</h2>
+<p>Picture a sushi conveyor belt with room for only a few plates. The chef (producer) puts plates on; if the belt is full, the chef waits. The customer (consumer) takes plates off; if the belt is empty, the customer waits. Nobody needs to shout "ready?": the belt does the coordination.</p>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="A producer thread puts items into a bounded ArrayBlockingQueue of capacity 2; a consumer thread takes them. put blocks when the queue is full, take blocks when it is empty. The producer ends with a poison pill -1.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="70" width="140" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="90" y="96" text-anchor="middle">producer</text>
+    <text x="90" y="114" text-anchor="middle" font-size="11">put(1..100), put(-1)</text>
+    <rect x="240" y="60" width="200" height="80" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="52" text-anchor="middle" fill="var(--accent)">ArrayBlockingQueue(2)</text>
+    <rect x="270" y="80" width="60" height="40" fill="none" stroke="currentColor"/>
+    <rect x="350" y="80" width="60" height="40" fill="none" stroke="currentColor"/>
+    <text x="300" y="105" text-anchor="middle">7</text>
+    <text x="380" y="105" text-anchor="middle">8</text>
+    <rect x="520" y="70" width="140" height="60" rx="6" fill="none" stroke="currentColor"/>
+    <text x="590" y="96" text-anchor="middle">consumer</text>
+    <text x="590" y="114" text-anchor="middle" font-size="11">take() until -1</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M160 100h74M228 95l6 5-6 5"/>
+      <path d="M440 100h74M508 95l6 5-6 5"/>
+    </g>
+    <text x="197" y="90" text-anchor="middle" font-size="11">put</text>
+    <text x="477" y="90" text-anchor="middle" font-size="11">take</text>
+    <text x="90" y="160" text-anchor="middle" font-size="11" fill="var(--accent)">full? put() waits</text>
+    <text x="590" y="160" text-anchor="middle" font-size="11" fill="var(--accent)">empty? take() waits</text>
+    <text x="340" y="195" text-anchor="middle" font-size="11">bounded = backpressure: a fast producer cannot fill the heap</text>
+  </g>
+</svg>
+<figcaption>The example's producer puts 1 to 100 and then a "poison pill" (-1); the consumer adds until it sees the pill. Sum: 5050.</figcaption>
+</figure>
+
+<h3>Four ways to react when it cannot proceed</h3>
+<table>
+<tr><th></th><th>Throws</th><th>Special value</th><th>Blocks</th><th>Times out<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></th></tr>
+<tr><td>Insert</td><td><code>add</code></td><td><code>offer</code></td><td><code>put</code></td><td><code>offer(e, t, unit)</code></td></tr>
+<tr><td>Remove</td><td><code>remove</code></td><td><code>poll</code></td><td><code>take</code></td><td><code>poll(t, unit)</code></td></tr>
+</table>
+<pre><code>BlockingQueue&lt;Integer&gt; q = new ArrayBlockingQueue&lt;&gt;(2);
+q.offer(1); q.offer(2); q.offer(3);   <span class="c">// true true false: no room for 3</span>
+
+<span class="c">// consumer thread</span>
+for (int x; (x = q.take()) != -1; ) sum += x;
+<span class="c">// producer thread</span>
+for (int i = 1; i &lt;= 100; i++) q.put(i);
+q.put(-1);                            <span class="c">// poison pill: "no more items"</span></code></pre>
+<p>Why a poison pill? "A BlockingQueue does not intrinsically support any kind of 'close' or 'shutdown' operation"; "a common tactic is for producers to insert special end-of-stream or poison objects".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></p>
+<p>Implementations: <code>ArrayBlockingQueue</code> (bounded array), <code>LinkedBlockingQueue</code> (optionally bounded), <code>PriorityBlockingQueue</code>, <code>DelayQueue</code>, <code>SynchronousQueue</code> (no capacity, direct hand-off), <code>LinkedTransferQueue</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a> Nulls are rejected because <code>null</code> signals "poll failed".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a> Like other concurrent collections, putting an element in happens-before taking it out in another thread (<a href="0005-visibility-and-happens-before.html">lesson 0005</a>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a> This is exactly the queue inside a <code>ThreadPoolExecutor</code> (<a href="0023-thread-pools-executors.html">lesson 0023</a>).</p>
+<p><strong>Trap:</strong> the bulk methods <code>addAll</code>, <code>containsAll</code>, <code>retainAll</code> and <code>removeAll</code> "are not necessarily performed atomically", so <code>addAll(c)</code> can fail after adding only some elements.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue javadoc</a></p>
+<p><strong>JDK 8 vs 17 vs 21:</strong> all these classes are available and behave the same on 8, 17 and 21. On JDK 21 a consumer blocked in <code>take()</code> can be a virtual thread (<a href="0006-virtual-threads.html">lesson 0006</a>), where blocking is cheap.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Four threads each add 10,000 items to one plain <code>ArrayList</code>. What is the most likely result?</p>
+  <div class="options">
+    <button class="opt" data-correct>Fewer than 40,000 items, often with no exception</button>
+    <button class="opt">Exactly 40,000 items, because add is a single call</button>
+    <button class="opt">More than 40,000 items, because some are duplicated</button>
+    <button class="opt">A compile error, because ArrayList is not thread-safe</button>
+  </div>
+  <div class="why">Updates are lost silently when two threads write the same slot. The run showed size=12481.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What do you need to iterate a <code>Collections.synchronizedList</code> safely?</p>
+  <div class="options">
+    <button class="opt" data-correct>A <code>synchronized (list)</code> block</button>
+    <button class="opt">Nothing extra at all</button>
+    <button class="opt">A <code>volatile</code> list field</button>
+    <button class="opt">Calling <code>clone()</code> first</button>
+  </div>
+  <div class="why">Each method is locked, but a loop is many calls. You must manually synchronize on the returned list when traversing it.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">When does <code>CopyOnWriteArrayList</code> fit best?</p>
+  <div class="options">
+    <button class="opt" data-correct>Reads far outnumber writes</button>
+    <button class="opt">Writes far outnumber reads</button>
+    <button class="opt">The list holds millions of items</button>
+    <button class="opt">The order of items does not matter</button>
+  </div>
+  <div class="why">Every write copies the array. That only pays off when traversal operations vastly outnumber mutations, like listener lists.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A loop over a <code>CopyOnWriteArrayList</code> of <code>[a, b]</code> adds one item per element. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>The loop sees 2 items; the list ends with 4</button>
+    <button class="opt">The loop sees 4 items; the list ends with 4</button>
+    <button class="opt">It throws ConcurrentModificationException</button>
+    <button class="opt">The loop never ends because the list grows</button>
+  </div>
+  <div class="why">The iterator reads the snapshot taken when it was created; additions go to a new array.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which <code>BlockingQueue</code> method waits until there is space?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>put(e)</code></button>
+    <button class="opt"><code>offer(e)</code></button>
+    <button class="opt"><code>add(e)</code></button>
+    <button class="opt"><code>peek()</code></button>
+  </div>
+  <div class="why">put blocks; offer returns false; add throws. The run showed offer returning false on a full ArrayBlockingQueue(2).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does a <code>BlockingQueue</code> reject <code>null</code> elements?</p>
+  <div class="options">
+    <button class="opt" data-correct>null is the signal that a poll failed</button>
+    <button class="opt">null would make put block forever</button>
+    <button class="opt">null cannot be stored in an array</button>
+    <button class="opt">null breaks the happens-before rule</button>
+  </div>
+  <div class="why">poll returns null when nothing is available, so null cannot also be a real element.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You need a sorted map with range queries, shared by many threads. Which one?</p>
+  <div class="options">
+    <button class="opt" data-correct>ConcurrentSkipListMap</button>
+    <button class="opt">ConcurrentHashMap</button>
+    <button class="opt">CopyOnWriteArrayList</button>
+    <button class="opt">synchronized HashMap</button>
+  </div>
+  <div class="why">ConcurrentSkipListMap is a concurrent NavigableMap with expected log(n) operations. ConcurrentHashMap has no order.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"Which thread-safe collections does Java offer, and how do you choose?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Plain collections lose updates silently under concurrent writes.</label></li>
+      <li><label><input type="checkbox"> Synchronized wrappers: one lock, simple, but you must lock manually to iterate.</label></li>
+      <li><label><input type="checkbox"> CopyOnWriteArrayList: copy on every write, snapshot iterators; for read-mostly lists.</label></li>
+      <li><label><input type="checkbox"> ConcurrentHashMap for shared maps, with atomic <code>merge</code>/<code>compute</code>.</label></li>
+      <li><label><input type="checkbox"> ConcurrentSkipListMap for a shared sorted map.</label></li>
+      <li><label><input type="checkbox"> BlockingQueue for producer-consumer: put/take block; bounded gives backpressure.</label></li>
+      <li><label><input type="checkbox"> No nulls in concurrent queues; poison pill to stop consumers.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"First, why it matters: a plain ArrayList shared by four threads lost most of 40,000 adds in my test, without any exception. The simplest fix is Collections.synchronizedList or synchronizedMap: one lock around every method, fine for low contention, but I have to hold the lock myself while iterating. For lists that are read all the time and written rarely, like listeners, I use CopyOnWriteArrayList: each write copies the array, and iterators work on a snapshot, so they never throw. For shared maps I use ConcurrentHashMap with its atomic methods, and ConcurrentSkipListMap if I need it sorted. Between producers and consumers I use a BlockingQueue, ideally bounded like ArrayBlockingQueue, so put blocks when it's full and gives backpressure. It doesn't accept nulls, and to stop consumers I send a poison pill."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0039-pick-the-concurrent-structure.md">Exercise 0039: pick the concurrent structure</a>. For each scenario, name the class and the one trap.</p>
+<p>Runnable example: <a href="../examples/collections/ConcurrentCollections.java"><code>ConcurrentCollections.java</code></a></p>
+
+<h2>What's next</h2>
+<p>This closes the collections block. Next comes <a href="0043-review-collections-advanced.html">Review 4</a>, which mixes lessons 0034 to 0039. After that, a senior interviewer often moves to functional style: <em>"What is a functional interface? What does a lambda capture?"</em> (<a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a>).</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue Javadoc (JDK 21)</a>. Read the four-forms table and the producer-consumer example in the class description.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why does ConcurrentHashMap scale better than a synchronized map?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0038-capacity-boxing-and-memory.html">← Capacity, boxing and the memory cost of collections</a> &nbsp;|&nbsp; <a href="0043-review-collections-advanced.html">Review 4: navigable, priority, special and concurrent collections →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CopyOnWriteArrayList.html">CopyOnWriteArrayList Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentSkipListMap.html">ConcurrentSkipListMap Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html">ArrayList Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

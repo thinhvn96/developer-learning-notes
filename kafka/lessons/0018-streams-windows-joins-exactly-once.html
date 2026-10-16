@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 18: Kafka Streams: windows, joins and exactly-once</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka Streams: windows, joins and exactly-once</h1>
+<p class="meta">Kafka · Lesson 0018 · step 17 of 23 · Senior · ~15 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0018-streams-windows-joins-exactly-once.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> choose a window type, explain co-partitioning and repartition topics for joins, and turn on exactly-once in a Kafka Streams app.</div>
+
+<h2>Three table-like abstractions</h2>
+<ul>
+<li><code>KStream</code>: every record is an independent fact ("self-contained datum").<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li><code>KTable</code>: every record is an "UPDATE" of the last value for its key; a <code>null</code> value deletes.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li><code>GlobalKTable</code>: every instance holds a full copy, "populated with data from all partitions of the topic".<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a> Good for small reference data.</li>
+</ul>
+<h2>Windows and late data</h2>
+<p>Aggregations over time need a window. The DSL offers tumbling (<code>TimeWindows.ofSizeWithNoGrace</code>), hopping, sliding (<code>SlidingWindows.ofTimeDifferenceAndGrace</code>) and session windows (<code>SessionWindows.ofInactivityGapWithNoGrace</code>).<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a> Tumbling: fixed, non-overlapping (orders per minute). Hopping: fixed size, overlapping (5-minute window every minute). Session: grows while events keep arriving within an inactivity gap (user sessions).</p>
+<p>Time is <em>stream time</em>, driven by record timestamps, and it "only advances when new records arrive". Records can arrive out of order; the <strong>grace period</strong> says how long a window still accepts them, and records after it are dropped.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+<pre><code>orders.groupByKey()
+      .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofMinutes(1), Duration.ofSeconds(30)))
+      .count();   // orders per key per minute, late records accepted for 30 s</code></pre>
+<h2>Joins need co-partitioning</h2>
+<ul>
+<li>"KStream-KStream joins are always windowed joins." KStream-KTable and KStream-GlobalKTable support inner and left, not outer.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li>"For equi-joins, input data must be co-partitioned": same key, same partition count, same partitioner. GlobalKTable and foreign-key joins do not need it.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+<li>Changing the key (<code>selectKey</code>, <code>map</code>) marks the stream for repartitioning; the next <code>groupByKey</code> or join writes through an internal repartition topic. "<code>groupBy</code> always causes data re-partitioning." Prefer <code>mapValues</code> when the key does not change.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></li>
+</ul>
+<h2>Exactly-once in Streams</h2>
+<p>Default is at-least-once. Set <code>processing.guarantee=exactly_once_v2</code> and the input offset commit, state store updates and output writes "will be completed atomically", using Kafka transactions.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a> This is the strongest exactly-once Kafka offers, because the whole read-process-write loop stays inside Kafka. Local state stores are restored from changelog topics after a failure.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+<div class="aside">Interview answer: "Windowed count with a grace period for late data; for joins I check co-partitioning first, or use a GlobalKTable for small dimension data; <code>exactly_once_v2</code> when outputs feed money-related logic."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. KStream-KStream joins are always...?</p>
+  <button>Global joins</button>
+  <button data-correct>Windowed joins</button>
+  <button>Foreign-key joins</button>
+  <button>Outer joins</button>
+  <p class="explain">KStream-KStream joins are always windowed joins.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Which join does NOT need co-partitioning?</p>
+  <button>KStream-KStream</button>
+  <button>KTable-KTable</button>
+  <button>KStream-KTable</button>
+  <button data-correct>KStream-GlobalKTable</button>
+  <p class="explain">GlobalKTable and foreign-key joins do not require co-partitioned inputs.<a class="cite" href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. A record arrives after the grace period. Result?</p>
+  <button>It is reordered</button>
+  <button>It opens new window</button>
+  <button data-correct>It is dropped</button>
+  <button>It stops the app</button>
+  <p class="explain">Records arriving after the grace period are discarded.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which value enables exactly-once in Streams?</p>
+  <button>idempotent_true</button>
+  <button>transactional</button>
+  <button>at_least_once</button>
+  <button data-correct>exactly_once_v2</button>
+  <p class="explain">Set processing.guarantee to exactly_once_v2.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0018-fraud-window.md">Exercise 0018: build a fraud window</a></p>
+<p>Runnable example: <a href="../examples/04-streams-wordcount.sh"><code>04-streams-wordcount.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">Kafka Streams DSL API</a>. Read 'Windowing' and 'Joining', including the co-partitioning requirements.</p>
+<p><a href="0006-idempotence-and-transactions.html">← Idempotent producers and transactions</a> &nbsp;|&nbsp; <a href="0010-kafka-connect.html">Kafka Connect: moving data in and out →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/streams/developer-guide/dsl-api/">Kafka Streams DSL API</a> · [2] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams Core Concepts</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

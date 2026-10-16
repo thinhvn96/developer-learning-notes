@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 8: Lambda và functional interface</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Lambda: truyền một đoạn code như một giá trị</h1>
+<p class="subtitle">Lambda thật ra là gì, nó biến thành interface nào, và quy tắc "effectively final".</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0008 · bước 23/46 · Core · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-lambdas-and-functional-interfaces.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Từ JDK 8, gần như codebase Java nào cũng truyền các hàm nhỏ đi khắp nơi: <code>list.forEach(...)</code>, <code>stream().filter(...)</code>, <code>executor.submit(...)</code>. Interviewer hay hỏi <em>"Functional interface là gì?"</em> và <em>"Vì sao biến được capture phải effectively final?"</em> Bài này giúp bạn trả lời cả hai.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết được một lambda, chọn đúng functional interface chuẩn cho nó, đổi nó thành method reference, và giải thích quy tắc "effectively final" trong hai câu.</div>
+
+<dl class="words">
+  <dt>interface</dt><dd>Danh sách các method mà một class hứa sẽ cung cấp. Nó nói <em>làm gì</em>, không nói <em>làm thế nào</em>.</dd>
+  <dt>abstract method</dt><dd>Method chỉ có tên, không có thân. Người khác phải viết phần thân.</dd>
+  <dt>functional interface</dt><dd>Interface có đúng một abstract method. Một lambda có thể đứng thay cho nó.</dd>
+  <dt>lambda</dt><dd>Một hàm ngắn, không tên, viết ngay tại chỗ, ví dụ <code>s -&gt; s.length()</code>.</dd>
+  <dt>anonymous class</dt><dd>Cách làm trước JDK 8: một class không tên, vừa khai báo vừa tạo object, thường chỉ để cung cấp một method.</dd>
+  <dt>generic <code>&lt;T&gt;</code></dt><dd>Chỗ giữ chỗ cho một kiểu. <code>Predicate&lt;String&gt;</code> nghĩa là "một Predicate làm việc với String".</dd>
+  <dt>method reference</dt><dd>Một lambda còn ngắn hơn, chỉ gọi một method đã có sẵn, ví dụ <code>String::length</code>.</dd>
+  <dt>effectively final</dt><dd>Biến local không bao giờ bị gán giá trị mới sau lần gán đầu tiên.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Kiểu của <code>s -&gt; s.length() &lt;= 3</code> là gì?"</em> Nó là một method? Một object? Hay thứ gì khác? Cứ đoán trước, dù chưa chắc. Cuối bài bạn sẽ so lại.</p>
+
+<h2>1. Hình dung: một tấm thẻ công thức</h2>
+<p>Hãy tưởng tượng bạn thuê một đầu bếp. Bạn không cần mô tả cả một nhân viên mới; bạn chỉ đưa <strong>một tấm thẻ công thức</strong>: "nhận một cái tên, trả lời có nếu tên dài tối đa 3 chữ". Lambda chính là tấm thẻ đó. Bạn truyền nó cho một method, và method quyết định khi nào dùng.</p>
+<p>Trước JDK 8, Java không có thẻ công thức. Muốn truyền hành vi, bạn viết một <span class="term">anonymous class</span>, nguyên một class chỉ để chứa một method:</p>
+<pre><code><span class="c">// JDK 7 style: an anonymous class</span>
+Predicate&lt;String&gt; shortName = new Predicate&lt;String&gt;() {
+  @Override public boolean test(String s) {
+    return s.length() &lt;= 3;
+  }
+};
+
+<span class="c">// JDK 8 style: a lambda, same meaning</span>
+Predicate&lt;String&gt; shortName = <span class="hl">s -&gt; s.length() &lt;= 3</span>;</code></pre>
+<p>Tutorial chính thức nói lambda cho phép bạn "coi chức năng như tham số của method, hay coi code như dữ liệu", và biểu diễn instance của các class một method gọn hơn anonymous class.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a></p>
+
+<h3>Cú pháp, từng phần một</h3>
+<pre><code>(a, b) -&gt; a + b              <span class="c">// params -&gt; expression</span>
+p -&gt; p.getAge() &gt;= 18        <span class="c">// one param: no ( ) needed</span>
+e -&gt; System.out.println(e)   <span class="c">// returns nothing</span>
+(a, b) -&gt; { return a + b; }  <span class="c">// block: braces + return</span></code></pre>
+<p>Bên trái mũi tên: các tham số. Bên phải: phần thân, là một biểu thức đơn hoặc một khối trong ngoặc nhọn.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> Thường bạn không cần ghi kiểu của tham số: compiler tự suy ra từ chỗ lambda được dùng.</p>
+
+<h2>2. Functional interface: một ô trống duy nhất</h2>
+<p>Lambda không phải một hàm trôi nổi tự do. Java luôn biến nó thành một <strong>object</strong> implement một interface nào đó. Interface nào? Interface có đúng <strong>một ô trống</strong>, tức một abstract method. Đó là <span class="term">functional interface</span>. Nó vẫn có thể có default method hoặc static method; những method đó đã có thân nên không tính.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a></p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="Lambda s -&gt; s.length() &lt;= 3 lấp vào abstract method duy nhất test của Predicate&lt;String&gt;. Default và static method đã có thân.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="66" width="210" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="125" y="91" text-anchor="middle" fill="var(--accent)">s -&gt; s.length() &lt;= 3</text>
+    <text x="125" y="50" text-anchor="middle" font-size="11" opacity=".75">lambda của bạn</text>
+    <g fill="none" stroke="var(--accent)"><path d="M230 86h68M292 81l6 5-6 5"/></g>
+    <text x="264" y="76" text-anchor="middle" font-size="11" fill="var(--accent)">lấp vào</text>
+    <rect x="300" y="20" width="360" height="190" rx="6" fill="none" stroke="currentColor"/>
+    <text x="320" y="44">interface Predicate&lt;String&gt;</text>
+    <rect x="316" y="62" width="328" height="48" rx="4" fill="none" stroke="var(--accent)" stroke-dasharray="5 3"/>
+    <text x="330" y="82" fill="var(--accent)">boolean test(String s);</text>
+    <text x="330" y="100" font-size="11" fill="var(--accent)">abstract method DUY NHẤT (ô trống)</text>
+    <text x="330" y="136" opacity=".75">default and(...)    đã có thân</text>
+    <text x="330" y="160" opacity=".75">default negate()    đã có thân</text>
+    <text x="330" y="184" opacity=".75">static  not(...)    đã có thân</text>
+  </g>
+</svg>
+<figcaption>Functional interface có một ô trống. Lambda trở thành phần thân của ô đó; default và static method thì đã được viết sẵn.</figcaption>
+</figure>
+
+<p>Vậy đáp án cho câu hỏi đầu bài: <code>s -&gt; s.length() &lt;= 3</code> không có kiểu riêng. Nó nhận kiểu của chỗ bạn đặt nó vào. Gán cho <code>Predicate&lt;String&gt;</code> thì nó thành một object <code>Predicate&lt;String&gt;</code>. JDK nói thẳng: "Functional interface cung cấp target type cho lambda expression và method reference."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/package-summary.html">java.util.function</a></p>
+
+<h3>Nhãn <code>@FunctionalInterface</code></h3>
+<p>Bạn có thể đánh dấu interface của mình bằng <code>@FunctionalInterface</code>. Khi đó, nếu ai thêm abstract method thứ hai, compiler "bắt buộc phải sinh ra thông báo lỗi". Nhãn này không bắt buộc: compiler coi mọi interface khớp định nghĩa là functional "bất kể có annotation <code>FunctionalInterface</code> hay không".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/FunctionalInterface.html">Javadoc FunctionalInterface</a></p>
+<pre><code>@FunctionalInterface
+interface PriceRule {
+  int apply(int price);      <span class="c">// the one abstract method</span>
+}
+PriceRule tenOff = p -&gt; p - 10;
+tenOff.apply(100);           <span class="hl">// 90</span></code></pre>
+
+<h2>3. Hộp đồ nghề chuẩn: java.util.function</h2>
+<p>Hiếm khi bạn cần tự viết interface. Package <code>java.util.function</code> có sẵn nhiều cái, như <code>Predicate&lt;T&gt;</code>, <code>Consumer&lt;T&gt;</code> và <code>Function&lt;T,R&gt;</code>.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> Hãy nhớ chúng theo hình dạng: cái gì đi vào, cái gì đi ra.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/package-summary.html">java.util.function</a></p>
+<table>
+<tr><th>Interface</th><th>Method</th><th>Vào → ra</th><th>Dùng ở đâu</th></tr>
+<tr><td><code>Predicate&lt;T&gt;</code></td><td><code>test</code></td><td>T → boolean</td><td><code>filter(...)</code></td></tr>
+<tr><td><code>Function&lt;T,R&gt;</code></td><td><code>apply</code></td><td>T → R</td><td><code>map(...)</code></td></tr>
+<tr><td><code>Consumer&lt;T&gt;</code></td><td><code>accept</code></td><td>T → không gì</td><td><code>forEach(...)</code></td></tr>
+<tr><td><code>Supplier&lt;T&gt;</code></td><td><code>get</code></td><td>không gì → T</td><td><code>orElseGet(...)</code>, factory</td></tr>
+<tr><td><code>BiFunction&lt;T,U,R&gt;</code></td><td><code>apply</code></td><td>T, U → R</td><td>hai đầu vào</td></tr>
+<tr><td><code>UnaryOperator&lt;T&gt;</code></td><td><code>apply</code></td><td>T → T</td><td>vào ra cùng kiểu</td></tr>
+<tr><td><code>BinaryOperator&lt;T&gt;</code></td><td><code>apply</code></td><td>T, T → T</td><td>gộp hai giá trị</td></tr>
+</table>
+<p class="muted">Còn có các bản dành cho số nguyên thủy, như <code>IntPredicate</code>, nhận thẳng <code>int</code> và tránh phải boxing thành <code>Integer</code>.</p>
+
+<h2>4. Method reference: lambda ngắn nhất</h2>
+<p>Nếu lambda chỉ gọi một method đã có, bạn chỉ cần <em>gọi tên</em> method đó. Tutorial gọi method reference là "những lambda expression gọn, dễ đọc cho các method đã có tên".<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/methodreferences.html">Method references tutorial</a> Có bốn loại:</p>
+<table>
+<tr><th>Loại</th><th>Cú pháp</th><th>Tương đương lambda</th></tr>
+<tr><td>Static method</td><td><code>Integer::parseInt</code></td><td><code>s -&gt; Integer.parseInt(s)</code></td></tr>
+<tr><td>Method của một object cụ thể</td><td><code>System.out::println</code></td><td><code>x -&gt; System.out.println(x)</code></td></tr>
+<tr><td>Method của một object bất kỳ thuộc một kiểu</td><td><code>String::length</code></td><td><code>s -&gt; s.length()</code></td></tr>
+<tr><td>Constructor</td><td><code>HashSet::new</code></td><td><code>() -&gt; new HashSet&lt;&gt;()</code></td></tr>
+</table>
+<p>Loại thứ ba hay làm người mới bối rối. <code>String::length</code> không chỉ một string cụ thể nào. Nó nghĩa là "string nào đi vào thì gọi <code>length()</code> trên string đó".</p>
+
+<h2>5. Quy tắc interviewer hay hỏi: effectively final</h2>
+<p>Lambda có thể dùng biến local của method bao quanh. Nhưng có một quy tắc: "Lambda expression chỉ được truy cập biến local và tham số của khối bao quanh nếu chúng là final hoặc effectively final."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> <span class="term">Effectively final</span> nghĩa là bạn không bao giờ gán giá trị mới cho biến sau lần gán đầu. Bạn không cần viết chữ <code>final</code>.</p>
+<p>Quay lại tấm thẻ công thức. Bạn ghi "cho <em>base</em> gram muối" rồi đưa thẻ đi với base = 10. Nếu sau đó bạn lén đổi base thành 11, đầu bếp sẽ dùng giá trị nào? Java tránh luôn câu hỏi này: một khi lambda đã đọc một biến local, biến đó không được thay đổi.</p>
+
+<figure>
+<svg viewBox="0 0 680 190" role="img" aria-label="Dòng thời gian: int base = 10, rồi lambda x -&gt; x + base đọc base, rồi base = 11 gây lỗi compile vì base không còn effectively final.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="40" width="190" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="115" y="67" text-anchor="middle">int base = 10;</text>
+    <g fill="none" stroke="currentColor"><path d="M210 62h33M237 57l6 5-6 5"/></g>
+    <rect x="245" y="40" width="190" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="340" y="67" text-anchor="middle">x -&gt; x + base</text>
+    <g fill="none" stroke="currentColor"><path d="M435 62h33M462 57l6 5-6 5"/></g>
+    <rect x="470" y="40" width="190" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="565" y="67" text-anchor="middle" fill="var(--accent)">base = 11;</text>
+    <text x="115" y="25" text-anchor="middle" font-size="11" opacity=".75">bước 1: gán một lần</text>
+    <text x="340" y="25" text-anchor="middle" font-size="11" opacity=".75">bước 2: lambda đọc nó</text>
+    <text x="565" y="25" text-anchor="middle" font-size="11" fill="var(--accent)">bước 3: gán lại</text>
+    <text x="115" y="110" text-anchor="middle" font-size="11">tới đây chưa đổi</text>
+    <text x="340" y="110" text-anchor="middle" font-size="11">plusBase.apply(5) → 15</text>
+    <text x="565" y="110" text-anchor="middle" font-size="11" fill="var(--accent)">lỗi compile</text>
+    <path d="M30 140h620" stroke="currentColor" opacity=".3"/>
+    <text x="340" y="168" text-anchor="middle" font-size="12">chỉ khi không có bước 3, base mới "effectively final"</text>
+  </g>
+</svg>
+<figcaption>Compiler kiểm tra cả method. Chỉ một lần gán lại ở bất kỳ đâu, kể cả sau lambda, cũng làm việc capture trở nên không hợp lệ.</figcaption>
+</figure>
+
+<h3>Lambda không mở scope mới</h3>
+<p>Lambda có <em>lexical scope</em>: nó không thừa hưởng tên từ supertype và không tạo thêm một tầng scope, nên tên bên trong lambda mang nghĩa y như ngay bên ngoài.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Lambda tutorial</a> Trong thực tế: bạn không thể đặt tên tham số lambda trùng với một biến local của method bao quanh; tutorial đưa ra lỗi compile "Lambda expression's parameter x cannot redeclare another local variable defined in an enclosing scope". Ngược lại, anonymous class là một class thật và có scope riêng.</p>
+
+<h3>Lần theo ví dụ từng bước</h3>
+<pre><code>List&lt;String&gt; names = Arrays.asList("ann", "bob", "cy", "dee");
+Predicate&lt;String&gt; shortName = s -&gt; s.length() &lt;= 3;
+Function&lt;String, Integer&gt; length = String::length;
+names.stream().filter(shortName).map(length).forEach(System.out::println);
+<span class="c">Step 1  "ann": test → 3 &lt;= 3 true  → apply → 3 → println</span>
+<span class="c">Step 2  "bob": test → true         → 3 → println</span>
+<span class="c">Step 3  "cy":  test → true         → 2 → println</span>
+<span class="c">Step 4  "dee": test → true         → 3 → println</span>
+
+int base = 10;                                  <span class="c">// effectively final</span>
+Function&lt;Integer, Integer&gt; plusBase = x -&gt; x + base;
+System.out.println(plusBase.apply(5));          <span class="hl">// 15</span></code></pre>
+<p>Tự chạy thử (nó compile được với <code>javac --release 8</code>, nên chỉ dùng tính năng của JDK 8):</p>
+<pre><code>$ java java/examples/jdk8/Lambdas.java
+3
+3
+2
+3
+15</code></pre>
+
+<h3>Lỗi hay gặp: đếm bên trong lambda</h3>
+<pre><code>int count = 0;
+names.forEach(n -&gt; count++);   <span class="hl">// compile error: count is not effectively final</span></code></pre>
+<p>Cách sửa không phải là "lừa" compiler. Hãy hỏi thẳng stream: <code>long count = names.stream().count();</code>. <a href="0004-streams-and-optional.vi.html">Bài 0004</a> giải thích vì sao không nên có side effect trong lambda của stream.</p>
+
+<h3>JDK 8 so với 17 và 21</h3>
+<p>Lambda, method reference và <code>java.util.function</code> đều có từ JDK 8 và chạy y như vậy trên 17 và 21. Các JDK mới hơn thêm nhiều method <em>nhận</em> lambda (ví dụ static method <code>Predicate.not</code>, thêm vào ở JDK 11 và có trong sơ đồ<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/Predicate.html">Javadoc Predicate</a>), nhưng các quy tắc trong bài này không đổi.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Một functional interface có bao nhiêu abstract method?</p>
+  <div class="options">
+    <button class="opt" data-correct>Đúng một, cộng thêm bao nhiêu default hay static method cũng được</button>
+    <button class="opt">Đúng hai, một cho đầu vào và một cho giá trị trả về ở đầu ra</button>
+    <button class="opt">Ít nhất một, và mọi method còn lại cũng đều phải là abstract</button>
+    <button class="opt">Không có cái nào, vì lambda tự cung cấp thân cho mọi method</button>
+  </div>
+  <div class="why">Một abstract method, chính là "ô trống" mà lambda lấp vào. Default và static method đã có thân nên không tính.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Kiểu của lambda <code>s -&gt; s.isEmpty()</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Functional interface mà ngữ cảnh mong đợi, ví dụ Predicate&lt;String&gt;</button>
+    <button class="opt">Luôn là java.lang.Function, kiểu dựng sẵn duy nhất của mọi lambda</button>
+    <button class="opt">Là một method, nên không có kiểu và không lưu vào biến được</button>
+    <button class="opt">Luôn là Object, và bạn phải ép kiểu trước khi gọi được nó</button>
+  </div>
+  <div class="why">Lambda lấy kiểu từ target của nó: functional interface "cung cấp target type cho lambda expression và method reference".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một lambda đọc biến local <code>limit</code>. Ba dòng sau, method chạy <code>limit = 5;</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không compile được</button>
+    <button class="opt">Ném lỗi lúc chạy</button>
+    <button class="opt">Lambda thấy giá trị 5</button>
+    <button class="opt">Lambda thấy giá trị cũ</button>
+  </div>
+  <div class="why">Biến local bị capture phải final hoặc effectively final. Gán lại ở bất kỳ đâu trong method là phá quy tắc, nên compiler từ chối.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Interface chuẩn nào nhận một <code>T</code> và trả về <code>boolean</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Predicate&lt;T&gt;</button>
+    <button class="opt">Consumer&lt;T&gt;</button>
+    <button class="opt">Supplier&lt;T&gt;</button>
+    <button class="opt">Function&lt;T,R&gt;</button>
+  </div>
+  <div class="why"><code>Predicate&lt;T&gt;</code> có <code>boolean test(T t)</code>. Consumer không trả về gì, Supplier không nhận gì, Function trả về R bất kỳ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Lambda nào tương đương với method reference <code>String::length</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>s -&gt; s.length()</button>
+    <button class="opt">() -&gt; String.length()</button>
+    <button class="opt">s -&gt; String.length(s)</button>
+    <button class="opt">() -&gt; new String().length()</button>
+  </div>
+  <div class="why">Đây là loại "instance method của một object bất kỳ thuộc một kiểu": string đi vào chính là object được gọi method.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">"Lambda có lexical scope." Trong thực tế điều đó nghĩa là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Tên bên trong mang nghĩa như ngay bên ngoài; không thêm scope mới</button>
+    <button class="opt">Lambda có scope riêng, nên được phép che bất kỳ biến local nào</button>
+    <button class="opt">Lambda thừa hưởng tên field và method từ kiểu interface của nó</button>
+    <button class="opt">Lambda chỉ thấy static field, không bao giờ thấy biến local nào</button>
+  </div>
+  <div class="why">Lambda không thừa hưởng tên từ supertype và không tạo thêm tầng scope. Ngược lại, anonymous class có scope riêng.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Lambda là gì, và functional interface là gì?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Lambda là một hàm ngắn không tên, cho phép truyền hành vi như một giá trị (JDK 8).</label></li>
+      <li><label><input type="checkbox"> Nó thay thế hầu hết anonymous class một method với ít code hơn nhiều.</label></li>
+      <li><label><input type="checkbox"> Functional interface có đúng một abstract method; default và static method không tính.</label></li>
+      <li><label><input type="checkbox"> Lambda lấy kiểu từ interface đích, ví dụ <code>Predicate</code>, <code>Function</code>, <code>Consumer</code>, <code>Supplier</code>.</label></li>
+      <li><label><input type="checkbox"> Method reference như <code>String::length</code> là lambda ngắn hơn cho method có sẵn.</label></li>
+      <li><label><input type="checkbox"> Biến local bị capture phải final hoặc effectively final.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Lambda, có từ JDK 8, là một hàm ngắn không tên, để em truyền behaviour như một giá trị, ví dụ vào <code>filter</code> hay <code>forEach</code>. Trước đó mình phải viết anonymous class chỉ để chứa một method. Lambda luôn trở thành object của một functional interface, tức interface có đúng một abstract method; nó vẫn có thể có default và static method. JDK có sẵn các dạng phổ biến trong <code>java.util.function</code>: <code>Predicate</code> trả về boolean, <code>Function</code> map từ T sang R, <code>Consumer</code> nhận giá trị và không trả gì, <code>Supplier</code> thì tạo ra giá trị. Nếu lambda chỉ gọi một method có sẵn thì em dùng method reference như <code>String::length</code>. Và có một quy tắc: lambda chỉ đọc được biến local final hoặc effectively final, nên không thể tăng biến đếm bên trong lambda."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-refactor-anonymous-classes.vi.md">Bài tập 0008: thay anonymous class</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/jdk8/Lambdas.java"><code>jdk8/Lambdas.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp Senior có thể hỏi: <em>"JDK đã thêm method như <code>Predicate.and</code> hay <code>List.forEach</code> vào các interface cũ thế nào mà không làm hỏng mọi class đang implement chúng?"</em> Đó là <a href="0009-default-methods-and-conflicts.vi.html">bài 0009, default method</a>. Sau đó <a href="0004-streams-and-optional.vi.html">bài 0004</a> đưa lambda vào dùng trong stream.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a>. Đọc cả trang, kể cả phần "Accessing Local Variables of the Enclosing Scope".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Target type chính xác là gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0043-review-collections-advanced.vi.html">← Ôn tập 4: navigable, priority, collection đặc biệt và concurrent collection</a> &nbsp;|&nbsp; <a href="0009-default-methods-and-conflicts.vi.html">Default method: thêm vào interface mà không làm hỏng ai →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Oracle Java Tutorials và tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/lambdaexpressions.html">Oracle Java Tutorials: Lambda Expressions</a> · <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/methodreferences.html">Oracle Java Tutorials: Method References</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/function/package-summary.html">Javadoc java.util.function</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/FunctionalInterface.html">Javadoc FunctionalInterface</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

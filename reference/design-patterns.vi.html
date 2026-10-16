@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bảng tóm tắt Design Patterns</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>main{max-width:60rem} td,th{font-size:.8rem}</style>
+</head>
+<body>
+<main>
+<h1>Bảng tóm tắt design pattern</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Tra cứu · tiện để in · <a href="../design-patterns/index.vi.html">Lộ trình Design Patterns</a> · <a href="../design-patterns/interview.vi.html">Hỏi đáp phỏng vấn</a> · <a href="../oop/index.vi.html">Lộ trình OOP</a> · <a class="lang" href="design-patterns.html" hreflang="en" lang="en">English</a></p>
+<p>Các dòng intent được diễn giải lại từ trang mô tả pattern trên <a href="https://refactoring.guru/design-patterns/catalog">Refactoring.Guru</a>; các ví dụ JDK đã được chạy trong bài học (là cách phân loại của tôi ở chỗ Javadoc không nêu tên pattern).</p>
+<table>
+<tr><th>Nhóm</th><th>Pattern</th><th>Mục đích</th><th>Dùng khi</th><th>Ví dụ JDK</th></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0004-factory-method.vi.html">Factory Method</a></td><td>method của superclass cho subclass chọn kiểu product</td><td>không biết trước kiểu chính xác; mở rộng framework</td><td>List.of, Integer.valueOf</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0005-abstract-factory.vi.html">Abstract Factory</a></td><td>tạo các họ object liên quan mà không gọi tên class cụ thể</td><td>các họ product phải khớp nhau (theme, nền tảng)</td><td>-</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0006-builder.vi.html">Builder</a></td><td>dựng object phức tạp theo từng bước</td><td>nhiều tham số tùy chọn (telescoping constructor)</td><td>StringBuilder</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0007-prototype.vi.html">Prototype</a></td><td>sao chép object có sẵn mà không phụ thuộc class của chúng</td><td>clone từ template đã cấu hình; chú ý shallow vs deep</td><td>Cloneable/clone</td></tr>
+<tr><td>Creational</td><td><a href="../design-patterns/lessons/0008-singleton.vi.html">Singleton</a></td><td>một instance cộng một điểm truy cập toàn cục</td><td>đúng một tài nguyên dùng chung; ưu tiên scope của DI</td><td>Runtime.getRuntime()</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0009-adapter.vi.html">Adapter</a></td><td>cho các interface không tương thích làm việc cùng nhau</td><td>tái sử dụng class có interface không khớp</td><td>Arrays.asList</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0010-bridge.vi.html">Bridge</a></td><td>tách abstraction và implementation thành hai hệ phân cấp</td><td>có nhiều chiều biến đổi trực giao</td><td>-</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0011-composite.vi.html">Composite</a></td><td>cấu trúc cây được xử lý như một object đơn lẻ</td><td>hệ phân cấp phần-tổng thể</td><td>-</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0012-decorator.vi.html">Decorator</a></td><td>gắn thêm hành vi bằng cách bọc object</td><td>thêm trách nhiệm lúc runtime, chồng được nhiều lớp</td><td>BufferedReader, unmodifiableList</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0013-facade.vi.html">Facade</a></td><td>interface đơn giản hóa cho một subsystem phức tạp</td><td>phân tầng; giấu độ phức tạp của subsystem</td><td>-</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0014-flyweight.vi.html">Flyweight</a></td><td>chia sẻ trạng thái chung để tiết kiệm RAM</td><td>số lượng khổng lồ object giống nhau</td><td>Integer.valueOf cache</td></tr>
+<tr><td>Structural</td><td><a href="../design-patterns/lessons/0015-proxy.vi.html">Proxy</a></td><td>vật thay thế kiểm soát truy cập tới một object khác</td><td>lazy load, kiểm soát truy cập, logging, caching</td><td>java.lang.reflect.Proxy</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0016-chain-of-responsibility.vi.html">Chain of Responsibility</a></td><td>chuyển request dọc theo một chuỗi handler</td><td>các bước xử lý có thứ tự và thay đổi được</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0017-command.vi.html">Command</a></td><td>request dưới dạng object</td><td>đưa vào queue, lên lịch, undo</td><td>Runnable</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0018-iterator.vi.html">Iterator</a></td><td>duyệt mà không để lộ cách biểu diễn</td><td>duyệt theo cùng một cách</td><td>Iterator/Iterable</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0019-mediator.vi.html">Mediator</a></td><td>giảm phụ thuộc chằng chịt nhờ một điều phối viên</td><td>nhiều component dính chặt vào nhau</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0020-memento.vi.html">Memento</a></td><td>lưu và khôi phục trạng thái mà không để lộ nó</td><td>undo, snapshot để rollback</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0021-observer.vi.html">Observer</a></td><td>cơ chế đăng ký để thông báo sự kiện cho nhiều object</td><td>tập object phụ thuộc thay đổi động</td><td>Flow (Observable đã deprecate)</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0022-state.vi.html">State</a></td><td>hành vi thay đổi theo trạng thái bên trong</td><td>nhiều trạng thái, khối điều kiện lớn</td><td>-</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0023-strategy.vi.html">Strategy</a></td><td>họ thuật toán có thể hoán đổi</td><td>đổi thuật toán lúc runtime</td><td>Comparator</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0024-template-method.vi.html">Template Method</a></td><td>bộ khung thuật toán, subclass điền từng bước</td><td>dùng chung các thuật toán gần giống hệt nhau</td><td>AbstractList</td></tr>
+<tr><td>Behavioral</td><td><a href="../design-patterns/lessons/0025-visitor.vi.html">Visitor</a></td><td>tách thuật toán khỏi cấu trúc object</td><td>nhiều thao tác trên một hệ phân cấp ổn định</td><td>FileVisitor</td></tr>
+</table>
+<h2>SOLID, mỗi nguyên tắc một dòng</h2>
+<ul>
+<li><a href="../oop/lessons/0017-single-responsibility-principle.vi.html">SRP</a>: mỗi class chỉ có một lý do để thay đổi.</li>
+<li><a href="../oop/lessons/0018-open-closed-principle.vi.html">OCP</a>: mở để mở rộng, đóng với việc sửa đổi.</li>
+<li><a href="../oop/lessons/0019-liskov-substitution-principle.vi.html">LSP</a>: subtype phải thay thế được cho base type của nó.</li>
+<li><a href="../oop/lessons/0020-interface-segregation-principle.vi.html">ISP</a>: đừng phụ thuộc vào những method bạn không dùng.</li>
+<li><a href="../oop/lessons/0021-dependency-inversion-principle.vi.html">DIP</a>: phụ thuộc vào abstraction, không phụ thuộc vào cài đặt cụ thể.</li></ul>
+<h2>Những cặp trông giống nhau</h2>
+<ul><li>Strategy (client chọn, không có chuyển trạng thái) vs State (các state tự kích hoạt chuyển trạng thái).</li><li>Decorator/Proxy (cùng interface) vs Adapter (interface khác) vs Facade (interface đơn giản hóa cho subsystem).</li><li>Template Method (kế thừa) vs Strategy (composition).</li><li>Mediator (điều phối viên trung tâm) vs Observer (subscription một chiều).</li></ul>
+<p>Xem thêm: <a href="../design-patterns/lessons/0026-choosing-between-similar-patterns.vi.html">chọn giữa các pattern giống nhau</a>.</p>
+<footer><p><strong>Hỏi giáo viên</strong> để được kiểm tra xem pattern nào hợp với một tình huống.</p></footer>
+</main>
+</body>
+</html>

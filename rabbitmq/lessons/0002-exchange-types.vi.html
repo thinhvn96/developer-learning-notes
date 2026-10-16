@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 2: Exchange kiểu direct, fanout và topic</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Exchange kiểu direct, fanout và topic</h1>
+<p class="meta">RabbitMQ · Bài 0002 · bước 2/9 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-exchange-types.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn được direct, fanout hay topic cho một yêu cầu routing, và đoán đúng những queue nào sẽ nhận message.</div>
+
+<h2>Bốn kiểu exchange, ba kiểu bạn sẽ dùng</h2>
+<table>
+<tr><th>Kiểu</th><th>Cách routing<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></th></tr>
+<tr><td>Direct</td><td>khớp chính xác routing key; unicast</td></tr>
+<tr><td>Fanout</td><td>sao chép tới <em>tất cả</em> queue đã bind, bỏ qua routing key</td></tr>
+<tr><td>Topic</td><td>khớp routing key theo <em>pattern</em> để phân phối có chọn lọc</td></tr>
+<tr><td>Headers</td><td>route theo giá trị header của message, không theo routing key</td></tr>
+</table>
+<h2>Ví dụ đã làm gì</h2>
+<ul>
+<li><code>ex.direct</code> bind <code>q.errors</code> với key <code>error</code>. Publish với <code>error</code> thì tới được queue này; <code>info</code> thì không tới đâu cả.</li>
+<li><code>ex.fanout</code> bind <code>q.all</code> và <code>q.eu</code>. Một lần publish đặt một bản sao vào mỗi queue.</li>
+<li><code>ex.topic</code> bind <code>q.eu</code> với pattern <code>orders.eu.*</code>. <code>orders.eu.created</code> khớp; <code>orders.us.created</code> thì không.</li>
+</ul>
+<pre><code>queue q.errors depth: 1
+queue q.all depth: 1
+queue q.eu depth: 2       # one from the fanout, one from the topic exchange</code></pre>
+<p>Pattern <code>orders.eu.*</code> dùng wildcard <code>*</code> của topic giống như trong tutorial AMQP (đoạn trích tài liệu chỉ mô tả topic exchange là khớp theo pattern; hành vi của wildcard ở đây được xác nhận qua lần chạy ở trên).</p>
+<div class="aside">Góc phỏng vấn: "Fanout khác topic thế nào?" Fanout là broadcast; topic là subscribe có chọn lọc theo pattern. Dùng direct khi bạn biết chính xác key, ví dụ mỗi mức severity một queue.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Exchange nào bỏ qua routing key?</p>
+  <button>Default</button>
+  <button data-correct>Fanout</button>
+  <button>Topic</button>
+  <button>Direct</button>
+  <p class="explain">Fanout broadcast bản sao tới mọi queue đã bind và bỏ qua routing key.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Exchange nào khớp routing key theo pattern?</p>
+  <button>Direct</button>
+  <button>Fanout</button>
+  <button>Headers</button>
+  <button data-correct>Topic</button>
+  <p class="explain">Topic exchange khớp theo pattern của routing key.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Exchange nào route theo giá trị header?</p>
+  <button>Direct</button>
+  <button>Default</button>
+  <button>Fanout</button>
+  <button data-correct>Headers</button>
+  <p class="explain">Headers exchange dùng giá trị header của message.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Bind với key error, publish key info vào direct. Kết quả?</p>
+  <button>Queue nhận được</button>
+  <button>Broker báo lỗi</button>
+  <button>Sao chép cho tất cả</button>
+  <button data-correct>Không route, bị bỏ</button>
+  <p class="explain">Direct đòi hỏi khớp chính xác; ví dụ trả về routed:false.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-design-the-topology.vi.md">Bài tập 0002: thiết kế topology</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a>. Phần 'Exchanges and Exchange Types'.</p>
+<p><a href="0001-amqp-model-exchanges-queues-bindings.vi.html">← Mô hình AMQP: exchange, queue và binding</a> &nbsp;|&nbsp; <a href="0003-acks-prefetch-redelivery.vi.html">Consumer acknowledgement, prefetch và redelivery →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

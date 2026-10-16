@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 7: Rolling update và rollback</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Rolling update và rollback</h1>
+<p class="meta">Kubernetes · Bài 0007 · bước 11/15 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-rolling-updates-and-rollbacks.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> mô tả cách rolling update hoạt động, giá trị surge và unavailable mặc định là bao nhiêu, và cách rollback.</div>
+
+<h2>Rolling update</h2>
+<p>Deployment cập nhật Pod từ từ: nó scale up một ReplicaSet mới đồng thời scale down ReplicaSet cũ. Chiến lược mặc định dùng <code>maxUnavailable: 25%</code> và <code>maxSurge: 25%</code>.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a> <code>maxSurge</code> giới hạn số Pod được phép tồn tại vượt quá số lượng mong muốn trong lúc cập nhật; <code>maxUnavailable</code> giới hạn số Pod được phép không sẵn sàng.</p>
+<pre><code>strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 25%
+    maxSurge: 25%</code></pre>
+<h2>Rollback</h2>
+<pre><code>kubectl rollout undo deployment/nginx-deployment</code></pre>
+<p>quay về revision trước đó.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+<h2>Probe giúp việc cập nhật an toàn như thế nào</h2>
+<p>Trong lúc rolling update, traffic chỉ nên tới một Pod mới khi nó đã sẵn sàng. Đó là nhiệm vụ của readiness probe trong <a href="0006-probes.vi.html">bài trước</a>.</p>
+<h2>Đã kiểm chứng: một bản release lỗi</h2>
+<pre><code>kubectl set image deployment/nginx-deployment nginx=nginx:does-not-exist
+kubectl rollout status ... --timeout=25s   -&gt; error: timed out waiting for the condition
+nginx-deployment-54fd...-4l88k  1/1 Running           # 3 old Pods kept
+nginx-deployment-54fd...-hrldm  1/1 Running
+nginx-deployment-54fd...-kqvcf  1/1 Running
+nginx-deployment-5fb7...-q7v2l  0/1 ImagePullBackOff  # 1 new Pod, stuck
+kubectl get endpoints nginx-service        -&gt; the 3 old Pod addresses only
+kubectl rollout undo deployment/nginx-deployment   -&gt; rolled back; stuck Pod terminates</code></pre>
+<p>Rollout bị kẹt lại chứ không làm sập service: với 3 replica, Kubernetes chỉ tạo thêm đúng một Pod và giữ cả ba Pod cũ tiếp tục phục vụ, còn endpoint của Service thì không hề thay đổi.</p>
+<div class="aside">Góc phỏng vấn: "Deploy một service Java không downtime thế nào?" Rolling update, readiness probe, startup probe cho các lần khởi động chậm, graceful shutdown khi nhận <code>SIGTERM</code> (xem bài Docker về <a href="../../docker/lessons/0006-pinning-nonroot-and-signals.vi.html">CMD dạng exec</a>), và một kế hoạch rollback.</div>
+<p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Thông số rolling update mặc định?</p>
+  <button>1 và 1</button>
+  <button>50% và 0</button>
+  <button data-correct>25% và 25%</button>
+  <button>100% và 0</button>
+  <p class="explain">maxUnavailable và maxSurge mặc định đều là 25 phần trăm.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lệnh nào để quay lui một bản release lỗi?</p>
+  <button>kubectl delete node</button>
+  <button data-correct>kubectl rollout undo</button>
+  <button>kubectl scale zero</button>
+  <button>kubectl drain pod</button>
+  <p class="explain">kubectl rollout undo deployment/name sẽ rollback.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. maxSurge kiểm soát cái gì?</p>
+  <button>CPU limit của Pod</button>
+  <button>Số lượng node</button>
+  <button data-correct>Số Pod được tạo dư</button>
+  <button>Tốc độ pull image</button>
+  <p class="explain">Nó giới hạn số Pod được phép vượt quá số lượng mong muốn trong lúc cập nhật (xem tài liệu Deployment).</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Probe nào quyết định traffic có tới Pod mới hay không?</p>
+  <button>Liveness probe</button>
+  <button>Không cần probe nào</button>
+  <button>Chỉ startup probe</button>
+  <button data-correct>Readiness probe</button>
+  <p class="explain">Readiness quyết định một Pod có nhận traffic từ Service hay không (bài về probe).</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-ship-and-roll-back.vi.md">Bài tập 0007: release và rollback</a></p>
+<p>Ví dụ chạy được: <a href="../examples/java-service.yaml"><code>java-service.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a>. Các phần 'Updating a Deployment', 'Rolling Back a Deployment'.</p>
+<p><a href="0006-probes.vi.html">← Liveness, readiness và startup probe</a> &nbsp;|&nbsp; <a href="0012-persistent-volumes-and-claims.vi.html">PersistentVolume, claim và StorageClass →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Docs: Deployments</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

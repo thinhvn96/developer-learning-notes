@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 13: Data stream và rollover</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Data stream và rollover</h1>
+<p class="meta">ELK Stack · Bài 0013 · bước 13/14 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-data-streams.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được data stream là gì, vì sao nó cần <code>@timestamp</code>, rollover làm gì, và khi nào nên dùng alias thay thế.</div>
+
+<h2>Data stream là gì</h2>
+<p>Data stream là "một lớp trừu tượng nằm trên một tập index được tối ưu để lưu dữ liệu time series chỉ ghi thêm (append-only)": bạn chỉ dùng một cái tên, còn nó tự quản lý các <em>backing index</em> ẩn, được sinh tự động. Mọi document đều cần field <code>@timestamp</code> (kiểu date hoặc date_nanos). Backing index mới nhất là <em>write index</em>; một lần <em>rollover</em> sẽ tạo backing index mới, tự động qua ILM hoặc thủ công.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+<p><strong>Không dành cho:</strong> những workload liên tục gửi document với cùng một <code>_id</code> và mong bản ghi sau cùng thắng (last-write-wins); trường hợp đó hãy dùng index alias có write index.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+<pre><code>PUT _index_template/logs-app {"index_patterns":["logs-app*"],"data_stream":{}}
+POST logs-app/_doc {"@timestamp":"...","message":"first"}
+  -&gt; indexed into backing index .ds-logs-app-2026.09.24-000001
+POST logs-app/_doc {"message":"no timestamp"}
+  -&gt; failed to parse: data stream timestamp field [@timestamp] is missing
+POST logs-app/_rollover
+  -&gt; rolled_over true; new index .ds-logs-app-2026.09.24-000002
+GET _data_stream/logs-app -&gt; backing indices: [...-000001, ...-000002]</code></pre>
+<p>Log và metric là những thứ hợp tự nhiên nhất; Filebeat và Logstash có thể ghi vào data stream (mình chưa test chuyện đó ở đây). Script: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a>. Tiếp theo: tự động hoá rollover và xoá dữ liệu bằng <a href="0014-index-lifecycle-management.vi.html">ILM</a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mọi document trong data stream bắt buộc có field nào?</p>
+  <button>Chỉ _id</button>
+  <button data-correct>@timestamp</button>
+  <button>host</button>
+  <button>level</button>
+  <p class="explain">Document phải có @timestamp; lần chạy đã từ chối một document thiếu field này.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Write index là gì?</p>
+  <button>Backing index cũ nhất</button>
+  <button>Mọi index</button>
+  <button>Template</button>
+  <button data-correct>Backing index mới nhất</button>
+  <p class="explain">Backing index gần nhất đóng vai trò write index.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Rollover làm gì?</p>
+  <button>Đổi mapping</button>
+  <button>Gộp shard</button>
+  <button>Xoá dữ liệu cũ</button>
+  <button data-correct>Tạo write index mới</button>
+  <p class="explain">Rollover tạo một backing index mới và index đó trở thành write index.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Trường hợp nào không hợp với data stream?</p>
+  <button>Trace</button>
+  <button>Metric</button>
+  <button>Log ứng dụng</button>
+  <button data-correct>Cập nhật doc theo cùng _id</button>
+  <p class="explain">Workload kiểu cùng _id, bản ghi sau thắng nên dùng alias thay thế.<a class="cite" href="https://www.elastic.co/docs/manage-data/data-store/data-streams">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-log-data-stream.vi.md">Bài tập 0013: một data stream cho log</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-ingest-datastream-ilm.sh"><code>04-ingest-datastream-ilm.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/manage-data/data-store/data-streams">Elasticsearch: Data streams</a>. Phần tổng quan và 'When to use'.</p>
+<p><a href="0012-ingest-pipelines.vi.html">← Ingest pipeline: parse ngay bên trong Elasticsearch</a> &nbsp;|&nbsp; <a href="0014-index-lifecycle-management.vi.html">Index lifecycle management (ILM) →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/manage-data/data-store/data-streams">Elasticsearch: Data streams</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

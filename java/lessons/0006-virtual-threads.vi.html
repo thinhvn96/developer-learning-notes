@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 6: Virtual thread: mở rộng quy mô, không phải tốc độ</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Virtual thread: mở rộng quy mô, không phải tốc độ</h1>
+<p class="subtitle">JDK 21 chạy mười nghìn task đang chờ trên vài thread thật như thế nào, và hai quy tắc để nó chạy đúng.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0006 · bước 44/46 · Advanced · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-virtual-threads.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Một backend service điển hình dành phần lớn thời gian để <em>chờ</em>: chờ database, chờ một HTTP service khác, chờ queue. Virtual thread, chính thức từ JDK 21, thay đổi số lượt chờ mà một server xử lý được. Giờ đây nó là một trong những câu hỏi Java senior phổ biến nhất: <em>"Virtual thread là gì, khi nào nó giúp ích, và cái gì có thể sai?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích virtual thread là gì, khi nào nó có ích, và hai quy tắc: không pool chúng, và dùng Semaphore để giới hạn mức đồng thời.</div>
+
+<dl class="words">
+  <dt>thread</dt><dd>Một luồng công việc chạy bên trong chương trình. Nhiều thread có thể chạy cùng lúc, mỗi thread có các bước riêng.</dd>
+  <dt>OS thread</dt><dd>Thread do hệ điều hành quản lý. Nó tốn kém: hệ điều hành cấp cho mỗi thread vùng nhớ riêng, nên bạn chỉ có được vài nghìn cái.</dd>
+  <dt>platform thread</dt><dd>Thread Java kiểu cổ điển. Mỗi cái là "một lớp bọc mỏng quanh một OS thread".</dd>
+  <dt>virtual thread</dt><dd>Thread Java nhẹ, chỉ mượn một OS thread trong lúc nó thật sự đang chạy code.</dd>
+  <dt>carrier thread</dt><dd>Platform thread mà virtual thread đang chạy trên đó.</dd>
+  <dt>blocking I/O</dt><dd>Lời gọi phải chờ thế giới bên ngoài: query database, gọi HTTP, đọc file, <code>Thread.sleep</code>.</dd>
+  <dt>throughput</dt><dd>Số task hoàn thành mỗi giây (thông lượng). Còn <em>latency</em> là thời gian một task mất.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Hãy nói thành tiếng: <em>"Server của mình có pool 200 thread. Mỗi request gọi một database trả lời sau 1 giây. Tối đa server xử lý được bao nhiêu request mỗi giây?"</em> Giữ con số đó; bạn sẽ kiểm tra lại ở mục 3.</p>
+
+<h2>1. Cách cũ: mỗi bàn một người phục vụ</h2>
+<p>Hãy tưởng tượng một nhà hàng mà mỗi người phục vụ nhận order, đi vào bếp rồi <strong>đứng đó</strong> cho tới khi món ăn xong. Có 200 người phục vụ thì phục vụ được 200 bàn cùng lúc. Bàn thứ 201 phải chờ ở cửa, dù hầu hết người phục vụ chỉ đang đứng không.</p>
+<p>Đó là một server Java cổ điển. Mỗi request nhận một <span class="term">platform thread</span>, và theo tài liệu, "platform thread được hiện thực như một lớp bọc mỏng quanh một OS thread".<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a> OS thread tốn kém, nên ta giữ một pool cố định (bài 0023):</p>
+<pre><code><span class="c">// JDK 8 / 17 style: a fixed pool of 200 platform threads</span>
+<span class="c">// (try-with-resources on an executor needs JDK 19+;</span>
+<span class="c">//  on 8 and 17 call shutdown() instead)</span>
+try (var pool = Executors.newFixedThreadPool(200)) {
+    for (int i = 0; i &lt; 10_000; i++) {
+        pool.submit(() -&gt; {
+            Thread.sleep(Duration.ofSeconds(1));   <span class="c">// holds its OS thread</span>
+            return null;
+        });
+    }
+}</code></pre>
+<p>Trong lúc chờ database, thread vẫn giữ OS thread của nó và chẳng làm gì. Chỉ 200 task chạy cùng lúc, nên 10.000 task một giây cần khoảng 10.000 / 200 × 1 s = <strong>50 giây</strong>. Đó là đáp án cho phần "Trước khi bắt đầu": tối đa 200 request mỗi giây.</p>
+
+<h2>2. Cách mới: người phục vụ không đứng chờ</h2>
+<p>Giờ người phục vụ nhận order, đưa cho bếp, rồi đi phục vụ bàn khác. Khi món xong, bất kỳ ai đang rảnh sẽ mang ra. Vài người phục vụ có thể lo hàng trăm bàn, vì không ai đứng yên.</p>
+<p>Đó là <span class="term">virtual thread</span>. "Giống platform thread, virtual thread cũng là một instance của <code>java.lang.Thread</code>. Tuy nhiên, virtual thread không gắn với một OS thread cụ thể nào." Khi code trong virtual thread gọi một thao tác blocking I/O, runtime tạm dừng nó và giải phóng OS thread cho các virtual thread khác.<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a></p>
+<p>JEP 444 đặt tên cho từng phần. JDK chạy một virtual thread "bằng cách mount virtual thread lên một platform thread", và "platform thread mà scheduler giao cho virtual thread được gọi là carrier của virtual thread đó". Khi virtual thread bị block, nó "có thể unmount khỏi carrier".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a></p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Bên trái: ba platform thread, mỗi cái gắn với một OS thread riêng. Bên phải: sáu virtual thread dùng chung hai carrier thread. Hai virtual thread đang được mount và chạy; bốn cái còn lại đang chờ và không giữ OS thread nào.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="24" text-anchor="middle" font-size="13">platform thread</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="50" width="110" height="34" rx="4"/>
+      <rect x="30" y="100" width="110" height="34" rx="4"/>
+      <rect x="30" y="150" width="110" height="34" rx="4"/>
+      <rect x="200" y="50" width="110" height="34" rx="4"/>
+      <rect x="200" y="100" width="110" height="34" rx="4"/>
+      <rect x="200" y="150" width="110" height="34" rx="4"/>
+      <path d="M140 67h60M140 117h60M140 167h60"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="85" y="72">Thread 1</text><text x="85" y="122">Thread 2</text><text x="85" y="172">Thread 3</text>
+      <text x="255" y="72">OS thread</text><text x="255" y="122">OS thread</text><text x="255" y="172">OS thread</text>
+    </g>
+    <text x="170" y="220" text-anchor="middle" font-size="11" opacity=".8">1 Java thread = 1 OS thread, luôn luôn</text>
+    <text x="170" y="238" text-anchor="middle" font-size="11" opacity=".8">tốn kém, nên chỉ giữ một pool nhỏ</text>
+    <path d="M340 20v220" stroke="currentColor" opacity=".3"/>
+    <text x="510" y="24" text-anchor="middle" font-size="13" fill="var(--accent)">virtual thread</text>
+    <rect x="370" y="50" width="40" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="530" y="50" width="40" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7">
+      <rect x="418" y="50" width="40" height="30" rx="4"/>
+      <rect x="466" y="50" width="40" height="30" rx="4"/>
+      <rect x="578" y="50" width="40" height="30" rx="4"/>
+      <rect x="610" y="96" width="40" height="30" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="390" y="70" fill="var(--accent)">v1</text>
+      <text x="438" y="70" opacity=".7">v2</text>
+      <text x="486" y="70" opacity=".7">v3</text>
+      <text x="550" y="70" fill="var(--accent)">v4</text>
+      <text x="598" y="70" opacity=".7">v5</text>
+      <text x="630" y="116" opacity=".7">v6</text>
+    </g>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M390 80v60M385 134l5 6 5-6"/>
+      <path d="M550 80v60M545 134l5 6 5-6"/>
+    </g>
+    <text x="398" y="112" font-size="11" fill="var(--accent)">mounted</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="360" y="142" width="120" height="40" rx="4"/>
+      <rect x="490" y="142" width="120" height="40" rx="4"/>
+    </g>
+    <g text-anchor="middle" font-size="11">
+      <text x="420" y="159">carrier 1</text><text x="420" y="174" opacity=".7">(một OS thread)</text>
+      <text x="550" y="159">carrier 2</text><text x="550" y="174" opacity=".7">(một OS thread)</text>
+    </g>
+    <text x="510" y="220" text-anchor="middle" font-size="11" opacity=".8">nét đứt: đang chờ I/O, không giữ OS thread</text>
+    <text x="510" y="238" text-anchor="middle" font-size="11" opacity=".8">nhiều virtual thread dùng chung vài carrier</text>
+  </g>
+</svg>
+<figcaption>Platform thread sở hữu OS thread của nó suốt đời. Virtual thread chỉ mượn carrier trong lúc chạy code.</figcaption>
+</figure>
+
+<p>Ai quyết định virtual thread nào chạy trên carrier nào? Một scheduler: "scheduler của virtual thread trong JDK là một <code>ForkJoinPool</code> work-stealing hoạt động ở chế độ FIFO." Mức song song của nó, tức số carrier, "mặc định bằng số processor khả dụng".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> Trên máy 8 core bạn có khoảng 8 carrier, dù tạo bao nhiêu virtual thread đi nữa.</p>
+
+<h2>3. Mười nghìn lần sleep trong một giây</h2>
+<p>Đây là ví dụ của khoá học. So với code dùng pool ở mục 1: chỉ đổi một dòng.</p>
+<pre><code>try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (int i = 0; i &lt; 10_000; i++) {
+        executor.submit(() -&gt; {
+            Thread.sleep(Duration.ofSeconds(1)); <span class="c">// blocks: v-thread unmounts</span>
+            return null;
+        });
+    }
+} <span class="c">// close() waits for all tasks</span></code></pre>
+<pre><code>$ java java/examples/VirtualThreadsDemo.java
+<span class="hl">10,000 one-second tasks finished in 1065 ms</span></code></pre>
+<p>Mười nghìn lần sleep một giây xong trong khoảng một giây. Với pool cố định 200 platform thread, cùng công việc sẽ mất khoảng 50 giây (10.000 / 200 × 1 s); hãy thử trong bài tập. Theo dõi một task:</p>
+<pre><code><span class="c">Step 1  submit() creates a new virtual thread v1 for the task</span>
+<span class="c">Step 2  the scheduler mounts v1 on a free carrier; v1 starts running</span>
+<span class="c">Step 3  v1 calls Thread.sleep(1 s): it unmounts, the carrier is free again</span>
+<span class="c">Step 4  the carrier runs v2, v3, ... which also sleep and unmount</span>
+<span class="c">Step 5  after 1 s, v1 is ready: it mounts on any free carrier and returns</span>
+<span class="hl">        all 10,000 wait at the same time, so the whole job takes ~1 s</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Dòng thời gian của một carrier thread. Nó chạy v1, rồi v1 bị block vì I/O và unmount, carrier chạy v2 và v3, sau đó v1 sẵn sàng và được mount lại.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="72">carrier</text>
+    <rect x="110" y="52" width="120" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="230" y="52" width="140" height="30" fill="none" stroke="currentColor"/>
+    <rect x="370" y="52" width="130" height="30" fill="none" stroke="currentColor"/>
+    <rect x="500" y="52" width="140" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="170" y="72" fill="var(--accent)">v1 chạy</text>
+      <text x="300" y="72">v2 chạy</text>
+      <text x="435" y="72">v3 chạy</text>
+      <text x="570" y="72" fill="var(--accent)">v1 chạy</text>
+    </g>
+    <text x="20" y="152">v1</text>
+    <rect x="110" y="132" width="120" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="230" y="132" width="270" height="30" fill="none" stroke="currentColor" stroke-dasharray="4 3" opacity=".7"/>
+    <rect x="500" y="132" width="140" height="30" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g text-anchor="middle">
+      <text x="170" y="152" fill="var(--accent)">đang chạy</text>
+      <text x="365" y="152" opacity=".8">đang chờ, đã unmount</text>
+      <text x="570" y="152" fill="var(--accent)">đang chạy</text>
+    </g>
+    <g font-size="11" text-anchor="middle">
+      <text x="230" y="108">sleep() / read()</text>
+      <text x="230" y="122">→ unmount</text>
+      <text x="500" y="108">I/O xong</text>
+      <text x="500" y="122">→ mount lại</text>
+    </g>
+    <path d="M110 194h530M634 189l6 5-6 5" fill="none" stroke="currentColor" opacity=".6"/>
+    <text x="110" y="212" font-size="11" opacity=".7">thời gian →</text>
+  </g>
+</svg>
+<figcaption>Trong lúc v1 chờ, carrier của nó không bị lãng phí: nó chạy các virtual thread khác.</figcaption>
+</figure>
+
+<p>Bạn cũng có thể tạo virtual thread trực tiếp. JEP 444: "<code>Thread.Builder</code>, <code>Thread.ofVirtual()</code> và <code>Thread.ofPlatform()</code> là các API mới để tạo virtual thread và platform thread", và "<code>Thread.startVirtualThread(Runnable)</code> là cách tiện lợi để tạo rồi start một virtual thread".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> Ngoài ra, "virtual thread luôn là daemon thread", nên tự chúng không giữ JVM sống.<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a></p>
+
+<h2>4. Mở rộng quy mô, không phải tốc độ</h2>
+<p>"Virtual thread không phải là thread nhanh hơn; chúng không chạy code nhanh hơn platform thread. Chúng tồn tại để mang lại khả năng mở rộng (throughput cao hơn), không phải tốc độ (latency thấp hơn)."<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> Chúng hợp với server kiểu thread-per-request có nhiều blocking I/O; cứ viết code blocking đơn giản.</p>
+<p>Quay lại nhà hàng: người phục vụ khéo léo không làm bếp nấu nhanh hơn. Một món vẫn mất mười phút. Cái thay đổi là số bàn bạn phục vụ cùng lúc. JEP 444 nói một cách chính thức: "khả năng mở rộng của ứng dụng server tuân theo Little's Law".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> Nói đơn giản, số request mỗi giây ≈ số request đang xử lý ÷ thời gian mỗi request. Với thời gian chờ 1 giây, 200 thread cho 200 request/giây; 10.000 virtual thread cho khoảng 10.000 request/giây.</p>
+<h3>Bẫy: công việc nặng CPU</h3>
+<p>Nếu mỗi task tính toán 1 giây (hash, resize ảnh) thay vì chờ, nó không bao giờ block, nên không bao giờ unmount. Bạn vẫn chỉ có số carrier bằng số core CPU, và công việc mất đúng bằng thời gian khi dùng pool platform thread. Virtual thread giúp cho việc <strong>chờ</strong>, không giúp cho việc tính.</p>
+
+<h2>5. Hai quy tắc: đừng pool, giới hạn bằng Semaphore</h2>
+<p><strong>Quy tắc 1: "Đừng bao giờ pool virtual thread."</strong> Mỗi task một virtual thread: <code>Executors.newVirtualThreadPerTaskExecutor()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> Tài liệu giải thích lý do: "Pool được thiết kế để chia sẻ tài nguyên khan hiếm, mà virtual thread thì không khan hiếm, nên đừng bao giờ pool chúng!"<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a> Tạo một cái rất rẻ; JEP 444 đưa ra một chương trình tạo 10.000 cái và nói tới việc "tạo 1.000.000 virtual thread chạy đồng thời".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a></p>
+<p><strong>Quy tắc 2: giới hạn mức đồng thời bằng <code>Semaphore</code>, không bằng pool.</strong><a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> Code cũ hay dùng pool 10 thread <em>đồng thời</em> để bảo vệ một service chậm khỏi nhận quá 10 lời gọi cùng lúc. Bỏ pool đi thì bạn vẫn cần giới hạn đó. Semaphore giống một bát có 10 vé: lấy một vé trước khi gọi, trả lại sau khi xong. Ví dụ trong tài liệu:<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a></p>
+<pre><code>Semaphore sem = new Semaphore(10);
+...
+Result foo() {
+    sem.acquire();      <span class="c">// wait for a ticket (an 11th caller waits here)</span>
+    try {
+        return callLimitedService();
+    } finally {
+        sem.release();  <span class="c">// always give the ticket back</span>
+    }
+}</code></pre>
+<p class="muted">Thêm một lưu ý từ JEP 444: vì bạn có thể có hàng triệu virtual thread, "chỉ dùng thread local sau khi cân nhắc kỹ".<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> Một object lớn cache trong <code>ThreadLocal</code> trước đây tồn tại 200 bản; giờ có thể là mỗi task một bản.</p>
+
+<h2>6. Điểm vướng: pinning</h2>
+<p>Đôi khi virtual thread không thể unmount trong lúc chờ. Khi đó nó bị <span class="term">pin</span> (ghim) vào carrier, ví dụ trong lời gọi native, điều này làm giảm khả năng mở rộng nhưng không ảnh hưởng tính đúng đắn.<a class="src" href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">core libraries guide</a> Trên JDK 21, tài liệu liệt kê hai trường hợp: "virtual thread chạy code bên trong một block hoặc method <code>synchronized</code>" và "virtual thread chạy một method <code>native</code> hoặc một foreign function".<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a></p>
+<p>Trong nhà hàng: một người phục vụ đang cầm chìa khoá duy nhất của hầm rượu trong lúc chờ ở bếp thì không thể giao chìa khoá cho ai, nên phải đứng đó. Người phục vụ đó bị pin.</p>
+<p>Bạn có thể nhìn thấy nó. "System property <code>jdk.tracePinnedThreads</code> in ra stack trace khi một thread bị block trong lúc đang bị pin."<a class="src" href="https://openjdk.org/jeps/444">JEP 444</a> Mình đã chạy một virtual thread sleep bên trong <code>synchronized (lock)</code> trên JDK 21:</p>
+<pre><code>$ java -Djdk.tracePinnedThreads=short Pin.java
+VirtualThread[#20]/runnable@ForkJoinPool-1-worker-1 reason:MONITOR
+    Pin.lambda$main$0(Pin.java:6) <span class="hl">&lt;== monitors:1</span>
+virtual? true, daemon? true</code></pre>
+<p>Cách đọc: virtual thread #20, đang chạy trên carrier <code>ForkJoinPool-1-worker-1</code>, bị block trong lúc giữ một monitor (lock của <code>synchronized</code>) ở dòng 6. Dòng cuối xác nhận nó là virtual và là daemon.</p>
+<p><strong>Cách sửa trên JDK 21:</strong> với các block <code>synchronized</code> chạy thường xuyên và bao quanh I/O lâu, hãy dùng <code>ReentrantLock</code> (bài 0024).<a class="src" href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">core libraries guide</a></p>
+<pre><code><span class="c">// Before: pins the carrier thread during frequentIO()</span>
+synchronized(lockObj) {
+    frequentIO();
+}
+
+<span class="c">// After</span>
+lock.lock();
+try {
+    frequentIO();
+} finally {
+    lock.unlock();
+}</code></pre>
+<p class="muted">Sau 21: JEP 491, có trong JDK 24, cho phép virtual thread unmount bên trong <code>synchronized</code>, điều này "sẽ loại bỏ gần như mọi trường hợp virtual thread bị pin vào platform thread". Lời gọi native vẫn có thể pin.<a class="src" href="https://openjdk.org/jeps/491">JEP 491</a> Khoá học này nhắm tới 21, nên lời khuyên dùng <code>ReentrantLock</code> vẫn áp dụng cho bạn.</p>
+
+<h3>JDK 8, 17 và 21</h3>
+<p>Virtual thread chính thức ở JDK 21 (JEP 444). JDK 8 và 17 chỉ có platform thread, nên bạn phải chọn kích thước pool (bài 0023) hoặc chuyển sang bất đồng bộ với <code>CompletableFuture</code> (bài 0010). Trên 21 bạn có thể viết lại code blocking bình thường mà vẫn mở rộng được.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Lợi ích chính của virtual thread là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Throughput tổng thể cao hơn</button>
+    <button class="opt">Vòng lặp nặng CPU chạy nhanh hơn</button>
+    <button class="opt">Latency mỗi lời gọi thấp hơn</button>
+    <button class="opt">Bytecode sau compile nhỏ hơn</button>
+  </div>
+  <div class="why">Chúng mang lại khả năng mở rộng (throughput), không phải tốc độ. Một task vẫn mất thời gian như cũ; chỉ là chạy được nhiều task cùng lúc hơn.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Nên quản lý virtual thread thế nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Tạo một cái mới cho mỗi task</button>
+    <button class="opt">Giữ một pool khoảng 200 cái</button>
+    <button class="opt">Tạo đúng một cái cho mỗi core</button>
+    <button class="opt">Dùng lại một cái cho mọi việc</button>
+  </div>
+  <div class="why">Mỗi task là một virtual thread; đừng bao giờ pool chúng. Chúng rẻ, còn pool sinh ra để chia sẻ tài nguyên khan hiếm.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Service của bạn chỉ được gọi API đối tác tối đa 10 lời gọi cùng lúc. Với virtual thread, bạn đảm bảo điều đó thế nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một Semaphore có 10 permit</button>
+    <button class="opt">Một pool cố định 10 virtual thread</button>
+    <button class="opt">Đánh dấu các thread là daemon</button>
+    <button class="opt">Tắt blocking I/O ở phía client</button>
+  </div>
+  <div class="why">Tài liệu khuyên dùng <code>Semaphore</code> để giới hạn mức đồng thời, không dùng pool.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Loại công việc nào được lợi ít nhất từ virtual thread?</p>
+  <div class="options">
+    <button class="opt" data-correct>Thuần tính toán nặng CPU</button>
+    <button class="opt">Gọi HTTP blocking tới service</button>
+    <button class="opt">Query database JDBC blocking</button>
+    <button class="opt">Chờ message trên một queue</button>
+  </div>
+  <div class="why">Công việc nặng CPU không block, nên unmount chẳng mang lại gì; virtual thread không chạy code nhanh hơn.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Trên JDK 21, một virtual thread gọi HTTP API chậm bên trong block <code>synchronized</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nó bị pin: carrier của nó cũng bị block</button>
+    <button class="opt">Nó unmount như thường và trả carrier lại</button>
+    <button class="opt">JVM ném một exception tại dòng đó</button>
+    <button class="opt">Block đó chạy trên một platform thread mới</button>
+  </div>
+  <div class="why">Ở JDK 21, code bên trong <code>synchronized</code> pin virtual thread. Kết quả vẫn đúng, nhưng carrier không phục vụ được thread khác. Hãy dùng <code>ReentrantLock</code> cho I/O lâu ở chỗ đó.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Pool 200 platform thread chạy 10.000 task, mỗi task sleep 1 giây. Mất khoảng bao lâu?</p>
+  <div class="options">
+    <button class="opt" data-correct>Khoảng 50 giây</button>
+    <button class="opt">Khoảng 1 giây</button>
+    <button class="opt">Khoảng 200 giây</button>
+    <button class="opt">Khoảng 10.000 giây</button>
+  </div>
+  <div class="why">200 task một lúc, mỗi task 1 giây: 10.000 / 200 × 1 s = 50 s. Với virtual thread thì mất khoảng 1 s.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"Virtual thread là gì, và khi nào bạn dùng nó?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Virtual thread là một <code>java.lang.Thread</code> không gắn với một OS thread cố định (chính thức ở JDK 21).</label></li>
+      <li><label><input type="checkbox"> Nó chạy khi được mount lên một carrier (platform) thread và unmount khi block vì I/O.</label></li>
+      <li><label><input type="checkbox"> Nó cho khả năng mở rộng (throughput), không phải tốc độ; giúp việc I/O, không giúp việc nặng CPU.</label></li>
+      <li><label><input type="checkbox"> Đừng pool: mỗi task một virtual thread (<code>newVirtualThreadPerTaskExecutor</code>).</label></li>
+      <li><label><input type="checkbox"> Giới hạn truy cập tài nguyên khan hiếm bằng <code>Semaphore</code>.</label></li>
+      <li><label><input type="checkbox"> Pinning: trên JDK 21, <code>synchronized</code> và lời gọi native pin carrier; dùng <code>ReentrantLock</code> quanh I/O lâu, tìm chỗ bị pin bằng <code>jdk.tracePinnedThreads</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Virtual thread là một <code>java.lang.Thread</code> bình thường, nhưng không bị gắn với một OS thread. JDK mount nó lên một carrier thread lấy từ một ForkJoinPool nhỏ, và khi nó block vì I/O, ví dụ gọi database, nó unmount để carrier chạy virtual thread khác. Nhờ vậy em có thể dùng mỗi request một thread, kể cả hàng chục nghìn, và viết code blocking đơn giản. Nó là về throughput chứ không phải tốc độ: một request không nhanh hơn, và việc nặng CPU không được lợi gì. Có hai quy tắc: em không bao giờ pool chúng, em dùng <code>newVirtualThreadPerTaskExecutor</code>, và nếu cần giới hạn số lời gọi tới một downstream service thì em dùng Semaphore chứ không dùng pool nhỏ. Cạm bẫy chính trên JDK 21 là pinning: trong <code>synchronized</code> hoặc code native thì virtual thread không unmount được, nên với I/O lâu và thường xuyên nằm dưới lock em chuyển sang <code>ReentrantLock</code>, và tìm những chỗ đó bằng <code>-Djdk.tracePinnedThreads</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-pool-vs-virtual.vi.md">Bài tập 0006: pool và virtual thread</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/VirtualThreadsDemo.java"><code>VirtualThreadsDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior sẽ hỏi sâu hơn: <em>"Bạn có chuyển một Spring service sang virtual thread không? Còn connection pool thì sao? Code dùng nhiều ThreadLocal sẽ ra sao?"</em> Gợi ý: database pool vẫn chỉ có, chẳng hạn, 20 connection, nên 10.000 virtual thread sẽ xếp hàng chờ chúng; virtual thread dời điểm nghẽn đi chỗ khác chứ không xoá nó. Ôn lại cách chọn kích thước pool ở <a href="0023-thread-pools-executors.vi.html">bài 0023</a> và lock ở <a href="0024-atomics-and-locks.vi.html">bài 0024</a>. Tiếp theo: JDK 21 thay đổi garbage collection thế nào với <a href="0017-generational-zgc.vi.html">generational ZGC</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual Threads (Oracle Java core libraries guide)</a>. Đọc hết trang; nó ngắn. Sau đó đọc <a href="https://openjdk.org/jeps/444">JEP 444</a> để hiểu thiết kế.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Carrier thread chính xác là gì?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0016-sequenced-collections.vi.html">← Đầu, cuối và đảo ngược: sequenced collection (JDK 21)</a> &nbsp;|&nbsp; <a href="0017-generational-zgc.vi.html">Generational ZGC: pause siêu ngắn, giờ có thêm young và old (JDK 21) →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Oracle core libraries guide, JEP 444, JEP 491 và các lần chạy trên JDK 21.0.12, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/25/core/virtual-threads.html">Java core libraries: Virtual Threads</a> · <a href="https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html">Virtual Threads (JDK 21 guide)</a> · <a href="https://openjdk.org/jeps/444">JEP 444: Virtual Threads</a> · <a href="https://openjdk.org/jeps/491">JEP 491: Synchronize Virtual Threads without Pinning</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

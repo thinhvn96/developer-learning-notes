@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 4: Factory Method</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Factory Method</h1>
+<p class="meta">Design Patterns · Bài 0004 · bước 4/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-factory-method.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được cách một creator giao việc chọn product cụ thể cho các subclass, và nhận ra các static factory method trong JDK.</div>
+
+<h2>Mục đích</h2>
+<p>Factory Method là "một creational design pattern cung cấp interface để tạo object trong superclass, nhưng cho phép subclass thay đổi kiểu object sẽ được tạo ra." Hãy dùng nó khi bạn không biết trước chính xác code của mình sẽ làm việc với những kiểu nào, khi bạn muốn cho người dùng library hoặc framework mở rộng các thành phần bên trong, hoặc khi muốn tái sử dụng các object có sẵn.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+<h2>Ví dụ</h2><p><code>Dialog.render()</code> được viết một lần dựa trên interface <code>Button</code>; mỗi subclass override <code>createButton()</code> để chọn product.</p><pre><code>java design-patterns/examples/FactoryMethodDemo.java
+WindowsDialog renders [Windows button]
+WebDialog renders &lt;button&gt;
+List.of(...) returns a List; concrete class chosen by the JDK: List12</code></pre><p>Mã nguồn: <a href="../examples/FactoryMethodDemo.java"><code>FactoryMethodDemo.java</code></a>. Người anh em bạn gặp hằng ngày: các static factory method như <code>List.of(..)</code> và <code>Integer.valueOf</code>, nơi caller nhận về một kiểu interface còn JDK tự chọn class (lần chạy của tôi ra <code>List12</code>).</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Giảm phụ thuộc giữa creator và các product cụ thể</li><li>Single Responsibility: code tạo object nằm ở một chỗ</li><li>Open/Closed: thêm loại product mới mà không sửa code cũ</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Code phức tạp hơn: phát sinh nhiều subclass mới</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a> Nó thường phát triển dần thành Abstract Factory, Prototype hoặc Builder, và có liên quan đến Template Method (factory method thường là một bước trong một template method).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Trong Factory Method, ai quyết định product cụ thể?</p>
+  <button>JVM</button>
+  <button data-correct>Subclass</button>
+  <button>Client</button>
+  <button>Compiler</button>
+  <p class="explain">Subclass thay đổi kiểu object được tạo ra.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Lợi ích?</p>
+  <button>Khởi động nhanh hơn</button>
+  <button>Ít class hơn</button>
+  <button data-correct>Tách creator khỏi product</button>
+  <button>Không cần interface</button>
+  <p class="explain">Nó loại bỏ sự phụ thuộc chặt giữa creator và các product cụ thể.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Nhược điểm?</p>
+  <button data-correct>Nhiều subclass</button>
+  <button>Gọi hàm chậm</button>
+  <button>Mất đa hình</button>
+  <button>Cần reflection</button>
+  <p class="explain">Độ phức tạp của code tăng theo số subclass mới.<a class="cite" href="https://refactoring.guru/design-patterns/factory-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Ví dụ factory method trong JDK?</p>
+  <button data-correct>List.of</button>
+  <button>new Object</button>
+  <button>System.exit</button>
+  <button>Thread.sleep</button>
+  <p class="explain">List.of trả về một List mà class cụ thể do JDK chọn.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-add-a-product.vi.md">Bài tập 4: thêm một product</a></p>
+<p>Ví dụ chạy được: <a href="../examples/FactoryMethodDemo.java"><code>FactoryMethodDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/factory-method">Factory Method (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0003-criticism-and-anti-patterns.vi.html">← Những lời chỉ trích pattern, và anti-pattern</a> &nbsp;|&nbsp; <a href="0005-abstract-factory.vi.html">Abstract Factory →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/factory-method">Factory Method (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

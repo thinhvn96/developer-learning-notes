@@ -1,5 +1,7 @@
 # Exercise 0006: harden a Dockerfile
 
+[Tiếng Việt](0006-harden-a-dockerfile.vi.md)
+
 Companion to [lesson 6](../lessons/0006-pinning-nonroot-and-signals.html).
 
 1. Look up the digest of `eclipse-temurin:21-jre` (`docker buildx imagetools inspect eclipse-temurin:21-jre`) and pin it in `hello-java/Dockerfile`.

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hỏi đáp phỏng vấn Kubernetes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kubernetes: câu hỏi và trả lời phỏng vấn</h1>
+<p class="meta"><a href="../index.vi.html">Trang chủ</a> · Kubernetes · 15 câu hỏi · <a href="index.vi.html">Lộ trình Kubernetes</a> · <a href="../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="interview.html" hreflang="en" lang="en">English</a></p>
+<p>Các câu hỏi Kubernetes cho vòng phỏng vấn backend Senior, xoay quanh việc vận hành một service Java. Các manifest trong <code>examples/</code> đã được apply trên một cluster kind chạy local; output trích dẫn bên dưới lấy từ những lần chạy đó.</p>
+<p class="controls"><button id="open-all">Mở tất cả</button><button id="close-all">Thu gọn tất cả</button> Hãy thử trả lời thành tiếng trước, rồi mới mở đáp án. Các link chỉ số trên dẫn tới nguồn chứng minh cho nhận định đó.</p>
+<details class="qa">
+<summary><span class="n">1.</span>Mô tả kiến trúc của Kubernetes.</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> một control plane (API server, etcd, scheduler, controller manager) và các node (kubelet, kube-proxy, container runtime).</p>
+<ul>
+<li><strong>kube-apiserver:</strong> cung cấp Kubernetes HTTP API.</li>
+<li><strong>etcd:</strong> kho key-value nhất quán, có tính sẵn sàng cao, chứa toàn bộ dữ liệu của API server.</li>
+<li><strong>kube-scheduler:</strong> gán các Pod chưa có node vào một node phù hợp.</li>
+<li><strong>kube-controller-manager:</strong> chạy các controller hiện thực hoá hành vi của API.</li>
+<li><strong>kubelet:</strong> đảm bảo các Pod và container của chúng đang chạy.</li>
+<li><strong>kube-proxy:</strong> duy trì network rule trên node để hiện thực hoá Service.</li>
+<li><strong>Container runtime:</strong> chạy container.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/components/">[1]</a></li>
+</ul>
+<p>Kubernetes mang tính khai báo: bạn nêu trạng thái mong muốn, các controller làm việc để đạt tới nó.<a class="cite" href="https://kubernetes.io/docs/concepts/overview/">[2]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Kể lại chuyện gì xảy ra khi chạy <code>kubectl apply</code>. (API server lưu object vào etcd; các controller tạo các object phụ thuộc; scheduler gán Pod vào node; kubelet khởi động container qua runtime.)</div>
+<p class="see">Học bài: <a href="lessons/0001-cluster-components.vi.html">Các thành phần của cluster</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">2.</span>Pod là gì? Vì sao không chạy Pod trần?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> đơn vị deploy nhỏ nhất: một hoặc nhiều container đặt cùng chỗ, dùng chung storage và network; Pod là thứ dùng xong bỏ, nên hãy dùng một workload resource.</p>
+<p>Nội dung của một Pod luôn được đặt cùng chỗ, lập lịch cùng nhau và chạy trong một ngữ cảnh dùng chung. Pod là những "thực thể tương đối ngắn hạn, dùng xong bỏ"; chúng nằm trên node của mình cho tới khi chạy xong, bị xoá, bị evict vì thiếu tài nguyên, hoặc node gặp sự cố. "Bạn hiếm khi tạo Pod trực tiếp": hãy dùng Deployment, Job hoặc StatefulSet.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[3]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Khi nào bạn dùng Pod nhiều container? (Khi có các helper container gắn chặt với nhau, một pattern nâng cao; phần lớn Pod chỉ có một container.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[3]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0002-pods.vi.html">Pod</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">3.</span>Deployment, ReplicaSet và Pod liên quan với nhau thế nào? Cái gì gắn kết chúng?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Deployment quản lý ReplicaSet, ReplicaSet quản lý Pod; label và selector gắn kết chúng lại.</p>
+<p>Deployment cung cấp cơ chế cập nhật khai báo cho Pod và ReplicaSet; bạn mô tả trạng thái mong muốn và controller đưa trạng thái thực tế về đó với tốc độ được kiểm soát. <code>.spec.selector.matchLabels</code> phải khớp với label trong Pod template.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[4]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Deployment khác StatefulSet thế nào? (Deployment hợp với workload thường không giữ trạng thái; StatefulSet dành cho workload có trạng thái.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[4]</a><a class="cite" href="https://kubernetes.io/docs/concepts/workloads/pods/">[3]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0003-deployments-and-labels.vi.html">Deployment và label</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">4.</span>Service hoạt động thế nào, và có những loại nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Service là một endpoint ổn định cho một tập Pod luôn thay đổi, được chọn bằng label.</p>
+<p>Pod là thứ ngắn hạn, IP thay đổi liên tục; Service expose chúng ra mạng và tìm chúng bằng selector, đồng thời giữ EndpointSlice luôn cập nhật. Các loại: <code>ClusterIP</code> (mặc định, chỉ trong cluster), <code>NodePort</code> (trên IP của từng node tại một port cố định), <code>LoadBalancer</code> (load balancer của cloud), <code>ExternalName</code> (ánh xạ tới một tên DNS bên ngoài). <code>port</code> là port Service expose; <code>targetPort</code> là port của container.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/service/">[6]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Service không gọi tới được Pod. Bạn kiểm tra gì? (Label so với selector, danh sách endpoint, port và targetPort, và trạng thái readiness; readiness fail sẽ gỡ Pod khỏi endpoint.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[5]</a>)</div>
+<p class="see">Học bài: <a href="lessons/0004-services.vi.html">Service</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">5.</span>Request và limit: chuyện gì xảy ra khi container vượt từng loại?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> request quyết định việc lập lịch; limit được thực thi lúc chạy; CPU vượt limit thì bị throttle, memory vượt limit thì có thể bị OOM-kill.</p>
+<p>Request là lượng container được đảm bảo và là thứ scheduler dùng để chọn node; limit là mức tối đa, do kubelet thực thi. CPU được thực thi bằng throttling; memory bằng OOM kill, mang tính phản ứng khi kernel phát hiện áp lực bộ nhớ. CPU tính bằng core hoặc millicore (<code>500m</code>), memory tính bằng byte (<code>256Mi</code>). Nếu đặt limit mà không đặt request, limit sẽ được dùng làm request.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[7]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Request có nên bằng limit không? (Bàn về tính dễ dự đoán so với mức tận dụng tài nguyên; đặt memory bằng nhau cho lượng sử dụng dễ dự đoán. Hãy nêu trade-off, đừng trả lời bằng khẩu hiệu.)</div>
+<p class="see">Học bài: <a href="lessons/0005-requests-limits-and-the-jvm.vi.html">Request, limit và JVM</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">6.</span>Bạn cấu hình memory cho một service Java trong Kubernetes thế nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> đặt memory request và limit, và đặt heap của JVM theo phần trăm của limit, dưới 100.</p>
+<p>Trên Linux, JVM mặc định nhận diện được limit của container và <code>-XX:MaxRAMPercentage</code> đặt kích thước heap theo phần trăm lượng memory nó thấy (mặc định 25 phần trăm).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">[8]</a> Với limit 512Mi và <code>MaxRAMPercentage=70</code>, heap có thể lên tới khoảng 358 MiB, phần còn lại dành cho metaspace, thread stack và buffer. Hãy kiểm chứng dưới tải; memory limit được thực thi bằng OOM kill.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">[7]</a></p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Pod restart với trạng thái OOMKilled nhưng heap dump trông rất nhỏ. Vì sao? (Memory non-heap đã đẩy tổng lượng dùng vượt quá limit.)</div>
+<p class="see">Học bài: <a href="lessons/0005-requests-limits-and-the-jvm.vi.html">Request, limit và JVM</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">7.</span>Giải thích liveness, readiness và startup probe. Chuyện gì trục trặc với một app Spring Boot khởi động chậm?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> liveness fail thì container bị restart; readiness fail thì bị gỡ khỏi endpoint của Service; startup hoãn hai probe kia lại.</p>
+<p>Liveness phát hiện các trạng thái hỏng không thể phục hồi trừ khi restart; readiness kiểm soát traffic mà không restart; startup bảo vệ các container khởi động chậm. HTTP probe thành công với status từ 200 đến 399.<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[5]</a> Nếu liveness bắt đầu trước khi JVM khởi động xong, kubelet sẽ restart container liên tục (crash loop); một startup probe với failure threshold rộng rãi sẽ giải quyết được. Giữ liveness thật nhẹ và độc lập với các dependency phía sau; dùng readiness cho câu hỏi "giờ tôi phục vụ được chưa?".</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Liveness có nên kiểm tra database không? (Nhìn chung là không: restart app không sửa được sự cố database; hãy dùng readiness.)</div>
+<p class="see">Học bài: <a href="lessons/0006-probes.vi.html">Probe</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">8.</span>Rolling update hoạt động thế nào và bạn rollback ra sao?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Deployment scale up một ReplicaSet mới đồng thời scale down ReplicaSet cũ trong giới hạn <code>maxSurge</code> và <code>maxUnavailable</code> (mặc định đều 25 phần trăm); <code>kubectl rollout undo</code> để quay lui.</p>
+<p>Các giá trị mặc định và câu lệnh này lấy từ tài liệu Deployment.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">[4]</a> Readiness probe quyết định khi nào Pod mới nhận traffic, nên một bản release lỗi sẽ bị kẹt lại thay vì nhận traffic (tài liệu về probe định nghĩa hành vi của readiness<a class="cite" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">[5]</a>). Để deploy Java không downtime, cần xử lý SIGTERM một cách graceful (CMD dạng exec, shutdown hook) và chủ động chọn giá trị <code>maxUnavailable</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn release một thay đổi rủi ro an toàn thế nào? (Nằm ngoài các nguồn đã đọc ở đây: canary/blue-green là câu trả lời phổ biến; hãy xem tài liệu Deployment và công cụ của platform bạn dùng.)</div>
+<p class="see">Học bài: <a href="lessons/0007-rolling-updates-and-rollbacks.vi.html">Rolling update và rollback</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">9.</span>Bạn truyền cấu hình và secret vào Pod thế nào? Secret có an toàn không?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> ConfigMap cho cấu hình không nhạy cảm, Secret cho dữ liệu nhạy cảm, cả hai đều dùng được dưới dạng env var hoặc file mount; mặc định Secret chỉ là base64, nên cần thêm encryption at rest và RBAC.</p>
+<p>ConfigMap (tối đa 1 MiB) có thể dùng qua command args, env var hoặc file trong volume; env var không được cập nhật trong container đang chạy, còn file được mount thì sau một lúc sẽ cập nhật.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/configmap/">[9]</a> Secret "mặc định được lưu không mã hoá trong ... etcd", base64 không phải là mã hoá; hãy bật encryption at rest, RBAC theo least privilege, giới hạn quyền truy cập, cân nhắc kho secret bên ngoài.<a class="cite" href="https://kubernetes.io/docs/concepts/configuration/secret/">[10]</a> Đã kiểm chứng trên kind: Pod in ra <code>DB_PASSWORD=s3cret</code> và <code>base64 -d</code> giải mã được giá trị đang lưu.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao đưa thay đổi cấu hình tới các Pod đọc qua env var? (Restart các Pod, ví dụ bằng một lần rollout Deployment.)</div>
+<p class="see">Học bài: <a href="lessons/0009-configmaps.vi.html">ConfigMap</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">10.</span>Namespace dùng để làm gì, và dùng nó vào việc gì là không hợp lý?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> để cô lập các nhóm tài nguyên; không dùng để phân biệt phiên bản (hãy dùng label).</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">[11]</a> Tên là duy nhất trong mỗi namespace; namespace không lồng nhau; PersistentVolume và Node có phạm vi toàn cluster. Triệu chứng hằng ngày: <code>kubectl get pod hello</code> báo "not found" vì Pod nằm trong <code>demo</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Làm sao giới hạn lượng tài nguyên một team được dùng? (Resource quota theo namespace; không nằm trong các trang đã đọc ở đây.)</div>
+<p class="see">Học bài: <a href="lessons/0008-namespaces.vi.html">Namespace</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">11.</span>Job so với CronJob, và cần nhớ gì về các việc chạy theo lịch?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> Job chạy Pod tới khi hoàn tất, có retry; CronJob tạo Job theo lịch; việc được chạy phải idempotent.</p>
+<p>Job cần <code>restartPolicy</code> là Never hoặc OnFailure, <code>backoffLimit</code> mặc định là 6.<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">[12]</a> CronJob dùng cú pháp cron và <code>concurrencyPolicy</code> Allow/Forbid/Replace, và trong một số tình huống vẫn có thể tạo ra các Job chạy đồng thời, nên Job "phải idempotent".<a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">[13]</a> Tôi đã thử một lần chạy thủ công bằng <code>kubectl create job --from=cronjob/nightly</code>.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Một job hằng đêm chạy lố sang tận đêm hôm sau. Bạn đặt gì? (concurrencyPolicy Forbid hoặc Replace.)</div>
+<p class="see">Học bài: <a href="lessons/0011-jobs-and-cronjobs.vi.html">Job và CronJob</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">12.</span>Giải thích PersistentVolume, PersistentVolumeClaim và StorageClass. Dữ liệu ra sao khi Pod bị xoá?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> PVC yêu cầu storage, được đáp ứng bởi một PV (thường được cấp phát động qua StorageClass); dữ liệu sống lâu hơn Pod; reclaim policy quyết định chuyện gì xảy ra khi claim bị xoá.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">[14]</a> Các access mode ReadWriteOnce, ReadOnlyMany, ReadWriteMany, ReadWriteOncePod; reclaim là Retain hoặc Delete. Trên kind, một PVC được bind động (StorageClass <code>standard</code>) và một Pod thứ hai dùng cùng claim đọc được dữ liệu của Pod đầu tiên.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Database production thì dùng reclaim policy nào? (Bàn về trade-off giữa Retain và Delete.)</div>
+<p class="see">Học bài: <a href="lessons/0012-persistent-volumes-and-claims.vi.html">Persistent volume</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">13.</span>Deployment so với StatefulSet?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> StatefulSet bổ sung định danh ổn định, storage ổn định và các thao tác có thứ tự; Deployment hợp với workload stateless.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">[15]</a> Cần một headless Service; scale down hoặc xoá không xoá volume. Trên kind: các Pod lên theo thứ tự (web-0 rồi tới web-1), mỗi Pod có PVC riêng, xoá web-0 thì nó được tạo lại với cùng tên và dữ liệu cũ, và scale down vẫn giữ <code>data-web-1</code>. Bản thân nó không tự replicate dữ liệu.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Bạn có chạy PostgreSQL trong StatefulSet không? (Bàn về operator và replication; nằm ngoài các nguồn đã đọc.)</div>
+<p class="see">Học bài: <a href="lessons/0013-statefulsets.vi.html">StatefulSet</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">14.</span>Bạn expose các service HTTP ra ngoài cluster bằng cách nào?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> dùng các loại Service (NodePort, LoadBalancer) hoặc Ingress kèm controller; tài liệu hiện khuyên dùng Gateway API.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[16]</a> Rule của Ingress khớp host và path tới các Service backend; không có controller thì "tạo một resource Ingress không có hiệu lực gì": Ingress của tôi có ADDRESS trống trên một cluster không cài controller. Ingress API đã bị đóng băng kể từ v1.19.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> TLS termination thì sao? (Ingress có thể đảm nhận; chi tiết nằm ngoài các đoạn trích đã đọc.)</div>
+<p class="see">Học bài: <a href="lessons/0014-ingress.vi.html">Ingress</a></p>
+</div>
+</details>
+<details class="qa">
+<summary><span class="n">15.</span>Horizontal Pod Autoscaler tính số replica thế nào và cần những gì?</summary>
+<div class="ans">
+<p><strong>Trả lời ngắn:</strong> <code>ceil(current x currentMetric / desiredMetric)</code>; cần resource request và một nguồn metric.</p>
+<p><a class="cite" href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">[17]</a> Ví dụ: 3 Pod ở mức 90 phần trăm so với mục tiêu 70 phần trăm cho ra ceil(3 x 90/70) = 4. Trên kind không có metrics server, HPA hiển thị <code>cpu: &lt;unknown&gt;/70%</code> và không làm gì cả.</p>
+<div class="follow"><strong>Câu hỏi nối tiếp thường gặp:</strong> Vì sao CPU request quan trọng với HPA? (Utilization được tính dựa trên request.)</div>
+<p class="see">Học bài: <a href="lessons/0015-horizontal-pod-autoscaler.vi.html">HPA</a></p>
+</div>
+</details>
+
+<footer>
+  <p><strong>Hỏi giáo viên</strong> để làm một buổi phỏng vấn thử: "hỏi tôi lần lượt từng câu Kubernetes này và phản biện câu trả lời của tôi".</p>
+  <p>Nguồn: [1] <a href="https://kubernetes.io/docs/concepts/overview/components/">Kubernetes: Components</a> · [2] <a href="https://kubernetes.io/docs/concepts/overview/">Kubernetes: Overview</a> · [3] <a href="https://kubernetes.io/docs/concepts/workloads/pods/">Kubernetes: Pods</a> · [4] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes: Deployments</a> · [5] <a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/">Kubernetes: Probes</a> · [6] <a href="https://kubernetes.io/docs/concepts/services-networking/service/">Kubernetes: Service</a> · [7] <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">Kubernetes: Resource management</a> · [8] <a href="https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html">java command reference</a> · [9] <a href="https://kubernetes.io/docs/concepts/configuration/configmap/">Kubernetes: ConfigMaps</a> · [10] <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Kubernetes: Secrets</a> · [11] <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/">Kubernetes: Namespaces</a> · [12] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/job/">Kubernetes: Jobs</a> · [13] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/">Kubernetes: CronJob</a> · [14] <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">Kubernetes: Persistent Volumes</a> · [15] <a href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes: StatefulSets</a> · [16] <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Kubernetes: Ingress</a> · [17] <a href="https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/">Kubernetes: Horizontal Pod Autoscaling</a></p>
+</footer>
+</main>
+<script src="../assets/interview.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 3: Consumer acknowledgement, prefetch và redelivery</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Consumer acknowledgement, prefetch và redelivery</h1>
+<p class="meta">RabbitMQ · Bài 0003 · bước 3/9 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-acks-prefetch-redelivery.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được manual acknowledgement, chuyện gì xảy ra khi một consumer chết, vì sao redelivery buộc consumer phải idempotent, và prefetch giới hạn số message đang xử lý dở (in-flight) ra sao.</div>
+
+<h2>Acknowledgement</h2>
+<p>Mỗi lần giao message được định danh bằng một delivery tag. Consumer trả lời bằng <code>basic.ack</code> (xác nhận thành công), <code>basic.nack</code> (từ chối, một phần mở rộng của RabbitMQ) hoặc <code>basic.reject</code> (từ chối, hạn chế hơn nack). Với <code>multiple=true</code>, RabbitMQ ack toàn bộ các tag còn treo cho tới và bao gồm cả tag được chỉ định.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+<p>Nếu consumer ngắt kết nối mà chưa ack, "mọi delivery (message) chưa được ack sẽ tự động được requeue", kèm cờ <code>redeliver</code>, vì vậy consumer "cần được viết với tư duy idempotent."<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a> Bài tổng quan về AMQP cũng nói y như vậy: broker sẽ giao lại cho một consumer khác.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[2]</a></p>
+<h2>Automatic ack là một cái bẫy</h2>
+<p>Automatic acknowledgement "nên được xem là không an toàn và không phù hợp với mọi loại workload", và consumer có thể bị dồn quá nhiều message, tạo backlog trong bộ nhớ.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a> Hãy dùng manual ack.</p>
+<h2>Prefetch</h2>
+<p>Prefetch của channel giới hạn số message chưa ack đang in-flight; 0 nghĩa là không giới hạn, và "các giá trị trong khoảng 100 đến 300 thường cho throughput tối ưu."<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a> Prefetch thấp giúp chia việc công bằng hơn giữa các worker chậm; prefetch cao giúp tăng throughput.</p>
+<h2>Quan sát</h2>
+<pre><code>get with ack_requeue_true (like a consumer that died before acking):
+  redelivered=false payload=job-1
+get again:
+  redelivered=true payload=job-1</code></pre>
+<p>Từ <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a>: lần giao thứ hai mang cờ <code>redelivered=true</code>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Consumer chết khi còn message chưa ack. Kết quả?</p>
+  <button>Bị xoá vĩnh viễn</button>
+  <button>Chuyển sang fanout</button>
+  <button data-correct>Tự động được requeue</button>
+  <button>Giữ lại chờ consumer đó</button>
+  <p class="explain">Các delivery chưa ack sẽ tự động được requeue.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao auto-ack bị coi là không an toàn?</p>
+  <button>Nó ép dùng fanout</button>
+  <button data-correct>Có thể mất message</button>
+  <button>Nó làm publisher chậm</button>
+  <button>Nó vô hiệu hoá queue</button>
+  <p class="explain">Tài liệu gọi automatic acknowledgement là không an toàn với nhiều workload và cảnh báo về việc backlog bị dồn lại.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Prefetch bằng 0 nghĩa là gì?</p>
+  <button data-correct>Không giới hạn</button>
+  <button>Không có message</button>
+  <button>Chỉ manual</button>
+  <button>Một message</button>
+  <p class="explain">Giá trị 0 nghĩa là không giới hạn số message chưa ack.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message có thể bị giao lại nên consumer phải...?</p>
+  <button>Dùng transaction</button>
+  <button data-correct>Idempotent</button>
+  <button>Chạy đơn luồng</button>
+  <button>Chỉ stateless</button>
+  <p class="explain">Consumer cần được viết với tư duy idempotent.<a class="cite" href="https://www.rabbitmq.com/docs/confirms">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-tune-prefetch.vi.md">Bài tập 0003: tinh chỉnh prefetch</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a>. Đọc phần 'Consumer Acknowledgements' và 'Consumer Prefetch'.</p>
+<p><a href="0002-exchange-types.vi.html">← Exchange kiểu direct, fanout và topic</a> &nbsp;|&nbsp; <a href="0004-publisher-confirms-and-durability.vi.html">Publisher confirm và độ bền dữ liệu →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/docs/confirms">RabbitMQ: Consumer Acknowledgements and Publisher Confirms</a> · [2] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

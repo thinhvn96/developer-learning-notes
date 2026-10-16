@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 14: Ingress: định tuyến HTTP vào cluster</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ingress: định tuyến HTTP vào cluster</h1>
+<p class="meta">Kubernetes · Bài 0014 · bước 14/15 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kubernetes</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0014-ingress.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích Ingress làm gì, vì sao bạn cần một controller, và vì sao tài liệu giờ khuyên dùng Gateway API.</div>
+
+<h2>Ingress là gì</h2>
+<p>"Ingress expose các route HTTP và HTTPS từ bên ngoài cluster tới các service bên trong cluster." Các rule trên Ingress quyết định việc định tuyến. Nó có thể cung cấp load balancing, TLS termination và virtual hosting theo tên miền.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a> Mỗi rule có một host (tuỳ chọn) và một danh sách path, mỗi path trỏ tới tên và port của một Service backend; cả host lẫn path đều phải khớp.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+<pre><code>spec:
+  ingressClassName: nginx-example
+  rules:
+  - http:
+      paths:
+      - path: /testpath
+        pathType: Prefix
+        backend: { service: { name: nginx-service, port: { number: 80 } } }</code></pre>
+<h2>Bắt buộc phải có controller</h2>
+<p>"Bạn phải có một Ingress controller thì Ingress mới có tác dụng. Chỉ tạo một resource Ingress thôi thì không có hiệu lực gì."<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+<pre><code>kubectl apply -f examples/ingress.yaml
+NAME              CLASS           HOSTS   ADDRESS   PORTS   AGE
+minimal-ingress   nginx-example   *                 80      20s      # ADDRESS empty: no controller</code></pre>
+<p>Object được chấp nhận nhưng không nhận được địa chỉ nào trên cluster của tôi, vì cluster đó không cài Ingress controller. Thêm một điểm: tài liệu khuyên dùng <a href="https://gateway-api.sigs.k8s.io/">Gateway API</a> thay thế, và nói rằng Ingress API "đã bị đóng băng kể từ Kubernetes v1.19".<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a> So sánh với <a href="0004-services.vi.html">Service</a>: Ingress định tuyến HTTP tới các Service. File: <a href="../examples/ingress.yaml"><code>ingress.yaml</code></a>.</p><p class="aside">Đã kiểm chứng: tôi đã apply các manifest trong <code>examples/</code> lên một cluster <a href="https://kind.sigs.k8s.io/">kind</a> dùng xong bỏ (Kubernetes v1.37.0, kubectl v1.37.1) và trích output từ lần chạy đó. Bản thân việc cài kind không nằm trong các trang tôi đã đọc; hãy làm theo tài liệu của chính dự án đó.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Ingress định tuyến loại traffic nào?</p>
+  <button>Chỉ TCP</button>
+  <button data-correct>HTTP và HTTPS</button>
+  <button>Log của node</button>
+  <button>Chỉ UDP</button>
+  <p class="explain">Nó expose các route HTTP và HTTPS tới Service.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Cần gì để một Ingress hoạt động?</p>
+  <button>Một CronJob</button>
+  <button data-correct>Một Ingress controller</button>
+  <button>Một StatefulSet</button>
+  <button>Một Secret</button>
+  <p class="explain">Chỉ tạo resource thôi thì không có hiệu lực gì.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Để khớp một rule của Ingress cần...?</p>
+  <button>Chỉ image</button>
+  <button>Chỉ tên Pod</button>
+  <button>Chỉ port</button>
+  <button data-correct>Khớp cả host và path</button>
+  <p class="explain">Cả host lẫn path đều phải khớp với request.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Theo tài liệu, thứ được khuyên dùng để thay thế?</p>
+  <button>ExternalName</button>
+  <button>NodePort</button>
+  <button>HostPath</button>
+  <button data-correct>Gateway API</button>
+  <p class="explain">Dự án khuyên dùng Gateway API; Ingress đã bị đóng băng kể từ v1.19.<a class="cite" href="https://kubernetes.io/docs/concepts/services-networking/ingress/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0014-route-two-services.vi.md">Bài tập 0014: định tuyến cho hai service</a></p>
+<p>Ví dụ chạy được: <a href="../examples/ingress.yaml"><code>ingress.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Kubernetes Docs: Ingress</a>. Đọc phần 'What is Ingress?' và 'Ingress rules'.</p>
+<p><a href="0013-statefulsets.vi.html">← StatefulSet: định danh và storage ổn định</a> &nbsp;|&nbsp; <a href="0015-horizontal-pod-autoscaler.vi.html">Horizontal Pod Autoscaler →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có chỗ nào chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "quiz khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Kubernetes Docs: Ingress</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

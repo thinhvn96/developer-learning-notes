@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 11: Ưu tiên composition hơn kế thừa</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Ưu tiên composition hơn kế thừa</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0011 · bước 11/22 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0011-composition-over-inheritance.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vấn đề fragile base class (class cha mong manh) bằng một ví dụ chạy được và sửa nó bằng composition và delegation (ủy quyền).</div>
+
+<h2>Nguyên lý</h2>
+<p>Composition over inheritance đạt được việc tái sử dụng bằng cách kết hợp các object thay vì xây dựng cây kế thừa: "Thay vì để hai class con kế thừa chức năng từ một class cha chung, composition mô phỏng kế thừa bằng cách cho các class con giữ một bản sao của một class 'giả làm cha' dưới dạng field." Cách này mang lại sự linh hoạt và tránh coupling chặt; nhược điểm là phải viết boilerplate để chuyển tiếp lời gọi.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[1]</a></p>
+<h2>Một bug do kế thừa gây ra</h2>
+<pre><code>java oop/examples/CompositionVsInheritance.java
+inheritance: added 3 elements, addCount = 6   (expected 3)
+composition: added 3 elements, addCount = 3   (expected 3)</code></pre>
+<p>Subclass của <code>HashSet</code> đếm số lần add bằng cách override cả <code>add</code> lẫn <code>addAll</code>. Nhưng bản thân <code>HashSet.addAll</code> (behavior được kế thừa) lại gọi <code>add</code> cho từng phần tử, nên mỗi phần tử bị đếm hai lần: ra 6 chứ không phải 3. Subclass phụ thuộc vào một chi tiết hiện thực bên trong của class cha, thứ mà class cha có thể thay đổi bất cứ lúc nào (đó là vấn đề <em>fragile base class</em>). Phiên bản dùng composition giữ một <code>Set</code> và chuyển tiếp lời gọi, nên nó không phụ thuộc vào cách class được bọc hoạt động bên trong. Mã nguồn: <a href="../examples/CompositionVsInheritance.java"><code>CompositionVsInheritance.java</code></a>.</p>
+<div class="aside">Kinh nghiệm: chỉ kế thừa khi có quan hệ is-a thực sự và class cha được thiết kế, được document để cho kế thừa; còn lại thì dùng composition. Các pattern thể hiện tư tưởng này: Strategy, Decorator, Bridge, State.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Composition tái sử dụng code bằng cách...?</p>
+  <button>Extend một class</button>
+  <button>Dùng static</button>
+  <button data-correct>Giữ một object khác</button>
+  <button>Sao chép file</button>
+  <p class="explain">Class chứa object cộng tác dưới dạng một field.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Trong demo kế thừa, ba lần add cho ra số đếm bao nhiêu?</p>
+  <button>Ba</button>
+  <button data-correct>Sáu</button>
+  <button>Hai</button>
+  <button>Chín</button>
+  <p class="explain">addAll lại gọi add, nên bị đếm hai lần.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cái giá chính của composition?</p>
+  <button>JVM chậm hơn</button>
+  <button>Không có interface</button>
+  <button>Không có polymorphism</button>
+  <button data-correct>Boilerplate chuyển tiếp</button>
+  <p class="explain">Có thể phải chuyển tiếp các method bằng tay.<a class="cite" href="https://en.wikipedia.org/wiki/Composition_over_inheritance">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Gốc rễ của vấn đề fragile base class?</p>
+  <button>GC chậm</button>
+  <button>Field static</button>
+  <button data-correct>Subclass phụ thuộc nội bộ class cha</button>
+  <button>Thiếu generic</button>
+  <p class="explain">Subclass dựa vào cách HashSet hiện thực addAll.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0011-wrap-dont-extend.vi.md">Bài tập 11: bọc lại, đừng extend</a></p>
+<p>Ví dụ chạy được: <a href="../examples/CompositionVsInheritance.java"><code>CompositionVsInheritance.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/Composition_over_inheritance">Wikipedia: Composition over inheritance</a>. Đọc phần tổng quan và 'Benefits'.</p>
+<p><a href="0010-interfaces-as-contracts.vi.html">← Interface như một hợp đồng</a> &nbsp;|&nbsp; <a href="0012-nested-classes.vi.html">Nested, inner, local và anonymous class →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/Composition_over_inheritance">Wikipedia: Composition over inheritance</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

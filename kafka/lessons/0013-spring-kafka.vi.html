@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 13: Spring Kafka: KafkaTemplate, @KafkaListener và commit</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Spring Kafka: KafkaTemplate, @KafkaListener và commit</h1>
+<p class="meta">Kafka · Bài 0013 · bước 8/23 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-spring-kafka.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nối một service Spring Boot vào Kafka bằng <code>KafkaTemplate</code> và <code>@KafkaListener</code>, và giải thích chính xác lúc nào Spring commit offset.</div>
+
+<h2>Ứng dụng tối giản</h2>
+<p>Với Spring Boot, bạn thêm <code>spring-boot-starter-kafka</code> và Boot sẽ tự quản lý một phiên bản tương thích.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">[1]</a> Consumer trong quick tour chỉ nhỏ thế này:<a class="cite" href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">[1]</a></p>
+<pre><code>@Bean
+public NewTopic topic() {
+    return TopicBuilder.name("topic1").partitions(10).replicas(1).build();
+}
+
+@KafkaListener(id = "myId", topics = "topic1")
+public void listen(String in) {
+    System.out.println(in);
+}</code></pre>
+<p>"Bean <code>NewTopic</code> khiến topic được tạo trên broker; nếu topic đã tồn tại thì không cần đến nó."<a class="cite" href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">[1]</a> Để produce, bạn gọi <code>template.send("topic1", key, value)</code> trên một <code>KafkaTemplate</code> được inject vào; lời gọi này trả về một future giống như producer thuần.</p>
+<h2>Offset được commit lúc nào?</h2>
+<p>Spring không dùng auto-commit của Kafka: "framework đặt <code>enable.auto.commit</code> thành <code>false</code> trừ khi bạn cấu hình rõ ràng."<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a> Listener container commit theo <code>AckMode</code> của nó; "AckMode mặc định là BATCH".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+<table>
+<tr><th>AckMode</th><th>Commit khi<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></th></tr>
+<tr><td><code>RECORD</code></td><td>listener return sau khi xử lý xong từng record</td></tr>
+<tr><td><code>BATCH</code> (mặc định)</td><td>mọi record mà <code>poll()</code> trả về đã được xử lý xong</td></tr>
+<tr><td><code>MANUAL</code></td><td>code của bạn gọi <code>Acknowledgment.acknowledge()</code>, sau đó áp dụng ngữ nghĩa như BATCH</td></tr>
+<tr><td><code>MANUAL_IMMEDIATE</code></td><td>ngay lập tức khi <code>acknowledge()</code> được gọi</td></tr>
+</table>
+<p>Vậy mặc định là xử lý trước, commit sau: at-least-once. Nếu crash giữa batch, phần đã xử lý của batch đó sẽ bị gửi lại, và đó là lý do listener của bạn phải idempotent.</p>
+<h2>Concurrency</h2>
+<p><code>concurrency=3</code> tạo ra ba <code>KafkaMessageListenerContainer</code>, mỗi cái có consumer riêng (vì <code>KafkaConsumer</code> không thread-safe<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[3]</a>), và Kafka chia partition cho chúng.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a> Đặt concurrency lớn hơn số partition thì các consumer thừa sẽ ngồi không. Khi listen nhiều topic, <code>RangeAssignor</code> mặc định cũng có thể khiến consumer ngồi không: ba topic, mỗi topic năm partition, với <code>concurrency=15</code> thì "chỉ có năm consumer hoạt động".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+<div class="aside">Câu trả lời khi phỏng vấn: "Spring Kafka tắt auto-commit và commit theo AckMode, mặc định là BATCH, tức là sau khi listener xử lý xong toàn bộ lần poll. Như vậy là at-least-once, nên listener phải idempotent. Concurrency bị giới hạn bởi số partition."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. AckMode mặc định của container Spring Kafka là gì?</p>
+  <button>TIME</button>
+  <button data-correct>BATCH</button>
+  <button>MANUAL</button>
+  <button>RECORD</button>
+  <p class="explain">AckMode mặc định là BATCH.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Spring Kafka đặt enable.auto.commit thành gì?</p>
+  <button data-correct>False, trừ khi tự cấu hình</button>
+  <button>True cho chế độ batch</button>
+  <button>True, như mặc định Kafka</button>
+  <button>Xoá hẳn key này đi</button>
+  <p class="explain">Từ bản 2.3, framework đặt nó thành false trừ khi bạn cấu hình rõ ràng.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Sáu partition, concurrency mười. Có bao nhiêu consumer hoạt động?</p>
+  <button data-correct>Sáu consumer</button>
+  <button>Mười consumer</button>
+  <button>Sáu mươi consumer</button>
+  <button>Một consumer</button>
+  <p class="explain">Mỗi partition chỉ giao cho một consumer trong group, nên bốn consumer ngồi không.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Thứ tự commit mặc định cho đảm bảo nào?</p>
+  <button>Exactly once</button>
+  <button>At most once</button>
+  <button data-correct>At least once</button>
+  <button>Không đảm bảo gì</button>
+  <p class="explain">BATCH commit sau khi các record đã được xử lý, nên crash sẽ gây gửi lại chứ không mất dữ liệu.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-spring-listener-review.vi.md">Bài tập 0013: review một Spring listener</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">Spring for Apache Kafka: Message Listener Containers</a>. Đọc mục 'Committing Offsets' và phần concurrency của ConcurrentMessageListenerContainer.</p>
+<p><a href="0012-partitioning-and-partition-count.vi.html">← Partitioning: key, partitioner và số partition</a> &nbsp;|&nbsp; <a href="0008-log-compaction.vi.html">Log compaction và tombstone →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-kafka/reference/quick-tour.html">Spring for Apache Kafka: Quick Tour</a> · [2] <a href="https://docs.spring.io/spring-kafka/reference/kafka/receiving-messages/message-listener-container.html">Spring for Apache Kafka: Message Listener Containers</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 31: Putting things in order</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>How Java puts things in order</h1>
+<p class="subtitle"><code>Comparable</code>, <code>Comparator</code>, and why a <code>TreeSet</code> can silently lose an element.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0031 · step 12 of 46 · Core · ~22 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0031-comparable-comparator-and-ordering.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Sorting orders by price, showing employees by department, keeping a leaderboard in a <code>TreeMap</code>: ordering is everywhere. Interviewers ask <em>"Comparable or Comparator?"</em> and then the trap: <em>"Why did my TreeSet lose an employee?"</em> After this lesson you can answer both and write comparators that cannot overflow.</div>
+
+<div class="win"><b>Today's win:</b> write correct Comparators with <code>Comparator.comparing</code> chains, and explain why a TreeSet can silently lose elements.</div>
+
+<dl class="words">
+  <dt>compare result</dt><dd>Comparing <code>a</code> with <code>b</code> returns an <code>int</code>: negative means "a comes first", zero means "same place", positive means "b comes first".</dd>
+  <dt><code>Comparable&lt;T&gt;</code></dt><dd>An interface a class implements to give itself one built-in order, with the method <code>compareTo</code>. <code>&lt;T&gt;</code> is the type being compared.</dd>
+  <dt>natural ordering</dt><dd>That built-in order: numbers small to big, strings alphabetically, dates oldest first.</dd>
+  <dt><code>Comparator&lt;T&gt;</code></dt><dd>A separate object with a <code>compare(a, b)</code> method. You can make as many as you like: by price, by name, reversed.</dd>
+  <dt>method reference</dt><dd>A short way to write a lambda: <code>Employee::salary</code> means "take an employee, return its salary".</dd>
+  <dt>TreeSet, TreeMap</dt><dd>A set and a map that keep their elements sorted all the time, using compare results.</dd>
+  <dt>stable sort</dt><dd>A sort that keeps elements that compare as equal in their original order.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Predict: you put four employees into a <code>TreeSet</code> that is sorted only by salary. Two of them, Lan and Minh, both earn 3000. How many employees does the set hold afterwards? Say the number and why. Section 3 shows the real run.</p>
+
+<h2>1. The picture: lining people up</h2>
+<p>A school photo: the photographer lines children up by height. Height is the children's <em>own</em> property, and everyone agrees on it: that is a <strong>natural ordering</strong>. But the teacher may want a different line, alphabetical for roll call or by birthday for a party. The teacher brings her own rule from outside: that is a <strong>comparator</strong>.</p>
+<ul>
+  <li><code>Comparable&lt;T&gt;</code>: the class's <em>natural ordering</em>, one <code>compareTo</code> inside the class (<code>String</code>, <code>Integer</code>, <code>LocalDate</code>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a></li>
+  <li><code>Comparator&lt;T&gt;</code>: an ordering from outside, as many as you like (by price, by date, reversed).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator javadoc</a></li>
+</ul>
+<pre><code>record Money(long cents) implements Comparable&lt;Money&gt; {
+  public int compareTo(Money o) { return Long.compare(cents, o.cents); }
+}
+<span class="c">// natural order, written once inside the class</span>
+
+Comparator&lt;Employee&gt; byName = Comparator.comparing(Employee::name);
+<span class="c">// an outside rule; you can have many</span></code></pre>
+<p>Only the <strong>sign</strong> of the result matters: <code>Long.compare(5, 9)</code> returns a negative number, so 5 comes first. Do not rely on it being exactly -1.</p>
+
+<h3>The rules every compareTo must follow</h3>
+<p>The contract: <code>sgn(x.compareTo(y)) == -sgn(y.compareTo(x))</code> (if x is before y, then y is after x), transitivity (if x &lt; y and y &lt; z, then x &lt; z), and <code>compareTo(null)</code> throws <code>NullPointerException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a> Sorting algorithms trust these rules. Break them and sorts can give strange orders.</p>
+
+<h2>2. Consistent with equals</h2>
+<p>An ordering is consistent with equals when <code>compareTo == 0</code> exactly when <code>equals</code> is true. It is "strongly recommended (though not required)" because sorted sets and maps "behave 'strangely'" otherwise: they use <code>compareTo</code>, not <code>equals</code>, to decide duplicates.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a></p>
+<p>TreeMap states the same: "two keys that are deemed equal by this method are, from the standpoint of the sorted map, equal."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap javadoc</a> Compare this with lesson 0001: a <code>HashSet</code> asks <code>hashCode</code> and <code>equals</code>; a <code>TreeSet</code> never calls <code>equals</code> at all.</p>
+<p>The JDK's own example is <code>BigDecimal</code> 4.0 vs 4.00.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable javadoc</a> They are the same number, but written with a different number of decimals, so <code>equals</code> says no and <code>compareTo</code> says "same":</p>
+<pre><code>$ java java/examples/collections/OrderingAndComparators.java
+4.0 equals 4.00?     false   compareTo == 0? true
+HashSet size: 2   TreeSet size: 1
+TreeSet by salary only keeps 3 of 4: [Hoa, Lan, An]
+  ...</code></pre>
+<p>Same two objects: the <code>HashSet</code> keeps both, the <code>TreeSet</code> keeps one.</p>
+
+<h2>3. The trap: a TreeSet that loses people</h2>
+<p>The third line of the output is the production bug. Here is the code:</p>
+<pre><code>Set&lt;Employee&gt; bySalary =
+    new TreeSet&lt;&gt;(Comparator.comparingInt(Employee::salary));
+bySalary.addAll(List.of(lan3000, minh3000, hoa2500, an4000));
+
+<span class="c">Step 1  add Lan  (3000)  tree is empty         → root</span>
+<span class="c">Step 2  add Minh (3000)  compare(Minh, Lan) = 0 → "already there"</span>
+<span class="c">Step 3  add Hoa  (2500)  compare(Hoa, Lan) &lt; 0  → goes left</span>
+<span class="c">Step 4  add An   (4000)  compare(An, Lan)  &gt; 0  → goes right</span>
+                                         <span class="hl">size 3, Minh is gone</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="A TreeSet sorted by salary: Lan 3000 at the root, Hoa 2500 on the left, An 4000 on the right. Minh 3000 compares as 0 with Lan and is dropped.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <rect x="230" y="30" width="140" height="46" rx="6" fill="none" stroke="currentColor"/>
+    <text x="300" y="50" text-anchor="middle">Lan</text>
+    <text x="300" y="68" text-anchor="middle" font-size="11" opacity=".75">3000 (root)</text>
+    <g fill="none" stroke="currentColor"><path d="M260 76l-80 56M340 76l80 56"/></g>
+    <text x="196" y="104" font-size="11" opacity=".75">&lt; 0</text>
+    <text x="388" y="104" font-size="11" opacity=".75">&gt; 0</text>
+    <rect x="110" y="132" width="140" height="46" rx="6" fill="none" stroke="currentColor"/>
+    <text x="180" y="152" text-anchor="middle">Hoa</text>
+    <text x="180" y="170" text-anchor="middle" font-size="11" opacity=".75">2500</text>
+    <rect x="350" y="132" width="140" height="46" rx="6" fill="none" stroke="currentColor"/>
+    <text x="420" y="152" text-anchor="middle">An</text>
+    <text x="420" y="170" text-anchor="middle" font-size="11" opacity=".75">4000</text>
+    <rect x="520" y="30" width="140" height="46" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="5 3"/>
+    <text x="590" y="50" text-anchor="middle" fill="var(--accent)">Minh</text>
+    <text x="590" y="68" text-anchor="middle" font-size="11" fill="var(--accent)">3000</text>
+    <g fill="none" stroke="var(--accent)"><path d="M520 53h-142M384 48l-6 5 6 5"/></g>
+    <text x="450" y="22" text-anchor="middle" font-size="11" fill="var(--accent)">compare(Minh, Lan) = 0</text>
+    <text x="590" y="100" text-anchor="middle" font-size="11" fill="var(--accent)">"duplicate"</text>
+    <text x="590" y="116" text-anchor="middle" font-size="11" fill="var(--accent)">→ dropped</text>
+    <text x="340" y="220" text-anchor="middle" font-size="12" opacity=".8">The tree asks the comparator, never equals(): 0 means "same element"</text>
+  </g>
+</svg>
+<figcaption>Minh is a different person, but the comparator only looks at salary. For the tree, a compare result of 0 means "this element is already here".</figcaption>
+</figure>
+
+<p>No exception, no warning: <code>add</code> just returns <code>false</code>. <strong>The fix:</strong> always end a comparator with a unique tie-breaker, for example <code>.thenComparing(Employee::name)</code> or an id.</p>
+
+<h2>4. Building comparators (JDK 8+)</h2>
+<p>Think of a sports league table: sort by points; if equal, by goal difference; if still equal, by name. Each rule only matters when all the earlier rules tie. Java's comparator chain works exactly like that:</p>
+<pre><code>staff.sort(Comparator.comparing(Employee::dept)
+        .thenComparing(Employee::salary, Comparator.reverseOrder())
+        .thenComparing(Employee::name));
+  Employee[dept=eng, name=An, salary=4000]
+  Employee[dept=eng, name=Lan, salary=3000]
+  Employee[dept=eng, name=Minh, salary=3000]
+  Employee[dept=ops, name=Hoa, salary=2500]</code></pre>
+<p>Line by line: <code>comparing(Employee::dept)</code> sorts by department, A to Z. <code>thenComparing(Employee::salary, Comparator.reverseOrder())</code> breaks ties by salary, highest first. <code>thenComparing(Employee::name)</code> breaks the last ties by name.</p>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="How the chained comparator decides two pairs. Lan versus Minh: dept ties, salary ties, name decides Lan first. An versus Lan: dept ties, salary decides An first, name is never checked.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="12">compare(Lan, Minh)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="34" width="190" height="54" rx="6"/>
+      <rect x="245" y="34" width="190" height="54" rx="6"/>
+      <path d="M210 61h29M233 56l6 5-6 5M435 61h29M458 56l6 5-6 5"/>
+    </g>
+    <rect x="470" y="34" width="190" height="54" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="115" y="56" text-anchor="middle">1. dept</text>
+    <text x="115" y="76" text-anchor="middle" font-size="11" opacity=".8">eng vs eng → 0, next</text>
+    <text x="340" y="56" text-anchor="middle">2. salary desc</text>
+    <text x="340" y="76" text-anchor="middle" font-size="11" opacity=".8">3000 vs 3000 → 0, next</text>
+    <text x="565" y="56" text-anchor="middle" fill="var(--accent)">3. name</text>
+    <text x="565" y="76" text-anchor="middle" font-size="11" fill="var(--accent)">Lan &lt; Minh → Lan first</text>
+
+    <text x="20" y="128" font-size="12">compare(An, Lan)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="138" width="190" height="54" rx="6"/>
+      <path d="M210 165h29M233 160l6 5-6 5"/>
+    </g>
+    <rect x="245" y="138" width="190" height="54" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <rect x="470" y="138" width="190" height="54" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".4"/>
+    <text x="115" y="160" text-anchor="middle">1. dept</text>
+    <text x="115" y="180" text-anchor="middle" font-size="11" opacity=".8">eng vs eng → 0, next</text>
+    <text x="340" y="160" text-anchor="middle" fill="var(--accent)">2. salary desc</text>
+    <text x="340" y="180" text-anchor="middle" font-size="11" fill="var(--accent)">4000 &gt; 3000 → An first</text>
+    <text x="565" y="160" text-anchor="middle" opacity=".45">3. name</text>
+    <text x="565" y="180" text-anchor="middle" font-size="11" opacity=".45">never checked</text>
+  </g>
+</svg>
+<figcaption>A chained comparator stops at the first rule that gives a non-zero answer. The last rule should be unique, so that 0 only happens for truly equal elements.</figcaption>
+</figure>
+
+<h3>Stability</h3>
+<p>Object sorts (<code>List.sort</code>, <code>Arrays.sort(Object[])</code>) are "guaranteed to be stable: equal elements will not be reordered", using TimSort; primitive arrays use Dual-Pivot Quicksort.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays javadoc</a> Stability is what makes sorting by one key, then another, predictable: if you sort by name and then by department, people inside one department stay in name order.</p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<p><code>Comparator.comparing</code>, <code>thenComparing</code>, <code>reverseOrder</code> and <code>nullsFirst</code> are JDK 8+, so they work everywhere. On JDK 17 and 21 you will often compare <code>record</code>s, as in the example, because records give you the accessor methods (<code>Employee::salary</code>) for free.</p>
+
+<h2>5. Two classic bugs</h2>
+<h3>Bug 1: comparing by subtraction</h3>
+<pre><code>Comparator&lt;Integer&gt; broken = (a, b) -&gt; a - b;   <span class="c">// looks fine, is not</span>
+
+<span class="c">Step 1  a = Integer.MIN_VALUE = -2147483648, b = 1</span>
+<span class="c">Step 2  a - b = -2147483649, which does not fit in an int</span>
+<span class="c">Step 3  the int wraps around                    → +2147483647</span>
+<span class="c">Step 4  positive means "a comes after b"</span>       <span class="hl">→ claims MIN_VALUE &gt; 1</span></code></pre>
+<pre><code>broken compare(MIN_VALUE, 1) = 2147483647  (positive: claims MIN_VALUE &gt; 1)
+Integer.compare(MIN_VALUE, 1) = -1</code></pre>
+<p><code>(a, b) -&gt; a - b</code> overflows; use <code>Integer.compare</code> or <code>Comparator.comparingInt</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator javadoc</a></p>
+
+<h3>Bug 2: nulls in the list</h3>
+<pre><code>naturalOrder with null -&gt; NullPointerException
+nullsFirst -&gt; [null, a, b]</code></pre>
+<p>The natural order cannot compare <code>null</code>. For nullable fields wrap with <code>Comparator.nullsFirst/nullsLast</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator javadoc</a></p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">What does a <code>TreeSet</code> use to decide that two elements are duplicates?</p>
+  <div class="options">
+    <button class="opt" data-correct>compareTo or the comparator returning 0</button>
+    <button class="opt">equals returning true for the two elements</button>
+    <button class="opt">hashCode returning the same number for both</button>
+    <button class="opt">== being true because they are one object</button>
+  </div>
+  <div class="why">Sorted sets and maps perform all comparisons with <code>compareTo</code> or <code>compare</code>. <code>equals</code> is never called.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You add <code>new BigDecimal("4.0")</code> and <code>new BigDecimal("4.00")</code> to a <code>HashSet</code> and to a <code>TreeSet</code>. What are the sizes?</p>
+  <div class="options">
+    <button class="opt" data-correct>HashSet 2, TreeSet 1</button>
+    <button class="opt">HashSet 1, TreeSet 2</button>
+    <button class="opt">HashSet 1, TreeSet 1</button>
+    <button class="opt">HashSet 2, TreeSet 2</button>
+  </div>
+  <div class="why"><code>equals</code> is false (different scale), so the HashSet keeps both. <code>compareTo</code> is 0, so the TreeSet keeps one.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A TreeSet sorted only by salary gets Lan (3000), Minh (3000), Hoa (2500) and An (4000). What is its size?</p>
+  <div class="options">
+    <button class="opt" data-correct>3, Minh is silently dropped</button>
+    <button class="opt">4, all the employees are kept</button>
+    <button class="opt">It throws on adding Minh</button>
+    <button class="opt">2, both 3000 people dropped</button>
+  </div>
+  <div class="why">Minh compares as 0 with Lan, so the tree treats Minh as a duplicate. Add a unique tie-breaker such as the name.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is wrong with the comparator <code>(a, b) -&gt; a - b</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>The subtraction can overflow and flip the sign</button>
+    <button class="opt">It sorts the numbers from biggest to smallest</button>
+    <button class="opt">It does not compile for Integer arguments</button>
+    <button class="opt">It is correct but much slower than compare</button>
+  </div>
+  <div class="why"><code>MIN_VALUE - 1</code> wraps to 2147483647, a positive number. Use <code>Integer.compare</code> or <code>Comparator.comparingInt</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Is <code>List.sort</code> on objects stable?</p>
+  <div class="options">
+    <button class="opt" data-correct>Yes, equal elements keep their order</button>
+    <button class="opt">No, equal elements may be shuffled</button>
+    <button class="opt">Only when the list is an ArrayList</button>
+    <button class="opt">Only for primitive arrays like int[]</button>
+  </div>
+  <div class="why">Object sorts are guaranteed stable (TimSort). Primitive arrays use Dual-Pivot Quicksort, where stability does not matter.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">In <code>comparing(Employee::dept).thenComparing(Employee::name)</code>, when is the name compared?</p>
+  <div class="options">
+    <button class="opt" data-correct>Only when the two departments are equal</button>
+    <button class="opt">Always, and the name result wins over dept</button>
+    <button class="opt">Only when the two departments are different</button>
+    <button class="opt">Never, because thenComparing replaces dept</button>
+  </div>
+  <div class="why">A chain stops at the first non-zero result. The next rule only breaks ties left by the earlier ones.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A list contains <code>null</code>. How do you sort it in natural order without an exception?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>Comparator.nullsFirst(Comparator.naturalOrder())</code></button>
+    <button class="opt"><code>Comparator.naturalOrder().reversed()</code></button>
+    <button class="opt"><code>Comparator.comparing(Object::toString)</code></button>
+    <button class="opt"><code>Collections.unmodifiableList(list)</code></button>
+  </div>
+  <div class="why"><code>naturalOrder</code> throws <code>NullPointerException</code> on null. <code>nullsFirst</code> puts nulls first and compares the rest normally: <code>[null, a, b]</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What's the difference between Comparable and Comparator, and how can a TreeSet lose elements?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>Comparable</code> = the class's own natural order (<code>compareTo</code>); <code>Comparator</code> = any number of outside orders.</label></li>
+      <li><label><input type="checkbox"> Negative / zero / positive; only the sign matters.</label></li>
+      <li><label><input type="checkbox"> TreeSet and TreeMap use compare, not equals: 0 means duplicate.</label></li>
+      <li><label><input type="checkbox"> Example: a comparator by salary only drops a second person with the same salary (or BigDecimal 4.0 vs 4.00).</label></li>
+      <li><label><input type="checkbox"> Fix: chain with <code>thenComparing</code> and end with a unique tie-breaker.</label></li>
+      <li><label><input type="checkbox"> Never <code>a - b</code>: overflow. Use <code>Integer.compare</code> / <code>comparingInt</code>.</label></li>
+      <li><label><input type="checkbox"> Object sorts are stable; <code>nullsFirst</code>/<code>nullsLast</code> for nulls.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"<code>Comparable</code> is the natural order a class defines for itself, with one <code>compareTo</code> method, like strings alphabetically. A <code>Comparator</code> is an ordering from outside, and I can have as many as I want, by price, by date, reversed. Both return negative, zero or positive. The trap is that TreeSet and TreeMap decide duplicates with the comparator, not with <code>equals</code>. So if I sort employees only by salary, two people with the same salary compare as zero and the second one is silently dropped. The fix is to chain with <code>thenComparing</code> and end with something unique, like an id. I also never write <code>a - b</code>, because it can overflow; I use <code>Integer.compare</code> or <code>comparingInt</code>. And object sorts in Java are stable, which makes multi-key sorting predictable."</em></p>
+  </div>
+</div>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0031-sort-the-orders.md">Exercise 0031: sort the orders</a>. Write the comparator first, predict the order, then run it.</p>
+<p>Runnable example: <a href="../examples/collections/OrderingAndComparators.java"><code>OrderingAndComparators.java</code></a></p>
+
+<h2>What's next</h2>
+<p>A senior interviewer may continue: <em>"How would you find the nearest price below 100 in a sorted map?"</em> That uses a <code>TreeMap</code> with your comparator: see <a href="0034-treemap-and-navigable-maps.html">lesson 0034</a>. First, <a href="0032-unmodifiable-vs-immutable.html">lesson 0032</a> answers another favourite: <em>"How do you return a list nobody can change?"</em></p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable Javadoc (JDK 21)</a>. Read the class description (natural ordering and consistency with equals); then skim Comparator's static methods.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why does BigDecimal care about the number of decimals?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0030-hashmap-internals.html">← Inside HashMap: buckets, resize and trees</a> &nbsp;|&nbsp; <a href="0032-unmodifiable-vs-immutable.html">Lists nobody can change (or can they?) →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Comparable.html">Comparable Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Comparator.html">Comparator Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html">Arrays Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap Javadoc (JDK 21)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 4: Compose: một ứng dụng và một database</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Compose: một ứng dụng và một database</h1>
+<p class="meta">Docker · Bài 0004 · bước 9/12 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-compose-app-and-database.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> mô tả mô hình service, network và volume của Compose, và start một ứng dụng cùng database, trong đó ứng dụng đợi database healthy rồi mới chạy.</div>
+
+<h2>Mô hình</h2>
+<p>"Với Docker Compose, bạn dùng một file cấu hình YAML, gọi là Compose file, để cấu hình các service của ứng dụng, rồi tạo và start toàn bộ service từ cấu hình đó bằng Compose CLI." Một <em>service</em> là "chạy cùng một container image và cấu hình, một hoặc nhiều lần". Các service giao tiếp với nhau qua <em>network</em> và lưu dữ liệu lâu dài trong <em>volume</em>.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+<h2>Một ví dụ chạy được</h2>
+<p>File: <a href="../examples/compose-postgres/compose.yaml"><code>compose.yaml</code></a>. Nó start <code>postgres:18</code> kèm health check, sau đó chạy một client kết nối tới host name <code>db</code> (tên service trên network mặc định) và in ra phiên bản của server.</p>
+<pre><code>cd docker/examples/compose-postgres
+docker compose up --abort-on-container-exit
+docker compose down -v      # -v also removes the volume</code></pre>
+<p>Khi chạy ở đây, nó in ra một bảng kết quả <code>psql</code>, và log của server có dòng <code>PostgreSQL 18.6</code>. <code>depends_on</code> với <code>condition: service_healthy</code> buộc client đợi health check pass; không có nó, client có thể start trước khi database nhận kết nối.</p>
+<div class="aside">Góc độ phỏng vấn: Compose dành cho dev local và các setup đơn giản trên một host. Cùng ý tưởng đó (service, networking, config, storage) chính là thứ Kubernetes diễn đạt bằng Deployment, Service và PersistentVolume; xem <a href="../../kubernetes/index.vi.html">Lộ trình Kubernetes</a>.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một service trong Compose là gì?</p>
+  <button>Một mục trong build cache</button>
+  <button data-correct>Một image chạy N lần</button>
+  <button>Một user Linux duy nhất</button>
+  <button>Một rule firewall của host</button>
+  <p class="explain">Service là cùng một image và cấu hình được chạy một hoặc nhiều lần.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Các service kết nối với nhau bằng cách nào?</p>
+  <button>Qua các layer của image</button>
+  <button data-correct>Qua network dùng chung</button>
+  <button>Qua heap của JVM</button>
+  <button>Qua việc reboot host</button>
+  <p class="explain">Các service giao tiếp với nhau qua network.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Dữ liệu lâu dài của database nằm ở đâu?</p>
+  <button data-correct>Trong volume</button>
+  <button>Trong Dockerfile</button>
+  <button>Trong layer của image</button>
+  <button>Trong heap của JVM</button>
+  <p class="explain">Các service lưu và chia sẻ dữ liệu lâu dài trong volume.<a class="cite" href="https://docs.docker.com/compose/intro/compose-application-model/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao cần health check kèm <code>service_healthy</code>?</p>
+  <button>Build image nhanh hơn</button>
+  <button>Volume được mã hóa</button>
+  <button data-correct>Client đợi tới khi sẵn sàng</button>
+  <button>Port được public ra ngoài</button>
+  <p class="explain">Container đang chạy chưa chắc đã sẵn sàng; điều kiện này hoãn các service phụ thuộc cho tới khi nó healthy.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-add-a-table.vi.md">Bài tập 0004: tạo table khi khởi động</a></p>
+<p>Ví dụ chạy được: <a href="../examples/compose-postgres/compose.yaml"><code>compose-postgres/compose.yaml</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/compose/intro/compose-application-model/">Docker Docs: Compose</a>. Sau đó đọc hướng dẫn 'Get started'.</p>
+<p><a href="0011-networks-and-port-publishing.vi.html">← Network, DNS theo tên và publish port</a> &nbsp;|&nbsp; <a href="0005-memory-cpu-limits-and-the-jvm.vi.html">Giới hạn memory và CPU, và JVM nhìn thấy gì →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/compose/intro/compose-application-model/">Docker Docs: The Compose application model</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

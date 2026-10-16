@@ -8,71 +8,258 @@
 </head>
 <body>
 <main>
-<h1>Deadlock and lock ordering</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0026 · step 17 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>When two threads wait for each other forever: deadlock</h1>
+<p class="subtitle">How it happens, how to find it in a running JVM, and the one rule that prevents it.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0026 · step 34 of 46 · Advanced · ~22 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0026-deadlock-and-lock-ordering.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> A deadlocked service does not crash and does not log an error: it just stops answering, and CPU stays low. Knowing how to spot and prevent one is a classic Senior question: <em>"What is a deadlock? How would you find one in production? How do you avoid it?"</em></div>
 
 <div class="win"><b>Today's win:</b> explain how a lock-ordering deadlock arises, detect it with <code>ThreadMXBean</code>, and prevent it.</div>
 
-<h2>Definition</h2>
-<p>"Deadlock describes a situation where two or more threads are blocked forever, waiting for each other."<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[1]</a> The tutorial's example: two friends bow to each other and each must stay bowed until the other bows back, with both methods <code>synchronized</code>.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[1]</a></p>
-<h2>Reproduce, detect, fix</h2>
-<pre><code>java java/examples/DeadlockDemo.java
+<dl class="words">
+  <dt>lock / monitor</dt><dd>Something only one thread can hold at a time. Every Java object has a built-in one, the <em>monitor</em>, used by <code>synchronized</code>.</dd>
+  <dt>blocked</dt><dd>A thread that is waiting to get a lock and cannot do anything else until it gets it.</dd>
+  <dt>deadlock</dt><dd>Threads that each hold a lock and wait for a lock another one of them holds, in a circle, so none can ever continue.</dd>
+  <dt>lock ordering</dt><dd>A rule that every thread takes several locks in the same fixed order, for example always A before B.</dd>
+  <dt>thread dump</dt><dd>A text snapshot of every thread in a running JVM: what it is doing, which locks it holds and which it waits for.</dd>
+  <dt><code>jstack</code></dt><dd>A JDK command-line tool that prints a thread dump of a running Java process.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Thread 1 locks A, then B. Thread 2 locks B, then A. Can this freeze? Under which timing?"</em> Try to describe the exact moment it gets stuck. Section 2 traces it.</p>
+
+<h2>1. The picture: two people, two keys</h2>
+<p>Two colleagues need two things to do their job: the meeting room key and the projector. Anna takes the room key and goes to get the projector. Ben already took the projector and goes to get the room key. Anna waits for Ben's projector. Ben waits for Anna's key. Nobody gives anything back, because nobody has finished. They wait forever.</p>
+<p>The Oracle tutorial's definition: "Deadlock describes a situation where two or more threads are blocked forever, waiting for each other."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java tutorial: deadlock</a> Its example: two friends bow to each other and each must stay bowed until the other bows back, with both methods <code>synchronized</code>.<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java tutorial: deadlock</a></p>
+
+<figure>
+<svg viewBox="0 0 680 290" role="img" aria-label="Deadlock cycle: thread T1 holds lock A and waits for lock B; thread T2 holds lock B and waits for lock A. The arrows form a circle.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="40" y="120" width="150" height="50" rx="25"/>
+      <rect x="490" y="120" width="150" height="50" rx="25"/>
+      <rect x="265" y="20" width="150" height="50" rx="4"/>
+      <rect x="265" y="220" width="150" height="50" rx="4"/>
+      <path d="M140 120 L265 58"/>
+      <path d="M540 170 L415 232"/>
+    </g>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="6 4">
+      <path d="M140 170 L259 229"/>
+      <path d="M540 120 L421 61"/>
+    </g>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5">
+      <path d="M249 230l10-1-6-8"/>
+      <path d="M431 60l-10 1 6 8"/>
+    </g>
+    <text x="115" y="150" text-anchor="middle">thread T1</text>
+    <text x="565" y="150" text-anchor="middle">thread T2</text>
+    <text x="340" y="50" text-anchor="middle">lock A</text>
+    <text x="340" y="250" text-anchor="middle">lock B</text>
+    <text x="160" y="80" font-size="12">holds</text>
+    <text x="475" y="226" font-size="12">holds</text>
+    <text x="90" y="222" font-size="12" fill="var(--accent)">waits for</text>
+    <text x="500" y="76" font-size="12" fill="var(--accent)">waits for</text>
+    <text x="340" y="140" text-anchor="middle" font-size="12" fill="var(--accent)">a cycle:</text>
+    <text x="340" y="158" text-anchor="middle" font-size="12" fill="var(--accent)">nobody can move</text>
+  </g>
+</svg>
+<figcaption>T1 holds A and waits for B; T2 holds B and waits for A. Follow the arrows: T1 → B → T2 → A → T1. A closed circle of "waits for" is a deadlock.</figcaption>
+</figure>
+
+<h2>2. Reproduce it</h2>
+<p>The example <code>DeadlockDemo.java</code> starts two threads with <strong>opposite</strong> lock orders. The key part:</p>
+<pre><code>synchronized (first) {               <span class="c">// T1: first = A    T2: first = B</span>
+    bothHoldFirst.countDown();       <span class="c">// "I have my first lock"</span>
+    bothHoldFirst.await();           <span class="c">// wait until the other one has its first lock too</span>
+    synchronized (second) {          <span class="c">// T1: second = B   T2: second = A</span>
+        System.out.println(name + " got both locks");
+    }
+}</code></pre>
+<p>The <code>CountDownLatch</code> just forces the bad timing every time, so the demo is reliable. Trace:</p>
+<pre><code><span class="c">Step 1  T1 locks A                 T2 locks B</span>
+<span class="c">Step 2  both pass the latch: each knows the other holds its first lock</span>
+<span class="c">Step 3  T1 asks for B → B is held by T2 → T1 blocks</span>
+<span class="c">Step 4  T2 asks for A → A is held by T1 → T2 blocks</span>
+<span class="c">Step 5  <span class="hl">neither block ever ends: "got both locks" is never printed</span></span></code></pre>
+<p>In real code there is no latch; the bad timing just happens now and then, under load. That is why deadlocks show up in production and not in tests.</p>
+<pre><code>$ java java/examples/DeadlockDemo.java
 --- opposite lock order (A then B, B then A)
-deadlocked threads detected: 2
+<span class="hl">deadlocked threads detected: 2</span>
 --- same lock order everywhere (A then B)
 T5 got both locks
 T6 got both locks</code></pre>
-<p><code>ManagementFactory.getThreadMXBean().findDeadlockedThreads()</code> returns the stuck threads; a thread dump (<code>jstack</code>) reports them too. The fix in the demo is a consistent lock order.</p>
-<p>The same advice appears for databases: PostgreSQL's docs say the best defense is to "acquire locks on multiple objects in a consistent order across all applications", and it detects deadlocks and aborts one transaction, so applications should be prepared to retry.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[2]</a> Source: <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a>; see <a href="../../postgresql/index.html">PostgreSQL locking</a>.</p>
-<div class="aside">Other prevention tools: <code>tryLock</code> with a timeout (from the <a href="0024-atomics-and-locks.html">previous lesson</a>), holding fewer locks, and not calling foreign code while holding a lock (general practice, not from the tutorial).</div>
+<p class="muted">The two stuck threads are daemon threads, so the program can still exit at the end. A normal (non-daemon) deadlocked thread would keep the JVM running forever.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Definition of deadlock?</p>
-  <button>A thrown exception</button>
-  <button data-correct>Threads blocked forever</button>
-  <button>Threads running slowly</button>
-  <button>A full heap</button>
-  <p class="explain">Two or more threads blocked forever waiting for each other.<a class="cite" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Most reliable prevention?</p>
-  <button>Bigger heap</button>
-  <button data-correct>Consistent lock order</button>
-  <button>More threads</button>
-  <button>Volatile fields</button>
-  <p class="explain">Acquire locks in the same order everywhere.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Which API detects deadlocked threads?</p>
-  <button>StringBuilder</button>
-  <button data-correct>ThreadMXBean</button>
-  <button>Optional</button>
-  <button>Collectors</button>
-  <p class="explain">findDeadlockedThreads on ThreadMXBean (shown in the demo).</p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Database reports a deadlock. What should code do?</p>
-  <button>Ignore the error</button>
-  <button data-correct>Retry the transaction</button>
-  <button>Disable locking</button>
-  <button>Restart the JVM</button>
-  <p class="explain">PostgreSQL aborts one transaction; handle by retrying.<a class="cite" href="https://www.postgresql.org/docs/current/explicit-locking.html">[2]</a></p>
-</div>
+<h2>3. Detect it</h2>
+<h3>From inside the program: <code>ThreadMXBean</code></h3>
+<p>The demo calls <code>ManagementFactory.getThreadMXBean().findDeadlockedThreads()</code>, which returns the stuck threads. The Javadoc: it "Finds cycles of platform threads that are in deadlock waiting to acquire object monitors or ownable synchronizers" (that is, <code>synchronized</code> and locks like <code>ReentrantLock</code>). It returns the thread IDs, or "<code>null</code> otherwise", so check for <code>null</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.management/java/lang/management/ThreadMXBean.html#findDeadlockedThreads()">ThreadMXBean javadoc</a> It "is designed for troubleshooting use, but not for synchronization control. It might be an expensive operation." In JDK 21, "Cycles that include virtual threads are not found by this method."</p>
+<h3>From outside: a thread dump</h3>
+<p>In production you usually take a thread dump with <code>jstack &lt;pid&gt;</code>; it reports deadlocks too. Here is the real end of a dump from a small program with the same A/B, B/A pattern (addresses shortened):</p>
+<pre><code>$ jstack 13046
+...
+Found one Java-level deadlock:
+=============================
+"T1":
+  waiting to lock monitor 0x...1920 (object 0x...e8e8, a java.lang.Object),
+  <span class="hl">which is held by "T2"</span>
+
+"T2":
+  waiting to lock monitor 0x...0f60 (object 0x...e8d8, a java.lang.Object),
+  <span class="hl">which is held by "T1"</span>
+...
+Found 1 deadlock.</code></pre>
+<p>Read it as the diagram: T1 waits for something held by T2, and T2 waits for something held by T1. The dump also shows the exact source lines, so you know which code to fix.</p>
+
+<h2>4. Prevent it</h2>
+<h3>Rule 1: one global lock order</h3>
+<p>If every thread takes A before B, the circle cannot close: whoever gets A first will also get B; the other thread simply waits for A, then continues. The demo's second part (T5, T6) does exactly this and both threads finish.</p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="With the same lock order, T1 locks A then B, works, and unlocks. T2 waits for A, then locks A and B after T1 is done. No cycle.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="62" font-size="13">T1</text>
+    <text x="20" y="132" font-size="13">T2</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="60" y="40" width="100" height="34" rx="4"/>
+      <rect x="170" y="40" width="100" height="34" rx="4"/>
+      <rect x="280" y="40" width="100" height="34" rx="4"/>
+      <rect x="390" y="40" width="110" height="34" rx="4"/>
+      <rect x="60" y="110" width="440" height="34" rx="4" stroke-dasharray="5 4" opacity=".8"/>
+      <path d="M500 74 L516 104M508 100l8 4 1-9"/>
+      <path d="M60 176h590M644 171l6 5-6 5" opacity=".6"/>
+    </g>
+    <rect x="520" y="110" width="140" height="34" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="110" y="62" text-anchor="middle">lock A</text>
+    <text x="220" y="62" text-anchor="middle">lock B</text>
+    <text x="330" y="62" text-anchor="middle">work</text>
+    <text x="445" y="62" text-anchor="middle">unlock B, A</text>
+    <text x="280" y="132" text-anchor="middle" opacity=".8">lock A … waits (T1 holds A), holds nothing</text>
+    <text x="590" y="132" text-anchor="middle" fill="var(--accent)">lock A, lock B</text>
+    <text x="355" y="194" text-anchor="middle" font-size="11" opacity=".75">time</text>
+  </g>
+</svg>
+<figcaption>Same order everywhere: T2 waits while holding <em>nothing</em>, so there is no circle. Waiting is fine; waiting in a circle is the bug.</figcaption>
+</figure>
+
+<p>A classic case is a money transfer, <code>transfer(from, to)</code>. One thread transfers from X to Y while another transfers from Y to X: opposite orders. The fix is to order by something stable, like the account ID:</p>
+<pre><code>Account first  = a.id() &lt; b.id() ? a : b;   <span class="c">// always the smaller ID first</span>
+Account second = a.id() &lt; b.id() ? b : a;
+synchronized (first) {
+    synchronized (second) {
+        <span class="c">// move the money</span>
+    }
+}</code></pre>
+<p>The same advice appears for databases: PostgreSQL's docs say the best defense is to "acquire locks on multiple objects in a consistent order across all applications", and it detects deadlocks and aborts one transaction, so applications should be prepared to retry.<a class="src" href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: explicit locking</a> See <a href="../../postgresql/index.html">PostgreSQL locking</a>.</p>
+<h3>Rule 2: don't wait forever</h3>
+<p>With a <code>ReentrantLock</code> (from the <a href="0024-atomics-and-locks.html">previous lessons</a>), <code>tryLock(timeout, unit)</code> "Acquires the lock if it is not held by another thread within the given waiting time".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock javadoc</a> If it returns <code>false</code>, release what you hold, wait a little, and try again. A <code>synchronized</code> block cannot do this: it waits forever.</p>
+<h3>Rule 3: hold fewer locks, for less time</h3>
+<p>Other prevention tools: holding fewer locks, and not calling foreign code while holding a lock (a callback, a listener, a remote call), because you cannot know which locks that code takes. This is general practice, not from the tutorial.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Which sentence is the definition of a deadlock?</p>
+  <div class="options">
+    <button class="opt" data-correct>Two or more threads blocked forever, waiting for each other</button>
+    <button class="opt">Two threads that overwrite each other's update of a field</button>
+    <button class="opt">A thread that runs slowly because the lock is very busy</button>
+    <button class="opt">A thread that throws an exception while holding a lock</button>
+  </div>
+  <div class="why">That is the tutorial's definition. The second option is a lost update (lesson 0024), the third is contention.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">T1 runs <code>synchronized(A){ synchronized(B){…} }</code>. T2 runs <code>synchronized(B){ synchronized(A){…} }</code>. What can happen?</p>
+  <div class="options">
+    <button class="opt" data-correct>Sometimes both freeze forever</button>
+    <button class="opt">It always deadlocks on the first run</button>
+    <button class="opt">It never deadlocks, Java prevents it</button>
+    <button class="opt">The compiler rejects nested blocks</button>
+  </div>
+  <div class="why">It deadlocks only with bad timing: T1 holds A and T2 holds B at the same moment. That is why it is rare in tests and appears under load.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the most reliable way to prevent a lock-ordering deadlock?</p>
+  <div class="options">
+    <button class="opt" data-correct>Take the locks in the same order everywhere</button>
+    <button class="opt">Give the JVM a bigger heap with -Xmx</button>
+    <button class="opt">Start more threads in the thread pool</button>
+    <button class="opt">Make the fields of the locks volatile</button>
+  </div>
+  <div class="why">With one global order, a thread that waits holds nothing the other needs, so a cycle cannot form.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which API can find deadlocked threads from inside the JVM?</p>
+  <div class="options">
+    <button class="opt" data-correct>ThreadMXBean.findDeadlockedThreads()</button>
+    <button class="opt">Thread.getAllStackTraces().size()</button>
+    <button class="opt">Runtime.getRuntime().availableProcessors()</button>
+    <button class="opt">ReentrantLock.getHoldCount() on a lock</button>
+  </div>
+  <div class="why"><code>findDeadlockedThreads()</code> finds cycles of platform threads waiting on monitors or ownable synchronizers, and returns <code>null</code> if there are none.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A service has stopped responding, CPU is near zero, and there are no errors in the log. What do you do first?</p>
+  <div class="options">
+    <button class="opt" data-correct>Take a thread dump with jstack and read it</button>
+    <button class="opt">Restart it and raise the heap size a bit</button>
+    <button class="opt">Turn on GC logging and wait for an error</button>
+    <button class="opt">Add more threads to the request pool</button>
+  </div>
+  <div class="why">Stuck and idle looks like threads waiting on locks. A thread dump shows "Found one Java-level deadlock" and the exact lines involved.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">PostgreSQL reports a deadlock and aborts your transaction. What should your code do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Retry the transaction</button>
+    <button class="opt">Ignore the error and continue</button>
+    <button class="opt">Disable row locking</button>
+    <button class="opt">Restart the JVM process</button>
+  </div>
+  <div class="why">PostgreSQL detects the deadlock and aborts one transaction; applications should be prepared to retry it.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is a deadlock? How would you detect and prevent it?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Definition: threads blocked forever, each waiting for a lock another one holds.</label></li>
+      <li><label><input type="checkbox"> Typical cause: two locks taken in opposite orders (A→B vs B→A).</label></li>
+      <li><label><input type="checkbox"> It depends on timing, so it appears under load, not in tests.</label></li>
+      <li><label><input type="checkbox"> Detect: thread dump (jstack) shows "Found one Java-level deadlock"; or ThreadMXBean.findDeadlockedThreads().</label></li>
+      <li><label><input type="checkbox"> Prevent: one global lock order (e.g. by ID).</label></li>
+      <li><label><input type="checkbox"> Also: tryLock with a timeout, fewer locks, no foreign calls while holding a lock; in databases, retry.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"A deadlock is when two or more threads are blocked forever, each waiting for a lock another one holds. The classic case is lock ordering: one thread takes A then B, another takes B then A; if each grabs its first lock at the same time, they wait for each other forever. It depends on timing, so it often only shows up under production load. To detect it, I take a thread dump with jstack; the JVM prints 'Found one Java-level deadlock' with the threads and the source lines. From code, ThreadMXBean.findDeadlockedThreads does the same check. To prevent it, I make every code path take locks in one global order, for example by account ID in a transfer. Where that's hard, I use ReentrantLock.tryLock with a timeout and back off, hold as few locks as possible, and never call unknown code while holding a lock. Databases have the same problem; PostgreSQL aborts one transaction, so the application should retry."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0026-find-the-deadlock.md">Exercise 0026: find the deadlock</a></p>
+<p><a href="../exercises/0026-find-the-deadlock.md">Exercise 0026: find the deadlock</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/DeadlockDemo.java"><code>DeadlockDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a>. Short page with the full example.</p>
-<p><a href="0023-thread-pools-executors.html">← Thread pools: core, max, queue and rejection</a> &nbsp;|&nbsp; <a href="0007-heap-and-garbage-collection.html">Heap sizing and garbage collection →</a></p>
+<h2>What's next</h2>
+<p>You have now seen threads fight over locks. The other big runtime topic in Senior interviews is memory: <em>"How big is the heap by default? What does the garbage collector do, and how do you read a GC log?"</em> <a href="0007-heap-and-garbage-collection.html">Lesson 0007</a> answers that.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a>, a short page with the full bowing example.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What is the difference between deadlock and livelock?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0023-thread-pools-executors.html">← How a thread pool decides: run, queue or reject</a> &nbsp;|&nbsp; <a href="0007-heap-and-garbage-collection.html">Where your objects live, and who cleans them up →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a> · [2] <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: Explicit locking and deadlocks</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Oracle Java Tutorials, the Java 21 documentation and the PostgreSQL documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Java Tutorials: Deadlock</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.management/java/lang/management/ThreadMXBean.html">ThreadMXBean Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock Javadoc</a> · <a href="https://www.postgresql.org/docs/current/explicit-locking.html">PostgreSQL: Explicit locking and deadlocks</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

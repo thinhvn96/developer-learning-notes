@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 16: Error handling: retries, poison pills, dead letter topics</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Error handling: retries, poison pills, dead letter topics</h1>
+<p class="meta">Kafka · Lesson 0016 · step 13 of 23 · Advanced · ~13 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0016-error-handling-and-dead-letter-topics.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> handle a failing record without blocking the partition forever: separate transient from permanent errors, retry with backoff, and park poison pills in a dead letter topic.</div>
+
+<h2>The problem</h2>
+<p>A partition is an ordered log and your consumer commits a position. If record 42 always throws and you never commit past it, the partition is stuck: every record behind it waits. If you skip it silently, you lose data. You need a policy.</p>
+<ul>
+<li><strong>Transient</strong> errors (timeout, database briefly down): retry with backoff.</li>
+<li><strong>Permanent</strong> errors (cannot deserialize, validation fails): retrying is pointless; move the record aside.</li>
+</ul>
+<h2>Spring Kafka's building blocks</h2>
+<ul>
+<li><code>DefaultErrorHandler</code>: by default <code>FixedBackOff(0L, 9)</code>, so "after ten failures, the failed record is logged" and the consumer moves on.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></li>
+<li><code>DeadLetterPublishingRecoverer</code>: instead of logging, publishes to "<code>&lt;originalTopic&gt;-dlt</code>" and "to the same partition as the original record", so the DLT "must have at least as many partitions as the original topic".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></li>
+<li>Fatal by default, no retries: <code>DeserializationException</code>, <code>MessageConversionException</code>, <code>ClassCastException</code> and a few others, "since these exceptions are unlikely to be resolved on a retried delivery".<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a> Add your own with <code>addNotRetryableExceptions(...)</code>.</li>
+<li><code>ErrorHandlingDeserializer</code> wraps your real deserializer so a malformed payload becomes a handled exception (in headers) instead of a crash loop.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></li>
+</ul>
+<pre><code>@Bean
+DefaultErrorHandler errorHandler(KafkaTemplate&lt;Object, Object&gt; template) {
+    var recoverer = new DeadLetterPublishingRecoverer(template);       // -&gt; orders-dlt, same partition
+    var handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 2L)); // 3 attempts, 1 s apart
+    handler.addNotRetryableExceptions(IllegalArgumentException.class); // validation: straight to DLT
+    return handler;
+}</code></pre>
+<p>This retries in place ("blocking" retries): the partition waits during backoff. <code>@RetryableTopic</code> gives "non-blocking" retries through separate retry topics, at the price of losing strict per-key order.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+<h2>Same idea elsewhere</h2>
+<p>Kafka Connect has it built in: <code>errors.tolerance=all</code>, <code>errors.deadletterqueue.topic.name</code>, <code>errors.deadletterqueue.context.headers.enable=true</code> and <code>errors.retry.timeout</code>.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[2]</a> Kafka Streams added DLQ support to its exception handlers in 4.2.</p>
+<div class="aside">Interview answer: "Classify errors. Transient: bounded retries with backoff. Permanent: DLT with the original record plus exception headers, alert on DLT traffic, and have a replay tool. If per-key order matters, retry in place; otherwise retry topics keep the partition flowing."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Spring's default DLT name for topic orders?</p>
+  <button>orders.error</button>
+  <button>dead-orders</button>
+  <button data-correct>orders-dlt</button>
+  <button>dlq.orders</button>
+  <p class="explain">By default the dead-letter record goes to &lt;originalTopic&gt;-dlt.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Why must the DLT have enough partitions?</p>
+  <button>For compression</button>
+  <button>To keep offsets</button>
+  <button data-correct>Same partition is used</button>
+  <button>Brokers require it</button>
+  <p class="explain">The default resolver publishes to the same partition as the original record.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. DeserializationException with DefaultErrorHandler?</p>
+  <button>Ignored silently</button>
+  <button data-correct>Recovered at once</button>
+  <button>Stops the broker</button>
+  <button>Retried nine times</button>
+  <p class="explain">It is fatal by default, so the recoverer is invoked on the first failure.<a class="cite" href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Retry topics trade away what?</p>
+  <button data-correct>Strict per-key order</button>
+  <button>At-least-once delivery</button>
+  <button>Producer idempotence</button>
+  <button>Broker replication</button>
+  <p class="explain">Records retried on another topic can be overtaken by later records with the same key.</p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0016-design-a-retry-policy.md">Exercise 0016: design a retry policy</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">Spring for Apache Kafka: Handling Exceptions</a>. Read 'DefaultErrorHandler' and 'Publishing Dead-letter Records', then the Non-Blocking Retries page.</p>
+<p><a href="0015-rebalancing-and-group-protocols.html">← Rebalancing: classic vs the new consumer protocol</a> &nbsp;|&nbsp; <a href="0017-schemas-and-schema-registry.html">Schemas, Schema Registry and compatibility →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.spring.io/spring-kafka/reference/kafka/annotation-error-handling.html">Spring for Apache Kafka: Handling Exceptions</a> · [2] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect User Guide</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

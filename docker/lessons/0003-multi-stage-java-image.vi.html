@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 3: Image multi-stage cho ứng dụng Java</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Image multi-stage cho ứng dụng Java</h1>
+<p class="meta">Docker · Bài 0003 · bước 6/12 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-multi-stage-java-image.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết một Dockerfile multi-stage compile trong image JDK và chạy trên image JRE nhỏ hơn, rồi chứng minh chênh lệch kích thước.</div>
+
+<h2>Vì sao cần multi-stage</h2>
+<p>Multi-stage build giúp "bất kỳ ai từng vất vả tối ưu Dockerfile mà vẫn muốn giữ nó dễ đọc, dễ bảo trì." Nó "tách bạch rõ ràng hơn giữa quá trình build image và đầu ra cuối cùng."<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[1]</a><a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a> Bạn có thể đặt tên cho một stage (<code>FROM ... AS build</code>) và copy artifact ra khỏi nó bằng <code>COPY --from=build</code>; <code>docker build --target build</code> sẽ dừng ở stage được chọn.<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[1]</a></p>
+<h2>Phiên bản cho Java</h2>
+<pre><code>FROM eclipse-temurin:21-jdk AS build
+WORKDIR /src
+COPY src/ src/
+RUN mkdir out &amp;&amp; javac -d out src/Hello.java
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /src/out/ ./
+CMD ["java", "-cp", ".", "Hello"]</code></pre>
+<p>Compiler và source nằm lại ở stage đầu tiên; chỉ có các file class đi vào image runtime. File đầy đủ: <a href="../examples/hello-java/Dockerfile"><code>Dockerfile</code></a> và <a href="../examples/hello-java/Dockerfile.naive"><code>Dockerfile.naive</code></a>.</p>
+<h2>Đo trên máy này</h2>
+<pre><code>hello-naive:latest 475MB   (JDK image, one stage)
+hello-multi:latest 318MB   (JRE image, two stages)</code></pre>
+<p>Một fat jar Spring Boot thật sẽ cộng thêm kích thước của chính nó, nhưng ý tưởng tiết kiệm nhờ đổi base từ JDK sang JRE vẫn y như vậy. Tài liệu Docker cũng khuyên dùng base image tối giản và tin cậy.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. <code>COPY --from=build</code> làm gì?</p>
+  <button>Pull một image mới</button>
+  <button>Xóa một stage</button>
+  <button>Đổi tên một stage</button>
+  <button data-correct>Copy từ một stage</button>
+  <p class="explain">Nó copy artifact từ một stage trước đó đã được đặt tên (hoặc từ một image bên ngoài).<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao không để JDK trong image cuối cùng?</p>
+  <button>JRE luôn chạy nhanh hơn</button>
+  <button>JDK làm hỏng JVM</button>
+  <button>Docker cấm dùng JDK</button>
+  <button data-correct>Đầu ra nhỏ và gọn hơn</button>
+  <p class="explain">Multi-stage build tách quá trình build khỏi đầu ra cuối cùng.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Làm sao dừng build tại stage <code>build</code>?</p>
+  <button>docker run --stop build</button>
+  <button>docker build --until build</button>
+  <button>docker stage build</button>
+  <button data-correct>docker build --target build</button>
+  <p class="explain">Flag <code>--target</code> dừng quá trình build tại một stage cụ thể.<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. <code>AS build</code> trong FROM dùng để làm gì?</p>
+  <button>Đặt user chạy</button>
+  <button>Chọn platform</button>
+  <button data-correct>Đặt tên stage</button>
+  <button>Pin một digest</button>
+  <p class="explain">Đặt tên stage giúp COPY --from vẫn chạy đúng khi thứ tự các stage thay đổi.<a class="cite" href="https://docs.docker.com/build/building/multi-stage/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-build-both-images.vi.md">Bài tập 0003: build cả hai image</a></p>
+<p>Ví dụ chạy được: <a href="../examples/hello-java/Dockerfile"><code>hello-java/Dockerfile</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/build/building/multi-stage/">Docker Docs: Multi-stage builds</a>. Trang ngắn; hãy chạy thử các ví dụ.</p>
+<p><a href="0009-cmd-entrypoint-and-exec-form.vi.html">← CMD, ENTRYPOINT và exec form vs shell form</a> &nbsp;|&nbsp; <a href="0010-volumes-and-bind-mounts.vi.html">Volume và bind mount →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/build/building/multi-stage/">Docker Docs: Multi-stage builds</a> · [2] <a href="https://docs.docker.com/build/building/best-practices/">Docker Docs: Best practices</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

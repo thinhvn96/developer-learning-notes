@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 13: Enum cũng là class</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Enum cũng là class</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0013 · bước 13/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0013-enums-as-classes.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng một enum có field, constructor và method riêng cho từng hằng (constant-specific method) như một tập instance an toàn về kiểu.</div>
+
+<h2>Enum là gì</h2>
+<p>"Kiểu enum là một kiểu dữ liệu đặc biệt cho phép một biến chỉ nhận giá trị trong một tập hằng số định sẵn." Enum có thể có field, method và constructor (constructor bắt buộc là package-private hoặc private) và mang lại sự an toàn về kiểu ngay lúc compile. "Mọi enum đều ngầm extend <code>java.lang.Enum</code>", nên enum không thể extend thứ gì khác.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a> Hãy dùng enum "bất cứ khi nào bạn cần biểu diễn một tập hằng số cố định".<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+<pre><code>java oop/examples/EnumsAsClasses.java
+MERCURY  gravity 3.70
+EARTH    gravity 9.80
+ADD 6,7 -&gt; 13
+MUL 6,7 -&gt; 42
+valueOf(&quot;EARTH&quot;) == Planet.EARTH : true
+EnumMap: {ADD=2}
+no such constant: No enum constant EnumsAsClasses.Planet.PLUTO</code></pre>
+<p><code>Planet</code> mang dữ liệu; <code>Op</code> cho mỗi hằng một behavior riêng (mỗi hằng là một <a href="../../design-patterns/lessons/0023-strategy.vi.html">strategy</a> tí hon); <code>EnumMap</code> là một map hiệu quả dùng enum làm key. Hãy so sánh với sealed hierarchy khi mỗi biến thể cần <em>dữ liệu</em> khác nhau (<a href="../../java/lessons/0014-sealed-classes.vi.html">bài JDK 17</a>). Mã nguồn: <a href="../examples/EnumsAsClasses.java"><code>EnumsAsClasses.java</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Enum là một tập cố định các...?</p>
+  <button>Package</button>
+  <button>Interface</button>
+  <button data-correct>Instance</button>
+  <button>Thread</button>
+  <p class="explain">Một tập hằng số (instance) định sẵn.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Constructor của enum có thể là...?</p>
+  <button>Chỉ được vắng mặt</button>
+  <button data-correct>Private hoặc package-private</button>
+  <button>Chỉ protected</button>
+  <button>Public</button>
+  <p class="explain">Constructor bắt buộc là package-private hoặc private.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Enum có extend được class khác không?</p>
+  <button>Chỉ class abstract</button>
+  <button>Chỉ class final</button>
+  <button>Có</button>
+  <button data-correct>Không</button>
+  <p class="explain">Nó đã ngầm extend java.lang.Enum.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Thân method riêng cho từng hằng mang lại...?</p>
+  <button>Kế thừa</button>
+  <button>Khởi động nhanh hơn</button>
+  <button data-correct>Behavior riêng mỗi hằng</button>
+  <button>Khả năng thay đổi</button>
+  <p class="explain">Op.ADD và Op.MUL mỗi cái hiện thực apply theo cách khác nhau.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0013-state-machine-enum.vi.md">Bài tập 13: enum làm state machine</a></p>
+<p>Ví dụ chạy được: <a href="../examples/EnumsAsClasses.java"><code>EnumsAsClasses.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">Java Tutorials: Enum Types</a>. Ví dụ cơ bản và ví dụ Planet.</p>
+<p><a href="0012-nested-classes.vi.html">← Nested, inner, local và anonymous class</a> &nbsp;|&nbsp; <a href="0014-immutability.vi.html">Immutability và defensive copy →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/enum.html">Java Tutorials: Enum Types</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 1: Event, topic và partition</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Event, topic và partition</h1>
+<p class="meta">Kafka · Bài 0001 · bước 1/23 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-events-topics-partitions.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được Kafka lưu cái gì, vì sao một topic lại có nhiều partition, và Kafka đảm bảo thứ tự ở đâu, không đảm bảo ở đâu.</div>
+
+<h2>Kafka là gì</h2>
+<p>Event streaming là "việc thu thập dữ liệu theo thời gian thực từ các nguồn sự kiện ... dưới dạng các luồng event." Kafka gộp ba chức năng: publish và subscribe các luồng event, lưu trữ chúng một cách bền vững, và xử lý chúng ngay khi chúng xảy ra hoặc xử lý lại về sau.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+<h2>Topic và partition</h2>
+<p>Event được tổ chức theo <em>topic</em>. Một topic được "trải ra trên nhiều 'bucket' nằm ở các Kafka broker khác nhau": đó chính là các <em>partition</em> (phân vùng), và đây là cách Kafka mở rộng. Các event có cùng key sẽ vào cùng một partition, và consumer đọc event của một partition theo đúng thứ tự chúng được ghi.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+<p>Vì vậy thứ tự được đảm bảo <strong>trong từng partition</strong>, không phải trên cả topic. Key chính là công cụ để bạn có thứ tự cho một thực thể (ví dụ toàn bộ event của một user).</p>
+<h2>Không phải queue kiểu truyền thống</h2>
+<p>"Event không bị xoá sau khi được tiêu thụ." Retention được cấu hình theo từng topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a> Việc consume không xoá event, nên nhiều consumer có thể đọc cùng một dữ liệu một cách độc lập.</p>
+<h2>Chạy thử</h2>
+<pre><code>cd kafka/examples &amp;&amp; ./01-topics-keys-groups.sh
+Topic: orders PartitionCount: 3 ReplicationFactor: 1
+Partition:0   u2 b
+Partition:0   u2 f
+Partition:1   u1 a
+Partition:1   u1 c
+Partition:1   u1 e
+Partition:1   u3 d</code></pre>
+<p>Cả ba event của <code>u1</code> đều rơi vào partition 1, còn hai event của <code>u2</code> vào partition 0 (cùng key thì cùng partition). Key nào được map vào partition nào là do Kafka quyết định; thứ duy nhất được đảm bảo là "cùng key thì cùng partition". Mã nguồn: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a> (khởi động một container <code>apache/kafka</code> dùng xong bỏ).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Kafka đảm bảo thứ tự event ở phạm vi nào?</p>
+  <button>Trên mọi topic</button>
+  <button>Trên cả một topic</button>
+  <button data-correct>Trong một partition</button>
+  <button>Trên mọi broker</button>
+  <p class="explain">Event cùng key vào cùng partition và được đọc theo đúng thứ tự ghi.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một consumer đọc một event. Event đó sẽ ra sao?</p>
+  <button data-correct>Vẫn nằm trong topic</button>
+  <button>Bị nén mất đi</button>
+  <button>Bị xoá ngay lập tức</button>
+  <button>Bị chuyển sang DLQ</button>
+  <p class="explain">Event không bị xoá sau khi được tiêu thụ; retention được cấu hình theo từng topic.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao topic có nhiều partition?</p>
+  <button>Để sắp thứ tự mọi event</button>
+  <button>Để bỏ qua replication</button>
+  <button>Để mã hoá các event</button>
+  <button data-correct>Để chia tải ra nhiều broker</button>
+  <p class="explain">Topic được trải ra trên các bucket ở nhiều broker khác nhau để mở rộng.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Theo tài liệu, replication factor phổ biến trên production là bao nhiêu?</p>
+  <button>Bảy bản sao</button>
+  <button>Không bản sao</button>
+  <button data-correct>Ba bản sao</button>
+  <button>Một bản sao</button>
+  <p class="explain">Thiết lập phổ biến trên production là replication factor bằng 3.<a class="cite" href="https://kafka.apache.org/43/getting-started/introduction/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-partitions-and-keys.vi.md">Bài tập 0001: partition và key</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/getting-started/introduction/">Apache Kafka Documentation: Introduction</a>. Đọc phần 'Main Concepts and Terminology'.</p>
+<p> &nbsp;|&nbsp; <a href="0002-producers-keys-and-acks.vi.html">Producer, key và acks →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/getting-started/introduction/">Apache Kafka Documentation: Introduction</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

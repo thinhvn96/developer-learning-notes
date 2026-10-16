@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 4: Static member: state dùng chung và hằng số</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Static member: state dùng chung và hằng số</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0004 · bước 4/22 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0004-static-members.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nói được static field và static method là gì, và vì sao static method không dùng được <code>this</code>.</div>
+
+<h2>Class variable</h2>
+<p>"Các field có modifier <code>static</code> trong khai báo được gọi là <em>static field</em> hay <em>class variable</em>. Chúng gắn với class, chứ không gắn với object nào cả. Mọi instance của class đều dùng chung một class variable, nằm ở một vị trí cố định trong bộ nhớ."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+<h2>Class method</h2>
+<p>"Class method không thể truy cập trực tiếp instance variable hay instance method; chúng phải dùng một object reference. Ngoài ra, class method không dùng được từ khoá <code>this</code> vì không có instance nào để <code>this</code> trỏ tới."<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a> Hằng số kết hợp <code>static</code> và <code>final</code>, theo quy ước đặt tên VIẾT_HOA.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+<pre><code>java oop/examples/StaticMembers.java
+before: 0
+after 3 objects, shared count = 3
+instance ids: 1, 2, 3
+constant: 100</code></pre>
+<p>Một bộ đếm dùng chung, nhưng mỗi object có <code>id</code> riêng. Mã nguồn: <a href="../examples/StaticMembers.java"><code>StaticMembers.java</code></a>. Cảnh báo về thiết kế: state static có thể thay đổi chính là state toàn cục (global state), khiến code khó test (xem <a href="../../design-patterns/lessons/0008-singleton.vi.html">bài Singleton</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một static field có bao nhiêu bản sao?</p>
+  <button>Không có</button>
+  <button>Mỗi thread một</button>
+  <button>Mỗi object một</button>
+  <button data-correct>Một</button>
+  <p class="explain">Mọi instance dùng chung class variable.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Static method có dùng được this không?</p>
+  <button>Chỉ trong enum</button>
+  <button>Chỉ trong main</button>
+  <button data-correct>Không</button>
+  <button>Có</button>
+  <p class="explain">Không có instance nào để this trỏ tới.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Hằng số được khai báo bằng...?</p>
+  <button>volatile</button>
+  <button>abstract</button>
+  <button>chỉ private</button>
+  <button data-correct>static final</button>
+  <p class="explain">static final dùng để định nghĩa hằng số.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Bộ đếm static sau khi tạo 3 object?</p>
+  <button>Chín</button>
+  <button>Không</button>
+  <button>Một</button>
+  <button data-correct>Ba</button>
+  <p class="explain">Demo in ra shared count bằng 3.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0004-id-generator.vi.md">Bài tập 4: bộ sinh id</a></p>
+<p>Ví dụ chạy được: <a href="../examples/StaticMembers.java"><code>StaticMembers.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">Java Tutorials: Understanding Class Members</a>. Class variable và class method.</p>
+<p><a href="0003-access-levels.vi.html">← Access level: che giấu những gì cần che giấu</a> &nbsp;|&nbsp; <a href="0006-inheritance.vi.html">Kế thừa: extends, super và quan hệ is-a →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/javaOO/classvars.html">Java Tutorials: Understanding Class Members</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

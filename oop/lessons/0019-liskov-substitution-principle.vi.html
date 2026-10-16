@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 19: SOLID 3: Liskov Substitution Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 3: Liskov Substitution Principle</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0019 · bước 19/22 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0019-liskov-substitution-principle.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> phát biểu được LSP, nhận ra một subclass vi phạm nó, và sửa lại thiết kế.</div>
+
+<h2>Nguyên lý</h2>
+<p>"Nếu S là subtype của T, thì các object kiểu T trong chương trình có thể được thay bằng các object kiểu S mà không làm thay đổi bất kỳ tính chất mong muốn nào của chương trình đó." Theo cách diễn đạt của Martin: các hàm dùng reference tới base class phải làm việc được với các class dẫn xuất mà không cần biết điều đó.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[2]</a> Các quy tắc behavioral subtyping: không được siết chặt precondition (điều kiện trước), không được nới lỏng postcondition (điều kiện sau), không được nới lỏng invariant, và ràng buộc lịch sử (history constraint: subtype không được cho phép những thay đổi state mà class cha cấm).<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a></p>
+<h2>Ví dụ vi phạm kinh điển</h2>
+<pre><code>java oop/examples/LspDemo.java
+Rectangle: area = 20 (expected 20)
+Square: area = 16 (expected 20)
+fixed design areas: 20, 16</code></pre>
+<p>Code viết cho <code>Rectangle</code> đặt chiều rộng 5, chiều cao 4 và mong đợi kết quả 20. Một <code>Square</code> override các setter để giữ các cạnh bằng nhau thì cho ra 16: nó đã thay đổi behavior mà phía gọi dựa vào, nên nó không thay thế được, dù về mặt toán học "hình vuông là hình chữ nhật".<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a> Cách sửa là tách các kiểu ra dưới một abstraction chung (<code>Shape2</code>) với <code>Rect2</code> và <code>Sq2</code> immutable. Mã nguồn: <a href="../examples/LspDemo.java"><code>LspDemo.java</code></a>.</p>
+<div class="aside">Cách kiểm tra khả năng thay thế: subclass có ném lỗi với input mà class cha chấp nhận không (precondition chặt hơn), có trả về ít hơn những gì class cha đã hứa không, hay có làm phía gọi bất ngờ không? Một subclass ném <code>UnsupportedOperationException</code> cho một method được kế thừa là dấu hiệu đáng báo động (xem bài tiếp theo).</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. LSP nói một subtype phải...?</p>
+  <button data-correct>Thay thế được cho base</button>
+  <button>Nhỏ hơn base của nó</button>
+  <button>Là abstract</button>
+  <button>Nhanh hơn base của nó</button>
+  <p class="explain">Object kiểu T có thể được thay bằng S mà không làm thay đổi các tính chất mong muốn.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Diện tích trong demo Square extends Rectangle?</p>
+  <button>20</button>
+  <button>25</button>
+  <button>9</button>
+  <button data-correct>16</button>
+  <p class="explain">Setter của Square thay đổi cả hai cạnh.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thay đổi nào vi phạm LSP?</p>
+  <button>Thêm một comment</button>
+  <button data-correct>Siết chặt precondition</button>
+  <button>Thêm một method</button>
+  <button>Đổi tên một field</button>
+  <p class="explain">Subtype không được siết chặt precondition.<a class="cite" href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cách sửa được dùng trong demo?</p>
+  <button>Xoá Rectangle</button>
+  <button>Dùng reflection</button>
+  <button>Cho field là public</button>
+  <button data-correct>Tách kiểu dưới một abstraction chung</button>
+  <p class="explain">Rect2 và Sq2 implement Shape2 một cách độc lập.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0019-fix-the-bird.vi.md">Bài tập 19: sửa con chim không biết bay</a></p>
+<p>Ví dụ chạy được: <a href="../examples/LspDemo.java"><code>LspDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Wikipedia: Liskov substitution principle</a>. Phần phát biểu hình thức và phần behavioral subtyping.</p>
+<p><a href="0018-open-closed-principle.vi.html">← SOLID 2: Open/Closed Principle</a> &nbsp;|&nbsp; <a href="0020-interface-segregation-principle.vi.html">SOLID 4: Interface Segregation Principle →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Wikipedia: Liskov substitution principle</a> · [2] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

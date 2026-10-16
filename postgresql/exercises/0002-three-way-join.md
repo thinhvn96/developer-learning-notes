@@ -1,5 +1,7 @@
 # Exercise 0002: a three-way join
 
+[Tiếng Việt](0002-three-way-join.vi.md)
+
 Companion to [lesson 2](../lessons/0002-joins-inner-and-left.html).
 
 Using your library schema, list every member with their number of loans, including members who have never borrowed. Then:

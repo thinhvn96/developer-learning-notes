@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 5: Visibility và happens-before</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Vì sao một thread có thể không thấy giá trị mà thread khác đã ghi</h1>
+<p class="subtitle">Thread, bộ nhớ dùng chung, CPU cache, và quy tắc <em>happens-before</em> giúp một lần ghi trở nên nhìn thấy được.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0005 · bước 30/46 · Advanced · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-visibility-and-happens-before.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Service backend nào cũng chạy nhiều thread cùng lúc, và bug giữa các thread là loại khó tìm nhất: một tuần xuất hiện một lần, và chỉ trên production. Interviewer kiểm tra phần này bằng câu <em>"<code>volatile</code> làm gì?"</em> và <em>"happens-before là gì?"</em>. Bài này cho bạn bức tranh đằng sau cả hai câu trả lời.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vì sao một thread có thể bỏ lỡ giá trị thread khác đã ghi, và kể ra ba cách tạo một cạnh happens-before.</div>
+
+<dl class="words">
+  <dt>thread</dt><dd>Một luồng công việc bên trong chương trình. Một chương trình có thể chạy nhiều thread cùng lúc, giống nhiều đầu bếp trong một bếp.</dd>
+  <dt>shared memory</dt><dd>Bộ nhớ dùng chung mà mọi thread của chương trình đều đọc và ghi được, ví dụ một field của object mà hai thread cùng dùng.</dd>
+  <dt>CPU cache</dt><dd>Một vùng nhớ nhỏ, rất nhanh nằm trong mỗi lõi CPU. Lõi giữ bản sao các giá trị vừa dùng ở đó để khỏi phải ra bộ nhớ chính mỗi lần.</dd>
+  <dt>visibility</dt><dd>Tính nhìn thấy: giá trị một thread ghi có được thread khác thấy hay không.</dd>
+  <dt>data race</dt><dd>Hai thread cùng truy cập một biến, ít nhất một bên ghi, và không có gì sắp thứ tự hai lần truy cập đó.</dd>
+  <dt>happens-before</dt><dd>Một quy tắc trong đặc tả Java: nếu A happens-before B, thì B chắc chắn thấy những gì A đã ghi.</dd>
+  <dt><code>volatile</code></dt><dd>Một từ khóa đặt trên field. Mỗi lần ghi vào nó sẽ được mọi lần đọc sau đó thấy, ở bất kỳ thread nào.</dd>
+  <dt><code>synchronized</code></dt><dd>Một từ khóa chỉ cho một thread chạy một khối code tại một thời điểm, được bảo vệ bởi lock trên một object.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Thread W chạy <code>while (!stop) {}</code>. Sau đó main thread đặt <code>stop = true</code>. W có chắc chắn dừng không?"</em> Đoán và nêu lý do. Bạn sẽ kiểm tra câu trả lời ở mục 3.</p>
+
+<h2>1. Thread là gì?</h2>
+<p>Hãy nghĩ tới bếp của một nhà hàng. Cả bếp là <strong>chương trình</strong> của bạn. Mỗi <strong>đầu bếp</strong> là một <span class="term">thread</span>: họ làm theo danh sách việc của riêng mình, theo tốc độ riêng, cùng lúc với những người khác.</p>
+<p>Tutorial của Oracle nói đúng như vậy: "Thread tồn tại bên trong một process — mỗi process có ít nhất một thread." Khi chương trình khởi động, bạn có một thread, "gọi là <em>main thread</em>".<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Java tutorial: threads</a> Bạn có thể tạo thêm:</p>
+<pre><code>Thread worker = new Thread(() -&gt; {
+    System.out.println("hello from the worker");
+});
+worker.start();   <span class="c">// the worker now runs at the same time as main</span>
+worker.join();    <span class="c">// main waits here until the worker has finished</span></code></pre>
+<ul>
+  <li><code>new Thread(...)</code> tạo thread. Phần code trong <code>() -&gt; { ... }</code> (một <em>lambda</em>, tức một đoạn code nhỏ bạn truyền đi được) là việc nó sẽ làm.</li>
+  <li><code>start()</code> cho nó chạy. Từ đây có hai đầu bếp làm song song.</li>
+  <li><code>join()</code> bắt main thread chờ đến khi worker xong việc.</li>
+</ul>
+
+<h2>2. Bộ nhớ dùng chung và CPU cache</h2>
+<p>Mọi đầu bếp dùng chung một <strong>tấm bảng trắng</strong> trên tường: đó là <span class="term">shared memory</span>. "Các thread dùng chung tài nguyên của process, gồm bộ nhớ và các file đang mở", điều mà tutorial gọi là "hiệu quả, nhưng có thể gây rắc rối".<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Java tutorial: threads</a></p>
+<p>Đi tới tấm bảng thì chậm, nên mỗi đầu bếp chép những giá trị cần dùng vào <strong>sổ tay riêng</strong>. Cuốn sổ đó là <span class="term">CPU cache</span>. Một đầu bếp có thể cứ đọc sổ tay mãi mà không nhìn lại tấm bảng. Một người khác có thể ghi giá trị mới vào sổ <em>của họ</em> và rất lâu sau mới chép lên bảng.</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Hai lõi CPU, mỗi lõi có cache riêng. Lõi 1 đã ghi stop = true vào cache của nó; lõi 2 vẫn giữ bản sao cũ stop = false. Bộ nhớ chính dùng chung nằm bên dưới.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <rect x="40" y="20" width="250" height="50" rx="6"/>
+      <rect x="390" y="20" width="250" height="50" rx="6"/>
+      <rect x="40" y="190" width="600" height="50" rx="6"/>
+      <path d="M165 70v24M160 88l5 6 5-6"/>
+      <path d="M515 70v24M510 88l5 6 5-6"/>
+    </g>
+    <text x="165" y="42" text-anchor="middle">Core 1</text>
+    <text x="165" y="60" text-anchor="middle" font-size="11" opacity=".75">chạy thread main</text>
+    <text x="515" y="42" text-anchor="middle">Core 2</text>
+    <text x="515" y="60" text-anchor="middle" font-size="11" opacity=".75">chạy thread worker</text>
+    <rect x="40" y="100" width="250" height="44" rx="4" fill="none" stroke="currentColor"/>
+    <text x="165" y="127" text-anchor="middle">cache: stop = true</text>
+    <rect x="390" y="100" width="250" height="44" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="515" y="127" text-anchor="middle" fill="var(--accent)">cache: stop = false</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".7">
+      <path d="M165 144v40"/>
+      <path d="M515 144v40"/>
+    </g>
+    <text x="175" y="170" font-size="11" opacity=".75">chép về… khi nào?</text>
+    <text x="525" y="170" font-size="11" fill="var(--accent)">đọc lại… khi nào?</text>
+    <text x="340" y="212" text-anchor="middle">bộ nhớ chính (mọi thread dùng chung)</text>
+    <text x="340" y="230" text-anchor="middle" font-size="11" opacity=".75">field stop</text>
+  </g>
+</svg>
+<figcaption>Main thread đã ghi <code>stop = true</code>, nhưng worker có thể cứ đọc bản sao cũ của chính nó. Không có gì trong code Java thông thường nói <em>khi nào</em> các bản sao được đồng bộ.</figcaption>
+</figure>
+
+<p class="muted">Bức tranh này là một mô hình để hình dung. Đặc tả Java hoàn toàn không nói về cache; nó chỉ nói lần đọc nào <em>chắc chắn</em> thấy lần ghi nào. Cache, compiler và CPU đều được phép sắp xếp lại hoặc trì hoãn mọi thứ, miễn là một thread đơn lẻ không nhận ra. Một thread khác thì <em>có thể</em> nhận ra.</p>
+<p>Tutorial của Oracle đưa ra trường hợp đơn giản nhất: thread A chạy <code>counter++</code>, sau đó thread B in <code>counter</code>. Giá trị được in ra "rất có thể là "0", vì không có gì đảm bảo thay đổi của thread A với <code>counter</code> sẽ được thread B nhìn thấy — trừ khi lập trình viên đã thiết lập quan hệ happens-before giữa hai câu lệnh này."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Java tutorial: memory consistency</a></p>
+<p>Đặc tả ngôn ngữ Java (JLS) đặt tên cho tình huống này. Hai lần truy cập cùng một biến là <em>xung đột</em> nếu ít nhất một lần là ghi, và chương trình có "hai lần truy cập xung đột không được sắp thứ tự bởi quan hệ happens-before" thì chứa một <span class="term">data race</span>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a> Không có thứ tự đó thì không có gì đảm bảo bên đọc thấy lần ghi, và JVM được tự do sắp xếp lại.</p>
+
+<h2>3. Xem tận mắt: cờ dừng</h2>
+<p>Đây là chương trình ví dụ <code>StopFlag.java</code>, rút gọn một chút:</p>
+<pre><code>static <span class="hl">volatile</span> boolean stop = false;
+
+Thread worker = new Thread(() -&gt; {
+    long spins = 0;
+    while (!stop) spins++;                 <span class="c">// keep reading stop</span>
+    System.out.println("worker saw stop after spinning");
+});
+worker.start();
+Thread.sleep(200);                         <span class="c">// main waits 0.2 s</span>
+stop = true;                               <span class="c">// volatile write</span>
+worker.join(2000);                         <span class="c">// wait at most 2 s for the worker</span></code></pre>
+<p>Đi theo từng bước:</p>
+<pre><code><span class="c">Bước 1  main khởi động worker                start() happens-before các hành động của worker</span>
+<span class="c">Bước 2  worker đọc stop → false, quay vòng, đọc lại, lại nữa…</span>
+<span class="c">Bước 3  main ghi stop = true                 một lần ghi volatile</span>
+<span class="c">Bước 4  lần đọc stop tiếp theo của worker    một lần đọc volatile đến sau</span>
+<span class="c">        → quy tắc bắt nó phải thấy true       → vòng lặp kết thúc</span>
+<span class="c">Bước 5  join() của main trả về               worker đã xong</span></code></pre>
+<pre><code>$ java java/examples/StopFlag.java
+worker saw stop after spinning
+worker finished</code></pre>
+<p>Giờ hãy tưởng tượng bạn xóa <code>volatile</code>. Bước 4 mất đi sự đảm bảo. Worker <em>có thể</em> thấy <code>true</code> ngay, rất lâu sau, hoặc không bao giờ: compiler thậm chí được phép đọc <code>stop</code> một lần rồi giữ nguyên giá trị đó. Đặc tả không hứa sẽ treo cũng không hứa sẽ chạy đúng; đó chính là vấn đề. Bạn sẽ thử điều này trong bài tập.</p>
+
+<h2>4. Quy tắc: happens-before</h2>
+<p>Quay lại căn bếp. Một đầu bếp viết "bàn 5 xong rồi" lên bảng rồi <strong>rung chuông</strong>. Đầu bếp nào nghe chuông rồi mới nhìn bảng thì chắc chắn thấy dòng chữ đó, và <em>mọi thứ</em> được viết trước tiếng chuông. Tiếng chuông là một cạnh <span class="term">happens-before</span>.</p>
+<p>JLS xây quy tắc từ những mảnh nhỏ:<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></p>
+<ul>
+  <li><strong>Thứ tự chương trình (program order):</strong> "Nếu <em>x</em> và <em>y</em> là hành động của cùng một thread và <em>x</em> đứng trước <em>y</em> theo thứ tự chương trình, thì <em>hb(x, y)</em>." Trong một thread, dòng trước happens-before dòng sau.</li>
+  <li><strong>Các cạnh đồng bộ</strong> giữa các thread (danh sách bên dưới).</li>
+  <li><strong>Tính bắc cầu:</strong> "Nếu <em>hb(x, y)</em> và <em>hb(y, z)</em>, thì <em>hb(x, z)</em>." Các cạnh nối tiếp thành chuỗi.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 310" role="img" aria-label="Hai dòng thời gian của thread. Main ghi data = 42, rồi ghi volatile stop = true. Một mũi tên happens-before đi tới lần đọc volatile stop của worker, sau đó worker đọc data và thấy 42.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="150" y="30" text-anchor="middle" font-size="13">thread main</text>
+    <text x="530" y="30" text-anchor="middle" font-size="13">thread worker</text>
+    <g fill="none" stroke="currentColor" opacity=".45">
+      <path d="M150 42v28M150 178v112"/>
+      <path d="M530 42v28M530 106v90M530 284v6"/>
+    </g>
+    <text x="340" y="300" text-anchor="middle" font-size="11" opacity=".75">thời gian trôi xuống dưới</text>
+    <rect x="50" y="70" width="200" height="36" rx="4" fill="none" stroke="currentColor"/>
+    <text x="150" y="93" text-anchor="middle">data = 42   (plain)</text>
+    <path d="M150 106v34M145 134l5 6 5-6" fill="none" stroke="currentColor"/>
+    <text x="160" y="128" font-size="11" opacity=".75">program order</text>
+    <rect x="50" y="142" width="200" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="150" y="165" text-anchor="middle" fill="var(--accent)">stop = true (volatile)</text>
+    <rect x="430" y="196" width="200" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="530" y="219" text-anchor="middle" fill="var(--accent)">read stop → true</text>
+    <path d="M250 165 L424 210" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+    <path d="M415 212l10-1-7-7" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+    <text x="340" y="172" text-anchor="middle" font-size="11" fill="var(--accent)">happens-before</text>
+    <path d="M530 232v20M525 246l5 6 5-6" fill="none" stroke="currentColor"/>
+    <rect x="430" y="254" width="200" height="30" rx="4" fill="none" stroke="currentColor"/>
+    <text x="530" y="274" text-anchor="middle">read data → 42</text>
+    <rect x="430" y="70" width="200" height="36" rx="4" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".7"/>
+    <text x="530" y="93" text-anchor="middle" opacity=".75">read stop → false</text>
+  </g>
+</svg>
+<figcaption>Program order (trong main) + cạnh volatile (main → worker) nối thành chuỗi, nên worker chắc chắn cũng thấy <code>data = 42</code>, dù <code>data</code> không phải volatile.</figcaption>
+</figure>
+
+<p>Lần theo chuỗi trong hình:</p>
+<pre><code><span class="c">Bước 1  data = 42      hb  stop = true       program order trong main</span>
+<span class="c">Bước 2  stop = true    hb  read stop → true  ghi volatile, rồi đọc volatile sau đó</span>
+<span class="c">Bước 3  read stop      hb  read data         program order trong worker</span>
+<span class="c">Bước 4  bắc cầu:       data = 42  hb  read data   →  <span class="hl">worker thấy 42</span></span></code></pre>
+<p>Đây là pattern phổ biến "chuẩn bị rồi bật cờ": chuẩn bị dữ liệu bằng các lần ghi thường, rồi làm một lần ghi volatile làm tín hiệu.</p>
+
+<h3>Những gì tạo ra cạnh happens-before</h3>
+<ul>
+<li>Một lần unlock monitor happens-before mọi lần lock sau đó trên cùng monitor đó (<code>synchronized</code>).<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></li>
+<li>Một lần ghi vào field <code>volatile</code> happens-before mọi lần đọc field đó sau này.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></li>
+<li><code>Thread.start()</code> happens-before các hành động của thread được khởi động; các hành động của một thread happen-before lúc thread khác trả về từ <code>join()</code> trên nó.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></li>
+<li>Các cạnh từ thư viện: đặt object vào một concurrent collection, submit vào <code>Executor</code>, <code>Future.get()</code>, <code>Lock.unlock</code>/<code>lock</code>, <code>CountDownLatch.countDown</code>/<code>await</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent: Memory Consistency Properties</a></li>
+</ul>
+<p>Vậy với <code>synchronized</code>, tiếng chuông là "unlock, rồi lần lock kế tiếp trên cùng object". Nếu bên ghi và bên đọc dùng hai object lock <em>khác nhau</em> thì không có cạnh nào cả.</p>
+<p>Phần thưởng: "Nếu một chương trình được đồng bộ đúng, thì mọi lần thực thi của chương trình sẽ trông như nhất quán tuần tự (sequentially consistent)."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a> Nói đơn giản: loại bỏ hết data race thì bạn có thể suy luận về chương trình như thể các bước của các thread chỉ đơn giản xen kẽ nhau, từng bước một. Bạn suy luận về các kiểu xen kẽ, không phải về việc sắp xếp lại.</p>
+<p class="muted">JDK 8 vs 17 vs 21: các quy tắc này giống nhau ở cả ba phiên bản. Thứ thay đổi xung quanh chúng là công cụ (ví dụ virtual thread trong JDK 21, bài 0006), không phải memory model.</p>
+
+<h2>5. Những cái bẫy interviewer thích</h2>
+<h3>Bẫy 1: "volatile làm count++ an toàn"</h3>
+<p>Không. <code>volatile</code> cho visibility và thứ tự, không cho tính nguyên tử (atomicity) của <code>count++</code>, vốn gồm ba bước: đọc, cộng một, ghi. Hai thread có thể cùng đọc 5 và cùng ghi 6. Đó là câu hỏi nối tiếp trong interview, và <a href="0024-atomics-and-locks.vi.html">bài 0024</a> cho bạn thấy các update bị mất và cách sửa.</p>
+<h3>Bẫy 2: <code>long</code> và <code>double</code> bị "xé đôi"</h3>
+<p>Một lần ghi <code>long</code> hoặc <code>double</code> không volatile có thể bị coi như hai lần ghi 32-bit, nên bên đọc có thể thấy một giá trị bị xé: nửa từ lần ghi này, nửa từ lần ghi khác. "Việc ghi và đọc các giá trị <code>long</code> và <code>double</code> volatile luôn là nguyên tử."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.7">JLS 17.7</a></p>
+<h3>Bẫy 3: "máy em chạy được mà"</h3>
+<p>Một chương trình có race có thể qua mọi test trên máy bạn và lỗi trên server nhiều lõi hơn, hoặc sau khi JIT compiler tối ưu vòng lặp. Một test chạy qua không chứng minh được gì về data race. Cách sửa là chủ động tạo cạnh: <code>volatile</code>, <code>synchronized</code>, một lock, hoặc một class của <code>java.util.concurrent</code>.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Theo JLS, điều gì khiến hai lần truy cập xung đột trở thành data race?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chúng không được sắp thứ tự bởi happens-before</button>
+    <button class="opt">Cả hai cùng đọc field tại cùng một thời điểm</button>
+    <button class="opt">Chúng xảy ra bên trong cùng một thread duy nhất</button>
+    <button class="opt">Chúng được sắp thứ tự bởi một lần ghi volatile</button>
+  </div>
+  <div class="why">Data race là hai lần truy cập xung đột (ít nhất một lần ghi) mà không có quan hệ happens-before nào sắp thứ tự (JLS 17.4.5).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cái nào dưới đây KHÔNG tạo cạnh happens-before giữa hai thread?</p>
+  <div class="options">
+    <button class="opt" data-correct>Ghi field thường, rồi đọc field thường</button>
+    <button class="opt">Ghi volatile, rồi đọc chính field đó</button>
+    <button class="opt">Unlock monitor, rồi lock chính monitor đó</button>
+    <button class="opt">Gọi start() trên thread mới tạo</button>
+  </div>
+  <div class="why">Truy cập thường tự nó không tạo thứ tự giữa các thread. Ba cái còn lại là các cạnh được liệt kê trong JLS 17.4.5.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>volatile</code> KHÔNG cho bạn điều gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một phép count++ nguyên tử trên field đó</button>
+    <button class="opt">Visibility của lần ghi với các lần đọc sau</button>
+    <button class="opt">Thứ tự của các lần ghi trước nó</button>
+    <button class="opt">Ghi nguyên tử với long hoặc double</button>
+  </div>
+  <div class="why"><code>count++</code> là đọc, cộng, ghi: ba bước. <code>volatile</code> làm mỗi bước được nhìn thấy nhưng không gắn chúng lại thành một.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Main ghi <code>data = 42</code> (thường), rồi <code>ready = true</code> (volatile). Worker đọc <code>ready</code> được <code>true</code>, rồi đọc <code>data</code>. Nó thấy gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>42, vì các cạnh nối thành chuỗi</button>
+    <button class="opt">Có thể là 0, vì data không volatile</button>
+    <button class="opt">Nó ném IllegalStateException</button>
+    <button class="opt">Chỉ phụ thuộc vào loại CPU đang chạy</button>
+  </div>
+  <div class="why">Program order trong main + cạnh volatile + program order trong worker, nối bằng tính bắc cầu, cho ra hb(data = 42, read data).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn bỏ <code>volatile</code> khỏi cờ <code>stop</code>. Đặc tả hứa điều gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không gì cả: có thể dừng, dừng muộn hoặc không bao giờ</button>
+    <button class="opt">Worker sẽ treo mãi mãi, lần chạy nào cũng vậy</button>
+    <button class="opt">Worker sẽ dừng, chỉ là muộn hơn một chút thôi</button>
+    <button class="opt">Compiler sẽ từ chối build chương trình này</button>
+  </div>
+  <div class="why">Không có cạnh happens-before thì không có đảm bảo theo chiều nào. Vì thế một test chạy qua không chứng minh được gì.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">JLS hứa gì với một chương trình được đồng bộ đúng?</p>
+  <div class="options">
+    <button class="opt" data-correct>Mọi lần thực thi trông như nhất quán tuần tự</button>
+    <button class="opt">Nó không bao giờ deadlock, dù dùng lock nào</button>
+    <button class="opt">Nó chạy nhanh bằng chương trình một thread</button>
+    <button class="opt">Các thread luôn chạy theo thứ tự được start</button>
+  </div>
+  <div class="why">Đó là đảm bảo của JLS cho chương trình không có data race: bạn có thể suy luận bằng các kiểu xen kẽ đơn giản. Nó không nói gì về deadlock hay tốc độ.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Happens-before là gì, và khi nào bạn cần <code>volatile</code>?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Các thread dùng chung bộ nhớ, nhưng không có thứ tự thì một thread có thể không thấy lần ghi của thread khác (cache, sắp xếp lại).</label></li>
+      <li><label><input type="checkbox"> Data race: hai lần truy cập xung đột không được sắp thứ tự bởi happens-before.</label></li>
+      <li><label><input type="checkbox"> Nếu A happens-before B, B chắc chắn thấy những gì A đã ghi.</label></li>
+      <li><label><input type="checkbox"> Các cạnh: ghi volatile → đọc sau, unlock → lock sau, start(), join(), các class của java.util.concurrent.</label></li>
+      <li><label><input type="checkbox"> Các cạnh nối với program order (bắc cầu), nên một cờ volatile có thể publish dữ liệu thường.</label></li>
+      <li><label><input type="checkbox"> volatile cho visibility và thứ tự, không làm count++ thành nguyên tử.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Các thread dùng chung heap, nhưng mỗi core có thể cache giá trị và compiler có thể sắp xếp lại code, nên nếu không có thứ tự gì thì một thread có thể không bao giờ thấy giá trị thread kia ghi. Java memory model định nghĩa thứ tự đó là happens-before: nếu action A happens-before B thì B thấy những gì A đã ghi. Nếu hai thread cùng truy cập một biến, một bên ghi, mà giữa chúng không có happens-before thì đó là data race. Em tạo cạnh bằng ghi volatile rồi đọc, bằng unlock rồi lock cùng một monitor, bằng Thread.start và join, hoặc bằng các class trong java.util.concurrent như executor hay latch. Các cạnh này nối tiếp với program order, nên em có thể ghi dữ liệu bình thường rồi set một cờ volatile để publish nó. Em dùng volatile cho cờ đơn giản và cho việc publish, nhưng không dùng cho count++, vì volatile không làm read-modify-write thành nguyên tử; trường hợp đó em dùng atomic hoặc lock."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-remove-volatile.vi.md">Bài tập 0005: bỏ volatile và quan sát</a>. Hãy gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/StopFlag.java"><code>StopFlag.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Một interviewer cấp senior sẽ hỏi tiếp: <em>"Vậy <code>volatile int count; count++</code> từ bốn thread: kết quả là gì? Sửa thế nào, và mỗi cách sửa tốn gì?"</em> <a href="0024-atomics-and-locks.vi.html">Bài 0024</a> chạy đúng chương trình đó và so sánh atomic với lock.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5: Happens-before Order</a>. Khá đặc; chỉ đọc 17.4.4 và 17.4.5, và nhờ giáo viên dịch giúp câu nào khó. Muốn nhẹ nhàng hơn, đọc <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">trang tutorial của Oracle về lỗi memory consistency</a>.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao compiler lại chỉ đọc stop một lần?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0044-review-jdk8.vi.html">← Ôn tập 5: lambda, stream, java.time và CompletableFuture</a> &nbsp;|&nbsp; <a href="0024-atomics-and-locks.vi.html">Vì sao count++ làm mất update, và cách sửa →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Java Language Specification (Java SE 21), tài liệu Java 21 và Oracle Java Tutorials, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17: Threads and Locks</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary (Memory Consistency Properties)</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Java Tutorials: Processes and Threads</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Java Tutorials: Memory Consistency Errors</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

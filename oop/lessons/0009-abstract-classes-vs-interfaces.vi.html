@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 9: Abstract class và interface</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Abstract class và interface</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0009 · bước 9/22 · Core · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-abstract-classes-vs-interfaces.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn giữa abstract class và interface dựa trên tiêu chí của tutorial.</div>
+
+<h2>Abstract class</h2>
+<p>Một abstract class "không thể được khởi tạo (instantiate)" nhưng có thể được kế thừa, và có thể chứa cả method abstract lẫn method không abstract. Một class có method abstract thì bản thân nó phải là abstract; subclass thường sẽ hiện thực các method đó, nếu không thì nó cũng phải là abstract.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+<table><tr><th></th><th>Abstract class</th><th>Interface<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></th></tr>
+<tr><td>Field</td><td>cho phép non-static, non-final</td><td>chỉ public static final</td></tr>
+<tr><td>Method</td><td>method cụ thể public, protected, private</td><td>tất cả là public</td></tr>
+<tr><td>Kế thừa</td><td>chỉ extend được một class</td><td>implement được nhiều</td></tr></table>
+<h2>Khi nào dùng cái nào (hướng dẫn của tutorial)</h2>
+<ul><li><strong>Abstract class:</strong> chia sẻ code giữa các class có quan hệ gần gũi; cần member không public hoặc field non-static, non-final.</li>
+<li><strong>Interface:</strong> các class không liên quan gì với nhau sẽ implement nó; muốn đặc tả behavior mà không áp đặt cách hiện thực; muốn đa kế thừa về kiểu (multiple inheritance of type).<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></li></ul>
+<pre><code>java oop/examples/AbstractVsInterface.java
+robot r2 reporting
+r2 started, running=true
+charging from level 42
+Robot is a Machine: true, is Chargeable: true, is Swimmer: false</code></pre>
+<p><code>Robot</code> extend một abstract class (code và state dùng chung) và implement một interface có default method (một năng lực). Mã nguồn: <a href="../examples/AbstractVsInterface.java"><code>AbstractVsInterface.java</code></a>. Pattern template method được xây dựng trên hình dạng abstract class này (<a href="../../design-patterns/lessons/0024-template-method.vi.html">bài về pattern</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Có thể khởi tạo một abstract class không?</p>
+  <button>Chỉ trong test</button>
+  <button data-correct>Không</button>
+  <button>Có</button>
+  <button>Chỉ khi nó rỗng</button>
+  <p class="explain">Abstract class không thể được khởi tạo.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một class có thể extend bao nhiêu class?</p>
+  <button data-correct>Một</button>
+  <button>Không</button>
+  <button>Bao nhiêu cũng được</button>
+  <button>Hai</button>
+  <p class="explain">Chỉ một, nhưng có thể implement nhiều interface.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cần field state dùng chung. Chọn gì?</p>
+  <button>Record</button>
+  <button>Interface</button>
+  <button>Chỉ enum</button>
+  <button data-correct>Abstract class</button>
+  <p class="explain">Interface chỉ cho phép field public static final.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Các class không liên quan cần chung một năng lực. Chọn gì?</p>
+  <button>Final class</button>
+  <button>Abstract class</button>
+  <button data-correct>Interface</button>
+  <button>Inner class</button>
+  <p class="explain">Dùng interface khi các class không liên quan cùng implement nó.<a class="cite" href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-abstract-or-interface.vi.md">Bài tập 9: abstract hay interface</a></p>
+<p>Ví dụ chạy được: <a href="../examples/AbstractVsInterface.java"><code>AbstractVsInterface.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">Java Tutorials: Abstract Methods and Classes</a>. Đọc phần so sánh.</p>
+<p><a href="0008-polymorphism.vi.html">← Polymorphism và cơ chế gọi virtual method</a> &nbsp;|&nbsp; <a href="0010-interfaces-as-contracts.vi.html">Interface như một hợp đồng →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.oracle.com/javase/tutorial/java/IandI/abstract.html">Java Tutorials: Abstract Methods and Classes</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

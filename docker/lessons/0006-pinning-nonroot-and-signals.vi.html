@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 6: Image được pin, chạy non-root và xử lý signal đúng</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Image được pin phiên bản, chạy non-root và xử lý signal đúng</h1>
+<p class="meta">Docker · Bài 0006 · bước 12/12 · Senior · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0006-pinning-nonroot-and-signals.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> review một Dockerfile theo bốn quy tắc hardening có trong tài liệu: pin base image, user non-root, CMD dạng exec form, mỗi container một nhiệm vụ.</div>
+
+<h2>Bốn quy tắc từ best practices chính thức</h2>
+<ul>
+<li><strong>Pin base image.</strong> Tag có thể thay đổi, nên "không có gì đảm bảo mỗi lần build bạn nhận được cùng một image." Hãy pin theo digest, ví dụ <code>alpine:3.21@sha256:...</code>.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+<li><strong>Chạy với user non-root.</strong> "Nếu một service chạy được mà không cần đặc quyền, hãy dùng <code>USER</code> để chuyển sang một user không phải root."<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+<li><strong>Dùng exec form</strong> cho <code>CMD</code> và <code>ENTRYPOINT</code> để process xử lý signal đúng khi là PID 1.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+<li><strong>Mỗi container một nhiệm vụ</strong>; tách rời các ứng dụng để dễ mở rộng và module hóa.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></li>
+</ul>
+<h2>Trong ví dụ</h2>
+<p><a href="../examples/hello-java/Dockerfile">Dockerfile multi-stage</a> tạo một system user và chuyển sang user đó; khi chạy, kết quả hiện <code>uid=10001(app)</code>. <code>CMD</code> của nó ở dạng exec form (một mảng JSON), nên <code>java</code> là PID 1 và nhận trực tiếp <code>SIGTERM</code> từ <code>docker stop</code>. Với shell form, shell sẽ là PID 1 (tài liệu khuyên dùng exec form để xử lý signal; việc kiểm chứng signal có tới nơi hay không để dành cho bài tập).</p>
+<p>Cũng từ trang đó: dùng <code>.dockerignore</code>; dùng base image tối giản và tin cậy (Docker Official Images).<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+<div class="aside">Câu nói khi phỏng vấn: "Tôi pin base image theo digest, bỏ quyền root, dùng entrypoint dạng exec form để shutdown hook chạy khi nhận <code>SIGTERM</code>, và giữ mỗi container một process."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Vì sao pin base image theo digest?</p>
+  <button>Nó bỏ bớt layer</button>
+  <button data-correct>Tag có thể thay đổi</button>
+  <button>Tag bị cấm dùng</button>
+  <button>Digest build nhanh hơn</button>
+  <p class="explain">Tag có thể thay đổi nên không đảm bảo mỗi lần build đều ra cùng một image.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Dòng nào trong Dockerfile bỏ đặc quyền?</p>
+  <button>LABEL app</button>
+  <button>WORKDIR app</button>
+  <button data-correct>USER app</button>
+  <button>EXPOSE app</button>
+  <p class="explain">USER chuyển sang một user non-root.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Vì sao CMD nên dùng exec form?</p>
+  <button data-correct>Xử lý signal đúng</button>
+  <button>Tự có health check</button>
+  <button>JVM khởi động nhanh hơn</button>
+  <button>Layer của image nhỏ hơn</button>
+  <p class="explain">Exec form đảm bảo signal được xử lý đúng khi process là PID 1.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một container chạy cả app, database và cron. Sửa thế nào?</p>
+  <button>Dùng base lớn hơn</button>
+  <button data-correct>Tách theo nhiệm vụ</button>
+  <button>Pin theo digest</button>
+  <button>Thêm nhiều layer hơn</button>
+  <p class="explain">Docker khuyến nghị mỗi container một nhiệm vụ.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0006-harden-a-dockerfile.vi.md">Bài tập 0006: gia cố một Dockerfile</a></p>
+<p>Ví dụ chạy được: <a href="../examples/hello-java/Dockerfile"><code>hello-java/Dockerfile</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/build/building/best-practices/">Docker Docs: Building best practices</a>. Đọc hết trang này; đó là checklist khi review Dockerfile ở cấp Senior.</p>
+<p><a href="0012-restart-policies.vi.html">← Restart policy</a> &nbsp;|&nbsp; <a href="../index.vi.html">Quay lại lộ trình</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/build/building/best-practices/">Docker Docs: Building best practices</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

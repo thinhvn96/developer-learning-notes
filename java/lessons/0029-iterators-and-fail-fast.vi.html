@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 29: Xóa phần tử khi đang lặp</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Vì sao xóa phần tử trong vòng lặp lại bị crash</h1>
+<p class="subtitle">Iterator, cơ chế fail-fast và <code>ConcurrentModificationException</code>, mà không cần đến thread nào.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0029 · bước 8/46 · Foundation · ~20 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0029-iterators-and-fail-fast.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> "Xóa các user không hoạt động khỏi list này" là việc làm hằng ngày, và phiên bản đầu tiên mà đa số mọi người viết ra đều crash. Người phỏng vấn rất thích câu hỏi nối tiếp: <em>"Chỉ với một thread thì có bị ConcurrentModificationException không?"</em> Sau bài này bạn sẽ trả lời được là có, giải thích được vì sao, và chỉ ra ba cách làm đúng.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích vì sao chỉ một thread cũng có thể gặp <code>ConcurrentModificationException</code>, và xóa phần tử khi đang lặp theo ba cách đúng.</div>
+
+<dl class="words">
+  <dt>collection</dt><dd>Một object chứa một nhóm object khác, như <code>List</code>, <code>Set</code> hoặc tập key của một <code>Map</code>.</dd>
+  <dt>iterator</dt><dd>Một object trợ giúp nhỏ đi qua collection từng phần tử một. Nó có <code>hasNext()</code> ("còn phần tử nữa không?") và <code>next()</code> ("đưa tôi phần tử tiếp theo").</dd>
+  <dt>vòng lặp for-each</dt><dd>Vòng lặp ngắn <code>for (String n : names)</code>. Phía sau, Java tạo một iterator và gọi <code>hasNext()</code>, <code>next()</code> giúp bạn.</dd>
+  <dt>structural change</dt><dd>Thay đổi <em>hình dạng</em> của collection (thay đổi cấu trúc): thêm hoặc xóa phần tử. Thay một value bằng value khác thì không phải.</dd>
+  <dt>modCount</dt><dd>Một bộ đếm bên trong <code>ArrayList</code> và <code>HashMap</code>, tăng lên một sau mỗi structural change. Hãy coi nó như số phiên bản.</dd>
+  <dt>fail-fast</dt><dd>Iterator dừng lại bằng một exception ngay khi phát hiện collection bị thay đổi sau lưng nó, thay vì tiếp tục với dữ liệu sai.</dd>
+  <dt>exception</dt><dd>Một object lỗi mà Java "ném" ra để dừng công việc bình thường. Nếu không ai bắt nó, chương trình dừng và in lỗi ra.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Dự đoán thành lời: list là <code>[ann, bob, cid, dan]</code>. Chạy <code>for (String n : names) if (n.startsWith("b")) names.remove(n);</code> thì chuyện gì xảy ra? In ra kết quả, crash, hay bỏ sót phần tử? Chốt một câu trả lời; bạn sẽ kiểm tra lại ở phần 2.</p>
+
+<h2>1. Hình dung: cô giáo đọc danh sách điểm danh</h2>
+<p>Một cô giáo đọc tên trong tờ điểm danh, dùng ngón tay dò xuống từng dòng. Trên đầu tờ giấy có một <strong>số phiên bản</strong> nhỏ. Mỗi lần văn phòng thêm hoặc gạch một cái tên, họ tăng số đó lên.</p>
+<p>Cô giáo cẩn thận ghi nhớ số phiên bản trước khi bắt đầu. Trước khi đọc mỗi tên tiếp theo, cô kiểm tra lại. Nếu số đã đổi, tức là có người sửa tờ giấy trong lúc cô đang đọc, và ngón tay cô có thể đang chỉ sai dòng. Nên cô dừng lại và nói "danh sách đã bị đổi!" thay vì đọc sai tên.</p>
+<p>Đó chính xác là một iterator <span class="term">fail-fast</span>:</p>
+<ul>
+  <li>Tờ điểm danh là <code>ArrayList</code>.</li>
+  <li>Số phiên bản là field <code>modCount</code> của nó. Trong <code>ArrayList</code> (thông qua <code>AbstractList</code>), mỗi structural change đều tăng nó lên.</li>
+  <li>Ngón tay là iterator. Nó nhớ con số đó dưới tên <code>expectedModCount</code> và kiểm tra ở mỗi lần <code>next()</code>: <code>if (modCount != expectedModCount) throw new ConcurrentModificationException();</code><a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">ArrayList.java</a></li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Trước: list ann bob cid dan với modCount 0 và iterator kỳ vọng 0. Sau list.remove bob: modCount là 1 nhưng iterator vẫn kỳ vọng 0, nên next ném ConcurrentModificationException.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="30" font-size="12" opacity=".75">bắt đầu vòng lặp</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="42" width="70" height="40" rx="3"/><rect x="90" y="42" width="70" height="40" rx="3"/>
+      <rect x="160" y="42" width="70" height="40" rx="3"/><rect x="230" y="42" width="70" height="40" rx="3"/>
+    </g>
+    <text x="55" y="67" text-anchor="middle">ann</text><text x="125" y="67" text-anchor="middle">bob</text>
+    <text x="195" y="67" text-anchor="middle">cid</text><text x="265" y="67" text-anchor="middle">dan</text>
+    <rect x="360" y="42" width="140" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="430" y="67" text-anchor="middle">modCount = 0</text>
+    <rect x="520" y="42" width="140" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="590" y="62" text-anchor="middle" font-size="11">iterator kỳ vọng</text>
+    <text x="590" y="76" text-anchor="middle" font-size="11">0  ✓ khớp</text>
+
+    <g fill="none" stroke="currentColor"><path d="M160 100v32M155 126l5 6 5-6"/></g>
+    <text x="175" y="122" font-size="11" opacity=".8">names.remove("bob")  (structural change)</text>
+
+    <text x="20" y="160" font-size="12" opacity=".75">sau khi remove</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="172" width="70" height="40" rx="3"/><rect x="90" y="172" width="70" height="40" rx="3"/>
+      <rect x="160" y="172" width="70" height="40" rx="3"/>
+    </g>
+    <text x="55" y="197" text-anchor="middle">ann</text><text x="125" y="197" text-anchor="middle">cid</text>
+    <text x="195" y="197" text-anchor="middle">dan</text>
+    <rect x="360" y="172" width="140" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="430" y="197" text-anchor="middle" fill="var(--accent)">modCount = 1</text>
+    <rect x="520" y="172" width="140" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="590" y="192" text-anchor="middle" font-size="11">iterator kỳ vọng</text>
+    <text x="590" y="206" text-anchor="middle" font-size="11">0  (đã cũ)</text>
+    <text x="340" y="242" text-anchor="middle" font-size="12" fill="var(--accent)">next(): 1 ≠ 0 → ném ConcurrentModificationException</text>
+  </g>
+</svg>
+<figcaption>List bị thay đổi sau lưng iterator. Ở lần <code>next()</code> tiếp theo, hai con số khác nhau, nên iterator dừng lại.</figcaption>
+</figure>
+
+<h3>Cái tên gây hiểu lầm: chuyện này không phải về thread</h3>
+<p>"Concurrent" nghe như "hai thread". Nhưng Javadoc nói: "exception này không phải lúc nào cũng cho thấy một object đã bị một thread <em>khác</em> sửa đồng thời ... nếu một thread sửa trực tiếp một collection trong khi đang duyệt nó bằng một iterator fail-fast, iterator sẽ ném exception này."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">CME javadoc</a> Một thread là đủ.</p>
+
+<h2>2. Lần theo cú crash, từng bước một</h2>
+<p>Vòng lặp for-each thực chất chỉ là một iterator. Java Language Specification định nghĩa <code>for (T x : collection)</code> là một vòng lặp gọi <code>iterator()</code>, rồi <code>hasNext()</code> và <code>next()</code>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.14.2">JLS 14.14.2</a> Vì vậy <code>list.remove(x)</code> bên trong vòng lặp sẽ tăng <code>modCount</code> sau lưng iterator.</p>
+<pre><code>List&lt;String&gt; names = new ArrayList&lt;&gt;(List.of("ann", "bob", "cid", "dan"));
+for (String n : names) if (n.startsWith("b")) names.remove(n);
+
+<span class="c">Step 1  iterator created            expectedModCount = 0, cursor = 0</span>
+<span class="c">Step 2  next() → "ann"              check 0 == 0 ✓, cursor = 1</span>
+<span class="c">Step 3  next() → "bob"              check 0 == 0 ✓, cursor = 2</span>
+<span class="c">Step 4  names.remove("bob")         modCount = 1, size = 3</span>
+<span class="c">Step 5  hasNext(): cursor 2 != size 3 → true</span>
+<span class="c">Step 6  next(): check 1 == 0 ✗</span>          <span class="hl">→ ConcurrentModificationException</span></code></pre>
+<p>Trong mã nguồn OpenJDK, <code>hasNext()</code> chỉ đơn giản là <code>return cursor != size;</code> còn <code>next()</code> chạy phép kiểm tra trước tiên.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">ArrayList.java</a> Hãy nhớ điều này: nó giải thích cái bẫy ở phần sau.</p>
+<p>Đây là output thật của ví dụ chạy được. Dòng 1 chính là cú crash bạn vừa lần theo:</p>
+<pre><code>$ java java/examples/collections/IteratorsAndFailFast.java
+1. for-each + list.remove        -&gt; ConcurrentModificationException
+2. remove 2nd-to-last in for-each -&gt; no exception, list=[ann, cid]  (loop silently skipped 'cid')
+3. Iterator.remove()              -&gt; [ann, cid, dan]
+4. removeIf (JDK 8)               -&gt; [ann, cid, dan]
+5. ListIterator set + add         -&gt; [ANN, ann!, BOB, bob!]
+6. entry.setValue while iterating -&gt; {a=10, b=20}
+7. map.put new key while iterating -&gt; ConcurrentModificationException</code></pre>
+
+<h2>3. Cái bẫy: đôi khi nó không crash</h2>
+<p>Nhìn dòng 2. Cùng một lỗi, nhưng list là <code>[ann, bob, cid]</code> và bạn xóa <code>bob</code>, phần tử <strong>áp chót</strong>. Không có exception. Nhưng <code>cid</code> không bao giờ được duyệt tới.</p>
+<pre><code>List&lt;String&gt; tricky = new ArrayList&lt;&gt;(List.of("ann", "bob", "cid"));
+for (String n : tricky) if (n.equals("bob")) tricky.remove(n);
+
+<span class="c">Step 1  next() → "ann"                cursor = 1</span>
+<span class="c">Step 2  next() → "bob"                cursor = 2</span>
+<span class="c">Step 3  tricky.remove("bob")          size = 2, modCount = 1</span>
+<span class="c">Step 4  hasNext(): cursor 2 != size 2 → false</span>
+        <span class="hl">→ loop ends, no check ever runs</span></code></pre>
+
+<figure>
+<svg viewBox="0 0 680 220" role="img" aria-label="Trước khi xóa, cursor ở index 2 của list có size 3. Sau khi xóa bob, cid dời về index 1, size thành 2, cursor bằng size, nên hasNext là false và cid bị bỏ qua.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <text x="20" y="30" font-size="12" opacity=".75">ngay sau khi next() trả về "bob"</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="42" width="80" height="40" rx="3"/><rect x="100" y="42" width="80" height="40" rx="3"/>
+      <rect x="180" y="42" width="80" height="40" rx="3"/>
+    </g>
+    <text x="60" y="67" text-anchor="middle">ann</text><text x="140" y="67" text-anchor="middle">bob</text>
+    <text x="220" y="67" text-anchor="middle">cid</text>
+    <g font-size="10" opacity=".6"><text x="24" y="96">0</text><text x="104" y="96">1</text><text x="184" y="96">2</text></g>
+    <g fill="none" stroke="currentColor"><path d="M220 120v-18M215 108l5-6 5 6"/></g>
+    <text x="220" y="134" text-anchor="middle" font-size="11">cursor = 2</text>
+    <text x="320" y="67" font-size="12">size = 3 → hasNext() true</text>
+
+    <text x="20" y="166" font-size="12" opacity=".75">sau tricky.remove("bob")</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="176" width="80" height="34" rx="3"/><rect x="100" y="176" width="80" height="34" rx="3"/>
+    </g>
+    <text x="60" y="198" text-anchor="middle">ann</text>
+    <text x="140" y="198" text-anchor="middle" fill="var(--accent)">cid</text>
+    <rect x="180" y="176" width="80" height="34" rx="3" fill="none" stroke="var(--accent)" stroke-dasharray="4 3"/>
+    <text x="220" y="198" text-anchor="middle" font-size="11" fill="var(--accent)">cursor 2</text>
+    <text x="320" y="190" font-size="12" fill="var(--accent)">size = 2 → cursor == size</text>
+    <text x="320" y="206" font-size="12" fill="var(--accent)">hasNext() false: bỏ sót cid</text>
+  </g>
+</svg>
+<figcaption>Xóa <code>bob</code> làm <code>cid</code> dời sang trái, vào ô mà cursor đã đi qua. Cursor và size giờ bằng nhau, nên vòng lặp kết thúc lặng lẽ.</figcaption>
+</figure>
+
+<p>Đây là cái bẫy trong interview: xóa phần tử áp chót làm size giảm, nên <code>hasNext()</code> trả về false trước khi phép kiểm tra kịp chạy. Không có exception, và phần tử cuối không bao giờ được duyệt. <strong>Một bug không gây crash.</strong></p>
+<p>Đó là lý do Javadoc gọi fail-fast là "best-effort" (cố gắng hết mức, không đảm bảo): "sẽ là sai nếu viết một chương trình phụ thuộc vào exception này để chạy đúng".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">CME javadoc</a> Exception này là công cụ phát hiện bug, không phải một sự đảm bảo.</p>
+
+<h2>4. Các cách làm đúng</h2>
+<p>Quay lại cô giáo: nếu chính <em>cô</em> gạch một cái tên, cô biết chuyện đó và cập nhật lại số đã nhớ. Chỉ có những chỉnh sửa <em>do người khác</em> làm mới khiến cô bối rối. Trong Java, "cô giáo" chính là iterator.</p>
+
+<h3>Cách 1: <code>Iterator.remove()</code></h3>
+<pre><code>for (Iterator&lt;String&gt; it = a.iterator(); it.hasNext(); )
+  if (it.next().startsWith("b")) it.remove();   <span class="hl">// [ann, cid, dan]</span></code></pre>
+<p>Đây là cách xóa duy nhất mà iterator biết. Trong mã nguồn, <code>Itr.remove()</code> xóa phần tử, lùi cursor lại và gán <code>expectedModCount = modCount</code>, nên lần kiểm tra tiếp theo vẫn qua.<a class="src" href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">ArrayList.java</a> Các view của HashMap là fail-fast "theo mọi cách, trừ khi thông qua chính method <code>remove</code> của iterator".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+
+<h3>Cách 2: <code>removeIf</code> (JDK 8+)</h3>
+<pre><code>b.removeIf(n -&gt; n.startsWith("b"));             <span class="hl">// [ann, cid, dan]</span></code></pre>
+<p>Một lời gọi, không có iterator nào trong code của bạn. <code>n -&gt; n.startsWith("b")</code> là một <em>lambda</em>: một hàm nhỏ trả lời câu "có xóa phần tử này không?". Trên <code>ArrayList</code>, nó dồn mảng trong một lượt thay vì dịch mảng sau mỗi lần xóa. Đây là phiên bản nên viết trong interview.</p>
+
+<h3>Cách 3: <code>ListIterator</code> để sửa trong lúc duyệt</h3>
+<pre><code>for (ListIterator&lt;String&gt; it = c.listIterator(); it.hasNext(); ) {
+  String n = it.next();
+  it.set(n.toUpperCase());   <span class="c">// replace the current element</span>
+  it.add(n + "!");           <span class="c">// insert after it</span>
+}                            <span class="hl">// [ANN, ann!, BOB, bob!]</span></code></pre>
+<p><code>ListIterator</code> còn có thể <code>set</code> và <code>add</code> trong lúc duyệt một list.</p>
+
+<h3>Với Map: sửa value được, sửa key thì không</h3>
+<ul>
+  <li>Đổi một <em>value</em> (<code>entry.setValue</code>) không phải structural change, nên được phép (dòng 6 của output).</li>
+  <li>Thêm hoặc xóa key là structural change, nên <code>map.put(newKey, ...)</code> trong vòng lặp key sẽ ném exception (dòng 7).</li>
+</ul>
+<p>Thêm hai lựa chọn: gom các phần tử vào một list mới rồi sửa list gốc sau vòng lặp, hoặc dùng concurrent collection nếu có <em>thread khác</em> sửa nó (<a href="0039-concurrent-collections.vi.html">bài 0039</a>).</p>
+
+<h3>JDK 8, 17 và 21</h3>
+<p>Quy tắc fail-fast giống nhau ở cả ba phiên bản. Khác biệt chỉ nằm ở phong cách: <code>removeIf</code> có từ JDK 8, nên trên mọi codebase hiện đại nó là câu trả lời mặc định.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Một chương trình chỉ có một thread có thể gặp <code>ConcurrentModificationException</code> không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Có, nếu nó sửa list trong lúc đang lặp qua list đó</button>
+    <button class="opt">Không, luôn cần hai thread chạy cùng một lúc</button>
+    <button class="opt">Chỉ khi collection là HashMap, không phải list</button>
+    <button class="opt">Chỉ khi vòng lặp dùng Java stream thay vì for</button>
+  </div>
+  <div class="why">Sửa trực tiếp một collection trong khi đang duyệt nó bằng iterator fail-fast sẽ ném exception, kể cả chỉ có một thread.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Ở mỗi lần <code>next()</code>, iterator fail-fast so sánh cái gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>modCount của list với expectedModCount của nó</button>
+    <button class="opt">Size của list với size lúc bắt đầu vòng lặp</button>
+    <button class="opt">Phần tử hiện tại với phần tử ngay trước nó</button>
+    <button class="opt">Id của thread với id của thread tạo ra list</button>
+  </div>
+  <div class="why">Mỗi structural change tăng <code>modCount</code>. Iterator đã nhớ giá trị cũ; nếu hai số khác nhau, nó ném exception.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">List là <code>[ann, bob, cid]</code>. Một vòng for-each gọi <code>list.remove("bob")</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không có exception, và cid không được duyệt</button>
+    <button class="opt">ConcurrentModificationException tại cid</button>
+    <button class="opt">bob bị xóa và cid vẫn được duyệt bình thường</button>
+    <button class="opt">Vòng lặp chạy mãi trên cùng một phần tử</button>
+  </div>
+  <div class="why">Sau khi xóa, size là 2 và cursor là 2, nên <code>hasNext()</code> là false và phép kiểm tra không bao giờ chạy. Một bug âm thầm.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cơ chế phát hiện fail-fast có được đảm bảo không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không, chỉ là best-effort, dùng để phát hiện bug</button>
+    <button class="opt">Có, exception luôn được ném ra đúng lúc</button>
+    <button class="opt">Có, nhưng chỉ với ArrayList, không với map</button>
+    <button class="opt">Chỉ khi bạn chạy Java với cờ -ea</button>
+  </div>
+  <div class="why">Javadoc nói sẽ là sai nếu viết chương trình phụ thuộc vào exception này để chạy đúng.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Cách xóa nào an toàn bên trong một vòng lặp iterator tường minh?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>it.remove()</code></button>
+    <button class="opt"><code>list.remove(x)</code></button>
+    <button class="opt"><code>list.clear()</code></button>
+    <button class="opt"><code>list.add(x)</code></button>
+  </div>
+  <div class="why">Chính <code>remove</code> của iterator cập nhật <code>expectedModCount</code>, nên lần kiểm tra sau vẫn qua.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn lặp qua <code>map.entrySet()</code> và gọi <code>entry.setValue(v * 10)</code>. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>Chạy được, vì đổi value không phải structural change</button>
+    <button class="opt">Ném exception, vì mọi thay đổi đều tính là structural</button>
+    <button class="opt">Chạy được, nhưng map bị rehash sau mỗi lần gọi</button>
+    <button class="opt">Nó xóa entry rồi chèn vào một entry hoàn toàn mới</button>
+  </div>
+  <div class="why">Chỉ thêm hoặc xóa key mới làm đổi cấu trúc. Dòng 6 của output in ra <code>{a=10, b=20}</code>.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Người phỏng vấn hỏi: <strong>"ConcurrentModificationException là gì, và bạn xóa phần tử khỏi list trong lúc lặp như thế nào?"</strong> Bấm giờ. Trả lời thành lời, bằng câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Nó có thể xảy ra với một thread: sửa collection trong lúc đang duyệt nó.</label></li>
+      <li><label><input type="checkbox"> Vòng lặp for-each dùng iterator ở bên dưới.</label></li>
+      <li><label><input type="checkbox"> Collection đếm structural change trong <code>modCount</code>; iterator so sánh nó với <code>expectedModCount</code> ở mỗi <code>next()</code>.</label></li>
+      <li><label><input type="checkbox"> Nó chỉ là best-effort: xóa phần tử áp chót sẽ bỏ sót phần tử cuối mà không có exception.</label></li>
+      <li><label><input type="checkbox"> Cách sửa: <code>Iterator.remove()</code>, <code>removeIf</code>, hoặc <code>ListIterator</code>.</label></li>
+      <li><label><input type="checkbox"> <code>setValue</code> trên entry của map thì được; thêm hoặc xóa key thì không.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Dù tên là vậy, nó thường không liên quan đến thread. Nếu em gọi <code>list.remove</code> trong vòng for-each thì chỉ một thread cũng bị, vì for-each dùng iterator. List giữ một <code>modCount</code> tăng lên mỗi lần add hay remove, còn iterator nhớ giá trị lúc nó bắt đầu. Ở mỗi <code>next()</code> nó so sánh hai số và ném exception nếu khác nhau. Nó chỉ là best-effort thôi: nếu em xóa phần tử áp chót, size giảm, <code>hasNext()</code> trả về false, và phần tử cuối bị bỏ qua mà không báo gì. Nên cách đúng là dùng <code>removeIf</code>, hoặc <code>Iterator.remove()</code>, hoặc <code>ListIterator</code> nếu em cần thay hay chèn thêm. Còn đổi value của map bằng <code>setValue</code> thì không sao, vì đó không phải structural change."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0029-fix-the-loops.vi.md">Bài tập 0029: sửa các vòng lặp</a>. Dự đoán kết quả của từng vòng lặp trước, rồi mới chạy.</p>
+<p>Ví dụ chạy được: <a href="../examples/collections/IteratorsAndFailFast.java"><code>IteratorsAndFailFast.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Người phỏng vấn senior có thể hỏi: <em>"Nếu một thread khác sửa list thì sao? Có iterator nào không bao giờ ném exception không?"</em> Các concurrent collection như <code>CopyOnWriteArrayList</code> và <code>ConcurrentHashMap</code> dùng loại iterator khác, không ném exception: xem <a href="0039-concurrent-collections.vi.html">bài 0039</a>. Tiếp theo, <a href="0001-hashmap-equals-hashcode.vi.html">bài 0001</a> mở chính <code>HashMap</code> ra xem.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">ConcurrentModificationException Javadoc (JDK 21)</a>. Đọc phần mô tả class; sau đó đọc đoạn về fail-fast trong Javadoc của ArrayList.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Vì sao xóa phần tử cuối cùng cũng không crash?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist của bạn: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0002-choosing-a-list.vi.html">← ArrayList, LinkedList hay ArrayDeque?</a> &nbsp;|&nbsp; <a href="0001-hashmap-equals-hashcode.vi.html">HashMap tìm value của bạn như thế nào →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, Java Language Specification (SE 21) và mã nguồn OpenJDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ConcurrentModificationException.html">ConcurrentModificationException Javadoc (JDK 21)</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc (JDK 21)</a> · <a href="https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/util/ArrayList.java">OpenJDK 21 source: ArrayList.java</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-14.html#jls-14.14.2">JLS 14.14.2: câu lệnh for nâng cao</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

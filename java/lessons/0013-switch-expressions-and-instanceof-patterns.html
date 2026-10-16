@@ -3,79 +3,299 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 13: JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</title>
+<title>Java 13: switch expressions and instanceof patterns</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 14 and 16: switch expressions and instanceof patterns (in JDK 17)</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0013 · step 20 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>switch that returns a value, instanceof that casts for you</h1>
+<p class="subtitle">Two JDK 14 and JDK 16 features that remove a whole class of copy-paste bugs.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0013 · step 38 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0013-switch-expressions-and-instanceof-patterns.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
 
-<div class="win"><b>Today's win:</b> rewrite an if-else cast chain with <code>instanceof</code> patterns and a switch statement with a switch expression.</div>
+<div class="mission"><strong>Why this lesson?</strong> A forgotten <code>break</code> in a JDK 8 <code>switch</code> and a wrong cast after <code>instanceof</code> are classic production bugs. Interviewers ask <em>"What changed in <code>switch</code> after Java 8?"</em> to check that you know modern Java, and these two features are the base for pattern matching in JDK 21.</div>
 
-<h2>Switch expressions (final in JDK 14)</h2>
-<p>JEP 361 extends <code>switch</code> "so it can be used as either a statement or an expression." Arrow labels (<code>case L -&gt;</code>) do not fall through: "only the code to the right executes". A block inside a switch expression returns a value with <code>yield</code>. A switch expression must be exhaustive, so it needs cases for all values, typically via <code>default</code>.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
-<pre><code>return switch (day) {
+<div class="win"><b>Today's win:</b> rewrite a JDK 8 <code>switch</code> statement as a switch expression, and an <code>instanceof</code>-then-cast chain with <code>instanceof</code> patterns, and explain why neither can fall through or cast wrongly.</div>
+
+<dl class="words">
+  <dt>statement</dt><dd>A line of code that <em>does</em> something, like <code>x = 5;</code> or <code>if (...) {...}</code>. It gives no value back.</dd>
+  <dt>expression</dt><dd>Code that <em>produces a value</em>, like <code>2 + 3</code> or <code>name.length()</code>. You can put it on the right of <code>=</code>.</dd>
+  <dt>fall-through</dt><dd>In an old <code>switch</code>, after one <code>case</code> matches, Java keeps running the next cases until it meets <code>break</code>.</dd>
+  <dt>exhaustive</dt><dd>Covers every possible input. Nothing is left without an answer.</dd>
+  <dt>cast</dt><dd>Telling Java "treat this object as type X", written <code>(String) obj</code>. If you are wrong, it throws <code>ClassCastException</code> at runtime.</dd>
+  <dt>pattern variable</dt><dd>A new variable that <code>instanceof</code> creates for you when the test succeeds, like <code>s</code> in <code>obj instanceof String s</code>.</dd>
+  <dt>scope</dt><dd>The part of the code where a variable name can be used.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Read this JDK 8 code and say out loud what it prints when <code>day</code> is 1. Then check in section 1.</p>
+<pre><code>String r;
+switch (day) {
+  case 1: r = "one";
+  case 2: r = "two"; break;
+  default: r = "?";
+}
+System.out.println(r);</code></pre>
+
+<h2>1. The old switch is a slide, not a button</h2>
+<p>Picture a water slide with several entry doors. You enter at door 1, but nothing stops you there: you slide past door 2, door 3, and so on, until you hit a wall. In an old <code>switch</code>, the <code>case</code> labels are the doors and <code>break</code> is the wall. This is <span class="term">fall-through</span>.</p>
+<p>So the code above prints <strong>two</strong>, not one. I ran it on JDK 21:</p>
+<pre><code><span class="c">Step 1  day is 1, so Java jumps to "case 1"</span>
+<span class="c">Step 2  r = "one"</span>
+<span class="c">Step 3  no break, so Java falls into "case 2": r = "two"</span>
+<span class="c">Step 4  break: leave the switch</span>
+$ java Old.java
+<span class="hl">two</span></code></pre>
+<p>JEP 361 says it plainly: the old switch "supports fall through semantics by default".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> Forget one <code>break</code> and the bug is silent.</p>
+
+<h3>The new switch is a vending machine</h3>
+<p>A vending machine is different: press B2 and you get exactly one snack. JDK 14 brought arrow labels, <code>case L -&gt;</code>. With them, "there is no fall through": only the code to the right of the arrow runs.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> And JEP 361 extends <code>switch</code> "so it can be used as either a statement or an expression".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> An <span class="term">expression</span> gives back a value, so you can <code>return</code> it or assign it directly.</p>
+<pre><code><span class="c">// JDK 8: a statement, a variable declared outside, a break on every line</span>
+String kind;
+switch (day) {
+  case 6: case 7: kind = "weekend"; break;
+  case 1: case 2: case 3: case 4: case 5: kind = "weekday"; break;
+  default: kind = "invalid: " + day;
+}
+return kind;
+
+<span class="c">// JDK 14+: a switch expression</span>
+return switch (day) {
     case 6, 7 -&gt; "weekend";
     case 1, 2, 3, 4, 5 -&gt; "weekday";
     default -&gt; { String msg = "invalid: " + day; yield msg; }
 };</code></pre>
-<h2>Pattern matching for instanceof (final in JDK 16)</h2>
-<p>JEP 394 replaces the test-then-cast idiom:</p>
-<pre><code>if (obj instanceof String s) {   // s is bound only where the match is certain
-    ...
-}</code></pre>
-<p>The binding uses flow scoping: "A pattern variable is in scope where it has definitely matched."<a class="cite" href="https://openjdk.org/jeps/394">[2]</a></p>
-<p>Both are part of what "JDK 17" means for you, since 17 includes everything finalized up to 17. Source: <a href="../examples/jdk17/Jdk17Features.java"><code>Jdk17Features.java</code></a>.</p>
-<div class="aside">Pattern matching for <em>switch</em> is a JDK 21 feature: the JDK 21 example does not compile under <code>--release 17</code> (verified while writing this lesson; the compiler says patterns in switch are not supported in -source 17). See <a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 15</a>.</div>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Does an arrow-label switch fall through?</p>
-  <button>Only for enums</button>
-  <button>Yes, by default</button>
-  <button data-correct>No, it never does</button>
-  <button>Only with yield</button>
-  <p class="explain">Arrow labels prevent fall-through; only the code to the right executes.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Keyword that returns a value from a switch block?</p>
-  <button>return</button>
-  <button>break</button>
-  <button data-correct>yield</button>
-  <button>continue</button>
-  <p class="explain">yield returns a value from a block in a switch expression.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Where is a pattern variable in scope?</p>
-  <button>Whole enclosing method</button>
-  <button>Only inside the if</button>
-  <button data-correct>Where it definitely matched</button>
-  <button>Whole class body</button>
-  <p class="explain">A pattern variable is in scope where it has definitely matched.<a class="cite" href="https://openjdk.org/jeps/394">[2]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Must a switch expression be exhaustive?</p>
-  <button>Only for enums</button>
-  <button data-correct>Yes, always</button>
-  <button>No, never</button>
-  <button>Only with yield</button>
-  <p class="explain">The compiler requires all possible values to be handled.<a class="cite" href="https://openjdk.org/jeps/361">[1]</a></p>
-</div>
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Left: old switch statement. Entering at case 1 flows down through case 2 until break. Right: arrow switch. Each case points to exactly one result, and the result is returned as the value.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="22" text-anchor="middle" font-size="11" opacity=".75">JDK 8 switch statement</text>
+    <text x="510" y="22" text-anchor="middle" font-size="11" opacity=".75">JDK 14+ switch expression</text>
+    <rect x="30" y="40" width="250" height="36" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="46" y="63">case 1: r = "one";</text>
+    <rect x="30" y="96" width="250" height="36" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="46" y="119">case 2: r = "two";</text>
+    <rect x="30" y="152" width="250" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="46" y="175">break;&#160;&#160;→ leave</text>
+    <g fill="none" stroke="var(--accent)" stroke-width="1.5">
+      <path d="M290 58c30 0 30 56 0 56M296 109l-6 5 6 4"/>
+      <path d="M290 114c30 0 30 56 0 56M296 165l-6 5 6 4"/>
+    </g>
+    <text x="155" y="214" text-anchor="middle" font-size="11" fill="var(--accent)">day = 1 falls through: r ends as "two"</text>
+    <rect x="380" y="40" width="130" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="396" y="63">case 6, 7</text>
+    <rect x="380" y="96" width="130" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="396" y="119">case 1..5</text>
+    <rect x="380" y="152" width="130" height="36" rx="5" fill="none" stroke="currentColor"/>
+    <text x="396" y="175">default</text>
+    <g fill="none" stroke="currentColor"><path d="M510 58h40M544 53l6 5-6 5M510 114h40M544 109l6 5-6 5M510 170h40M544 165l6 5-6 5"/></g>
+    <rect x="554" y="40" width="106" height="148" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="607" y="63" text-anchor="middle">"weekend"</text>
+    <text x="607" y="119" text-anchor="middle">"weekday"</text>
+    <text x="607" y="175" text-anchor="middle">yield msg</text>
+    <text x="520" y="214" text-anchor="middle" font-size="11" fill="var(--accent)">one case runs, its value is the result</text>
+    <text x="340" y="240" text-anchor="middle" font-size="11" opacity=".8">-&gt; never falls through; the whole switch is one value you can return</text>
+  </g>
+</svg>
+<figcaption>Old <code>switch</code>: enter at a case and slide down until <code>break</code>. Arrow <code>switch</code>: one case, one value.</figcaption>
+</figure>
+
+<h2>2. Read the new switch, line by line</h2>
+<ol class="steps">
+  <li><strong><code>case 6, 7 -&gt;</code></strong>: several constants in one label, separated by commas. JEP 361 proposes "to allow multiple constants per case, separated by commas".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a></li>
+  <li><strong><code>-&gt; "weekend";</code></strong>: the value on the right is the value of the whole switch.</li>
+  <li><strong><code>default -&gt; { ... yield msg; }</code></strong>: when you need several lines, use a block <code>{ }</code> and give back the value with <code>yield</code>. JEP 361 introduces "a new <code>yield</code> statement to yield a value, which becomes the value of the enclosing <code>switch</code> expression".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a></li>
+</ol>
+<p>The real example prints the three cases:</p>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+{
+  "name": "orders",
+  "port": 8080
+}
+<span class="hl">weekend, weekday, invalid: 9</span>
+3.14 4.00 6.00</code></pre>
+<p class="muted">The JSON lines come from the text block of <a href="0012-var-and-text-blocks.html">lesson 0012</a>; the last line comes from section 4 below.</p>
+
+<h3>Rule: a switch expression must cover every value</h3>
+<p>A switch expression must give a value for every possible input: it must be <span class="term">exhaustive</span>. For an <code>int</code>, that usually means a <code>default</code>.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> Remove the <code>default</code> above and <code>javac</code> 21 refuses:</p>
+<pre><code>error: the switch expression does not cover all possible input values
+    return switch (day) { case 6, 7 -&gt; "weekend"; case 1, 2, 3, 4, 5 -&gt; "weekday"; };</code></pre>
+<p>For an <code>enum</code>, listing every constant is enough. A <code>default</code> is not needed; instead "a <code>default</code> clause is inserted by the compiler", so a constant added later is caught at runtime.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a></p>
+<pre><code>enum Size { S, M, L }
+<span class="c">// no default needed: all 3 constants are listed</span>
+String label = switch (size) {
+    case S -&gt; "small";
+    case M -&gt; "medium";
+    case L -&gt; "large";
+};</code></pre>
+
+<h3>Trap: <code>return</code> inside a switch expression</h3>
+<p>Inside a switch <em>expression</em> you cannot use <code>return</code>, <code>break</code> or <code>continue</code> to jump out. A switch expression must "complete normally with a value, or complete abruptly by throwing an exception".<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a> <strong>The fix:</strong> use <code>yield</code> to give back a value, or <code>throw</code> for an impossible case.</p>
+
+<h2>3. instanceof: test and name it in one step</h2>
+<p>Imagine a security guard checking boxes. In JDK 8 the guard says "Is this a laptop? Yes." Then a second person says "OK, I will now <em>treat</em> it as a laptop." Two steps, and the second person can make a mistake. In JDK 16, the guard says "If this is a laptop, call it <code>lap</code>," and hands it over already labelled.</p>
+<pre><code><span class="c">// JDK 8: test, then cast by hand (type written twice)</span>
+if (obj instanceof String) {
+    String s = (String) obj;       <span class="c">// the JEP itself comments: "grr..."</span>
+    System.out.println(s.length());
+}
+
+<span class="c">// JDK 16+: pattern matching for instanceof</span>
+if (obj instanceof String s) {     <span class="c">// test + new variable s</span>
+    System.out.println(s.length());
+}</code></pre>
+<p>JEP 394 says "all Java programmers are familiar with the <code>instanceof</code>-and-cast idiom", and replaces it.<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> The old way has a hidden risk: if you copy-paste the block and change the test to <code>Integer</code> but forget the cast, the code still compiles and throws <code>ClassCastException</code> at runtime. With a pattern, the type is written once, so test and cast can never disagree.</p>
+
+<h3>Where can you use <code>s</code>? Flow scoping</h3>
+<p>The <span class="term">pattern variable</span> <code>s</code> exists only where the compiler is sure the test passed: "A pattern variable is only in scope where the compiler can deduce that the pattern has definitely matched."<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> Follow the compiler's reasoning:</p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Two code examples. In the first, s is usable on the right side of the AND operator and in the true block, but not in the else block. In the second, after if not instanceof then return, s is usable in the rest of the method.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11" opacity=".75">example A: &amp;&amp;</text>
+    <rect x="54" y="58" width="164" height="20" fill="var(--accent-soft)"/>
+    <rect x="20" y="82" width="300" height="20" fill="var(--accent-soft)"/>
+    <text x="28" y="50">if (o instanceof String s</text>
+    <text x="28" y="72">&#160;&#160;&#160;&#160;&amp;&amp; s.length() &gt; 3) {</text>
+    <text x="28" y="96">&#160;&#160;use(s);&#160;&#160;&#160;<tspan fill="var(--accent)">✓ s is a String</tspan></text>
+    <text x="28" y="120">} else {</text>
+    <text x="28" y="144">&#160;&#160;use(s);&#160;&#160;&#160;<tspan opacity=".75">✗ no s here</tspan></text>
+    <text x="28" y="168">}</text>
+    <text x="370" y="24" font-size="11" opacity=".75">example B: early exit</text>
+    <text x="370" y="50">if (!(o instanceof String s)) {</text>
+    <text x="386" y="72">return;&#160;&#160;&#160;<tspan opacity=".75">✗ no s here</tspan></text>
+    <text x="370" y="96">}</text>
+    <rect x="362" y="106" width="298" height="46" fill="var(--accent-soft)"/>
+    <text x="370" y="122">use(s);&#160;&#160;&#160;<tspan fill="var(--accent)">✓ s is a String</tspan></text>
+    <text x="370" y="144">... rest of the method</text>
+    <text x="340" y="206" text-anchor="middle" font-size="11" fill="var(--accent)">shaded = where the compiler knows the match succeeded, so s exists</text>
+    <text x="340" y="228" text-anchor="middle" font-size="11" opacity=".8">B works because the only way past the if is that o IS a String</text>
+  </g>
+</svg>
+<figcaption>The pattern variable lives exactly where the test is certain to have passed. This is called flow scoping.</figcaption>
+</figure>
+<p>In example A, <code>s</code> "is in scope on the right hand side of the <code>&amp;&amp;</code> operator, as well as in the true block".<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> Java evaluates <code>&amp;&amp;</code> left to right and stops early when the left side is false, so on the right side the test has already passed. Example B is also in the JEP: after <code>if (!(o instanceof String s)) throw ...;</code>, <code>s</code> is in scope for the rest of the code.<a class="src" href="https://openjdk.org/jeps/394">JEP 394</a> I ran both on JDK 21; they compile and print the expected values.</p>
+<p class="muted">With <code>||</code> it is the opposite: in <code>o instanceof String s || s.isEmpty()</code> the right side runs only when the test <em>failed</em>, so <code>s</code> is not available there and the code does not compile.</p>
+
+<h2>4. Both together: the shape example</h2>
+<p>The course example uses <code>instanceof</code> patterns to compute the area of three shapes. Each line tests and names in one go:</p>
+<pre><code>static double area(Shape s) {
+    if (s instanceof Circle c) return Math.PI * c.r() * c.r();
+    if (s instanceof Square q) return q.side() * q.side();
+    if (s instanceof Rect r)   return r.w() * r.h();
+    throw new IllegalStateException();
+}</code></pre>
+<pre><code>$ java java/examples/jdk17/Jdk17Features.java
+...
+<span class="hl">3.14 4.00 6.00</span></code></pre>
+<p>Notice the last line, <code>throw new IllegalStateException()</code>. The compiler cannot know that these three shapes are the only ones, so you need a fallback. In <a href="0014-sealed-classes.html">lesson 0014</a> you will close the list of shapes, and in JDK 21 a <code>switch</code> can then check it for you.</p>
+<p>Both features are part of what "JDK 17" means for you, since 17 includes everything finalized up to 17: switch expressions became final in JDK 14, <code>instanceof</code> patterns in JDK 16 after previews in 14 and 15.<a class="src" href="https://openjdk.org/jeps/361">JEP 361</a><a class="src" href="https://openjdk.org/jeps/394">JEP 394</a></p>
+<div class="aside">Pattern matching for <em>switch</em> (<code>case Circle c -&gt;</code>) is a JDK 21 feature: the JDK 21 example does not compile under <code>--release 17</code> (verified while writing this lesson; the compiler says patterns in switch are not supported in -source 17). See <a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 15</a>.</div>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">In the JDK 8 code <code>case 1: r = "one"; case 2: r = "two"; break;</code>, what is <code>r</code> when <code>day</code> is 1?</p>
+  <div class="options">
+    <button class="opt" data-correct>"two", because case 1 falls through</button>
+    <button class="opt">"one", because case 1 matched first</button>
+    <button class="opt">null, because no break follows case 1</button>
+    <button class="opt">It does not compile without a break</button>
+  </div>
+  <div class="why">Without <code>break</code>, the old switch keeps running into case 2, which overwrites <code>r</code> with "two".</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What happens after a <code>case L -&gt;</code> label matches?</p>
+  <div class="options">
+    <button class="opt" data-correct>Only the code to the right of the arrow runs</button>
+    <button class="opt">The next cases run until a break is found</button>
+    <button class="opt">The default branch also runs at the end</button>
+    <button class="opt">It falls through only for enum constants</button>
+  </div>
+  <div class="why">Arrow labels never fall through. One case, one result.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which keyword gives back a value from a <code>{ }</code> block inside a switch expression?</p>
+  <div class="options">
+    <button class="opt" data-correct>yield</button>
+    <button class="opt">return</button>
+    <button class="opt">break</button>
+    <button class="opt">continue</button>
+  </div>
+  <div class="why"><code>yield</code> sets the value of the switch expression. <code>return</code> and <code>break</code> cannot jump out of a switch expression.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A switch expression on an <code>int</code> has cases 1 to 7 but no <code>default</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>Compile error: not all values are covered</button>
+    <button class="opt">It compiles and returns null for 8</button>
+    <button class="opt">It compiles and throws for 8 at runtime</button>
+    <button class="opt">It compiles with a warning only</button>
+  </div>
+  <div class="why">A switch expression must be exhaustive. An <code>int</code> has many more values than 1 to 7, so you need <code>default</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A switch expression on <code>enum Size { S, M, L }</code> lists S, M and L. Is a <code>default</code> required?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, all constants are covered</button>
+    <button class="opt">Yes, every switch needs a default</button>
+    <button class="opt">Yes, in case the enum is null</button>
+    <button class="opt">Only when it uses yield blocks</button>
+  </div>
+  <div class="why">Listing every constant makes it exhaustive. The compiler inserts its own default for constants added later.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">After <code>if (!(o instanceof String s)) return;</code>, can the next line use <code>s</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Yes, o must be a String to get there</button>
+    <button class="opt">No, s exists only inside the if braces</button>
+    <button class="opt">No, the negation hides the variable</button>
+    <button class="opt">Yes, but only after a cast to String</button>
+  </div>
+  <div class="why">Flow scoping: the only way past the <code>if</code> is that the test succeeded, so the compiler knows <code>s</code> is a <code>String</code>.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What changed in <code>switch</code> and <code>instanceof</code> between Java 8 and Java 17?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Old <code>switch</code> falls through without <code>break</code>, a classic silent bug.</label></li>
+      <li><label><input type="checkbox"> JDK 14: arrow labels <code>case X -&gt;</code> never fall through; several constants per case with commas.</label></li>
+      <li><label><input type="checkbox"> <code>switch</code> can be an expression that returns a value; <code>yield</code> returns from a block.</label></li>
+      <li><label><input type="checkbox"> A switch expression must be exhaustive: <code>default</code>, or every enum constant.</label></li>
+      <li><label><input type="checkbox"> JDK 16: <code>obj instanceof String s</code> tests and casts in one step; no manual cast.</label></li>
+      <li><label><input type="checkbox"> Flow scoping: <code>s</code> exists only where the match is certain (after <code>&amp;&amp;</code>, in the true block, after a negated early return).</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"In Java 8, <code>switch</code> was only a statement, and it falls through: if I forget a <code>break</code>, the next case runs too. Since JDK 14 we have arrow labels, <code>case 6, 7 -&gt;</code>, which never fall through, and <code>switch</code> can be an expression, so I can write <code>return switch (day) {...}</code>. If a case needs several lines, I use a block and <code>yield</code> the value. A switch expression must be exhaustive, so the compiler forces a <code>default</code>, or for an enum, all constants. For <code>instanceof</code>, JDK 16 added pattern matching: <code>if (obj instanceof String s)</code> tests and casts in one step, so the type is written once and the test and cast can't disagree. The variable <code>s</code> uses flow scoping: it's only usable where the match is certain, for example on the right of <code>&amp;&amp;</code> or after an early return. Both are the base for pattern matching in switch in JDK 21."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0013-modernize-a-visitor.md">Exercise 0013: modernize a cast chain</a></p>
+<p><a href="../exercises/0013-modernize-a-visitor.md">Exercise 0013: modernize a cast chain</a>. Rewrite it, then send your version to the teacher before you compare.</p>
 <p>Runnable example: <a href="../examples/jdk17/Jdk17Features.java"><code>jdk17/Jdk17Features.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a>. Then JEP 394.</p>
-<p><a href="0012-var-and-text-blocks.html">← JDK 10 and 15: var and text blocks (in JDK 17)</a> &nbsp;|&nbsp; <a href="0003-records-and-immutability.html">Records and shallow immutability →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will push: <em>"Your <code>area()</code> method ends with <code>throw new IllegalStateException()</code>. How can the compiler prove you covered every shape?"</em> The answer needs two more pieces: records to hold the data (<a href="0003-records-and-immutability.html">lesson 0003</a>) and sealed types to close the list (<a href="0014-sealed-classes.html">lesson 0014</a>). Then <a href="0015-pattern-matching-switch-and-record-patterns.html">lesson 0015</a> puts them in a JDK 21 <code>switch</code>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a>, then <a href="https://openjdk.org/jeps/394">JEP 394: Pattern Matching for instanceof</a>. Both have short, clear Motivation sections.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why can't I use return inside a switch expression?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0012-var-and-text-blocks.html">← var and text blocks: less typing, same types</a> &nbsp;|&nbsp; <a href="0003-records-and-immutability.html">Records: one line instead of forty →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> · [2] <a href="https://openjdk.org/jeps/394">JEP 394: Pattern Matching for instanceof</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the OpenJDK JEPs and compiled with JDK 21, October 2026.</p>
+  <p>References: <a href="https://openjdk.org/jeps/361">JEP 361: Switch Expressions</a> · <a href="https://openjdk.org/jeps/394">JEP 394: Pattern Matching for instanceof</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

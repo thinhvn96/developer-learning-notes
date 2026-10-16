@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 2: Inner join, left join và cái bẫy WHERE</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Inner join, left join và cái bẫy WHERE</h1>
+<p class="meta">PostgreSQL · Bài 0002 · bước 3/13 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-joins-inner-and-left.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> đoán được số dòng của inner join và left join, và phát hiện mệnh đề WHERE âm thầm biến left join thành inner join.</div>
+
+<h2>Inner join vs left outer join</h2>
+<p>Inner join chỉ giữ những dòng khớp ở cả hai phía. Left outer join được gọi như vậy vì "table nằm bên trái toán tử join sẽ có mỗi dòng của nó xuất hiện trong kết quả ít nhất một lần"; với một dòng bên trái không khớp gì, "giá trị rỗng (null) được điền vào các cột của table bên phải."<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 02-joins.sql
+-- inner join: 2 rows (Hayward dropped)
+-- left outer join: 3 rows (Hayward with NULL name, location)</code></pre>
+<h2>Cái bẫy</h2>
+<p>Thêm <code>WHERE cities.location IS NOT NULL</code> vào left join là Hayward lại biến mất: giá trị NULL mà outer join sinh ra không qua được bộ lọc. Kết quả chạy chỉ còn 2 dòng. (Điều này suy ra trực tiếp từ quy tắc điền NULL ở trên; query thứ ba trong ví dụ minh họa nó.) Muốn lọc table bên phải mà không mất dòng bên trái, hãy đặt điều kiện vào mệnh đề <code>ON</code>.</p>
+<p class="aside">Góc độ phỏng vấn: "Vì sao LEFT JOIN của tôi trả về ít dòng hơn table bên trái?" Trả lời: có một điều kiện WHERE trên các cột của table bên phải.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Inner join, dòng bên trái không khớp. Kết quả?</p>
+  <button>Dòng đó bị nhân đôi</button>
+  <button data-correct>Dòng đó bị loại bỏ</button>
+  <button>Báo lỗi</button>
+  <button>Dòng đó xuất hiện với NULL</button>
+  <p class="explain">Inner join chỉ trả về những dòng khớp ở cả hai phía.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Left outer join, dòng bên trái không khớp. Kết quả?</p>
+  <button data-correct>Các cột bên phải là NULL</button>
+  <button>Các cột bên trái là NULL</button>
+  <button>Báo lỗi</button>
+  <button>Dòng đó bị loại bỏ</button>
+  <p class="explain">Giá trị rỗng (null) được điền vào các cột của table bên phải.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Điều kiện lọc table bên phải nên đặt ở đâu để giữ dòng bên trái?</p>
+  <button>Trong WHERE sau join</button>
+  <button>Trong ORDER BY</button>
+  <button>Trong GROUP BY</button>
+  <button data-correct>Trong mệnh đề ON</button>
+  <p class="explain">Điều kiện WHERE trên cột bên phải loại bỏ những dòng đã được điền NULL; ON lọc trước khi điền NULL.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Phía nào của left join giữ lại mọi dòng?</p>
+  <button>Cả hai table</button>
+  <button>Không table nào</button>
+  <button>Table bên phải</button>
+  <button data-correct>Table bên trái</button>
+  <p class="explain">Mỗi dòng của table bên trái xuất hiện ít nhất một lần.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-join.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-three-way-join.vi.md">Bài tập 0002: join ba table</a></p>
+<p>Ví dụ chạy được: <a href="../examples/02-joins.sql"><code>02-joins.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-join.html">PostgreSQL Tutorial: Joins Between Tables</a>. Mục 2.6.</p>
+<p><a href="0007-aggregates-group-by-having.vi.html">← Hàm tổng hợp, GROUP BY và HAVING</a> &nbsp;|&nbsp; <a href="0008-transactions-commit-rollback-savepoints.vi.html">Transaction: COMMIT, ROLLBACK và savepoint →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/tutorial-join.html">PostgreSQL Tutorial: Joins Between Tables</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

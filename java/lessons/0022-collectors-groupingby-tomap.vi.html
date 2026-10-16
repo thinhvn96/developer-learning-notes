@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 22: Collectors: groupingBy và toMap</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Collectors: phân loại stream vào các thùng</h1>
+<p class="subtitle"><code>groupingBy</code>, <code>partitioningBy</code>, <code>joining</code> và <code>toMap</code>, cùng cái sẽ ném lỗi khi hai key trùng nhau.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0022 · bước 26/46 · Core · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0022-collectors-groupingby-tomap.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Service thật lúc nào cũng làm báo cáo: đơn hàng theo khách hàng, tổng lương theo phòng ban, user "active và inactive". Trong Java bạn viết những thứ này bằng collector. Interviewer hay đưa một danh sách nhân viên và bảo bạn gom nhóm ngay tại chỗ, rồi hỏi <em>"Chuyện gì xảy ra nếu <code>toMap</code> gặp key trùng?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> viết thuộc lòng các pipeline <code>groupingBy</code>, <code>partitioningBy</code>, <code>joining</code> và <code>toMap</code>, và nói chính xác khi nào <code>toMap</code> ném lỗi và cách sửa.</div>
+
+<dl class="words">
+  <dt>collector</dt><dd>Một công thức chỉ cho <code>collect(...)</code> cách gói các phần tử stream thành một kết quả: list, map, một con số, một chuỗi.</dd>
+  <dt>classifier</dt><dd>Hàm gán cho mỗi phần tử một key nhóm, ví dụ <code>Emp::dept</code>.</dd>
+  <dt>downstream collector</dt><dd>Một collector thứ hai chạy bên trong mỗi nhóm, ví dụ "cộng lương của nhóm này".</dd>
+  <dt>record</dt><dd>Cách viết ngắn (JDK 16+) cho một class dữ liệu: <code>record Emp(String name, String dept, int salary) {}</code>.</dd>
+  <dt>merge function</dt><dd>Hàm nói cách gộp hai giá trị rơi vào cùng một key.</dd>
+  <dt>unmodifiable</dt><dd>Collection chỉ đọc được, không sửa được; <code>add</code> sẽ ném exception.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Hai nhân viên cùng lương 4800. Mình dựng map từ lương sang tên bằng <code>Collectors.toMap(Emp::salary, Emp::name)</code>. Chuyện gì xảy ra?"</em> Chọn một: cái đầu thắng, cái cuối thắng, hay ném exception.</p>
+
+<h2>1. Hình dung: phòng phân loại ở bưu điện</h2>
+<p>Ở bưu điện, thư đến trên băng chuyền. Một nhân viên đọc tên thành phố trên mỗi lá thư và bỏ nó vào thùng của thành phố đó. Thành phố nào chưa có thùng thì mở thùng mới. Cuối cùng bạn có mỗi thành phố một thùng.</p>
+<p>Đó chính là <code>groupingBy</code>. Thành phố là <span class="term">classifier</span>; mỗi thùng là một entry trong map. Javadoc gọi nó là phép "group by", giống SQL.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a> Mọi ví dụ trong bài dùng dữ liệu này:</p>
+<pre><code>record Emp(String name, String dept, int salary) {}
+
+List&lt;Emp&gt; emps = List.of(
+    new Emp("ann", "dev", 5200), new Emp("bob", "dev", 4200),
+    new Emp("cy",  "ops", 4800), new Emp("dee", "ops", 4800));</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="groupingBy theo dept: ann và bob vào thùng dev, cy và dee vào thùng ops. Downstream collector summingInt biến các thùng thành 9400 và 9600.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="30" width="150" height="34" rx="4"/><rect x="20" y="74" width="150" height="34" rx="4"/>
+      <rect x="20" y="118" width="150" height="34" rx="4"/><rect x="20" y="162" width="150" height="34" rx="4"/>
+    </g>
+    <text x="95" y="52" text-anchor="middle">ann dev 5200</text>
+    <text x="95" y="96" text-anchor="middle">bob dev 4200</text>
+    <text x="95" y="140" text-anchor="middle">cy  ops 4800</text>
+    <text x="95" y="184" text-anchor="middle">dee ops 4800</text>
+    <text x="250" y="20" text-anchor="middle" font-size="11" fill="var(--accent)">classifier Emp::dept</text>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M170 47L322 72"/><path d="M170 91L322 82"/>
+      <path d="M170 135L322 146"/><path d="M170 179L322 156"/>
+    </g>
+    <rect x="325" y="50" width="160" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="405" y="72" text-anchor="middle" fill="var(--accent)">thùng "dev"</text>
+    <text x="405" y="92" text-anchor="middle" font-size="11">[ann, bob]</text>
+    <rect x="325" y="124" width="160" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="405" y="146" text-anchor="middle" fill="var(--accent)">thùng "ops"</text>
+    <text x="405" y="166" text-anchor="middle" font-size="11">[cy, dee]</text>
+    <g fill="none" stroke="currentColor"><path d="M485 78h58M537 73l6 5-6 5"/><path d="M485 152h58M537 147l6 5-6 5"/></g>
+    <text x="580" y="20" text-anchor="middle" font-size="11">downstream</text>
+    <text x="580" y="36" text-anchor="middle" font-size="11">summingInt(salary)</text>
+    <rect x="545" y="58" width="115" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="602" y="83" text-anchor="middle">9400</text>
+    <rect x="545" y="132" width="115" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="602" y="157" text-anchor="middle">9600</text>
+    <text x="340" y="236" text-anchor="middle" font-size="12">kết quả: {ops=9600, dev=9400}   (Map&lt;String, Integer&gt;)</text>
+  </g>
+</svg>
+<figcaption>Classifier chọn thùng. Không có downstream collector thì mỗi thùng là một <code>List</code>; có nó thì mỗi thùng được rút gọn thành một giá trị.</figcaption>
+</figure>
+
+<h2>2. groupingBy, có và không có downstream collector</h2>
+<pre><code>emps.stream().collect(Collectors.groupingBy(Emp::dept));
+<span class="c">// {ops=[Emp[cy..], Emp[dee..]], dev=[Emp[ann..], Emp[bob..]]}  bins of whole Emps</span>
+
+emps.stream().collect(Collectors.groupingBy(Emp::dept,
+        Collectors.mapping(Emp::name, Collectors.toList())));
+<span class="c">// {ops=[cy, dee], dev=[ann, bob]}   each bin keeps only the names</span>
+
+emps.stream().collect(Collectors.groupingBy(Emp::dept,
+        Collectors.summingInt(Emp::salary)));
+<span class="c">// {ops=9600, dev=9400}              each bin becomes one number</span></code></pre>
+<p>Tham số thứ hai là <span class="term">downstream collector</span>: nó quyết định chuyện gì xảy ra <em>bên trong</em> mỗi thùng. Hay dùng nhất là <code>counting()</code>, <code>summingInt(...)</code>, <code>mapping(...)</code> và <code>toList()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a></p>
+<h3>Lần theo từng bước</h3>
+<pre><code>groupingBy(Emp::dept, summingInt(Emp::salary))
+<span class="c">Step 1  ann → key "dev" → no bin yet → new bin, sum = 5200</span>
+<span class="c">Step 2  bob → key "dev" → bin exists  → sum = 5200 + 4200 = 9400</span>
+<span class="c">Step 3  cy  → key "ops" → new bin     → sum = 4800</span>
+<span class="c">Step 4  dee → key "ops" → bin exists  → sum = 4800 + 4800 = 9600</span>
+<span class="c">Result  </span><span class="hl">{ops=9600, dev=9400}</span></code></pre>
+<p class="muted">Vì sao <code>ops</code> in ra trước <code>dev</code>? Kết quả là một map thường, và tài liệu "không đảm bảo gì về kiểu, khả năng sửa đổi, serialization hay thread-safety của <code>Map</code>".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a> Cần key có thứ tự? Dùng dạng ba tham số: <code>groupingBy(Emp::dept, TreeMap::new, downstream)</code>.</p>
+
+<h2>3. partitioningBy và joining</h2>
+<p><strong>partitioningBy</strong> là phòng phân loại chỉ có đúng hai thùng: "có" và "không". Bạn đưa cho nó một phép thử (một <code>Predicate</code>) thay vì classifier. Kết quả là <code>Map&lt;Boolean, ...&gt;</code> "luôn chứa cả hai key <code>false</code> và <code>true</code>", kể cả khi một thùng rỗng.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a></p>
+<pre><code>emps.stream().collect(Collectors.partitioningBy(e -&gt; e.salary() &gt;= 5000,
+                                                Collectors.counting()));
+<span class="hl">// {false=3, true=1}</span></code></pre>
+<p>Nếu dùng <code>groupingBy(e -&gt; e.salary() &gt;= 5000)</code>, nhóm nào không có phần tử sẽ đơn giản là không xuất hiện. Đó là khác biệt mà interviewer muốn nghe.</p>
+<p><strong>joining</strong> xâu các chuỗi lại như xâu hạt. <code>joining(delimiter, prefix, suffix)</code> "nối các phần tử đầu vào, ngăn cách bằng delimiter, kèm prefix và suffix, theo thứ tự gặp".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a></p>
+<pre><code>emps.stream().map(Emp::name).collect(Collectors.joining(", ", "[", "]"));
+<span class="hl">// [ann, bob, cy, dee]</span></code></pre>
+
+<h2>4. toMap: một key, một value, không thì ném lỗi</h2>
+<p>Hãy nghĩ tới danh bạ điện thoại mà mỗi tên chỉ được xuất hiện một lần. <code>toMap(keyMapper, valueMapper)</code> dựng một danh bạ như vậy. Nếu hai phần tử cho ra cùng một key, Java không lặng lẽ chọn một. Tài liệu: "Nếu các key được map có trùng lặp (theo <code>Object.equals(Object)</code>), một <code>IllegalStateException</code> sẽ được ném khi phép collect được thực hiện."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a></p>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="toMap từ lương sang tên. 5200 sang ann, 4200 sang bob, 4800 sang cy. Rồi dee cũng có key 4800. Không có merge function thì ném IllegalStateException; có merge function thì value thành cy+dee.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="20" y="24" font-size="11">toMap(Emp::salary, Emp::name)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="36" width="200" height="32" rx="4"/><rect x="20" y="76" width="200" height="32" rx="4"/>
+      <rect x="20" y="116" width="200" height="32" rx="4"/>
+    </g>
+    <text x="120" y="57" text-anchor="middle">5200 → "ann"</text>
+    <text x="120" y="97" text-anchor="middle">4200 → "bob"</text>
+    <text x="120" y="137" text-anchor="middle">4800 → "cy"</text>
+    <rect x="20" y="170" width="200" height="40" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="120" y="195" text-anchor="middle" fill="var(--accent)">dee: lại key 4800!</text>
+    <g fill="none" stroke="var(--accent)"><path d="M220 190h40l40-60h18M312 125l6 5-6 5"/><path d="M260 190l40 40h18M312 225l6 5-6 5"/></g>
+    <rect x="320" y="108" width="340" height="44" rx="6" fill="none" stroke="var(--accent)"/>
+    <text x="490" y="128" text-anchor="middle" fill="var(--accent)">không có merge function</text>
+    <text x="490" y="144" text-anchor="middle" font-size="11" fill="var(--accent)">IllegalStateException</text>
+    <rect x="320" y="200" width="340" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="490" y="218" text-anchor="middle" font-size="11">merge (x, y) -&gt; x + "+" + y</text>
+    <text x="490" y="236" text-anchor="middle">4800 → "cy+dee"</text>
+    <text x="490" y="60" text-anchor="middle" font-size="11" opacity=".8">ba key đầu đều mới:</text>
+    <text x="490" y="78" text-anchor="middle" font-size="11" opacity=".8">được đưa thẳng vào map</text>
+  </g>
+</svg>
+<figcaption>Phần tử thứ tư lặp lại key 4800. Không có merge function, <code>toMap</code> ném lỗi; có thì nó gộp hai value lại.</figcaption>
+</figure>
+
+<p>Cách sửa: "Nếu các key có thể trùng, hãy dùng <code>toMap(Function, Function, BinaryOperator)</code>."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a> Tham số thứ ba là <span class="term">merge function</span>: nó nhận value cũ và value mới, rồi trả về value cần giữ.</p>
+<pre><code>Map&lt;Integer, String&gt; merged = emps.stream().collect(
+    Collectors.toMap(Emp::salary, Emp::name, (x, y) -&gt; x + "+" + y));
+<span class="c">Step 1  ann: 5200 new → put "ann"</span>
+<span class="c">Step 2  bob: 4200 new → put "bob"</span>
+<span class="c">Step 3  cy:  4800 new → put "cy"</span>
+<span class="c">Step 4  dee: 4800 exists → merge("cy", "dee") → "cy+dee"</span></code></pre>
+<p class="muted">Các merge hay dùng: <code>(a, b) -&gt; a</code> giữ cái đầu, <code>(a, b) -&gt; b</code> giữ cái cuối, <code>Integer::sum</code> cộng lại. Hãy chọn có chủ đích; "không bao giờ trùng đâu" chính là giả định mà exception này bảo vệ bạn.</p>
+
+<h3>Chạy thử</h3>
+<pre><code>$ java java/examples/CollectorsDemo.java
+groupingBy      : {ops=[cy, dee], dev=[ann, bob]}
+sum by dept     : {ops=9600, dev=9400}
+partitioningBy : {false=3, true=1}
+joining         : [ann, bob, cy, dee]
+toMap duplicate: IllegalStateException
+toMap w/ merge  : {4200=bob, 4800=cy+dee, 5200=ann}</code></pre>
+<p>Dòng cuối được in qua một <code>TreeMap</code> nên key có thứ tự. Hãy so tất cả với SQL <code>GROUP BY</code> trong <a href="../../postgresql/index.vi.html">lộ trình PostgreSQL</a>.</p>
+
+<h2>5. Bạn nhận được loại list hay map nào?</h2>
+<p><code>Collectors.toList()</code> và <code>toSet()</code> "không đảm bảo gì về kiểu, khả năng sửa đổi, serialization hay thread-safety"; nếu cần kiểm soát, dùng <code>toCollection(Supplier)</code>, ví dụ <code>toCollection(ArrayList::new)</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a></p>
+<table>
+<tr><th>Bạn viết</th><th>Bạn nhận</th><th>Từ</th></tr>
+<tr><td><code>collect(Collectors.toList())</code></td><td>một List nào đó, không hứa gì về việc sửa đổi</td><td>JDK 8</td></tr>
+<tr><td><code>collect(Collectors.toCollection(ArrayList::new))</code></td><td>đúng một <code>ArrayList</code></td><td>JDK 8</td></tr>
+<tr><td><code>collect(Collectors.toUnmodifiableList())</code></td><td>một List unmodifiable</td><td>JDK 10</td></tr>
+<tr><td><code>stream.toList()</code></td><td>một List unmodifiable</td><td>JDK 16</td></tr>
+</table>
+<p>Nguồn: Javadoc Collectors cho ba dòng đầu<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a>, Javadoc Stream cho <code>toList()</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Javadoc Stream</a> <code>toUnmodifiableMap</code> còn "không cho phép key và value null".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a></p>
+
+<h3>Lỗi hay gặp</h3>
+<ul>
+  <li><strong>Dùng <code>toMap</code> với dữ liệu có thể lặp key.</strong> Test thì chạy, production thì ném lỗi. Cách sửa: truyền merge function, hoặc dùng <code>groupingBy</code> nếu muốn giữ mọi value.</li>
+  <li><strong>Dựa vào thứ tự của map từ <code>groupingBy</code>.</strong> Cách sửa: truyền <code>TreeMap::new</code> hoặc <code>LinkedHashMap::new</code> làm map factory.</li>
+  <li><strong>Gọi add trên kết quả của <code>stream.toList()</code>.</strong> Nó ném <code>UnsupportedOperationException</code>. Cách sửa: <code>toCollection(ArrayList::new)</code>.</li>
+</ul>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q"><code>toMap</code> gặp hai key bằng nhau và bạn không đưa merge function. Chuyện gì xảy ra?</p>
+  <div class="options">
+    <button class="opt" data-correct>IllegalStateException</button>
+    <button class="opt">Value đầu tiên thắng</button>
+    <button class="opt">Value cuối cùng thắng</button>
+    <button class="opt">Một cái bị bỏ âm thầm</button>
+  </div>
+  <div class="why">Key trùng sẽ ném <code>IllegalStateException</code> trừ khi bạn truyền merge function làm tham số thứ ba.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>groupingBy(Emp::dept, summingInt(Emp::salary))</code> trả về gì với dữ liệu trong bài?</p>
+  <div class="options">
+    <button class="opt" data-correct>Một map như {ops=9600, dev=9400}</button>
+    <button class="opt">Một map như {ops=[cy, dee], dev=[ann, bob]}</button>
+    <button class="opt">Một con số: tổng lương là 19000</button>
+    <button class="opt">Một list như [9400, 9600] xếp theo dept</button>
+  </div>
+  <div class="why">Classifier tạo mỗi phòng ban một thùng; downstream <code>summingInt</code> rút gọn mỗi thùng thành một con số.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Collector nào luôn cho bạn cả key <code>true</code> lẫn key <code>false</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>partitioningBy</button>
+    <button class="opt">groupingBy</button>
+    <button class="opt">counting</button>
+    <button class="opt">toMap</button>
+  </div>
+  <div class="why">Map của <code>partitioningBy</code> "luôn chứa cả hai key false và true". <code>groupingBy</code> trên boolean chỉ có những key nó đã gặp.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Collector nào dựng ra <code>"[ann, bob, cy, dee]"</code> từ một stream tên?</p>
+  <div class="options">
+    <button class="opt" data-correct>joining(", ", "[", "]")</button>
+    <button class="opt">mapping(", ", "[", "]")</button>
+    <button class="opt">toList(", ", "[", "]")</button>
+    <button class="opt">reducing(", ", "[", "]")</button>
+  </div>
+  <div class="why"><code>joining(delimiter, prefix, suffix)</code> nối các phần tử theo thứ tự gặp, kèm delimiter, prefix và suffix.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Collectors.toList()</code> có đảm bảo trả về một <code>ArrayList</code> sửa được không?</p>
+  <div class="options">
+    <button class="opt" data-correct>Không: không có đảm bảo gì về kiểu hay sửa đổi</button>
+    <button class="opt">Có: nó luôn trả về một ArrayList mới, sửa được</button>
+    <button class="opt">Không: nó luôn trả về một list unmodifiable</button>
+    <button class="opt">Có, nhưng chỉ khi stream chạy tuần tự mà thôi</button>
+  </div>
+  <div class="why">Tài liệu "không đảm bảo gì về kiểu, khả năng sửa đổi, serialization hay thread-safety". Dùng <code>toCollection(ArrayList::new)</code> để kiểm soát.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Bạn cần các phòng ban theo thứ tự chữ cái trong map kết quả. Bạn đổi gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Dùng groupingBy(Emp::dept, TreeMap::new, downstream)</button>
+    <button class="opt">Gọi sorted() trên stream trước khi gọi groupingBy</button>
+    <button class="opt">Không cần gì: groupingBy luôn tự sắp xếp các key</button>
+    <button class="opt">Dùng partitioningBy, vì nó giữ các key có thứ tự</button>
+  </div>
+  <div class="why">Kiểu của map không được đảm bảo. <code>groupingBy</code> ba tham số nhận một map factory, nên <code>TreeMap::new</code> cho key có thứ tự.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Bạn gom nhân viên theo phòng ban và cộng lương thế nào? Và toMap có những cái bẫy gì?"</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Sau đó bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> <code>collect(groupingBy(Emp::dept, summingInt(Emp::salary)))</code>: classifier cộng downstream collector.</label></li>
+      <li><label><input type="checkbox"> Downstream collector (<code>counting</code>, <code>mapping</code>, <code>summingInt</code>) chạy bên trong mỗi nhóm.</label></li>
+      <li><label><input type="checkbox"> <code>partitioningBy</code> chia theo predicate và luôn có cả key true lẫn false.</label></li>
+      <li><label><input type="checkbox"> <code>toMap</code> ném <code>IllegalStateException</code> khi key trùng.</label></li>
+      <li><label><input type="checkbox"> Cách sửa: truyền merge function làm tham số thứ ba (hoặc dùng <code>groupingBy</code>).</label></li>
+      <li><label><input type="checkbox"> Kiểu map/list không được đảm bảo; dùng map factory hoặc <code>toCollection</code> khi cần.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Em sẽ stream danh sách nhân viên rồi gọi <code>collect(Collectors.groupingBy(Emp::dept, Collectors.summingInt(Emp::salary)))</code>. Tham số đầu là classifier, chọn key của nhóm; tham số thứ hai là downstream collector chạy bên trong mỗi nhóm, nên em có map từ phòng ban sang tổng lương. Nếu chỉ cần hai nhóm, kiểu lương cao và lương thấp, em dùng <code>partitioningBy</code>, nó luôn có cả key true và false. Cái bẫy chính của <code>toMap</code> là key trùng: mặc định nó ném <code>IllegalStateException</code>, nên nếu key có thể lặp thì em truyền merge function làm tham số thứ ba, ví dụ giữ cái đầu hoặc cộng dồn. Và tài liệu không đảm bảo kiểu của map hay list, nên nếu cần key có thứ tự hay list sửa được thì em truyền <code>TreeMap::new</code> hoặc dùng <code>toCollection</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0022-report-with-collectors.vi.md">Bài tập 0022: làm báo cáo bằng collector</a>. Gửi dự đoán của bạn cho giáo viên trước, rồi mới chạy code.</p>
+<p>Ví dụ chạy được: <a href="../examples/CollectorsDemo.java"><code>CollectorsDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp Senior có thể hỏi <em>"Bạn có dùng parallel stream cho báo cáo này không?"</em> hoặc chuyển sang thời gian: <em>"Giờ gom đơn hàng theo ngày, theo múi giờ của khách."</em> Ngày giờ và múi giờ là bài tiếp theo: <a href="0011-java-time.vi.html">bài 0011, java.time</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a>: phần mô tả class và các ví dụ.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hãy hỏi mình trong chat Claude Code. Mình là giáo viên của bạn, nên cứ hỏi bất cứ điều gì, ví dụ <em>"Gom nhóm theo hai field thì làm sao?"</em> hoặc <em>"Kiểm tra giúp mình câu trả lời 60 giây"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0004-streams-and-optional.vi.html">← Stream và Optional, tránh các cái bẫy</a> &nbsp;|&nbsp; <a href="0011-java-time.vi.html">java.time: bạn cần loại đồng hồ nào? →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Collectors.html">Javadoc Collectors</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html">Javadoc Stream</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

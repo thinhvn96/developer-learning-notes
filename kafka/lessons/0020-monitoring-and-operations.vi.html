@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 20: Giám sát và vận hành một cluster</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Giám sát và vận hành một cluster</h1>
+<p class="meta">Kafka · Bài 0020 · bước 20/23 · Senior · ~13 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0020-monitoring-and-operations.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> kể tên được một nhóm nhỏ metric cho bạn biết một cluster Kafka hay một consumer đang không khoẻ, và các bước CLI để xem lag, di chuyển partition và restart an toàn.</div>
+
+<h2>Sức khoẻ broker: danh sách cảnh báo</h2>
+<table>
+<tr><th>Metric<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></th><th>Khoẻ mạnh</th><th>Ý nghĩa khi xấu</th></tr>
+<tr><td><code>UnderReplicatedPartitions</code></td><td>0</td><td>một follower rơi khỏi ISR: giảm dự phòng</td></tr>
+<tr><td><code>UnderMinIsrPartitionCount</code></td><td>0</td><td>ISR thấp hơn <code>min.insync.replicas</code>: các lần ghi <code>acks=all</code> thất bại</td></tr>
+<tr><td><code>OfflinePartitionsCount</code></td><td>0</td><td>không có leader: partition không dùng được</td></tr>
+<tr><td><code>ActiveControllerCount</code></td><td>1 trên đúng một node</td><td>không có controller, hoặc bị split brain</td></tr>
+<tr><td><code>IsrShrinksPerSec</code></td><td>0, trừ lúc đang restart</td><td>follower chập chờn, đĩa hoặc network chậm</td></tr>
+<tr><td><code>RequestHandlerAvgIdlePercent</code>, <code>NetworkProcessorAvgIdlePercent</code></td><td>trên 0.3</td><td>các thread của broker đã bão hoà</td></tr>
+</table>
+<p>Latency của request là <code>TotalTimeMs</code> theo từng loại request, được tách ra thành thời gian chờ queue, xử lý local, chờ remote và gửi response, nhờ đó bạn biết thời gian bị tiêu <em>ở đâu</em>.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a> Remote JMX mặc định bị tắt và khi bật lên thì không có xác thực, nên hãy bảo vệ nó.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></p>
+<h2>Sức khoẻ consumer: lag</h2>
+<p>Lag là log-end offset trừ committed offset, tính theo từng partition. Theo dõi từ bên ngoài bằng <code>kafka-consumer-groups.sh --describe --group &lt;g&gt;</code>, lệnh này cho thấy consumer "đang tụt lại bao xa so với cuối log".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a> Từ bên trong, metric phía client <code>records-lag-max</code> là lag lớn nhất trong cửa sổ đo, tính theo vị trí hiện tại.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a> Hãy cảnh báo khi lag cứ tăng mãi, không phải khi vượt một con số cố định: lag vọt lên một lúc sau khi deploy là chuyện bình thường.</p>
+<h2>Vận hành hằng ngày (day-2)</h2>
+<ul>
+<li><strong>Restart an toàn:</strong> <code>controlled.shutdown.enable=true</code> chuyển leadership ra khỏi broker trước khi nó dừng; việc này "chỉ thành công nếu mọi partition trên broker đó đều có replica".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a> Roll từng broker một và chờ under-replicated về 0.</li>
+<li><strong>Cân bằng leader:</strong> mặc định Kafka trả leadership về preferred replica; nếu không thì chạy <code>kafka-leader-election.sh --election-type preferred</code>.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a></li>
+<li><strong>Thêm broker:</strong> broker mới không nhận partition nào đang có. Di chuyển chúng bằng <code>kafka-reassign-partitions.sh</code> (<code>--generate</code>, <code>--execute</code>, <code>--verify</code>); "admin phải tự xác định topic hoặc partition nào cần di chuyển".<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a> Hãy throttle việc di chuyển để traffic replication không làm client bị đói.</li>
+</ul>
+<div class="aside">Câu trả lời khi phỏng vấn: "Bốn cảnh báo đầu tiên: under-replicated, under-min-ISR, offline partition, active controller count. Sau đó là tỉ lệ idle của thread và phân tích latency của request. Với ứng dụng thì xem xu hướng consumer lag theo từng group. Rolling restart từng broker một, chờ ISR đầy đủ giữa mỗi lần."</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. UnderMinIsrPartitionCount lớn hơn 0 nghĩa là?</p>
+  <button>Topic bị compaction</button>
+  <button data-correct>Ghi acks=all thất bại</button>
+  <button>Đĩa sắp đầy rồi</button>
+  <button>Consumer đang rảnh</button>
+  <p class="explain">ISR thấp hơn min.insync.replicas, nên các lần ghi cần đủ chừng đó replica sẽ bị từ chối.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Tỉ lệ idle của request handler nên giữ trên mức nào?</p>
+  <button>Khoảng 0.9</button>
+  <button>Đúng 1.0</button>
+  <button>Khoảng 0.01</button>
+  <button data-correct>Khoảng 0.3</button>
+  <p class="explain">Tài liệu đưa ra mức lý tưởng là trên 0.3.<a class="cite" href="https://kafka.apache.org/43/operations/monitoring/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bạn thêm một broker. Các partition hiện có thì sao?</p>
+  <button>Tăng gấp đôi</button>
+  <button data-correct>Ở yên; phải reassign</button>
+  <button>Tự động di chuyển</button>
+  <button>Bị xoá đi</button>
+  <p class="explain">Bạn phải tự di chuyển partition bằng công cụ reassignment.<a class="cite" href="https://kafka.apache.org/43/operations/basic-kafka-operations/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Cảnh báo consumer lag tốt nhất?</p>
+  <button>Không bao giờ xem lag</button>
+  <button data-correct>Lag tăng đều liên tục</button>
+  <button>Lag nhỏ hơn mười</button>
+  <button>Lag bất kỳ lớn hơn 0</button>
+  <p class="explain">Lag tự nhiên sẽ vọt lên rồi hồi lại; tăng kéo dài nghĩa là consumer không theo kịp.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0020-on-call-runbook.vi.md">Bài tập 0020: viết runbook cho on-call</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka Operations: Monitoring</a>. Đọc bảng metric của broker và mục 'Consumer monitoring'.</p>
+<p><a href="0019-kraft-and-controllers.vi.html">← KRaft: controller và metadata quorum</a> &nbsp;|&nbsp; <a href="0021-share-groups.vi.html">Share group: queue cho Kafka →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/operations/monitoring/">Kafka Operations: Monitoring</a> · [2] <a href="https://kafka.apache.org/43/operations/basic-kafka-operations/">Kafka Operations: Basic Kafka Operations</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -3,76 +3,314 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Java 16: JDK 21: sequenced collections</title>
+<title>Java 16: First, last and reversed (JDK 21)</title>
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
 <main>
-<h1>JDK 21: sequenced collections</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0016 · step 25 of 27 · Core · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>First, last and reversed: sequenced collections (JDK 21)</h1>
+<p class="subtitle">One set of methods for "the first one", "the last one" and "backwards", on every collection that has an order.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0016 · step 43 of 46 · Core · ~20 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0016-sequenced-collections.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> "Give me the latest order", "show the newest message first": you need the first or last element all the time. Before JDK 21, every collection type did it differently. Interviewers ask <em>"What are sequenced collections in Java 21?"</em> to see if you follow the modern API. After this lesson you can answer, and stop writing <code>list.get(list.size() - 1)</code>.</div>
 
 <div class="win"><b>Today's win:</b> use <code>getFirst</code>, <code>getLast</code> and <code>reversed</code> on lists, deques and ordered sets and maps, and name the three new interfaces.</div>
 
-<h2>The gap it fills (final in JDK 21)</h2>
-<p>JEP 431 introduces "new interfaces to represent collections with a defined encounter order". Before it, reverse iteration and end-element access differed across <code>List</code>, <code>Deque</code>, <code>SortedSet</code> and <code>LinkedHashSet</code>.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
-<table>
-<tr><th>Interface</th><th>Key methods<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></th></tr>
-<tr><td><code>SequencedCollection&lt;E&gt;</code></td><td><code>reversed()</code>, <code>addFirst</code>, <code>addLast</code>, <code>getFirst</code>, <code>getLast</code>, <code>removeFirst</code>, <code>removeLast</code></td></tr>
-<tr><td><code>SequencedSet&lt;E&gt;</code></td><td>extends Set and SequencedCollection; covariant <code>reversed()</code></td></tr>
-<tr><td><code>SequencedMap&lt;K,V&gt;</code></td><td><code>reversed()</code>, <code>putFirst</code>, <code>putLast</code>, <code>firstEntry</code>, <code>lastEntry</code>, <code>pollFirstEntry</code>, <code>pollLastEntry</code>, sequenced views</td></tr>
-</table>
-<pre><code>java java/examples/jdk21/Jdk21Features.java
-a c [c, b, a]                       # list.getFirst(), getLast(), reversed()
-one=1 two=2 {two=2, one=1}          # firstEntry(), lastEntry(), reversed() of a LinkedHashMap</code></pre>
-<p class="aside">This is why <a href="0002-choosing-a-list.html">lesson 2</a> mentions <code>getFirst</code> and <code>getLast</code> in the ArrayList Javadoc: those methods are documented there in the current API. On JDK 17 you would write <code>list.get(list.size() - 1)</code>.</p>
+<dl class="words">
+  <dt>collection</dt><dd>An object that holds a group of elements, like a <code>List</code> or a <code>Set</code>.</dd>
+  <dt>interface</dt><dd>A list of methods a class promises to have. <code>List</code> is an interface; <code>ArrayList</code> is a class that keeps the promise.</dd>
+  <dt>encounter order</dt><dd>The order you meet the elements when you loop over them. A list has one; a <code>HashSet</code> does not promise any.</dd>
+  <dt>generic <code>&lt;E&gt;</code></dt><dd>A placeholder for "the type of the elements". <code>SequencedCollection&lt;String&gt;</code> holds strings.</dd>
+  <dt>view</dt><dd>A second "window" onto the same data. It copies nothing; if the data changes, the view shows the change.</dd>
+  <dt>deque</dt><dd>Say "deck": a queue you can use from both ends, for example <code>ArrayDeque</code>.</dd>
+</dl>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Which interface adds putFirst and putLast?</p>
-  <button>Deque</button>
-  <button>SequencedSet</button>
-  <button>Collection</button>
-  <button data-correct>SequencedMap</button>
-  <p class="explain">SequencedMap has putFirst, putLast and related methods.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Method returning a reverse-ordered view?</p>
-  <button data-correct>reversed</button>
-  <button>flip</button>
-  <button>reverse</button>
-  <button>backwards</button>
-  <p class="explain">reversed() returns a reverse-ordered view.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Which JDK finalized sequenced collections?</p>
-  <button>JDK 17</button>
-  <button data-correct>JDK 21</button>
-  <button>JDK 8</button>
-  <button>JDK 11</button>
-  <p class="explain">Finalized in Java 21.<a class="cite" href="https://openjdk.org/jeps/431">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Does a plain HashSet have an encounter order guarantee?</p>
-  <button>Yes, sorted</button>
-  <button>Yes, reversed</button>
-  <button data-correct>No, none</button>
-  <button>Yes, insertion</button>
-  <p class="explain">Only collections with a defined encounter order are sequenced; HashSet is not one (see the HashMap lesson on ordering).</p>
-</div>
+<h2>Before you start</h2>
+<p>Say out loud: <em>"How do I get the last element of an <code>ArrayList</code>? And of a <code>LinkedHashSet</code>?"</em> If the second one feels awkward, good: that awkwardness is the reason this lesson exists.</p>
+
+<h2>1. The old way: four types, four answers</h2>
+<p>Think of a queue at the bank. Everyone understands "the first person" and "the last person". Nobody needs a different word for it depending on whether the queue is inside or outside the building.</p>
+<p>Java before 21 did need different words. JEP 431 lists them:<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+<table>
+<tr><th>Type</th><th>First element</th><th>Last element</th></tr>
+<tr><td><code>List</code></td><td><code>list.get(0)</code></td><td><code>list.get(list.size() - 1)</code></td></tr>
+<tr><td><code>Deque</code></td><td><code>deque.getFirst()</code></td><td><code>deque.getLast()</code></td></tr>
+<tr><td><code>SortedSet</code></td><td><code>sortedSet.first()</code></td><td><code>sortedSet.last()</code></td></tr>
+<tr><td><code>LinkedHashSet</code></td><td><code>linkedHashSet.iterator().next()</code></td><td>missing</td></tr>
+</table>
+<p>The last cell is the worst: "The only way to get the last element of a <code>LinkedHashSet</code> is to iterate the entire set."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Reverse iteration was just as uneven. And there was no common type, so you could not write one method that accepts "any collection with an order".</p>
+
+<h2>2. The new way: one interface, both ends</h2>
+<p>JEP 431 introduces "new interfaces to represent collections with a defined encounter order". Such a collection "has a well-defined first element, second element, and so forth, up to the last element."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Here is the main one, exactly as the JEP shows it:<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+<pre><code>interface SequencedCollection&lt;E&gt; extends Collection&lt;E&gt; {
+    <span class="c">// new method</span>
+    SequencedCollection&lt;E&gt; reversed();
+    <span class="c">// methods promoted from Deque</span>
+    void addFirst(E);
+    void addLast(E);
+    E getFirst();
+    E getLast();
+    E removeFirst();
+    E removeLast();
+}</code></pre>
+<p>Notice "promoted from Deque": the names are not new. <code>Deque</code> already had them; JDK 21 moved them up so every ordered collection shares them.</p>
+
+<figure>
+<svg viewBox="0 0 680 230" role="img" aria-label="A list a, b, c. On the left end: getFirst returns a, addFirst and removeFirst. On the right end: getLast returns c, addLast and removeLast. Below, reversed() shows c, b, a as a view of the same elements.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="250" y="60" width="60" height="44" rx="4"/>
+      <rect x="310" y="60" width="60" height="44" rx="4"/>
+      <rect x="370" y="60" width="60" height="44" rx="4"/>
+    </g>
+    <text x="280" y="87" text-anchor="middle">a</text>
+    <text x="340" y="87" text-anchor="middle">b</text>
+    <text x="400" y="87" text-anchor="middle">c</text>
+    <text x="340" y="40" text-anchor="middle" font-size="11" opacity=".75">list = [a, b, c]</text>
+    <g font-size="12" fill="var(--accent)">
+      <text x="40" y="62">getFirst() → a</text>
+      <text x="40" y="84">addFirst(x)</text>
+      <text x="40" y="106">removeFirst()</text>
+      <text x="470" y="62">getLast() → c</text>
+      <text x="470" y="84">addLast(x)</text>
+      <text x="470" y="106">removeLast()</text>
+    </g>
+    <g fill="none" stroke="var(--accent)">
+      <path d="M180 82h64M238 77l6 5-6 5"/>
+      <path d="M460 82h-24M442 77l-6 5 6 5"/>
+    </g>
+    <text x="340" y="146" text-anchor="middle" font-size="12">list.reversed()</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 3">
+      <rect x="250" y="160" width="60" height="40" rx="4"/>
+      <rect x="310" y="160" width="60" height="40" rx="4"/>
+      <rect x="370" y="160" width="60" height="40" rx="4"/>
+    </g>
+    <text x="280" y="185" text-anchor="middle">c</text>
+    <text x="340" y="185" text-anchor="middle">b</text>
+    <text x="400" y="185" text-anchor="middle">a</text>
+    <text x="470" y="178" font-size="11" opacity=".8">a view: same elements,</text>
+    <text x="470" y="194" font-size="11" opacity=".8">read backwards, no copy</text>
+  </g>
+</svg>
+<figcaption>Every sequenced collection has two ends with the same six methods, plus <code>reversed()</code>, a backwards view.</figcaption>
+</figure>
+
+<p>Run the course example on JDK 21:</p>
+<pre><code>$ java java/examples/jdk21/Jdk21Features.java
+circle r=5.0 at 1,2
+huge circle at 0,0
+rect width 4 height 3
+null handled inside the switch | blank string | string x | int 7
+<span class="hl">a c [c, b, a]</span>
+<span class="hl">one=1 two=2 {two=2, one=1}</span></code></pre>
+<p>The first highlighted line is <code>list.getFirst()</code>, <code>list.getLast()</code> and <code>list.reversed()</code> on <code>["a", "b", "c"]</code>. The second is a map, section 5.</p>
+
+<h2>3. <code>reversed()</code> is a view, not a copy</h2>
+<p>A view is like looking at a street through the rear window of a car: you see the same street, just the other way round. If a new shop opens, you see it in both windows.</p>
+<p>JEP 431: "The new <code>reversed()</code> method provides a reverse-ordered view of the original collection." Changes to the original show in the view, and "If permitted, modifications to the view write through to the original collection."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> I ran these lines on JDK 21:</p>
+<pre><code>var list = new ArrayList&lt;&gt;(List.of("a", "b", "c"));
+var rev = list.reversed();
+list.add("d");
+System.out.println(rev);
+<span class="c">Step 1  rev is created: it remembers "read list backwards"</span>
+<span class="c">Step 2  list becomes [a, b, c, d]</span>
+<span class="c">Step 3  printing rev reads list backwards now</span>
+<span class="hl">[d, c, b, a]</span></code></pre>
+<p>That makes <code>reversed()</code> cheap: no elements are copied. It also means you can loop backwards with a normal for-each: <code>for (var x : list.reversed())</code>. In JDK 8 you needed a <code>ListIterator</code> walking from the end, or <code>Collections.reverse</code> on a copy.</p>
+
+<h2>4. Which collections are sequenced?</h2>
+<p>JDK 21 added three interfaces and fitted them into the existing family. <code>List</code> and <code>Deque</code> now extend <code>SequencedCollection</code>; <code>LinkedHashSet</code> and <code>LinkedHashMap</code> add <code>SequencedSet</code> and <code>SequencedMap</code>; <code>SortedSet</code> and <code>SortedMap</code> now extend them too.<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Interface family. Collection is extended by SequencedCollection, which is extended by List, Deque and SequencedSet. SequencedSet is extended by SortedSet and implemented by LinkedHashSet. Map is extended by SequencedMap, which is extended by SortedMap and implemented by LinkedHashMap. HashSet and HashMap are not sequenced.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="90" y="16" width="160" height="32" rx="4"/>
+      <rect x="20" y="152" width="80" height="32" rx="4"/>
+      <rect x="110" y="152" width="80" height="32" rx="4"/>
+      <rect x="170" y="220" width="100" height="32" rx="4"/>
+      <rect x="280" y="220" width="130" height="32" rx="4"/>
+      <rect x="460" y="16" width="160" height="32" rx="4"/>
+      <rect x="440" y="152" width="100" height="32" rx="4"/>
+      <rect x="550" y="152" width="120" height="32" rx="4"/>
+      <path d="M170 48v36M170 116L60 152M170 116L150 152M170 116L270 152M270 184L220 220M270 184L345 220M540 48v36M540 116L490 152M540 116L610 152"/>
+    </g>
+    <g fill="var(--accent-soft)" stroke="var(--accent)">
+      <rect x="60" y="84" width="220" height="32" rx="4"/>
+      <rect x="200" y="152" width="140" height="32" rx="4"/>
+      <rect x="440" y="84" width="200" height="32" rx="4"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="170" y="37">Collection</text>
+      <text x="170" y="105" fill="var(--accent)">SequencedCollection</text>
+      <text x="60" y="173">List</text>
+      <text x="150" y="173">Deque</text>
+      <text x="270" y="173" fill="var(--accent)">SequencedSet</text>
+      <text x="220" y="241">SortedSet</text>
+      <text x="345" y="241">LinkedHashSet</text>
+      <text x="540" y="37">Map</text>
+      <text x="540" y="105" fill="var(--accent)">SequencedMap</text>
+      <text x="490" y="173">SortedMap</text>
+      <text x="610" y="173">LinkedHashMap</text>
+    </g>
+    <text x="555" y="222" text-anchor="middle" font-size="11" opacity=".6">HashSet, HashMap:</text>
+    <text x="555" y="240" text-anchor="middle" font-size="11" opacity=".6">no defined order,</text>
+    <text x="555" y="258" text-anchor="middle" font-size="11" opacity=".6">not sequenced</text>
+  </g>
+</svg>
+<figcaption>The three new interfaces (highlighted) sit between the old ones. Only types with a defined order joined.</figcaption>
+</figure>
+
+<p>Look at what is <strong>not</strong> in the picture: <code>HashSet</code> and <code>HashMap</code>. They have no defined order, so they are not sequenced. I checked: <code>new HashSet&lt;&gt;() instanceof SequencedCollection</code> prints <code>false</code>.</p>
+<p><code>SequencedSet</code> only adds one thing: "<code>SequencedSet&lt;E&gt; reversed();    // covariant override</code>".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> "Covariant" means the reversed view of a set is still a set, not just a collection.</p>
+<p>A set cannot hold the same element twice, so what does <code>addFirst</code> do with an element that is already there? "If the element is already present in the set then it is moved to the appropriate position."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> My run:</p>
+<pre><code>var set = new LinkedHashSet&lt;&gt;(List.of("x", "y", "z"));
+set.addFirst("z");
+System.out.println(set + " last=" + set.getLast());
+<span class="hl">[z, x, y] last=y</span></code></pre>
+<p>One line for the last element of a <code>LinkedHashSet</code>, the cell that was "missing" in the old table.</p>
+
+<h2>5. Maps with an order: <code>SequencedMap</code></h2>
+<p>Maps are not collections in Java (<code>Map</code> does not extend <code>Collection</code>), so they get their own interface:<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+<pre><code>interface SequencedMap&lt;K,V&gt; extends Map&lt;K,V&gt; {
+    <span class="c">// new methods</span>
+    SequencedMap&lt;K,V&gt; reversed();
+    SequencedSet&lt;K&gt; sequencedKeySet();
+    SequencedCollection&lt;V&gt; sequencedValues();
+    SequencedSet&lt;Entry&lt;K,V&gt;&gt; sequencedEntrySet();
+    V putFirst(K, V);
+    V putLast(K, V);
+    <span class="c">// methods promoted from NavigableMap</span>
+    Entry&lt;K, V&gt; firstEntry();
+    Entry&lt;K, V&gt; lastEntry();
+    Entry&lt;K, V&gt; pollFirstEntry();
+    Entry&lt;K, V&gt; pollLastEntry();
+}</code></pre>
+<p>From the course example:</p>
+<pre><code>var map = new LinkedHashMap&lt;String, Integer&gt;();
+map.put("one", 1); map.put("two", 2);
+System.out.println(map.firstEntry() + " " + map.lastEntry() + " " + map.reversed());
+<span class="hl">one=1 two=2 {two=2, one=1}</span></code></pre>
+<p>"Poll" means "get and remove": <code>pollFirstEntry()</code> takes the oldest entry out of a <code>LinkedHashMap</code>. That is handy for a simple cache that drops its oldest item (you will build an LRU cache in <a href="0033-hashset-linkedhashmap-and-lru.html">lesson 0033</a>).</p>
+
+<h2>6. Traps: empty collections and "I can't add there"</h2>
+<p><strong>Trap 1: empty.</strong> "The <code>get*()</code> and <code>remove*()</code> methods throw <code>NoSuchElementException</code> if the collection is empty."<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Note the exception changes compared with the old way: <code>list.get(0)</code> on an empty list throws <code>IndexOutOfBoundsException</code>, while <code>list.getFirst()</code> throws <code>NoSuchElementException</code>. Check <code>isEmpty()</code> first.</p>
+<p><strong>Trap 2: you can't always add at an end.</strong> "The <code>add*(E)</code> and <code>remove*()</code> methods are optional, primarily to support the case of unmodifiable collections." For sorted collections the position comes from comparing elements, so "these methods can throw <code>UnsupportedOperationException</code>".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> My run on JDK 21:</p>
+<pre><code>new TreeSet&lt;&gt;(List.of(3, 1, 2)).getFirst()    <span class="c">→ 1        (reading is fine)</span>
+new TreeSet&lt;&gt;(List.of(3, 1, 2)).reversed()    <span class="c">→ [3, 2, 1]</span>
+new TreeSet&lt;&gt;(List.of(3, 1, 2)).addFirst(0)   <span class="hl">→ UnsupportedOperationException</span>
+List.of(1).addFirst(0)                        <span class="hl">→ UnsupportedOperationException</span>
+new ArrayList&lt;String&gt;().getFirst()            <span class="hl">→ NoSuchElementException</span></code></pre>
+<p class="muted">JDK 21 also added <code>Collections.unmodifiableSequencedCollection</code>, <code>unmodifiableSequencedSet</code> and <code>unmodifiableSequencedMap</code>, read-only wrappers that keep the sequenced type.<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a></p>
+
+<h3>JDK 8 vs 17 vs 21</h3>
+<p>Sequenced collections are final in JDK 21 only. On 8 and 17 you use the old table above: on JDK 17 you write <code>list.get(list.size() - 1)</code>. This is why <a href="0002-choosing-a-list.html">lesson 2</a> mentions <code>getFirst</code> and <code>getLast</code> in the ArrayList Javadoc: those methods are documented there in the current API.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">Which interface adds <code>putFirst</code> and <code>putLast</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>SequencedMap</button>
+    <button class="opt">SequencedSet</button>
+    <button class="opt">Deque</button>
+    <button class="opt">Collection</button>
+  </div>
+  <div class="why"><code>SequencedMap</code> has <code>putFirst</code>, <code>putLast</code>, <code>firstEntry</code>, <code>lastEntry</code> and related methods.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which method returns a reverse-ordered view?</p>
+  <div class="options">
+    <button class="opt" data-correct>reversed()</button>
+    <button class="opt">reverse()</button>
+    <button class="opt">flip()</button>
+    <button class="opt">backwards()</button>
+  </div>
+  <div class="why"><code>reversed()</code> returns a reverse-ordered view. (<code>Collections.reverse</code> is the old static method that reorders a list in place.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>rev = list.reversed()</code> on <code>[a, b, c]</code>, then <code>list.add("d")</code>. What does <code>rev</code> print?</p>
+  <div class="options">
+    <button class="opt" data-correct>[d, c, b, a]</button>
+    <button class="opt">[c, b, a]</button>
+    <button class="opt">[a, b, c, d]</button>
+    <button class="opt">[c, b, a, d]</button>
+  </div>
+  <div class="why"><code>reversed()</code> is a view, not a copy, so it shows the new element, read backwards.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Is a plain <code>HashSet</code> a <code>SequencedCollection</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>No, it has no defined order</button>
+    <button class="opt">Yes, it keeps insertion order</button>
+    <button class="opt">Yes, it keeps elements sorted</button>
+    <button class="opt">Only after you call reversed()</button>
+  </div>
+  <div class="why">Only collections with a defined encounter order are sequenced. <code>HashSet</code> is not; <code>LinkedHashSet</code> is.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>new ArrayList&lt;String&gt;().getFirst()</code> do?</p>
+  <div class="options">
+    <button class="opt" data-correct>Throws NoSuchElementException</button>
+    <button class="opt">Throws IndexOutOfBoundsException</button>
+    <button class="opt">Returns null without any error</button>
+    <button class="opt">Returns an empty Optional value</button>
+  </div>
+  <div class="why">The <code>get*()</code> and <code>remove*()</code> methods throw <code>NoSuchElementException</code> on an empty collection. The old <code>get(0)</code> throws <code>IndexOutOfBoundsException</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Why does <code>treeSet.addFirst(0)</code> throw <code>UnsupportedOperationException</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>A sorted set decides positions by comparing</button>
+    <button class="opt">TreeSet is not a sequenced collection at all</button>
+    <button class="opt">addFirst only works on lists, never on sets</button>
+    <button class="opt">0 is smaller than the elements already there</button>
+  </div>
+  <div class="why">In a sorted collection the order comes from comparison, so you cannot choose "first". The <code>add*</code> methods are optional and throw there.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What are sequenced collections in Java 21, and why were they added?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Before 21, first/last and reverse access differed per type (<code>get(size()-1)</code>, <code>last()</code>, nothing for LinkedHashSet).</label></li>
+      <li><label><input type="checkbox"> JDK 21 (JEP 431) adds <code>SequencedCollection</code>, <code>SequencedSet</code> and <code>SequencedMap</code> for types with a defined encounter order.</label></li>
+      <li><label><input type="checkbox"> Methods: <code>getFirst/getLast</code>, <code>addFirst/addLast</code>, <code>removeFirst/removeLast</code>, and <code>reversed()</code>; maps get <code>firstEntry</code>, <code>putFirst</code>, <code>pollFirstEntry</code>…</label></li>
+      <li><label><input type="checkbox"> <code>reversed()</code> is a view, not a copy.</label></li>
+      <li><label><input type="checkbox"> List, Deque, LinkedHashSet/Map and SortedSet/Map are sequenced; HashSet and HashMap are not.</label></li>
+      <li><label><input type="checkbox"> Empty → <code>NoSuchElementException</code>; sorted or unmodifiable → <code>add*</code> throws <code>UnsupportedOperationException</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Before Java 21, getting the first or last element depended on the type: <code>get(0)</code> and <code>get(size() - 1)</code> for a list, <code>first()</code> and <code>last()</code> for a sorted set, and for a <code>LinkedHashSet</code> there was no way to get the last element without iterating. JEP 431 in JDK 21 added three interfaces, <code>SequencedCollection</code>, <code>SequencedSet</code> and <code>SequencedMap</code>, for every collection with a defined encounter order. They give the same methods everywhere: <code>getFirst</code>, <code>getLast</code>, <code>addFirst</code>, <code>removeLast</code> and so on, plus <code>reversed()</code>, which is a cheap view, not a copy. List, Deque, LinkedHashSet, LinkedHashMap and the sorted types are sequenced; HashSet and HashMap aren't, because they have no order. Two things to watch: on an empty collection <code>getFirst</code> throws <code>NoSuchElementException</code>, and on a sorted or unmodifiable collection <code>addFirst</code> throws <code>UnsupportedOperationException</code>."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0016-last-element-refactor.md">Exercise 0016: last-element refactor</a></p>
+<p><a href="../exercises/0016-last-element-refactor.md">Exercise 0016: last-element refactor</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/jdk21/Jdk21Features.java"><code>jdk21/Jdk21Features.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a>. Read Summary and Description.</p>
-<p><a href="0015-pattern-matching-switch-and-record-patterns.html">← JDK 21: pattern matching for switch and record patterns</a> &nbsp;|&nbsp; <a href="0006-virtual-threads.html">Virtual threads: scale, not speed →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer may push: <em>"Is <code>reversed()</code> a copy? What happens if you call <code>addFirst</code> on a <code>TreeSet</code>? Could adding methods to <code>List</code> break existing code?"</em> You can answer the first two now. For the third: "All of the new methods declared in these interfaces have default implementations" (<a href="0009-default-methods-and-conflicts.html">lesson 0009</a> explains default methods), but the JEP still warns that new methods "high in the inheritance hierarchy" risk "clashes over obvious method names".<a class="src" href="https://openjdk.org/jeps/431">JEP 431</a> Next, the biggest JDK 21 change for servers: <a href="0006-virtual-threads.html">virtual threads</a>.</p>
+<p><strong>Read more:</strong> <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a>. Read Summary and Description; the diagram of the new interfaces is worth a look.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"What exactly is a view?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0015-pattern-matching-switch-and-record-patterns.html">← How switch takes objects apart (JDK 21)</a> &nbsp;|&nbsp; <a href="0006-virtual-threads.html">Virtual threads: scale, not speed →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against JEP 431 and runs on JDK 21.0.12, October 2026.</p>
+  <p>References: <a href="https://openjdk.org/jeps/431">JEP 431: Sequenced Collections</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

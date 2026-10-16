@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 14: Producer throughput: batching and compression</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Producer throughput: batching and compression</h1>
+<p class="meta">Kafka · Lesson 0014 · step 11 of 23 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0014-producer-throughput-batching-compression.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> tune <code>linger.ms</code>, <code>batch.size</code> and <code>compression.type</code> for throughput, explain why Kafka is fast (batching, page cache, zero-copy), and read a benchmark.</div>
+
+<h2>Why Kafka is fast</h2>
+<ul>
+<li><strong>Batching:</strong> "Batching is one of the big drivers of efficiency"; the producer is willing to "trade off a small amount of additional latency for better throughput".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><strong>Batch compression:</strong> "Efficient compression requires compressing multiple messages together rather than compressing each message individually." The batch stays compressed in the log and on the way to consumers.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></li>
+<li><strong>Page cache and zero-copy:</strong> "data is copied into pagecache exactly once and reused on each consumption", and <code>sendfile</code> lets the OS "send the data from pagecache to the network directly".<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a> TLS disables this zero-copy path, because data must be encrypted in user space.</li>
+</ul>
+<h2>The knobs</h2>
+<ul>
+<li><code>linger.ms</code> (default 5, was 0 before 4.0): wait a little so records join a batch; a full <code>batch.size</code> is sent immediately anyway.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></li>
+<li><code>batch.size</code> (default 16384 bytes): per-partition batch buffer.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></li>
+<li><code>compression.type</code> (default <code>none</code>; <code>gzip</code>, <code>snappy</code>, <code>lz4</code>, <code>zstd</code>): applied to whole batches, so better batching means better compression.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></li>
+<li><code>buffer.memory</code> (32 MB): when it is full, "additional send calls will block" up to <code>max.block.ms</code>, then fail.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[3]</a> This is the producer's backpressure.</li>
+</ul>
+<h2>Benchmark: one laptop, one broker</h2>
+<p><a href="../examples/06-batching-and-compression.sh"><code>06-batching-and-compression.sh</code></a> sends 500,000 small JSON records with <code>kafka-producer-perf-test</code>, <code>acks=all</code>:</p>
+<pre><code>linger.ms=0  batch.size=16384  compression.type=none  247892 records/sec (20.39 MB/sec) | on disk: 47036 KB
+linger.ms=5  batch.size=16384  compression.type=none  351864 records/sec (28.94 MB/sec) | on disk: 47036 KB
+linger.ms=20 batch.size=131072 compression.type=none  616522 records/sec (50.71 MB/sec) | on disk: 47016 KB
+linger.ms=20 batch.size=131072 compression.type=lz4   510725 records/sec (42.01 MB/sec) | on disk:  5812 KB
+linger.ms=20 batch.size=131072 compression.type=zstd  486854 records/sec (40.04 MB/sec) | on disk:  3528 KB</code></pre>
+<p>Reading it: bigger batches gave 2.5× the throughput. Compression cost some CPU on a single local broker (no real network), but cut disk use 8 to 13×; across a real network and with replication factor 3, fewer bytes usually wins. Your numbers will differ; the shape is what matters.</p>
+<div class="aside">Interview answer: "For throughput: raise <code>linger.ms</code> and <code>batch.size</code>, turn on <code>lz4</code> or <code>zstd</code>, keep idempotence and <code>acks=all</code>. For lowest latency: small linger, accept smaller batches. Always measure with perf-test on production-like data."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. What does compression act on in Kafka?</p>
+  <button data-correct>Whole record batches</button>
+  <button>Only record keys</button>
+  <button>Each single record</button>
+  <button>Only the headers</button>
+  <p class="explain">Compression applies to full batches, so better batching improves the ratio.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Default linger.ms in Kafka 4.x?</p>
+  <button data-correct>Five milliseconds</button>
+  <button>One hundred ms</button>
+  <button>Zero milliseconds</button>
+  <button>One full second</button>
+  <p class="explain">The default changed from 0 to 5 in Apache Kafka 4.0.<a class="cite" href="https://kafka.apache.org/43/configuration/producer-configs/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. buffer.memory is full. What does send() do?</p>
+  <button>Skips batching</button>
+  <button>Drops the record</button>
+  <button data-correct>Blocks, then fails</button>
+  <button>Writes to disk</button>
+  <p class="explain">Send calls block up to max.block.ms and then return a failed future.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which feature lets brokers skip user-space copies?</p>
+  <button>Idempotence</button>
+  <button>Consumer groups</button>
+  <button data-correct>sendfile zero-copy</button>
+  <button>Log compaction</button>
+  <p class="explain">sendfile sends data from pagecache to the network directly.<a class="cite" href="https://kafka.apache.org/43/design/design/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0014-tune-a-producer.md">Exercise 0014: tune a producer</a></p>
+<p>Runnable example: <a href="../examples/06-batching-and-compression.sh"><code>06-batching-and-compression.sh</code></a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a>. Read 'Efficiency' and 'The Producer' (load balancing, asynchronous send).</p>
+<p><a href="0005-replication-isr-and-durability.html">← Replication, ISR and durability</a> &nbsp;|&nbsp; <a href="0015-rebalancing-and-group-protocols.html">Rebalancing: classic vs the new consumer protocol →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · [2] <a href="https://kafka.apache.org/43/configuration/producer-configs/">Kafka Producer Configs</a> · [3] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/producer/KafkaProducer.html">KafkaProducer Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

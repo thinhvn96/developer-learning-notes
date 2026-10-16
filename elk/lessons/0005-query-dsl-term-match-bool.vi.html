@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 5: Query DSL: term, match và bool</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Query DSL: term, match và bool</h1>
+<p class="meta">ELK Stack · Bài 0005 · bước 7/14 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0005-query-dsl-term-match-bool.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn đúng giữa <code>match</code> và <code>term</code>, và dựng một <code>bool</code> query dùng <code>filter</code> cho các điều kiện chính xác.</div>
+
+<h2>text và keyword, term và match</h2>
+<p>"Tránh dùng <code>term</code> query cho các field <code>text</code>." Mặc định Elasticsearch biến đổi giá trị text trong quá trình analysis, điều này "có thể khiến việc tìm khớp chính xác giá trị của field text trở nên khó khăn"; hãy dùng <code>match</code> cho field text.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[1]</a> Các giá trị chính xác như id hay username thì nên nằm trong field <code>keyword</code>, và search bằng <code>term</code>.</p>
+<pre><code>term  'Timeout' (exact token):            0 hits
+term  'timeout' (lowercased token):       1 hit
+match 'Timeout' (query is analyzed too):  1 hit</code></pre>
+<p>Message <code>Connection Timeout to payment-service</code> đã được analyze thành các token viết thường, nên <code>term</code> với <code>Timeout</code> trượt còn <code>match</code> thì tìm ra (kết quả từ script).</p>
+<h2>bool</h2>
+<ul>
+<li><code>must</code> và <code>should</code> góp vào điểm relevance (relevance score).</li>
+<li><code>filter</code> và <code>must_not</code> chạy trong filter context: bỏ qua việc tính điểm và được cache.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[2]</a></li>
+</ul>
+<pre><code>{ "query": { "bool": {
+    "filter": [ { "term":  { "level": "ERROR" } } ],
+    "must":   [ { "match": { "message": "payment" } } ] } } }</code></pre>
+<p>Dùng <code>filter</code> cho các điều kiện có/không (level, service, khoảng thời gian) và <code>must</code> cho phần full-text cần relevance. Bool query trong script trả về 1 hit cho các log ERROR có nhắc tới payment.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Query nào hợp với field text đã được analyze?</p>
+  <button>term</button>
+  <button>exists</button>
+  <button data-correct>match</button>
+  <button>ids</button>
+  <p class="explain">Dùng match cho field text; term không thực hiện analysis.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Mệnh đề bool nào bỏ qua việc tính điểm?</p>
+  <button>cả ba</button>
+  <button>must</button>
+  <button data-correct>filter</button>
+  <button>should</button>
+  <p class="explain">filter bỏ qua điểm; must và should có góp điểm.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Kiểu field tốt nhất cho user id?</p>
+  <button data-correct>keyword</button>
+  <button>text đã analyze</button>
+  <button>long text</button>
+  <button>text</button>
+  <p class="explain">Field chứa giá trị chính xác là field keyword, search bằng term.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Những mệnh đề bool nào được cache?</p>
+  <button>must và should</button>
+  <button>chỉ should</button>
+  <button>không cái nào</button>
+  <button data-correct>filter và must_not</button>
+  <p class="explain">filter và must_not chạy trong filter context và được cache.<a class="cite" href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0005-write-the-error-query.vi.md">Bài tập 0005: viết query tìm lỗi</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">Elasticsearch Docs: Boolean query</a>. Sau đó đọc trang match query.</p>
+<p><a href="0004-near-real-time-search-and-refresh.vi.html">← Tìm kiếm gần thời gian thực và refresh</a> &nbsp;|&nbsp; <a href="0010-bulk-api.vi.html">Bulk API và lỗi theo từng item →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-term-query">Elasticsearch Docs: Term query</a> · [2] <a href="https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-bool-query">Elasticsearch Docs: Boolean query</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

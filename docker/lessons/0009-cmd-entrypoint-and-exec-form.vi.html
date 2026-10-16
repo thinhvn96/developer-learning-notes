@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker 9: CMD, ENTRYPOINT và exec form vs shell form</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>CMD, ENTRYPOINT và exec form vs shell form</h1>
+<p class="meta">Docker · Bài 0009 · bước 5/12 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Docker</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-cmd-entrypoint-and-exec-form.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dự đoán được container sẽ chạy gì từ ENTRYPOINT cộng CMD, và cái gì thay đổi khi bạn truyền tham số vào <code>docker run</code>.</div>
+
+<h2>Các quy tắc</h2>
+<ul><li>"Chỉ có thể có một lệnh CMD ... chỉ lệnh cuối cùng có hiệu lực."</li>
+<li>CMD cung cấp giá trị mặc định cho ENTRYPOINT, hoặc tự chạy một mình; "CMD sẽ bị ghi đè khi chạy container với các tham số khác".</li>
+<li>Dùng ENTRYPOINT khi container đóng vai trò như một chương trình thực thi.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></li></ul>
+<table><tr><th>Tình huống</th><th>Kết quả<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></th></tr>
+<tr><td>không có ENTRYPOINT, có CMD</td><td>CMD được chạy</td></tr>
+<tr><td>ENTRYPOINT exec form + CMD exec form</td><td>ENTRYPOINT được chạy; CMD được nối vào làm tham số</td></tr>
+<tr><td>ENTRYPOINT ở shell form</td><td>CMD bị bỏ qua; chạy qua <code>/bin/sh -c</code></td></tr></table>
+<h2>Exec form vs shell form</h2>
+<p>Exec form (<code>["executable","arg"]</code>) là JSON, không gọi shell và không thay thế biến; shell form thì luôn dùng shell.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a> Best practices của Docker khuyên dùng exec form cho <code>CMD</code>/<code>ENTRYPOINT</code> để signal được xử lý đúng khi process là PID 1 (xem <a href="0006-pinning-nonroot-and-signals.vi.html">bài về hardening</a>).<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a></p>
+<pre><code>./05-cmd-entrypoint-arg-env.sh
+docker run lesson-entry                      -&gt; hello world      # ENTRYPOINT + CMD
+docker run lesson-entry Docker               -&gt; hello Docker     # args replace CMD
+docker run --entrypoint printenv lesson-entry APP_MODE -&gt; prod</code></pre>
+<p>Với Java: <code>ENTRYPOINT ["java","-jar","app.jar"]</code>, dùng <code>CMD</code> cho các tham số mặc định, và đặt <code>JAVA_TOOL_OPTIONS</code> trong biến môi trường cho các flag của JVM (gợi ý thiết kế; hãy test lại).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. ENTRYPOINT exec form cộng CMD exec form. Cái gì được chạy?</p>
+  <button>Chỉ CMD</button>
+  <button>Chỉ ENTRYPOINT</button>
+  <button>Một shell script</button>
+  <button data-correct>ENTRYPOINT với tham số từ CMD</button>
+  <p class="explain">ENTRYPOINT được chạy và CMD được nối vào làm tham số.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một Dockerfile có hai dòng CMD. Dòng nào có hiệu lực?</p>
+  <button data-correct>Dòng cuối cùng</button>
+  <button>Không dòng nào chạy</button>
+  <button>Dòng đầu tiên</button>
+  <button>Cả hai đều chạy</button>
+  <p class="explain">Chỉ CMD cuối cùng có hiệu lực.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Tham số đặt sau tên image thay thế cái gì?</p>
+  <button>FROM</button>
+  <button>ENTRYPOINT</button>
+  <button data-correct>CMD</button>
+  <button>WORKDIR</button>
+  <p class="explain">CMD bị ghi đè bởi các tham số khác truyền vào.<a class="cite" href="https://docs.docker.com/reference/dockerfile/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Vì sao nên ưu tiên exec form?</p>
+  <button>Build nhanh hơn</button>
+  <button>Dockerfile ngắn hơn</button>
+  <button data-correct>Signal tới được process</button>
+  <button>Image nhỏ hơn</button>
+  <p class="explain">Exec form đảm bảo signal được xử lý đúng khi process là PID 1.<a class="cite" href="https://docs.docker.com/build/building/best-practices/">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-predict-the-command.vi.md">Bài tập 0009: đoán lệnh được chạy</a></p>
+<p>Ví dụ chạy được: <a href="../examples/05-cmd-entrypoint-arg-env.sh"><code>05-cmd-entrypoint-arg-env.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference: CMD and ENTRYPOINT</a>. Xem bảng 'Understand how CMD and ENTRYPOINT interact'.</p>
+<p><a href="0002-layer-cache-and-dockerfile-order.vi.html">← Layer cache và thứ tự lệnh trong Dockerfile</a> &nbsp;|&nbsp; <a href="0003-multi-stage-java-image.vi.html">Image multi-stage cho ứng dụng Java →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile reference</a> · [2] <a href="https://docs.docker.com/build/building/best-practices/">Building best practices</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

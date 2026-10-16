@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 3: Shard và replica</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Shard và replica</h1>
+<p class="meta">ELK Stack · Bài 0003 · bước 5/14 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-shards-and-replicas.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được primary và replica, cái gì bị cố định khi tạo index, và vì sao cluster một node lại báo yellow.</div>
+
+<h2>Shard</h2>
+<p>Bạn thêm node vào cluster để tăng năng lực, và Elasticsearch "tự động phân phối dữ liệu và tải query của bạn lên tất cả các node đang có." Có hai loại shard: "Mỗi document trong một index thuộc về một primary shard. Replica shard là bản sao của một primary shard."<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+<p>Replica "duy trì các bản sao dự phòng của dữ liệu trên các node trong cluster", giúp chống sự cố phần cứng và "tăng năng lực phục vụ các request đọc".<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+<h2>Cái gì thay đổi được</h2>
+<p>"Số primary shard của một index bị cố định tại thời điểm tạo index, nhưng số replica shard có thể thay đổi bất cứ lúc nào, mà không làm gián đoạn việc index hay query."<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a> Hệ quả cần nhớ khi phỏng vấn: chọn số primary shard có tính đến tăng trưởng (hoặc lên kế hoạch reindex).</p>
+<h2>Vì sao lại yellow?</h2>
+<pre><code>logs 0 p STARTED
+logs 0 r UNASSIGNED
+index health: yellow</code></pre>
+<p>Đó là output của <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a> trên một node duy nhất với mặc định một replica: primary đã started còn replica thì unassigned, nên index ở trạng thái yellow. Replica tồn tại để làm bản sao trên một node <em>khác</em>, nên khi chỉ có một node thì chẳng có chỗ nào hữu ích để đặt nó (trang tài liệu mình đọc không phát biểu nguyên văn quy tắc đặt replica; lần chạy chỉ chứng minh kết quả).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mỗi document thuộc về bao nhiêu primary shard?</p>
+  <button>Không shard nào</button>
+  <button data-correct>Đúng một</button>
+  <button>Mọi shard</button>
+  <button>Hai shard</button>
+  <p class="explain">Mỗi document trong một index thuộc về một primary shard.<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Cái nào đổi được sau khi tạo index?</p>
+  <button>Không cái nào</button>
+  <button>Số primary</button>
+  <button data-correct>Số replica</button>
+  <button>Cả hai</button>
+  <p class="explain">Replica đổi được bất cứ lúc nào; primary bị cố định khi tạo index.<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Replica mang lại điều gì?</p>
+  <button>Index nhỏ hơn</button>
+  <button>Mã hoá dữ liệu</button>
+  <button>Chỉ ghi nhanh hơn</button>
+  <button data-correct>Dự phòng và năng lực đọc</button>
+  <p class="explain">Chúng chống sự cố phần cứng và tăng năng lực phục vụ đọc.<a class="cite" href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một node, cấu hình một replica. Health là gì?</p>
+  <button data-correct>Yellow</button>
+  <button>Purple</button>
+  <button>Green</button>
+  <button>Red</button>
+  <p class="explain">Replica vẫn unassigned, nên index ở trạng thái yellow (quan sát được trong lần chạy).</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-size-the-shards.vi.md">Bài tập 0003: tính số shard</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-elasticsearch-basics.sh"><code>01-elasticsearch-basics.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">Elasticsearch Docs: Clusters, nodes and shards</a>. Đọc toàn bộ trang.</p>
+<p><a href="0009-text-analysis.vi.html">← Text analysis: analyzer và token</a> &nbsp;|&nbsp; <a href="0004-near-real-time-search-and-refresh.vi.html">Tìm kiếm gần thời gian thực và refresh →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/deploy-manage/distributed-architecture/clusters-nodes-shards">Elasticsearch Docs: Clusters, nodes and shards</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

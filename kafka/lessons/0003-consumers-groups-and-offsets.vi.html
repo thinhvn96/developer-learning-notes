@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 3: Consumer, consumer group và offset</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Consumer, consumer group và offset</h1>
+<p class="meta">Kafka · Bài 0003 · bước 5/23 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0003-consumers-groups-and-offsets.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được consumer group, cách gán partition, offset và rebalance, và vì sao có nhiều consumer hơn số partition cũng không giúp gì.</div>
+
+<h2>Consumer group</h2>
+<p>Các consumer dùng chung một <code>group.id</code> sẽ chia nhau công việc: "mỗi partition được gán cho đúng một consumer trong group."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> Thành viên của group thay đổi động; khi consumer tham gia hoặc rời đi, các partition được rebalance (phân bổ lại).<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> Một hệ quả (suy ra từ quy tắc "đúng một", không phải trích dẫn): với 3 partition, consumer thứ 4 trong cùng group sẽ ngồi không. Các group khác nhau thì mỗi group đều nhận toàn bộ event.</p>
+<h2>Offset</h2>
+<p>"Vị trí của một consumer trong mỗi partition chỉ là một số nguyên duy nhất, chính là offset của message kế tiếp cần consume."<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a> Consumer có một vị trí hiện tại (record kế tiếp sẽ fetch) và một vị trí đã commit (offset cuối cùng đã được lưu an toàn).<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> Bạn xem được trạng thái của group bằng <code>kafka-consumer-groups.sh --describe</code>: current offset, log-end offset và lag.</p>
+<pre><code>GROUP  TOPIC   PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
+g1     orders  0          2               2               0
+g1     orders  1          4               4               0
+g1     orders  2          0               0               0</code></pre>
+<p>Output này lấy từ <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a>: group <code>g1</code> đã đọc hết sáu event, nên lag bằng 0.</p>
+<h2>Những cấu hình hay gây chuyện</h2>
+<ul>
+<li><code>enable.auto.commit</code> mặc định là true: offset được commit định kỳ ở chế độ nền.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></li>
+<li><code>auto.offset.reset</code> (mặc định <code>latest</code>) chỉ có tác dụng khi chưa có offset đã commit hợp lệ.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></li>
+<li><code>session.timeout.ms</code>: nếu không nhận được heartbeat, broker sẽ loại client khỏi group và bắt đầu rebalance; <code>max.poll.interval.ms</code> giới hạn khoảng trễ giữa các lần gọi <code>poll()</code>.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></li>
+<li>"Consumer không thread-safe."<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a> Mỗi thread một instance consumer.</li>
+</ul>
+<p>Phác thảo cấu hình: <a href="../examples/manual-commit-consumer.properties"><code>manual-commit-consumer.properties</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Trong một group, một partition được giao cho bao nhiêu consumer?</p>
+  <button>Không ai, đến khi được yêu cầu</button>
+  <button data-correct>Đúng một consumer</button>
+  <button>Tất cả consumer</button>
+  <button>Ít nhất hai consumer</button>
+  <p class="explain">Mỗi partition được gán cho đúng một consumer trong group.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Offset của consumer là gì?</p>
+  <button data-correct>Message kế tiếp cần consume</button>
+  <button>Tổng số message hiện có</button>
+  <button>Số id của broker</button>
+  <button>Id của partition leader</button>
+  <p class="explain">Đó là offset của message kế tiếp cần consume.<a class="cite" href="https://kafka.apache.org/43/design/design/">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Consumer ngừng gửi heartbeat. Broker làm gì?</p>
+  <button data-correct>Loại nó ra, rebalance</button>
+  <button>Nhân đôi số partition</button>
+  <button>Mặc kệ sự im lặng</button>
+  <button>Xoá luôn topic</button>
+  <p class="explain">Sau session.timeout.ms, broker loại client ra và khởi động rebalance.<a class="cite" href="https://kafka.apache.org/43/configuration/consumer-configs/">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Một instance KafkaConsumer có thread-safe không?</p>
+  <button>Chỉ khi đọc</button>
+  <button>Chỉ trong group</button>
+  <button data-correct>Không, không hề</button>
+  <button>Có, hoàn toàn</button>
+  <p class="explain">Javadoc nói rõ consumer không thread-safe.<a class="cite" href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0003-scale-a-consumer-group.vi.md">Bài tập 0003: mở rộng một consumer group</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-topics-keys-groups.sh"><code>01-topics-keys-groups.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a>. Đọc phần 'Consumer Groups and Topic Subscriptions' và 'Offsets and Consumer Position'.</p>
+<p><a href="0007-retention-and-topic-configs.vi.html">← Retention và cấu hình topic</a> &nbsp;|&nbsp; <a href="0004-delivery-semantics.vi.html">Delivery semantics: at most, at least, exactly once →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer Javadoc</a> · [2] <a href="https://kafka.apache.org/43/design/design/">Kafka Design: consumer position</a> · [3] <a href="https://kafka.apache.org/43/configuration/consumer-configs/">Kafka Consumer Configs</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

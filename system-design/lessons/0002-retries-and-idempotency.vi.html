@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 2: Retry, backoff và idempotency</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Retry, backoff và idempotency</h1>
+<p class="meta">System Design · Bài 0002 · bước 2/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0002-retries-and-idempotency.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được khi nào retry có ích, khi nào nó làm sự cố tệ hơn, và vì sao idempotency là điều kiện tiên quyết.</div>
+
+<h2>Khi nào nên retry</h2>
+<p>Lỗi tạm thời (transient fault: mất mạng chốc lát, service đang bận) "thường tự khắc phục", nên retry sau một khoảng delay hợp lý nhiều khả năng sẽ thành công. Pattern liệt kê ba chiến lược: <strong>hủy</strong> nếu lỗi không phải tạm thời, <strong>retry ngay</strong> nếu lỗi hiếm gặp, và <strong>retry sau một khoảng delay</strong> cho các lỗi bận hoặc lỗi kết nối thường gặp.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+<h2>Retry thế nào cho an toàn</h2>
+<ul>
+<li><strong>Giãn cách các lần retry</strong>: tăng delay dần dần hoặc theo hàm mũ, tới một số lần thử tối đa, và chọn delay sao cho "dàn đều request từ nhiều instance của ứng dụng nhất có thể".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a> Ngẫu nhiên hóa delay (jitter) là cách ví dụ bên dưới đạt được việc dàn đều đó; thuật ngữ "jitter" là do mình đặt, còn mục tiêu thì lấy từ tài liệu.</li>
+<li><strong>Đừng dội request</strong>: "Một retry policy hung hăng, delay giữa các lần thử rất ngắn và số lần retry lớn, có thể làm một service đang bận càng xuống cấp thêm".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a> Sau nhiều lần thất bại, hãy ngừng gửi request và thỉnh thoảng thăm dò: đó là pattern Circuit Breaker.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></li>
+<li><strong>Idempotency</strong>: theo tài liệu, "Nếu đúng vậy (thao tác idempotent) thì retry vốn dĩ an toàn. Nếu không, retry có thể khiến thao tác bị thực thi nhiều hơn một lần." Server có thể đã xử lý request nhưng không gửi được response.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></li>
+<li><strong>Chỉ retry ở một tầng</strong>: các retry policy lồng nhau sẽ nhân delay lên; ở tầng thấp hãy fail fast.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></li>
+</ul>
+<pre><code>java system-design/examples/RetryDemo.java
+attempt 1 failed; sleeping 72 ms (cap 100)
+attempt 2 failed; sleeping 136 ms (cap 200)
+attempt 3 failed; sleeping 123 ms (cap 400)
+result: ok after 4 calls
+attempt 1 failed; sleeping 27 ms (cap 100)
+attempt 2 failed; sleeping 133 ms (cap 200)
+gave up after 3 attempts: transient</code></pre>
+<p>Mã nguồn: <a href="../examples/RetryDemo.java"><code>RetryDemo.java</code></a> (random có seed cố định, nên các delay lặp lại giống nhau mỗi lần chạy).</p>
+<p class="aside">Không dùng cho: lỗi kéo dài, lỗi business logic, hoặc để thay thế cho việc scale một service liên tục báo bận.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Lỗi không phải tạm thời. Chiến lược tốt nhất?</p>
+  <button data-correct>Hủy thao tác</button>
+  <button>Retry mãi mãi</button>
+  <button>Tăng gấp đôi timeout</button>
+  <button>Retry ngay lập tức</button>
+  <p class="explain">Nếu retry khó có khả năng thành công, hãy hủy và báo exception.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao giãn cách retry bằng delay tăng dần?</p>
+  <button>Để bỏ qua idempotency</button>
+  <button data-correct>Tránh làm quá tải service</button>
+  <button>Tiết kiệm bộ nhớ client</button>
+  <button>Để bỏ qua timeout</button>
+  <p class="explain">Retry hung hăng có thể làm một service đang bận càng xuống cấp thêm.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thao tác nào vốn dĩ an toàn khi retry?</p>
+  <button data-correct>Thao tác idempotent</button>
+  <button>Mọi request POST</button>
+  <button>Chỉ các lệnh DELETE</button>
+  <button>Chỉ đọc trên cache</button>
+  <p class="explain">Nếu thao tác là idempotent thì retry vốn dĩ an toàn.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Sau nhiều lần thất bại, pattern nào giúp ích?</p>
+  <button>Read replica</button>
+  <button data-correct>Circuit Breaker</button>
+  <button>Cache-Aside</button>
+  <button>Sharding</button>
+  <p class="explain">Ngừng gửi request tới tài nguyên đang lỗi và thỉnh thoảng thăm dò, như trong Circuit Breaker.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0002-retry-budget.vi.md">Bài tập 0002: retry budget</a></p>
+<p>Ví dụ chạy được: <a href="../examples/RetryDemo.java"><code>RetryDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">Azure Architecture Center: Retry pattern</a>. Sau đó đọc các pattern Circuit Breaker và Idempotent Consumer được liên kết từ trang đó.</p>
+<p><a href="0001-cache-aside.vi.html">← Pattern cache-aside</a> &nbsp;|&nbsp; <a href="0004-circuit-breaker.vi.html">Pattern circuit breaker →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">Azure Architecture Center: Retry pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 10: Kafka Connect: đưa dữ liệu vào và ra</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka Connect: đưa dữ liệu vào và ra</h1>
+<p class="meta">Kafka · Bài 0010 · bước 18/23 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-kafka-connect.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được Kafka Connect là gì, sự phân chia source/sink, task và converter, và chuyển dữ liệu qua Kafka bằng hai connector.</div>
+
+<h2>Nó là gì</h2>
+<p>Một framework để "stream dữ liệu giữa Kafka và các hệ thống khác một cách có thể mở rộng và tin cậy". <strong>Connector</strong> là các plugin quản lý việc di chuyển dữ liệu và sinh ra các <strong>task</strong> làm việc song song. Connector <strong>source</strong> đọc từ một hệ thống bên ngoài vào các topic Kafka; connector <strong>sink</strong> ghi các topic ra một hệ thống bên ngoài. <strong>Converter</strong> chuyển đổi giữa định dạng nội bộ của Connect và dữ liệu đã serialize (JSON, Avro...).<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+<h2>Chế độ chạy và quản lý</h2>
+<p><strong>Standalone:</strong> một process duy nhất, không có khả năng chịu lỗi hay mở rộng. <strong>Distributed:</strong> tự động cân bằng tải, mở rộng động và chịu lỗi; offset, cấu hình và trạng thái task được lưu trong các topic Kafka. Một REST API (mặc định ở port 8083) dùng để tạo, cập nhật, giám sát và xoá connector.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+<h2>Chạy thử</h2>
+<pre><code>cd kafka/examples &amp;&amp; ./03-connect-file.sh
+source connector: /tmp/in.txt  -&gt; topic connect-demo
+sink connector  : topic connect-demo -&gt; /tmp/out.txt     (line one / line two / line three)
+GET :8083/connectors  -&gt; ["demo-file-source","demo-file-sink"]
+append "line four" to the source file -&gt; it appears in the sink and in the topic</code></pre>
+<p>Các connector FileStream đi kèm Kafka chỉ để minh hoạ; pipeline thật dùng connector cho database, object store và search (ví dụ đổ dữ liệu vào Elasticsearch, xem <a href="../../elk/index.vi.html">lộ trình ELK</a>). Mã nguồn: <a href="../examples/03-connect-file.sh"><code>03-connect-file.sh</code></a>.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Một source connector chuyển dữ liệu...?</p>
+  <button>Giữa các consumer</button>
+  <button>Giữa các broker</button>
+  <button data-correct>Vào Kafka</button>
+  <button>Ra khỏi Kafka</button>
+  <p class="explain">Source connector đọc từ hệ thống bên ngoài vào Kafka.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Chế độ nào có khả năng chịu lỗi?</p>
+  <button>Cả hai như nhau</button>
+  <button data-correct>Distributed</button>
+  <button>Không chế độ nào</button>
+  <button>Standalone</button>
+  <p class="explain">Chế độ distributed cung cấp cân bằng tải và khả năng chịu lỗi.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Converter làm gì?</p>
+  <button>Compact log</button>
+  <button>Bầu chọn leader</button>
+  <button>Gán partition</button>
+  <button data-correct>Serialize và deserialize dữ liệu</button>
+  <p class="explain">Chúng chuyển đổi giữa định dạng nội bộ của Connect và dữ liệu đã serialize.<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Giao diện quản lý của Connect là gì?</p>
+  <button data-correct>REST API</button>
+  <button>Email</button>
+  <button>Chỉ gRPC</button>
+  <button>SQL shell</button>
+  <p class="explain">Một REST API quản lý các connector (mặc định ở port 8083).<a class="cite" href="https://kafka.apache.org/43/kafka-connect/user-guide/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-design-a-cdc-pipeline.vi.md">Bài tập 0010: thiết kế một pipeline</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-connect-file.sh"><code>03-connect-file.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect User Guide</a>. Phần 'Running Kafka Connect' và phần mở đầu của 'Connector Development Guide'.</p>
+<p><a href="0018-streams-windows-joins-exactly-once.vi.html">← Kafka Streams: window, join và exactly-once</a> &nbsp;|&nbsp; <a href="0019-kraft-and-controllers.vi.html">KRaft: controller và metadata quorum →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/kafka-connect/user-guide/">Kafka Connect User Guide</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

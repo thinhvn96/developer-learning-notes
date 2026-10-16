@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 21: Wildcard (extends, super) và type erasure</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Khi nào viết <code>? extends</code>, khi nào viết <code>? super</code></h1>
+<p class="subtitle">Wildcard làm method generic linh hoạt; type erasure giải thích generic còn lại gì lúc chạy.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0021 · bước 4/46 · Advanced · ~25 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0021-wildcards-and-type-erasure.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> Ở <a href="0020-generics-basics-and-invariance.vi.html">bài 0020</a> bạn đã biết <code>List&lt;Integer&gt;</code> không phải <code>List&lt;Number&gt;</code>. Vậy làm sao viết một method cộng tổng được mọi list số? Interview senior hỏi đúng câu này, rồi hỏi tiếp <em>"PECS là gì?"</em> và <em>"Generic có tồn tại lúc chạy không?"</em></div>
+
+<div class="win"><b>Thành quả hôm nay:</b> chọn <code>? extends</code> hay <code>? super</code> bằng cách hỏi tham số đó là producer ("in") hay consumer ("out"), và giải thích type erasure cùng các hệ quả của nó.</div>
+
+<dl class="words">
+  <dt>wildcard</dt><dd>Dấu chấm hỏi trong generic type, <code>List&lt;?&gt;</code>: "list của một kiểu nào đó mà mình không biết chính xác".</dd>
+  <dt>? extends T</dt><dd>Wildcard chặn trên: "một kiểu là T hoặc kiểu con của T". Ví dụ: <code>List&lt;? extends Number&gt;</code>.</dd>
+  <dt>? super T</dt><dd>Wildcard chặn dưới: "một kiểu là T hoặc kiểu cha của T". Ví dụ: <code>List&lt;? super Integer&gt;</code>.</dd>
+  <dt>producer / "in"</dt><dd>Tham số mà method của bạn chỉ <em>đọc</em> ra. Nó cung cấp dữ liệu cho code của bạn.</dd>
+  <dt>consumer / "out"</dt><dd>Tham số mà method của bạn chỉ <em>ghi</em> vào. Nó nhận dữ liệu từ code của bạn.</dd>
+  <dt>type erasure</dt><dd>Compiler xóa type argument sau khi kiểm tra xong, nên chương trình lúc chạy không thấy chúng.</dd>
+  <dt>reifiable</dt><dd>Kiểu mà thông tin đầy đủ vẫn còn lúc chạy. <code>String</code> thì có; <code>List&lt;String&gt;</code> thì không.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nói thành tiếng: <em>"Mình cần method <code>copy(src, dest)</code> chép các Integer từ list này sang list kia. Wildcard nào đặt cho <code>src</code>, wildcard nào cho <code>dest</code>?"</em> Đoán trước khi đọc.</p>
+
+<h2>1. Đọc ra: <code>? extends</code></h2>
+<p>Một người nếm trái cây sẽ nếm từ bất kỳ hộp nào bạn đưa. Hộp táo được, hộp chuối cũng được. Người đó chỉ lấy trái cây <em>ra</em>, nên hộp nào chứa "một loại trái cây nào đó" đều dùng được.</p>
+<p>Method chỉ đọc số chính là người nếm. Với <code>List&lt;Number&gt;</code> nó sẽ từ chối <code>List&lt;Integer&gt;</code> (invariance). Với <code>? extends Number</code> nó nhận cả hai:</p>
+<pre><code>static double sum(List&lt;? extends Number&gt; in) {   <span class="c">// reads Numbers</span>
+    double s = 0;
+    for (Number n : in) s += n.doubleValue();
+    return s;
+}
+<span class="c">Bước 1  sum(ints), ints là List&lt;Integer&gt;: Integer là Number → OK</span>
+<span class="c">Bước 2  mỗi phần tử được đọc như Number → doubleValue() chạy được</span>
+<span class="c">Bước 3  1 + 2 + 3 → 6.0</span></code></pre>
+<pre><code>$ java java/examples/GenericsDemo.java
+sum of ints    : 6.0
+...</code></pre>
+<h3>Bẫy: bạn không add vào được</h3>
+<p>Sao không <code>in.add(1)</code> được? Compiler chỉ biết đây là "list của <em>một</em> kiểu con nào đó của Number". Nó có thể là <code>List&lt;Double&gt;</code>, và khi đó Integer chính là quả chuối trong hộp táo. Nên javac của JDK 21 từ chối: <code>error: incompatible types: int cannot be converted to CAP#1</code> (<code>CAP#1</code> là tên compiler đặt cho "kiểu không biết").</p>
+<p>Tutorial thêm một chi tiết interviewer rất thích: list như vậy "có thể tạm xem là read-only, nhưng đó không phải là đảm bảo chặt chẽ". Bạn vẫn add được <code>null</code>, gọi được <code>clear</code>, hoặc xóa qua iterator.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Tutorial: wildcard guidelines</a></p>
+
+<h2>2. Ghi vào: <code>? super</code></h2>
+<p>Giờ là một người hái táo, chỉ bỏ táo <em>vào</em>. Bạn đưa được hộp nào cho người đó? Hộp "táo", hộp "trái cây", hoặc hộp "gì cũng được". Hộp nào cũng nhận táo. Còn hộp "chỉ đựng chuối" thì không.</p>
+<pre><code>static void fill(List&lt;? super Integer&gt; out) {    <span class="c">// writes Integers</span>
+    for (int i = 1; i &lt;= 3; i++) out.add(i);
+}
+<span class="c">Bước 1  fill(nums), một List&lt;Number&gt;: Number là kiểu cha → OK</span>
+<span class="c">Bước 2  fill(objs), một List&lt;Object&gt;: Object cũng là kiểu cha → OK</span>
+<span class="c">Bước 3  mỗi add(i) đều an toàn: list nào như vậy cũng chứa được Integer</span></code></pre>
+<pre><code>$ java java/examples/GenericsDemo.java
+...
+filled Number  : [1, 2, 3]
+filled Object  : [1, 2, 3]
+...</code></pre>
+<p>Mặt trái của sự đánh đổi: khi bạn <em>đọc</em> từ <code>List&lt;? super Integer&gt;</code>, compiler chỉ biết phần tử là "một kiểu cha nào đó của Integer", nên bạn nhận về <code>Object</code>.</p>
+
+<h2>3. Quy tắc: "in" và "out" (PECS)</h2>
+<p>Java tutorial phát biểu quy tắc bằng biến "in" và "out":<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Tutorial: wildcard guidelines</a></p>
+<ul>
+  <li>Biến <strong>"in"</strong> (cung cấp dữ liệu cho code của bạn) dùng wildcard chặn trên: <code>? extends</code>.</li>
+  <li>Biến <strong>"out"</strong> (nhận dữ liệu) dùng wildcard chặn dưới: <code>? super</code>.</li>
+  <li>Nếu biến "in" chỉ được dùng qua các method của <code>Object</code>: dùng <code>?</code> không chặn.</li>
+  <li>Nếu vừa "in" vừa "out": không dùng wildcard.</li>
+</ul>
+<p>Interviewer gọi nó là <strong>PECS</strong>: <em>Producer Extends, Consumer Super</em>. Cùng một quy tắc, chỉ khác cách nói.</p>
+
+<figure>
+<svg viewBox="0 0 680 225" role="img" aria-label="Dữ liệu đi từ list producer kiểu List extends Number, qua get, vào method của bạn, rồi qua add vào list consumer kiểu List super Integer. Producer extends, consumer super.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="currentColor">
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="60" width="200" height="80" rx="6"/>
+      <rect x="270" y="75" width="140" height="50" rx="6"/>
+      <rect x="35" y="98" width="80" height="26" rx="4" opacity=".7"/>
+      <rect x="125" y="98" width="80" height="26" rx="4" opacity=".7"/>
+      <path d="M220 100h44M258 95l6 5-6 5"/>
+    </g>
+    <rect x="460" y="60" width="200" height="80" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <g fill="none" stroke="var(--accent)">
+      <rect x="475" y="98" width="50" height="26" rx="4"/><rect x="535" y="98" width="50" height="26" rx="4"/>
+      <rect x="595" y="98" width="50" height="26" rx="4"/>
+      <path d="M410 100h44M448 95l6 5-6 5"/>
+    </g>
+    <text x="120" y="82" text-anchor="middle">List&lt;? extends Number&gt;</text>
+    <text x="75" y="115" text-anchor="middle">Integer</text>
+    <text x="165" y="115" text-anchor="middle">Double</text>
+    <text x="340" y="104" text-anchor="middle" font-size="13">method của bạn</text>
+    <text x="242" y="90" text-anchor="middle">get</text>
+    <text x="432" y="90" text-anchor="middle" fill="var(--accent)">add</text>
+    <text x="560" y="82" text-anchor="middle" fill="var(--accent)">List&lt;? super Integer&gt;</text>
+    <g text-anchor="middle" fill="var(--accent)">
+      <text x="500" y="115">1</text><text x="560" y="115">2</text><text x="620" y="115">3</text>
+    </g>
+    <text x="120" y="48" text-anchor="middle" opacity=".7">add() bị từ chối (trừ null)</text>
+    <text x="560" y="48" text-anchor="middle" opacity=".7">get() chỉ trả về Object</text>
+    <text x="120" y="162" text-anchor="middle">producer: bạn ĐỌC từ nó</text>
+    <text x="120" y="180" text-anchor="middle" font-size="12">→ ? extends T</text>
+    <text x="560" y="162" text-anchor="middle" fill="var(--accent)">consumer: bạn GHI vào nó</text>
+    <text x="560" y="180" text-anchor="middle" font-size="12" fill="var(--accent)">→ ? super T</text>
+    <text x="340" y="212" text-anchor="middle" font-size="12">PECS: Producer Extends, Consumer Super</text>
+  </g>
+</svg>
+<figcaption>Đi theo dữ liệu: nó đi <em>ra</em> từ producer (<code>extends</code>) và đi <em>vào</em> consumer (<code>super</code>).</figcaption>
+</figure>
+
+<p>Chính JDK cũng dùng quy tắc này. Đây là signature thật của <code>Collections.copy</code>:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a></p>
+<pre><code>public static &lt;T&gt; void copy(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src)</code></pre>
+<p><code>src</code> được đọc (producer, <code>extends</code>), <code>dest</code> được ghi (consumer, <code>super</code>). Đó là đáp án cho câu hỏi ở phần "Trước khi bắt đầu".</p>
+<h3>Thêm hai hướng dẫn</h3>
+<ul>
+  <li><strong>Không dùng wildcard ở kiểu trả về.</strong> Tutorial: "Nên tránh dùng wildcard làm kiểu trả về vì nó buộc những người dùng code phải xử lý wildcard."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Tutorial: wildcard guidelines</a></li>
+  <li><strong><code>List&lt;?&gt;</code> không phải <code>List&lt;Object&gt;</code>.</strong> "Bạn có thể chèn một Object, hoặc bất kỳ kiểu con nào của Object, vào List&lt;Object&gt;. Nhưng bạn chỉ chèn được null vào List&lt;?&gt;."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/unboundedWildcards.html">Tutorial: unbounded wildcards</a> Dùng <code>List&lt;?&gt;</code> cho các method kiểu "in ra list bất kỳ" hay "đếm phần tử".</li>
+</ul>
+
+<h2>4. Type erasure: nhãn bị bóc đi</h2>
+<p>Quay lại nhà kho ở bài 0020. Người kiểm tra ở cửa xem kỹ từng cái nhãn. Nhưng khi hộp đã vào trong, nhãn bị bóc đi cho gọn. Bên trong kho, hộp nào trông cũng như nhau.</p>
+<p>Đó là <span class="term">type erasure</span>. Sau khi kiểm tra code, compiler:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Tutorial: type erasure</a></p>
+<ol class="steps">
+  <li>thay các type parameter bằng bound của chúng, hoặc bằng <code>Object</code> nếu không có bound,</li>
+  <li>chèn cast ở chỗ cần để giữ type safety,</li>
+  <li>sinh ra <em>bridge method</em> để polymorphism vẫn chạy đúng trong lớp con của generic type.</li>
+</ol>
+<p>Tutorial tóm lại: "không có class mới nào được tạo cho parameterized type; vì thế generic không tốn chi phí lúc chạy."<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Tutorial: type erasure</a></p>
+
+<figure>
+<svg viewBox="0 0 680 240" role="img" aria-label="Bên trái, source của bạn với List của String. Bên phải, sau erasure: một List thường, và một cast sang String được chèn ở get. Lúc chạy List của String và List của Integer dùng chung một class.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="170" y="34" text-anchor="middle" font-size="11" opacity=".75">source của bạn (javac kiểm tra)</text>
+    <text x="510" y="34" text-anchor="middle" font-size="11" opacity=".75">sau erasure (thứ thật sự chạy)</text>
+    <g fill="none" stroke="currentColor">
+      <rect x="20" y="46" width="300" height="120" rx="6"/>
+      <rect x="360" y="46" width="300" height="120" rx="6"/>
+      <path d="M320 106h34M348 101l6 5-6 5"/>
+    </g>
+    <text x="32" y="78">List&lt;String&gt; names = ...;</text>
+    <text x="32" y="106">names.add("Ann");</text>
+    <text x="32" y="134">String s = names.get(0);</text>
+    <text x="372" y="78">List names = ...;</text>
+    <text x="372" y="106">names.add("Ann");</text>
+    <rect x="368" y="119" width="286" height="22" rx="3" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="372" y="134" fill="var(--accent)">String s = (String) names.get(0);</text>
+    <text x="340" y="96" text-anchor="middle" font-size="11">javac</text>
+    <text x="510" y="158" text-anchor="middle" font-size="11" fill="var(--accent)">cast được chèn giúp bạn</text>
+    <text x="340" y="198" text-anchor="middle" font-size="12">lúc chạy: new ArrayList&lt;String&gt;().getClass()</text>
+    <text x="340" y="218" text-anchor="middle" font-size="12" fill="var(--accent)">== new ArrayList&lt;Integer&gt;().getClass()  → true</text>
+  </g>
+</svg>
+<figcaption>Type argument được dùng để kiểm tra và chèn cast lúc compile, rồi bị xóa. Lúc chạy mọi <code>ArrayList</code> dùng chung một class.</figcaption>
+</figure>
+
+<p>Ví dụ chứng minh điều đó:</p>
+<pre><code>List&lt;String&gt; strings = new ArrayList&lt;&gt;();
+strings.getClass() == ints.getClass()
+
+$ java java/examples/GenericsDemo.java
+...
+same runtime class: true</code></pre>
+
+<h3>Các hệ quả bạn phải biết</h3>
+<p>Vì type argument đã biến mất lúc chạy, parameterized type không <span class="term">reifiable</span>.<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Tutorial: type erasure</a> Danh sách giới hạn trong tutorial có:<a class="src" href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Tutorial: restrictions on generics</a></p>
+<ul>
+  <li><strong>"Cannot Use Casts or instanceof with Parameterized Types"</strong> (không dùng cast hay instanceof với parameterized type). <code>obj instanceof List&lt;String&gt;</code> không compile; javac của JDK 21 báo <code>Object cannot be safely cast to List&lt;String&gt;</code>. Hãy kiểm tra <code>instanceof List&lt;?&gt;</code> thay vào đó.</li>
+  <li><strong>"Cannot Create Arrays of Parameterized Types"</strong> (không tạo mảng parameterized type). Không có <code>new List&lt;String&gt;[10]</code>.</li>
+  <li><strong>"Cannot Create Instances of Type Parameters"</strong> (không tạo instance của type parameter). Không có <code>new T()</code> bên trong generic class.</li>
+</ul>
+<p class="muted">JDK 8 so với 17 và 21: các quy tắc trong bài này giống nhau trên cả ba. Cái thay đổi là những thứ xung quanh, ví dụ <code>var</code> và record, bạn sẽ gặp sau.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Một method chỉ <em>đọc</em> Number từ list. Dùng kiểu tham số nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? extends Number&gt;</button>
+    <button class="opt">List&lt;? super Number&gt;</button>
+    <button class="opt">List&lt;Number&gt;</button>
+    <button class="opt">List&lt;Object&gt;</button>
+  </div>
+  <div class="why">Biến "in" (producer) dùng wildcard chặn trên, nên nhận được cả <code>List&lt;Integer&gt;</code> và <code>List&lt;Double&gt;</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Một method chỉ <em>add</em> Integer vào list. Dùng kiểu tham số nào?</p>
+  <div class="options">
+    <button class="opt" data-correct>List&lt;? super Integer&gt;</button>
+    <button class="opt">List&lt;? extends Integer&gt;</button>
+    <button class="opt">Chỉ List&lt;Integer&gt;</button>
+    <button class="opt">List&lt;?&gt; không chặn</button>
+  </div>
+  <div class="why">Biến "out" (consumer) dùng wildcard chặn dưới, nên <code>List&lt;Number&gt;</code> và <code>List&lt;Object&gt;</code> cũng được.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>in.add(1)</code> hỏng khi <code>in</code> là <code>List&lt;? extends Number&gt;</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>List thật có thể là một List&lt;Double&gt;</button>
+    <button class="opt">List wildcard luôn read-only tuyệt đối</button>
+    <button class="opt">Integer không lưu được vào generic list</button>
+    <button class="opt">add() đã bị erasure xóa khỏi list</button>
+  </div>
+  <div class="why">Compiler chỉ biết "một kiểu con nào đó của Number", nên không chứng minh được Integer bỏ vào vừa. (Bạn vẫn add được <code>null</code> hoặc gọi <code>clear</code>.)</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Signature thật của <code>Collections.copy</code> là gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>copy(List&lt;? super T&gt; dest, List&lt;? extends T&gt; src)</button>
+    <button class="opt">copy(List&lt;? extends T&gt; dest, List&lt;? super T&gt; src)</button>
+    <button class="opt">copy(List&lt;T&gt; dest, List&lt;T&gt; src), không có wildcard</button>
+    <button class="opt">copy(List&lt;?&gt; dest, List&lt;?&gt; src), không có bound</button>
+  </div>
+  <div class="why">Nguồn được đọc (extends), đích được ghi (super): PECS ngay trong JDK.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>new ArrayList&lt;String&gt;().getClass() == new ArrayList&lt;Integer&gt;().getClass()</code> in ra gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>true, erasure chỉ để lại một class lúc chạy</button>
+    <button class="opt">false, mỗi type argument có một class riêng</button>
+    <button class="opt">Không compile được vì hai kiểu khác nhau</button>
+    <button class="opt">Ném ClassCastException khi chương trình chạy</button>
+  </div>
+  <div class="why">Type erasure không tạo class mới cho parameterized type; demo in <code>same runtime class: true</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao <code>obj instanceof List&lt;String&gt;</code> bị từ chối khi <code>obj</code> là <code>Object</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Phần String đã bị xóa, nên không kiểm tra được</button>
+    <button class="opt">instanceof chỉ dùng được với class final</button>
+    <button class="opt">List là interface, mà instanceof cần class</button>
+    <button class="opt">Nó được phép, nhưng luôn trả về false</button>
+  </div>
+  <div class="why"><code>List&lt;String&gt;</code> không reifiable: lúc chạy chỉ còn <code>List</code>. Dùng <code>instanceof List&lt;?&gt;</code>.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Signature nào đúng theo hướng dẫn của tutorial?</p>
+  <div class="options">
+    <button class="opt" data-correct>static &lt;T&gt; List&lt;T&gt; merge(List&lt;? extends T&gt; a, List&lt;? extends T&gt; b)</button>
+    <button class="opt">static &lt;T&gt; List&lt;? extends T&gt; merge(List&lt;T&gt; a, List&lt;T&gt; b)</button>
+    <button class="opt">static &lt;T&gt; List&lt;? super T&gt; merge(List&lt;? super T&gt; a, List&lt;T&gt; b)</button>
+    <button class="opt">static List&lt;?&gt; merge(List&lt;?&gt; a, List&lt;?&gt; b) cho mọi kiểu</button>
+  </div>
+  <div class="why">Đầu vào được đọc nên dùng <code>? extends T</code>; kiểu trả về không có wildcard, nên bên gọi nhận một <code>List&lt;T&gt;</code> bình thường.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Giải thích <code>? extends</code> và <code>? super</code>, và type erasure là gì."</strong> Bấm giờ. Trả lời thành tiếng, nói thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Generic là invariant, nên cần wildcard để tham số linh hoạt.</label></li>
+      <li><label><input type="checkbox"> <code>? extends T</code> cho tham số bạn đọc ra (producer, "in"); không add được, trừ <code>null</code>.</label></li>
+      <li><label><input type="checkbox"> <code>? super T</code> cho tham số bạn ghi vào (consumer, "out"); đọc ra chỉ được <code>Object</code>.</label></li>
+      <li><label><input type="checkbox"> PECS, kèm ví dụ như <code>Collections.copy(dest super, src extends)</code>; không wildcard ở kiểu trả về.</label></li>
+      <li><label><input type="checkbox"> Erasure: compiler kiểm tra kiểu, rồi thay bằng bound hoặc <code>Object</code> và chèn cast.</label></li>
+      <li><label><input type="checkbox"> Hệ quả: một class lúc chạy, không <code>instanceof List&lt;String&gt;</code>, không mảng generic, không <code>new T()</code>.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Vì generic là invariant, tham số <code>List&lt;Number&gt;</code> không nhận <code>List&lt;Integer&gt;</code>, nên mình dùng wildcard. Em tự hỏi một câu: method này đọc từ tham số hay ghi vào nó? Nếu đọc thì nó là producer, em dùng <code>? extends T</code>: ví dụ <code>sum(List&lt;? extends Number&gt;)</code> nhận được list Integer lẫn Double, nhưng không add vào được. Nếu ghi thì nó là consumer, em dùng <code>? super T</code>: <code>fill(List&lt;? super Integer&gt;)</code> nhận list Integer, Number hay Object. Đó là PECS, producer extends, consumer super, và <code>Collections.copy</code> là ví dụ kinh điển. Em không đặt wildcard ở kiểu trả về. Type erasure nghĩa là compiler kiểm tra type argument, rồi xóa chúng về bound hoặc Object và chèn cast. Nên lúc chạy <code>List&lt;String&gt;</code> và <code>List&lt;Integer&gt;</code> là cùng một class, và em không thể <code>instanceof List&lt;String&gt;</code>, không tạo được mảng generic, hay gọi <code>new T()</code>."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0021-copy-with-wildcards.vi.md">Bài tập 0021: copy với wildcard</a>. Viết signature trước và nói tham số nào là producer, tham số nào là consumer.</p>
+<p>Ví dụ chạy được: <a href="../examples/GenericsDemo.java"><code>GenericsDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer cấp senior có thể hỏi: <em>"Bridge method là gì? Vì sao <code>Collections.max</code> khai báo <code>T extends Object &amp; Comparable&lt;? super T&gt;</code>? Framework như Jackson đọc generic type thế nào nếu chúng bị xóa?"</em> Thử áp PECS vào signature của <code>Collections.max</code>: <code>Comparable&lt;? super T&gt;</code> là consumer của T.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections javadoc</a> Tiếp theo, khép lại phần này với <a href="0040-review-fundamentals.vi.html">Ôn tập 1</a>, rồi phần collection bắt đầu với <a href="0028-collections-framework-map.vi.html">bài 0028</a>.</p>
+<p><strong>Đọc thêm:</strong> <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type Erasure</a>. Sau đó là "Guidelines for Wildcard Use".</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Cho mình xem bridge method trong bytecode được không?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ cho mình biết điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0020-generics-basics-and-invariance.vi.html">← Vì sao List không phải là List</a> &nbsp;|&nbsp; <a href="0040-review-fundamentals.vi.html">Ôn tập 1: string, exception và generic →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với Java Tutorials (Generics trail) và tài liệu Java 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://docs.oracle.com/javase/tutorial/java/generics/wildcardGuidelines.html">Java Tutorials: Wildcard guidelines</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/erasure.html">Java Tutorials: Type erasure</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/unboundedWildcards.html">Java Tutorials: Unbounded wildcards</a> · <a href="https://docs.oracle.com/javase/tutorial/java/generics/restrictions.html">Java Tutorials: Restrictions on generics</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html">Collections Javadoc</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

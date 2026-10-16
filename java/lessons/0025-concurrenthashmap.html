@@ -8,71 +8,215 @@
 </head>
 <body>
 <main>
-<h1>ConcurrentHashMap: atomic updates and weak consistency</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0025 · step 15 of 27 · Advanced · ~10 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Sharing a map between threads: ConcurrentHashMap</h1>
+<p class="subtitle">A thread-safe map does not make your code thread-safe. Its atomic methods do.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0025 · step 32 of 46 · Advanced · ~22 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0025-concurrenthashmap.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Caches, session stores, counters per user, per endpoint, per error code: services keep shared maps everywhere. Interviewers ask <em>"HashMap vs ConcurrentHashMap?"</em> and then the real question: <em>"Can you still lose updates with a ConcurrentHashMap?"</em></div>
 
 <div class="win"><b>Today's win:</b> use <code>ConcurrentHashMap</code> atomic methods correctly and explain its null rule and weakly consistent iterators.</div>
 
-<h2>Behavior</h2>
-<ul><li>"Retrieval operations (including get) do not entail locking" and reflect the most recently completed updates; updates enjoy high expected concurrency.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li>
-<li>Iterators are <em>weakly consistent</em> and do not throw <code>ConcurrentModificationException</code>; use them from one thread at a time.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a> Compare <code>HashMap</code>, whose iterators are fail-fast.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">[2]</a></li>
-<li>Null keys and values are <strong>not</strong> permitted (<code>NullPointerException</code>).<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li>
-<li>Atomic compound methods: <code>putIfAbsent</code>, <code>computeIfAbsent</code>, <code>computeIfPresent</code>, <code>compute</code>, <code>merge</code>. Functions passed to them must be short and must not modify the map.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li>
-<li><code>size()</code>, <code>isEmpty()</code> are only useful without concurrent updates.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></li></ul>
-<pre><code>java java/examples/ChmDemo.java
-merge() total   : 400000 (expected 400000)
+<dl class="words">
+  <dt>thread-safe</dt><dd>A class is thread-safe if many threads can call its methods at the same time and it still behaves correctly.</dd>
+  <dt>check-then-act</dt><dd>Code that first looks at a value ("is the key there?") and then acts on what it saw ("then put it"). Another thread can change things in between.</dd>
+  <dt>atomic method</dt><dd>A method that does its whole job as one step that other threads cannot interrupt halfway.</dd>
+  <dt>iterator</dt><dd>The object a <code>for (x : map.keySet())</code> loop uses behind the scenes to walk through the entries one by one.</dd>
+  <dt>fail-fast</dt><dd>An iterator that throws <code>ConcurrentModificationException</code> as soon as it notices the map was changed under it.</dd>
+  <dt>weakly consistent</dt><dd>An iterator that never throws for concurrent changes; it may or may not show changes made after it started.</dd>
+  <dt><code>LongAdder</code></dt><dd>A thread-safe counter built for many threads adding at once (from <a href="0024-atomics-and-locks.html">lesson 0024</a>).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Two threads run <code>map.put(word, map.get(word) + 1)</code> on a <code>ConcurrentHashMap</code>. Can a count be lost?"</em> Decide yes or no and give a reason. Section 3 has the answer.</p>
+
+<h2>1. Why a plain HashMap is not enough</h2>
+<p>Picture one notebook in an office where everybody writes down orders. If two people write on the same page at the same moment, the page gets messy. A plain <code>HashMap</code> is that notebook. Its Javadoc says: "Note that this implementation is not synchronized. If multiple threads access a hash map concurrently, and at least one of the threads modifies the map structurally, it must be synchronized externally."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a></p>
+<p><code>ConcurrentHashMap</code> (often "CHM") is a notebook designed for a crowd. Several people can read and write different pages at the same time, safely.</p>
+
+<h2>2. What ConcurrentHashMap promises</h2>
+<ul>
+  <li><strong>Reads don't lock.</strong> "Retrieval operations (including <code>get</code>) generally do not block", and "retrieval operations do <em>not</em> entail locking". A read sees "the results of the most recently <em>completed</em> update operations holding upon their onset"; updates enjoy high expected concurrency.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></li>
+  <li><strong>No whole-table lock.</strong> There is "<em>not</em> any support for locking the entire table in a way that prevents all access".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></li>
+  <li><strong>Visibility comes for free.</strong> Actions in a thread before putting an object into a concurrent collection happen-before actions after another thread reads or removes it (the edge from <a href="0005-visibility-and-happens-before.html">lesson 0005</a>).<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent: memory consistency</a></li>
+</ul>
+<p>So each <em>single</em> call is safe. The trap is in combining calls.</p>
+
+<h2>3. Thread-safe map, racy code</h2>
+<p>Here is the counter from "Before you start":</p>
+<pre><code>Integer old = map.get("hits");              <span class="c">// step 1: read</span>
+map.put("hits", old == null ? 1 : old + 1); <span class="c">// step 2: write</span></code></pre>
+<p>Each call is thread-safe, but <em>between</em> them another thread can do the same thing. It is the same lost update as <code>count++</code> in lesson 0024, one level up. This pattern is called <span class="term">check-then-act</span>, and it races even on a concurrent map.</p>
+
+<figure>
+<svg viewBox="0 0 680 270" role="img" aria-label="Left: with get then put, threads A and B both read 5 and both put 6, so hits ends at 6 and one count is lost. Right: with merge, A turns 5 into 6 as one step, then B turns 6 into 7.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="175" y="26" text-anchor="middle" font-size="13">get, then put</text>
+    <text x="505" y="26" text-anchor="middle" font-size="13">merge (one atomic step)</text>
+    <path d="M340 14v240" fill="none" stroke="currentColor" opacity=".3"/>
+    <g fill="none" stroke="currentColor">
+      <rect x="30" y="44" width="290" height="30" rx="4"/>
+      <rect x="30" y="82" width="290" height="30" rx="4"/>
+      <rect x="30" y="120" width="290" height="30" rx="4"/>
+      <rect x="360" y="44" width="290" height="50" rx="4"/>
+      <rect x="360" y="110" width="290" height="50" rx="4"/>
+      <path d="M505 94v10M500 98l5 6 5-6"/>
+    </g>
+    <rect x="30" y="158" width="290" height="30" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="45" y="64">A: get("hits")     → 5</text>
+    <text x="45" y="102">B: get("hits")     → 5</text>
+    <text x="45" y="140">A: put("hits", 6)</text>
+    <text x="45" y="178" fill="var(--accent)">B: put("hits", 6)  overwrites</text>
+    <text x="175" y="222" text-anchor="middle" fill="var(--accent)">hits = 6: one count lost</text>
+    <text x="375" y="66">A: merge("hits", 1, sum)</text>
+    <text x="375" y="84" font-size="11" opacity=".75">   read 5, write 6, no gap</text>
+    <text x="375" y="132">B: merge("hits", 1, sum)</text>
+    <text x="375" y="150" font-size="11" opacity=".75">   read 6, write 7, no gap</text>
+    <rect x="410" y="200" width="190" height="34" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="505" y="222" text-anchor="middle" fill="var(--accent)">hits = 7</text>
+    <path d="M505 160v34M500 188l5 6 5-6" fill="none" stroke="currentColor"/>
+  </g>
+</svg>
+<figcaption>Left: two safe calls with a gap between them. Right: one call that does the read and the write together, so the other thread's update cannot fall into a gap.</figcaption>
+</figure>
+
+<h3>The fix: the atomic compound methods</h3>
+<p>CHM gives you methods that do the read and the write as one step: <code>putIfAbsent</code>, <code>computeIfAbsent</code>, <code>computeIfPresent</code>, <code>compute</code>, <code>merge</code>. For <code>merge</code> and <code>computeIfAbsent</code> the Javadoc says: "The entire method invocation is performed atomically."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></p>
+<pre><code>map.merge("hits", 1, Integer::sum);</code></pre>
+<p>Read it as: "if <code>hits</code> has no value, put 1; otherwise replace the old value with <code>old + 1</code>". Trace two threads:</p>
+<pre><code><span class="c">Step 1  A calls merge: hits absent → put 1         (one step)</span>
+<span class="c">Step 2  B calls merge: hits = 1 → sum(1, 1) = 2    (one step)</span>
+<span class="c">Step 3  If B arrives while A is inside merge for the same key,</span>
+<span class="c">        B may wait a moment. It never sees a half-done update.</span></code></pre>
+<pre><code>$ java java/examples/ChmDemo.java
+merge() total   : <span class="hl">400000 (expected 400000)</span>
 null key        : NullPointerException
 modified while iterating: no exception, size=9
 HashMap          : ConcurrentModificationException</code></pre>
-<p>The docs' frequency-count idiom: <code>map.computeIfAbsent(key, k -&gt; new LongAdder()).increment()</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a> A "check then put" with a plain get/put is a race even on a concurrent map; use the atomic methods. Source: <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a>.</p>
+<p>The first line: four threads each called <code>merge("hits", 1, Integer::sum)</code> 100,000 times, and no count was lost.</p>
+<h3>The scalable counter idiom</h3>
+<p>For a frequency map with very many threads, the Javadoc's own idiom is:<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></p>
+<pre><code>ConcurrentHashMap&lt;String, LongAdder&gt; freqs = new ConcurrentHashMap&lt;&gt;();
+freqs.computeIfAbsent(key, k -&gt; new LongAdder()).increment();</code></pre>
+<p><code>computeIfAbsent</code> creates the counter once, atomically; then <code>increment()</code> on the <code>LongAdder</code> is thread-safe by itself.</p>
+<h3>Rules for the function you pass</h3>
+<p>While the function runs, "some attempted update operations on this map by other threads may be blocked", "so the computation should be short and simple". The mapping function "must not modify this map during computation", and the <code>merge</code> function "must not attempt to update any other mappings of this Map".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a> So: no database call, no HTTP call, no <code>map.put</code> inside <code>computeIfAbsent</code>.</p>
+<p class="muted">JDK 8 vs 17 vs 21: <code>merge</code>, <code>compute*</code> and <code>putIfAbsent</code>-style default methods on <code>Map</code> exist since JDK 8 (<code>Since: 1.8</code>)<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map javadoc</a>, so this lesson's code works the same on 8, 17 and 21.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. Can ConcurrentHashMap hold a null key?</p>
-  <button>Yes, one only</button>
-  <button data-correct>No, NPE is thrown</button>
-  <button>Only in Java 8</button>
-  <button>Yes, many</button>
-  <p class="explain">Null keys and values are not permitted.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Do its iterators throw ConcurrentModificationException?</p>
-  <button>Only in parallel</button>
-  <button>Yes, fail-fast</button>
-  <button data-correct>No, weakly consistent</button>
-  <button>Only on remove</button>
-  <p class="explain">Iterators are weakly consistent and do not throw CME.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. Atomic way to count occurrences?</p>
-  <button>containsKey then put</button>
-  <button>get then put</button>
-  <button>size then put</button>
-  <button data-correct>merge with sum</button>
-  <p class="explain">merge (or computeIfAbsent with LongAdder) is atomic; get-then-put races.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Mapping functions in compute methods must...?</p>
-  <button data-correct>Be short, not modify map</button>
-  <button>Return null</button>
-  <button>Lock the map</button>
-  <button>Be recursive</button>
-  <p class="explain">They should be short and must not update the map.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">[1]</a></p>
-</div>
+<h2>4. No nulls allowed</h2>
+<p>"Like <code>Hashtable</code> but unlike <code>HashMap</code>, this class does <em>not</em> allow <code>null</code> to be used as a key or value."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a> You saw it in the output: <code>counts.put(null, 1)</code> throws <code>NullPointerException</code>.</p>
+<p>A practical way to remember why it helps: if nulls are impossible, then <code>get(key)</code> returning <code>null</code> can only mean "the key is absent". With a <code>HashMap</code> you would also have to ask "or is the value null?", and between those two questions another thread could change the map.</p>
+
+<h2>5. Iterating while others write</h2>
+<p>A <code>HashMap</code> iterator is <span class="term">fail-fast</span>: if the map is structurally changed after the iterator is created (other than through the iterator itself), it throws <code>ConcurrentModificationException</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap javadoc</a> CHM iterators are <span class="term">weakly consistent</span>: they return elements "reflecting the state of the hash table at some point at or since the creation of the iterator", and "They do <em>not</em> throw <code>ConcurrentModificationException</code>. However, iterators are designed to be used by only one thread at a time."<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a></p>
+<p>The demo adds keys while looping over a 3-key map. CHM finishes with 9 entries and no exception (some new keys were visited and added more; on another run or JDK the number could differ). The <code>HashMap</code> version throws.</p>
+<h3>Trap: size() is a snapshot, not a fact</h3>
+<p>Results of "<code>size</code>, <code>isEmpty</code>, and <code>containsValue</code> are typically useful only when a map is not undergoing concurrent updates"; otherwise they are fine "for monitoring or estimation purposes, but not for program control".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">CHM javadoc</a> So <code>if (map.size() &lt; 100) map.put(...)</code> is another check-then-act race.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">What happens on <code>concurrentHashMap.put(null, 1)</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>It throws a NullPointerException</button>
+    <button class="opt">It stores one entry with a null key</button>
+    <button class="opt">It silently ignores the null key</button>
+    <button class="opt">It works only on JDK 8, not on 21</button>
+  </div>
+  <div class="why">Unlike <code>HashMap</code>, CHM does not allow <code>null</code> keys or values.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You add keys to a CHM while a for-each loop walks its keys. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>No exception; new keys may or may not appear</button>
+    <button class="opt">ConcurrentModificationException at once</button>
+    <button class="opt">The loop blocks until the writer is done</button>
+    <button class="opt">The loop sees a frozen copy of the old map</button>
+  </div>
+  <div class="why">CHM iterators are weakly consistent: they never throw CME and reflect the map at some point at or since they were created.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Two threads count words in a CHM. Which line is safe?</p>
+  <div class="options">
+    <button class="opt" data-correct>map.merge(w, 1, Integer::sum)</button>
+    <button class="opt">map.put(w, map.get(w) + 1)</button>
+    <button class="opt">if (!map.containsKey(w)) map.put(w, 1)</button>
+    <button class="opt">map.put(w, map.size() + 1)</button>
+  </div>
+  <div class="why"><code>merge</code> runs atomically. The others are check-then-act: two safe calls with a gap where another thread can write.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What is the rule for the function you pass to <code>computeIfAbsent</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Short and simple, and never modify the map</button>
+    <button class="opt">It must return null when the key exists</button>
+    <button class="opt">It should lock the map before it starts</button>
+    <button class="opt">It may call computeIfAbsent recursively</button>
+  </div>
+  <div class="why">Other updates may block while it runs, and the function must not modify the map during computation.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The code does <code>if (map.size() &lt; 100) map.put(k, v)</code> from many threads. What is the bug?</p>
+  <div class="options">
+    <button class="opt" data-correct>size() is an estimate; the check and put race</button>
+    <button class="opt">size() throws while another thread writes</button>
+    <button class="opt">put() fails when the size is close to 100</button>
+    <button class="opt">There is no bug, CHM makes the pair atomic</button>
+  </div>
+  <div class="why"><code>size()</code> during concurrent updates is for monitoring, not program control, and the gap between check and put lets the map grow past 100.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which statement about reads in CHM is true?</p>
+  <div class="options">
+    <button class="opt" data-correct>get() does not lock; it sees completed updates</button>
+    <button class="opt">get() locks the whole table while it reads</button>
+    <button class="opt">get() can see an update half finished</button>
+    <button class="opt">get() is safe only after calling lockAll()</button>
+  </div>
+  <div class="why">Retrievals do not entail locking and reflect the most recently completed updates. There is no whole-table lock at all.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"HashMap vs ConcurrentHashMap: what's the difference, and can you still lose updates with ConcurrentHashMap?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> HashMap is not synchronized; concurrent modification needs external locking.</label></li>
+      <li><label><input type="checkbox"> CHM: each call is thread-safe, reads don't lock, no whole-table lock.</label></li>
+      <li><label><input type="checkbox"> Yes, you can lose updates with check-then-act (get then put).</label></li>
+      <li><label><input type="checkbox"> Use the atomic methods: merge, compute, computeIfAbsent, putIfAbsent.</label></li>
+      <li><label><input type="checkbox"> Functions passed in must be short and must not modify the map.</label></li>
+      <li><label><input type="checkbox"> No null keys or values; iterators are weakly consistent (no CME); size() is only an estimate under updates.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"HashMap isn't synchronized, so if several threads modify it I'd need external locking, and its iterators are fail-fast. ConcurrentHashMap is built for concurrency: every single call is thread-safe, gets don't lock, and there's no lock on the whole table. But yes, I can still lose updates if I do check-then-act, like get then put: two threads read the same value and one put overwrites the other. So I use the atomic methods: merge for counters, computeIfAbsent to create a value once, for example with a LongAdder for hot counters. The function I pass must be short and must not touch the map. Two more differences: ConcurrentHashMap doesn't allow null keys or values, and its iterators are weakly consistent, so they never throw ConcurrentModificationException. And size is only an estimate while other threads are writing."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0025-word-count-concurrently.md">Exercise 0025: concurrent word count</a></p>
+<p><a href="../exercises/0025-word-count-concurrently.md">Exercise 0025: concurrent word count</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/ChmDemo.java"><code>ChmDemo.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a>. Class description.</p>
-<p><a href="0024-atomics-and-locks.html">← Atomics and ReentrantLock: fixing lost updates</a> &nbsp;|&nbsp; <a href="0023-thread-pools-executors.html">Thread pools: core, max, queue and rejection →</a></p>
+<h2>What's next</h2>
+<p>Next an interviewer asks who runs all these threads: <em>"You submit tasks to a thread pool. When does it create a thread, when does it queue, and when does it reject?"</em> <a href="0023-thread-pools-executors.html">Lesson 0023</a> traces a <code>ThreadPoolExecutor</code> task by task. For the other concurrent structures (queues, copy-on-write lists), see <a href="0039-concurrent-collections.html">lesson 0039</a>.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a>, the class description (the first screen is enough).</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why does computeIfAbsent block other threads?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0024-atomics-and-locks.html">← Why count++ loses updates, and how to fix it</a> &nbsp;|&nbsp; <a href="0023-thread-pools-executors.html">How a thread pool decides: run, queue or reject →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java 21 documentation, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ConcurrentHashMap.html">ConcurrentHashMap Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html">HashMap Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

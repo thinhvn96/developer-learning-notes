@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 29: Pattern trong Spring</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pattern trong Spring</h1>
+<p class="meta">Design Patterns · Bài 0029 · bước 29/30 · Senior · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0029-patterns-in-spring.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> nhận ra proxy, scope singleton/prototype, factory và IoC trong Spring, có dẫn chứng từ những gì ta đã kiểm chứng trước đó.</div>
+
+<table><tr><th>Tính năng Spring</th><th>Pattern</th><th>Bằng chứng</th></tr>
+<tr><td>Singleton bean scope (mặc định)</td><td>Singleton, nhưng theo container: theo tài liệu, "singleton của Spring khác với singleton của GoF: nó tính theo container và theo bean, không theo ClassLoader"<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></td><td>Demo: gọi <code>getBean</code> hai lần trả về cùng một instance.</td></tr>
+<tr><td>Prototype scope</td><td>Prototype/Factory: mỗi lần yêu cầu là một instance mới<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></td><td>Demo: id 2 và 3. Một singleton giữ một prototype thì chỉ được inject đúng một lần (1, 1); <code>ObjectProvider</code> cho ra 4, 5.</td></tr>
+<tr><td>Dependency injection</td><td>Dependency Inversion trong thực tế: container khởi tạo, lắp ráp và quản lý bean, đồng thời inject các phụ thuộc<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[2]</a></td><td><a href="../../oop/lessons/0021-dependency-inversion-principle.vi.html">Bài DIP</a>.</td></tr>
+<tr><td><code>@Transactional</code></td><td>Proxy: "ở proxy mode mặc định, chỉ những lời gọi method từ bên ngoài đi qua proxy mới bị chặn lại"<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[3]</a></td><td>Demo: self-invocation lưu 2 account thay vì rollback; đi qua proxy thì: 0.</td></tr>
+<tr><td><code>ObjectProvider</code>, <code>BeanFactory</code></td><td>Factory: container tạo object khi được yêu cầu<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[2]</a></td><td>Demo về scope.</td></tr></table>
+<p>Mọi thứ trong cột Bằng chứng đều lấy từ các test trong <code>spring-boot/examples/demo-app</code> (17 test pass): xem các bài <a href="../../spring-boot/lessons/0007-bean-scopes.vi.html">scope</a> và <a href="../../spring-boot/lessons/0005-transactional-proxies-and-rollback.vi.html">@Transactional</a>. Những tính năng Spring khác mà người ta hay gán cho pattern (các template class như <code>JdbcTemplate</code>, application event như Observer, filter như Chain of Responsibility) không nằm trong các trang tôi đã đọc, nên hãy coi chúng là đầu mối cần kiểm chứng, không phải sự thật của khóa học này.</p>
+<div class="aside">Vì sao nó quan trọng khi phỏng vấn: "Vì sao gọi một method @Transactional từ chính class đó lại không mở transaction?" là một câu trả lời về Proxy pattern.</div>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Singleton scope của Spring tính theo...?</p>
+  <button>Thread</button>
+  <button>JVM</button>
+  <button data-correct>Container</button>
+  <button>Class loader</button>
+  <p class="explain">Nó tính theo container và theo bean, không theo ClassLoader.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao self-invocation bỏ qua transaction?</p>
+  <button>Sai bean</button>
+  <button>Lỗi của Java</button>
+  <button>Thiếu @Bean</button>
+  <button data-correct>Đi vòng qua proxy</button>
+  <p class="explain">Chỉ những lời gọi đi qua proxy mới bị chặn lại.<a class="cite" href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">[3]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Làm sao lấy một prototype mới bên trong singleton?</p>
+  <button data-correct>ObjectProvider</button>
+  <button>Truy cập static</button>
+  <button>Truy cập field</button>
+  <button>Thread local</button>
+  <p class="explain">ObjectProvider trong demo cho ra id 4 và 5.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Ai khởi tạo và inject bean?</p>
+  <button>JIT</button>
+  <button>Hệ điều hành</button>
+  <button>Compiler</button>
+  <button data-correct>IoC container</button>
+  <p class="explain">Container khởi tạo, lắp ráp và quản lý bean.<a class="cite" href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0029-explain-a-transactional-bug.vi.md">Bài tập 29: giải thích một bug @Transactional</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a>. Sau đó đọc lại các quy tắc về visibility của method với @Transactional.</p>
+<p><a href="0028-patterns-in-modern-java.vi.html">← Pattern trong Java hiện đại: lambda, record, sealed type</a> &nbsp;|&nbsp; <a href="0030-talking-about-patterns-in-interviews.vi.html">Nói về pattern khi phỏng vấn →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://docs.spring.io/spring-framework/reference/core/beans/factory-scopes.html">Spring Framework Reference: Bean Scopes</a> · [2] <a href="https://docs.spring.io/spring-framework/reference/core/beans/introduction.html">Spring Framework Reference: IoC container</a> · [3] <a href="https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html">Spring Framework Reference: @Transactional</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

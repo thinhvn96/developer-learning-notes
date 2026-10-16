@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 17: Schemas, Schema Registry and compatibility</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Schemas, Schema Registry and compatibility</h1>
+<p class="meta">Kafka · Lesson 0017 · step 14 of 23 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Kafka ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0017-schemas-and-schema-registry.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="win"><b>Today's win:</b> explain why topics need a schema contract, how Schema Registry serializers work, and which compatibility mode decides who upgrades first.</div>
+
+<h2>Why a schema</h2>
+<p>To Kafka a record is bytes. Producers and consumers are deployed independently, often by different teams, so the real contract is the payload format. Without enforcement, one producer renaming a JSON field breaks every consumer at runtime.</p>
+<h2>How Schema Registry works</h2>
+<p>Schema Registry is a separate service (Confluent, not part of Apache Kafka) that stores versioned schemas. Avro, Protobuf and JSON Schema serializers are supported.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></p>
+<ul>
+<li>The serializer registers or looks up the schema and writes a small header: a version byte <code>0</code>, then a 4-byte big-endian schema ID, then the data.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a> The consumer reads the ID and fetches (and caches) the schema.</li>
+<li>Schemas live under a <strong>subject</strong>. The default <code>TopicNameStrategy</code> derives it from the topic (e.g. <code>orders-value</code>).<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></li>
+<li>Serializers "automatically register schemas by default" (<code>auto.register.schemas</code>); in production many teams turn this off and register schemas from CI.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></li>
+</ul>
+<h2>Compatibility decides the upgrade order</h2>
+<table>
+<tr><th>Mode</th><th>Guarantee<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></th><th>Upgrade first</th></tr>
+<tr><td><code>BACKWARD</code> (default)</td><td>consumers on the new schema can read data written with the last schema</td><td>consumers</td></tr>
+<tr><td><code>FORWARD</code></td><td>data written with the new schema can be read by consumers on the last schema</td><td>producers</td></tr>
+<tr><td><code>FULL</code></td><td>both, between new and last</td><td>either</td></tr>
+<tr><td><code>*_TRANSITIVE</code></td><td>same, against <em>all</em> earlier versions, not just the last</td><td>as above</td></tr>
+<tr><td><code>NONE</code></td><td>no checks</td><td>you are on your own</td></tr>
+</table>
+<p>In Avro, adding a field <strong>with a default</strong> keeps compatibility: old data gets the default when read with the new schema. Adding one without a default breaks backward compatibility.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a> Because compacted and long-retention topics are replayed from the start, transitive modes matter there: a new consumer may read data written with schema version 1.</p>
+<div class="aside">Interview answer: "Avro or Protobuf with Schema Registry, subject per topic value, <code>BACKWARD</code> or <code>BACKWARD_TRANSITIVE</code> for event topics, upgrade consumers first, only add fields with defaults, register schemas in CI and disable auto-register in prod."</div>
+
+<h2>Retrieval practice</h2>
+<p>Answer from memory. One attempt each.</p>
+<div class="quiz">
+  <p class="prompt">1. Default compatibility mode in Schema Registry?</p>
+  <button>NONE</button>
+  <button data-correct>BACKWARD</button>
+  <button>FULL</button>
+  <button>FORWARD</button>
+  <p class="explain">The default compatibility mode is BACKWARD.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Under BACKWARD, which side upgrades first?</p>
+  <button>Brokers first</button>
+  <button data-correct>Consumers first</button>
+  <button>Any order works</button>
+  <button>Producers first</button>
+  <p class="explain">New-schema consumers can read old data, so consumers upgrade first.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. What follows the magic byte in the wire format?</p>
+  <button>The full schema text</button>
+  <button>A CRC checksum</button>
+  <button data-correct>A 4-byte schema ID</button>
+  <button>The topic name</button>
+  <p class="explain">Byte 0 is the format version, bytes 1-4 the big-endian schema ID.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Which Avro change stays fully compatible?</p>
+  <button>Rename a field</button>
+  <button data-correct>Add field with default</button>
+  <button>Change a field type</button>
+  <button>Add required field</button>
+  <p class="explain">Adding or removing a field with a default value is a fully compatible change.<a class="cite" href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">[2]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Now do the exercise</h2>
+<p><a href="../exercises/0017-evolve-an-order-schema.md">Exercise 0017: evolve an order schema</a></p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">Confluent Docs: Schema Evolution and Compatibility</a>. Read 'Compatibility types' and the Avro examples.</p>
+<p><a href="0016-error-handling-and-dead-letter-topics.html">← Error handling: retries, poison pills, dead letter topics</a> &nbsp;|&nbsp; <a href="0009-kafka-streams-basics.html">Kafka Streams: streams, tables and state →</a></p>
+
+<footer>
+  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
+  <p>References: [1] <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html">Confluent Docs: Formats, Serializers and Deserializers</a> · [2] <a href="https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html">Confluent Docs: Schema Evolution and Compatibility</a> · [3] <a href="https://kafka.apache.org/43/design/design/">Kafka Documentation: Design</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

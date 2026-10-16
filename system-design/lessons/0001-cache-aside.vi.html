@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 1: Pattern cache-aside</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Pattern cache-aside</h1>
+<p class="meta">System Design · Bài 0001 · bước 1/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-cache-aside.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> mô tả được luồng đọc và ghi của cache-aside, thứ tự các bước khi ghi, và độ "stale" (dữ liệu cũ) vẫn còn tồn tại.</div>
+
+<h2>Luồng xử lý</h2>
+<ol>
+<li>Ứng dụng thử đọc từ cache.</li>
+<li>Khi <em>cache miss</em>, nó đọc từ data store (kho dữ liệu).</li>
+<li>Nó thêm item vào cache rồi trả về.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+</ol>
+<p>Khi cập nhật: theo tài liệu, ứng dụng "ghi thay đổi vào data store rồi sau đó invalidate item tương ứng trong cache".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a> Thứ tự rất quan trọng: "Cập nhật data store <em>trước</em> khi xóa item khỏi cache"; nếu không, một reader có thể cache lại item đã cũ trong khoảng hở giữa hai bước.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+<pre><code>java system-design/examples/CacheAsideDemo.java
+read: v1  (store reads so far: 1)
+read: v1  (store reads so far: 1)         # hit
+after write+invalidate: v2  (store reads: 2)
+after out-of-band change, cache still says: v2  (stale)</code></pre>
+<p>Mã nguồn: <a href="../examples/CacheAsideDemo.java"><code>CacheAsideDemo.java</code></a>.</p>
+<h2>Những gì pattern này không cho bạn</h2>
+<ul>
+<li><strong>Tính nhất quán:</strong> pattern này "không đảm bảo tính nhất quán giữa data store và cache"; một thay đổi từ bên ngoài chỉ xuất hiện khi item được load lại.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+<li><strong>Hết hạn và eviction:</strong> TTL quá ngắn gây miss liên tục, quá dài gây dữ liệu cũ; cache sẽ evict item, thường theo kiểu least-recently-used (LRU).<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+<li><strong>Cache cục bộ:</strong> mỗi instance giữ một bản riêng nên chúng lệch nhau dần; hãy cân nhắc một distributed cache dùng chung.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></li>
+</ul>
+<p>Không phù hợp khi phần lớn request đều miss, hoặc với dữ liệu nhạy cảm nằm trong một cache dùng chung.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Khi cache miss, ứng dụng làm gì?</p>
+  <button>Xóa sạch cache</button>
+  <button data-correct>Đọc từ data store</button>
+  <button>Chỉ ghi vào cache</button>
+  <button>Trả lỗi cho request</button>
+  <p class="explain">Nó lấy item từ data store rồi thêm vào cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Khi ghi, thứ tự đúng là gì?</p>
+  <button>Invalidate rồi cập nhật store</button>
+  <button data-correct>Cập nhật store rồi invalidate</button>
+  <button>Chỉ invalidate cache</button>
+  <button>Chỉ cập nhật cache</button>
+  <p class="explain">Cập nhật data store trước khi xóa item đã cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Cache-aside có đảm bảo tính nhất quán không?</p>
+  <button>Chỉ khi đọc</button>
+  <button>Có, luôn luôn</button>
+  <button>Chỉ khi dùng LRU</button>
+  <button data-correct>Không, không đảm bảo</button>
+  <p class="explain">Pattern này không đảm bảo tính nhất quán giữa store và cache.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Đặt thời gian hết hạn quá dài sẽ gây ra gì?</p>
+  <button>Data store nhỏ hơn</button>
+  <button data-correct>Trả về dữ liệu cũ</button>
+  <button>Cache miss liên tục</button>
+  <button>Evict nhanh hơn</button>
+  <p class="explain">Thời gian hết hạn quá dài khiến dữ liệu trong cache bị cũ.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-break-the-write-order.vi.md">Bài tập 0001: phá vỡ thứ tự ghi</a></p>
+<p>Ví dụ chạy được: <a href="../examples/CacheAsideDemo.java"><code>CacheAsideDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">Azure Architecture Center: Cache-Aside pattern</a>. Pattern trung lập với nhà cung cấp; ví dụ dùng Azure Redis nhưng các luồng xử lý là tổng quát.</p>
+<p> &nbsp;|&nbsp; <a href="0002-retries-and-idempotency.vi.html">Retry, backoff và idempotency →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside">Azure Architecture Center: Cache-Aside pattern</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

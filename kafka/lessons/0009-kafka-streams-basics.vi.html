@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kafka 9: Kafka Streams: stream, table và state</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Kafka Streams: stream, table và state</h1>
+<p class="meta">Kafka · Bài 0009 · bước 15/23 · Advanced · ~12 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Kafka</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0009-kafka-streams-basics.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được stream khác table thế nào, state store và xử lý theo event time, và chạy được một word count trên Kafka Streams.</div>
+
+<h2>Nó là gì</h2>
+<p>Kafka Streams là "một client library để xử lý và phân tích dữ liệu lưu trong Kafka", được nhúng vào các ứng dụng Java bình thường, không có dependency bên ngoài nào ngoài Kafka.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a> Bạn không phải deploy một cluster riêng: bạn chỉ cần chạy thêm instance của ứng dụng.</p>
+<h2>Các ý tưởng cốt lõi</h2>
+<ul><li><strong>KStream:</strong> một tập dữ liệu không giới hạn, cập nhật liên tục, gồm các record key-value bất biến. <strong>KTable:</strong> một snapshot dạng bảng, cho phép join và aggregation. <em>Tính đối ngẫu stream-table</em>: stream là changelog, còn table là stream tại một thời điểm.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>Topology:</strong> một đồ thị các processor; source processor đọc từ topic, sink processor ghi kết quả ngược lại vào Kafka hoặc ra nơi khác.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>State store</strong> làm nền cho các thao tác có state (join theo window, aggregation) với khả năng chịu lỗi và khôi phục tự động.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>Thời gian:</strong> event time (lúc sự kiện xảy ra), processing time, ingestion time; một <code>TimestampExtractor</code> gán timestamp.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li>
+<li><strong>Xử lý exactly-once</strong> từ bản 0.11.0.0: commit nguyên tử cho cả offset đầu vào, cập nhật state và output.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></li></ul>
+<pre><code>cd kafka/examples &amp;&amp; ./04-streams-wordcount.sh
+input: "all streams lead to kafka", "hello kafka streams"
+all 1 | streams 1 | lead 1 | to 1 | kafka 1 | hello 1 | kafka 2 | streams 2</code></pre>
+<p>Output là changelog của một KTable chứa số đếm: <code>kafka</code> xuất hiện với 1 rồi 2. Script chạy <code>WordCountDemo</code> đi kèm Kafka; trên image dựa trên Alpine, tôi phải cài <code>libstdc++</code> trước vì nếu thiếu nó thì state store RocksDB không load được (phát hiện ra khi chạy thử). Mã nguồn: <a href="../examples/04-streams-wordcount.sh"><code>04-streams-wordcount.sh</code></a>. Tư duy consumer idempotent vẫn cần thiết cho các side effect nằm ngoài Kafka (xem <a href="0006-idempotence-and-transactions.vi.html">transaction</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Kafka Streams là...?</p>
+  <button>Một database</button>
+  <button>Một cluster riêng</button>
+  <button>Chỉ là plugin của broker</button>
+  <button data-correct>Một client library</button>
+  <p class="explain">Nó là một client library nhúng trong ứng dụng của bạn.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Một KTable biểu diễn...?</p>
+  <button>Một topic partition</button>
+  <button data-correct>Một snapshot dạng bảng</button>
+  <button>Một log vô hạn các record bất biến</button>
+  <button>Một consumer group</button>
+  <p class="explain">KTable nắm bắt snapshot dạng bảng; KStream là luồng record.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Dữ liệu của thao tác có state nằm ở đâu?</p>
+  <button>Chỉ trong bộ nhớ</button>
+  <button data-correct>State store</button>
+  <button>Producer</button>
+  <button>Chỉ trong log của broker</button>
+  <p class="explain">State store giữ dữ liệu cho xử lý có state, kèm khả năng chịu lỗi.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Loại thời gian nào là lúc event xảy ra?</p>
+  <button data-correct>Event time</button>
+  <button>Ingestion time</button>
+  <button>Poll time</button>
+  <button>Processing time</button>
+  <p class="explain">Event time là thời điểm event xảy ra.<a class="cite" href="https://kafka.apache.org/43/streams/core-concepts/">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0009-word-count-with-windows.vi.md">Bài tập 0009: đọc hiểu word count</a></p>
+<p>Ví dụ chạy được: <a href="../examples/04-streams-wordcount.sh"><code>04-streams-wordcount.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams Core Concepts</a>. Tính đối ngẫu stream-table, thời gian, state.</p>
+<p><a href="0017-schemas-and-schema-registry.vi.html">← Schema, Schema Registry và tính tương thích</a> &nbsp;|&nbsp; <a href="0006-idempotence-and-transactions.vi.html">Idempotent producer và transaction →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://kafka.apache.org/43/streams/core-concepts/">Kafka Streams Core Concepts</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RabbitMQ 1: Mô hình AMQP: exchange, queue và binding</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Mô hình AMQP: exchange, queue và binding</h1>
+<p class="meta">RabbitMQ · Bài 0001 · bước 1/9 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình RabbitMQ</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0001-amqp-model-exchanges-queues-bindings.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> lần theo một message đi từ publisher đến consumer qua exchange, binding và queue, đồng thời giải thích được vì sao publisher không bao giờ gửi thẳng vào queue.</div>
+
+<h2>Mô hình</h2>
+<p>Theo tài liệu, "message được publish tới các exchange, thứ thường được ví như bưu điện hay hòm thư. Sau đó exchange phân phối bản sao của message tới các queue dựa trên các quy tắc gọi là binding."<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> Consumer lấy message từ queue, bằng cách subscribe (push) hoặc polling (pull, cách mà tài liệu khuyên không nên dùng).<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+<pre><code>publisher --&gt; [exchange] --binding--&gt; (queue) --&gt; consumer
+                        \--binding--&gt; (queue) --&gt; consumer</code></pre>
+<h2>Default exchange</h2>
+<p>"Default exchange là một direct exchange không có tên (chuỗi rỗng), được broker khai báo sẵn"; mọi queue mới đều tự động được bind vào nó với routing key chính là tên queue.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a> Đó là lý do trong các tutorial, kiểu "publish thẳng vào tên queue" vẫn chạy: thực chất là default exchange đang làm việc routing.</p>
+<p>Nhờ lớp gián tiếp này, publisher không cần biết đang có những queue nào. Một message không khớp binding nào sẽ bị bỏ đi, trừ khi bạn xử lý nó: API trong ví dụ trả về <code>{"routed":false}</code> cho những message như vậy.</p>
+<h2>Chạy thử</h2>
+<pre><code>cd rabbitmq/examples &amp;&amp; ./01-routing-ack-dlx.sh
+{"routed":true}  &lt;- ex.direct 'error'
+{"routed":false} &lt;- ex.direct 'info'      # no binding matched: unroutable</code></pre>
+<p>Mã nguồn: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a> (container <code>rabbitmq:4-management</code> dùng xong bỏ, điều khiển qua HTTP API).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Publisher gửi message tới đâu?</p>
+  <button>Thẳng vào một queue</button>
+  <button>Một binding</button>
+  <button>Một consumer</button>
+  <button data-correct>Một exchange</button>
+  <p class="explain">Message được publish tới exchange, exchange sẽ route bản sao tới các queue.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Thứ gì nối một exchange với một queue?</p>
+  <button>Một channel</button>
+  <button>Một vhost</button>
+  <button>Một prefetch</button>
+  <button data-correct>Một binding</button>
+  <p class="explain">Exchange phân phối bản sao tới các queue dựa trên các quy tắc gọi là binding.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Default exchange thuộc kiểu gì?</p>
+  <button>Fanout, có tên</button>
+  <button data-correct>Direct, không tên</button>
+  <button>Topic, có tên</button>
+  <button>Headers, không tên</button>
+  <p class="explain">Default exchange là một direct exchange không có tên.<a class="cite" href="https://www.rabbitmq.com/tutorials/amqp-concepts">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Message không khớp binding nào. API trong ví dụ trả về gì?</p>
+  <button>queue full</button>
+  <button>routed true</button>
+  <button data-correct>routed false</button>
+  <button>consumer busy</button>
+  <p class="explain">Lệnh publish trả về routed:false cho các message không có binding nào khớp.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0001-trace-a-message.vi.md">Bài tập 0001: lần theo một message</a></p>
+<p>Ví dụ chạy được: <a href="../examples/01-routing-ack-dlx.sh"><code>01-routing-ack-dlx.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a>. Hãy đọc hết trang này; đây là mô hình tư duy cho mọi thứ còn lại.</p>
+<p> &nbsp;|&nbsp; <a href="0002-exchange-types.vi.html">Exchange kiểu direct, fanout và topic →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.rabbitmq.com/tutorials/amqp-concepts">RabbitMQ: AMQP 0-9-1 Model Explained</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

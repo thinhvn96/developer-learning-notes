@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 43: Review 4: navigable, priority, special and concurrent collections</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Review 4: navigable, priority, special and concurrent collections</h1>
+<p class="subtitle">Six lessons, one question: "which collection, and what does it cost?" Practise answering it fast.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0043 · step 22 of 46 · Review · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0043-review-collections-advanced.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Senior interviews rarely ask "what is a TreeMap?". They describe a problem (fee tiers, the 10 slowest requests, counting per status, a shared listener list) and wait for you to pick the structure and name its trap. This review mixes lessons <a href="0034-treemap-and-navigable-maps.html">0034</a> to <a href="0039-concurrent-collections.html">0039</a> so you practise exactly that. There are no new facts here.</div>
+
+<div class="win"><b>Today's win:</b> score 10 or more of the 12 mixed questions, find the three bugs in the mixed task, and say all three 60-second answers with at least 5 checklist points each.</div>
+
+<dl class="words">
+  <dt>NavigableMap</dt><dd>A sorted map that can find the nearest key (<code>floor</code>, <code>ceiling</code>) and ranges (<code>subMap</code>). <code>TreeMap</code> is one (lesson 0034).</dd>
+  <dt>heap</dt><dd>A half-sorted tree where every parent is ≤ its children, so the smallest item is always on top (lesson 0035).</dd>
+  <dt>identity</dt><dd>"The same object in memory", tested with <code>==</code>, as opposed to "equal", tested with <code>equals</code> (lesson 0036).</dd>
+  <dt>remapping function</dt><dd>The function you give to <code>merge</code> or <code>compute</code>; returning <code>null</code> removes the entry (lesson 0037).</dd>
+  <dt>boxing</dt><dd>Wrapping an <code>int</code> in an <code>Integer</code> object so a collection can hold it (lesson 0038).</dd>
+  <dt>snapshot iterator</dt><dd>An iterator that walks a frozen copy, so it never sees later changes and never throws (lesson 0039).</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Without looking back, name the collection for each problem and say its cost: (1) "fee for an order of 230,000, given tiers"; (2) "the 10 largest of a billion numbers"; (3) "count orders per <code>enum Status</code>"; (4) "a list of listeners that many threads read". Rate your confidence from 0 to 100%, then check it against your quiz score at the end.</p>
+
+<h2>1. One decision tree for the whole block</h2>
+<p>Think of a toolbox. A hammer is the default (<code>HashMap</code>), but some jobs need pliers. The first question is always <strong>"will several threads use it?"</strong>; the second is <strong>"what do I need besides exact-key lookup?"</strong>.</p>
+
+<figure>
+<svg viewBox="0 0 680 330" role="img" aria-label="Decision tree. Shared by threads? No: need sorted or nearest key → TreeMap; only the smallest or top K → PriorityQueue; enum keys → EnumMap or EnumSet; same object not equal → IdentityHashMap; entry should die with key → WeakHashMap; otherwise HashMap. Yes: sorted → ConcurrentSkipListMap; map → ConcurrentHashMap; read-mostly list → CopyOnWriteArrayList; hand-off between threads → BlockingQueue.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="240" y="14" width="200" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="340" y="37" text-anchor="middle" fill="var(--accent)">shared by threads?</text>
+    <g fill="none" stroke="currentColor">
+      <path d="M260 50L170 80M176 72l-6 8 10 0"/>
+      <path d="M420 50L510 80M500 80l10 0-6-8"/>
+    </g>
+    <text x="196" y="66" font-size="11">no</text>
+    <text x="476" y="66" font-size="11">yes</text>
+    <rect x="20" y="84" width="310" height="232" rx="6" fill="none" stroke="currentColor"/>
+    <rect x="350" y="84" width="310" height="232" rx="6" fill="none" stroke="currentColor"/>
+    <g font-size="11">
+      <text x="32" y="108">need sorted / nearest key / range</text>
+      <text x="318" y="124" text-anchor="end" fill="var(--accent)">→ TreeMap (0034)</text>
+      <text x="32" y="148">only the smallest, or top K</text>
+      <text x="318" y="164" text-anchor="end" fill="var(--accent)">→ PriorityQueue (0035)</text>
+      <text x="32" y="188">keys are enum values</text>
+      <text x="318" y="204" text-anchor="end" fill="var(--accent)">→ EnumMap / EnumSet (0036)</text>
+      <text x="32" y="228">"same object", not "equal"</text>
+      <text x="318" y="244" text-anchor="end" fill="var(--accent)">→ IdentityHashMap (0036)</text>
+      <text x="32" y="268">entry should die with its key</text>
+      <text x="318" y="284" text-anchor="end" fill="var(--accent)">→ WeakHashMap (0036)</text>
+      <text x="32" y="306" opacity=".75">otherwise → HashMap (presize, 0038)</text>
+      <text x="362" y="108">sorted map, ranges</text>
+      <text x="648" y="124" text-anchor="end" fill="var(--accent)">→ ConcurrentSkipListMap</text>
+      <text x="362" y="158">any other shared map</text>
+      <text x="648" y="174" text-anchor="end" fill="var(--accent)">→ ConcurrentHashMap</text>
+      <text x="362" y="208">list read often, written rarely</text>
+      <text x="648" y="224" text-anchor="end" fill="var(--accent)">→ CopyOnWriteArrayList</text>
+      <text x="362" y="258">hand work from thread to thread</text>
+      <text x="648" y="274" text-anchor="end" fill="var(--accent)">→ BlockingQueue (bounded)</text>
+      <text x="362" y="306" opacity=".75">all in lesson 0039</text>
+    </g>
+  </g>
+</svg>
+<figcaption>The whole block on one page. Lesson 0037 (merge, compute) and the boxing half of 0038 apply to every map on both sides.</figcaption>
+</figure>
+
+<h2>2. The costs and the traps, side by side</h2>
+<table>
+<tr><th>Structure</th><th>Cost to remember</th><th>Its trap</th><th>Lesson</th></tr>
+<tr><td><code>TreeMap</code></td><td>get/put guaranteed log(n)</td><td>comparator ties drop keys; <code>floorEntry</code> can return null</td><td><a href="0034-treemap-and-navigable-maps.html">0034</a></td></tr>
+<tr><td><code>PriorityQueue</code></td><td>offer/poll log(n), peek O(1), contains O(n)</td><td>iterating or printing is not sorted</td><td><a href="0035-priorityqueue-and-top-k.html">0035</a></td></tr>
+<tr><td>top-K</td><td>O(n log k) time, O(k) memory</td><td>use a <strong>min</strong>-heap for the K largest</td><td><a href="0035-priorityqueue-and-top-k.html">0035</a></td></tr>
+<tr><td><code>EnumMap</code> / <code>EnumSet</code></td><td>array / bit vector, declaration order</td><td>no nulls</td><td><a href="0036-enummap-identity-and-weak-maps.html">0036</a></td></tr>
+<tr><td><code>WeakHashMap</code></td><td>entry leaves when the key is unreachable</td><td>values are strong; not a size-limited cache</td><td><a href="0036-enummap-identity-and-weak-maps.html">0036</a></td></tr>
+<tr><td><code>merge</code> / <code>computeIfAbsent</code></td><td>one call instead of get-check-put</td><td>null result removes; no recursion into the same map</td><td><a href="0037-map-default-methods.html">0037</a></td></tr>
+<tr><td><code>List&lt;Integer&gt;</code></td><td>~19 MB per million vs ~4 MB for <code>int[]</code> (rough)</td><td><code>==</code> above 127; <code>remove(1)</code> is an index</td><td><a href="0038-capacity-boxing-and-memory.html">0038</a></td></tr>
+<tr><td><code>CopyOnWriteArrayList</code></td><td>every write copies the array</td><td>bad for write-heavy lists</td><td><a href="0039-concurrent-collections.html">0039</a></td></tr>
+<tr><td><code>BlockingQueue</code></td><td>put/take block; bounded = backpressure</td><td>no nulls; stop with a poison pill</td><td><a href="0039-concurrent-collections.html">0039</a></td></tr>
+</table>
+<p>Two connections worth saying out loud in an interview. First, <strong>sorted collections decide equality with the comparator</strong>, so the leaderboard tie-breaker from lesson 0034 is the same rule as the TreeSet bug from lesson 0031. Second, the <strong>Map default methods are atomic only on <code>ConcurrentHashMap</code></strong>: lesson 0037 meets lesson 0039 there.</p>
+
+<h2>3. Mixed task: find the three bugs</h2>
+<p>Read this class like a reviewer. Several request threads call it at the same time. There are three bugs, each from a different lesson. Name the lesson and the fix <em>before</em> opening the answer.</p>
+<pre><code>class Monitor {
+    <span class="c">// listeners register at runtime, from any thread</span>
+    private final List&lt;Listener&gt; listeners = new ArrayList&lt;&gt;();               <span class="c">// (A)</span>
+
+    void register(Listener l) { listeners.add(l); }
+    void fire(Event e)        { for (Listener l : listeners) l.on(e); }
+
+    <span class="c">// report the 10 slowest response times, slowest first</span>
+    List&lt;Long&gt; slowest10(List&lt;Long&gt; millis) {
+        PriorityQueue&lt;Long&gt; pq = new PriorityQueue&lt;&gt;(Comparator.reverseOrder());
+        pq.addAll(millis);                                                      <span class="c">// (B)</span>
+        return new ArrayList&lt;&gt;(pq).subList(0, 10);
+    }
+
+    boolean isAdmin(Long userId, Long adminId) { return userId == adminId; }   <span class="c">// (C)</span>
+}</code></pre>
+<details class="qa">
+<summary>Show the three bugs</summary>
+<div class="ans">
+<p><strong>(A) Lesson 0039.</strong> A plain <code>ArrayList</code> shared by threads loses adds silently, and <code>fire</code> can throw <code>ConcurrentModificationException</code> while another thread registers. Listener lists are read far more than written: use <code>CopyOnWriteArrayList</code>, whose snapshot iterators never throw.</p>
+<p><strong>(B) Lesson 0035, two problems in one.</strong> Copying a PriorityQueue into a list gives <em>heap order</em>, not sorted order, so <code>subList(0, 10)</code> is not the top 10. And a max-heap of everything costs O(n) memory. Fix: a <strong>min</strong>-heap of size 10 (offer, and poll the head when a bigger value arrives), then sort the 10 results.</p>
+<p><strong>(C) Lesson 0038.</strong> <code>==</code> on two <code>Long</code> objects compares references. It works for small IDs in tests and fails for real ones above 127. Fix: <code>userId.equals(adminId)</code>, or <code>Objects.equals</code> if either may be null.</p>
+</div>
+</details>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Fee tiers start at 0, 200,000 and 500,000. Which call finds the tier for an order total?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>floorEntry(total)</code></button>
+    <button class="opt"><code>ceilingEntry(total)</code></button>
+    <button class="opt"><code>higherEntry(total)</code></button>
+    <button class="opt"><code>tailMap(total)</code></button>
+  </div>
+  <div class="why">The tier is the greatest start ≤ the total, which is exactly floor. See lesson 0034.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You print a <code>PriorityQueue</code> built from <code>7, 3, 9, 1, 5, 8</code>. What is guaranteed about the output?</p>
+  <div class="options">
+    <button class="opt" data-correct>Only that the first element is the smallest</button>
+    <button class="opt">That all elements appear in ascending order</button>
+    <button class="opt">That elements appear in insertion order</button>
+    <button class="opt">That all elements appear in descending order</button>
+  </div>
+  <div class="why">toString walks the heap array: <code>[1, 3, 8, 7, 5, 9]</code>. Only polling gives sorted order. See lesson 0035.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which map should count orders per <code>enum Status</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>EnumMap</button>
+    <button class="opt">IdentityHashMap</button>
+    <button class="opt">WeakHashMap</button>
+    <button class="opt">TreeMap</button>
+  </div>
+  <div class="why">EnumMap is an array indexed by ordinal: compact, fast, declaration order. See lesson 0036.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">The remapping function in <code>merge</code> returns <code>null</code>. What happens to the entry?</p>
+  <div class="options">
+    <button class="opt" data-correct>It is removed from the map</button>
+    <button class="opt">It is stored with a null value</button>
+    <button class="opt">It keeps its old value unchanged</button>
+    <button class="opt">merge throws NullPointerException</button>
+  </div>
+  <div class="why">If a remapping function returns null, the mapping is removed. See lesson 0037.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>Integer a = 1000, b = 1000;</code> A test checks <code>a == b</code>. What is true?</p>
+  <div class="options">
+    <button class="opt" data-correct>The result is not guaranteed; use equals</button>
+    <button class="opt">It is always true, both hold 1000</button>
+    <button class="opt">It always throws NullPointerException</button>
+    <button class="opt">It does not compile for boxed types</button>
+  </div>
+  <div class="why">Identity of boxed values is guaranteed only in -128..127. See lesson 0038.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A listener list is read on every event and changed once a day by any thread. Which list?</p>
+  <div class="options">
+    <button class="opt" data-correct>CopyOnWriteArrayList</button>
+    <button class="opt">Collections.synchronizedList</button>
+    <button class="opt">A plain ArrayList</button>
+    <button class="opt">A LinkedList</button>
+  </div>
+  <div class="why">Traversals vastly outnumber mutations, and snapshot iterators never throw. See lesson 0039.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You keep the 10 largest values of a huge stream. What does the head of your heap hold?</p>
+  <div class="options">
+    <button class="opt" data-correct>The smallest of the current top 10</button>
+    <button class="opt">The largest value seen so far</button>
+    <button class="opt">The most recently added value</button>
+    <button class="opt">The median of the current top 10</button>
+  </div>
+  <div class="why">A min-heap of size K: its head is the one a newcomer must beat. See lesson 0035.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A memoized <code>fib</code> calls <code>memo.computeIfAbsent(n, k -&gt; fib(k-1) + fib(k-2))</code> on a <code>HashMap</code>. What happens?</p>
+  <div class="options">
+    <button class="opt" data-correct>HashMap can throw ConcurrentModificationException</button>
+    <button class="opt">It works and is the recommended way to memoize</button>
+    <button class="opt">It silently stores null for every second number</button>
+    <button class="opt">It deadlocks because the map locks itself twice</button>
+  </div>
+  <div class="why">The mapping function must not modify the same map. Compute first, then put. See lesson 0037.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Keys are 5, 12, 20, 33. What does <code>subMap(10, 33)</code> contain?</p>
+  <div class="options">
+    <button class="opt" data-correct>12 and 20</button>
+    <button class="opt">12, 20 and 33</button>
+    <button class="opt">5, 12 and 20</button>
+    <button class="opt">Only 20</button>
+  </div>
+  <div class="why">subMap(from, to) includes from and excludes to. It is also a live view. See lesson 0034.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A <code>WeakHashMap</code> value holds a reference to its own key. What is the effect?</p>
+  <div class="options">
+    <button class="opt" data-correct>The entry is never removed: a leak</button>
+    <button class="opt">The entry is removed right away</button>
+    <button class="opt">put throws IllegalStateException</button>
+    <button class="opt">The value becomes a weak reference</button>
+  </div>
+  <div class="why">Values are held strongly, so value → key keeps the key reachable. See lesson 0036.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">A producer is much faster than its consumer. Which queue protects the heap?</p>
+  <div class="options">
+    <button class="opt" data-correct>A bounded ArrayBlockingQueue with put</button>
+    <button class="opt">An unbounded LinkedBlockingQueue with add</button>
+    <button class="opt">A CopyOnWriteArrayList used as a queue</button>
+    <button class="opt">A PriorityQueue shared by both threads</button>
+  </div>
+  <div class="why">A bounded queue makes put block when full: backpressure. See lesson 0039.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You will put 2,000,000 entries into a HashMap on JDK 21. Which line avoids every resize?</p>
+  <div class="options">
+    <button class="opt" data-correct><code>HashMap.newHashMap(2_000_000)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;(2_000_000)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;(16, 0.75f)</code></button>
+    <button class="opt"><code>new HashMap&lt;&gt;().trimToSize()</code></button>
+  </div>
+  <div class="why">newHashMap(n) accounts for the 0.75 load factor; a capacity of 2,000,000 still resizes past 75%. See lesson 0038.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">Recall 1. <strong>"When would you use TreeMap, and when PriorityQueue? Give one real example each."</strong> Start a timer. Answer out loud, then click.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> TreeMap: red-black tree, keys sorted, guaranteed log(n).</label></li>
+      <li><label><input type="checkbox"> Example: fee tiers with <code>floorEntry</code>, or a time window with <code>subMap</code> (a live view).</label></li>
+      <li><label><input type="checkbox"> PriorityQueue: binary heap, head is the smallest; offer/poll log(n), peek O(1).</label></li>
+      <li><label><input type="checkbox"> Example: top-K with a min-heap of size K, O(n log k) and O(k) memory.</label></li>
+      <li><label><input type="checkbox"> Iterating a PriorityQueue is not sorted.</label></li>
+      <li><label><input type="checkbox"> Threads: ConcurrentSkipListMap and PriorityBlockingQueue.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"I use a TreeMap when I need order: it's a red-black tree, so keys stay sorted and get and put are log n, guaranteed. My favourite example is fee tiers: the key is where each tier starts, and floorEntry of the order total returns the right tier in one call. subMap gives me a time window, and it's a live view. I use a PriorityQueue when I only need the smallest item next, not full order. It's a binary heap: offer and poll are log n, peek is constant. The classic case is top K: I keep a min-heap of size K, and a new value replaces the head only if it's bigger, so it's n log k time and K memory. Careful: iterating a PriorityQueue isn't sorted. For threads I'd switch to ConcurrentSkipListMap or PriorityBlockingQueue."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 2. <strong>"Which special-purpose maps and Map methods do you use, and what are their traps?"</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> EnumMap/EnumSet for enum keys: array / bit vector, no nulls.</label></li>
+      <li><label><input type="checkbox"> IdentityHashMap compares with <code>==</code>; for object-graph work like deep copy.</label></li>
+      <li><label><input type="checkbox"> WeakHashMap: entry leaves with its key; values are strong; not a real cache.</label></li>
+      <li><label><input type="checkbox"> <code>merge(k, 1, Integer::sum)</code> and <code>computeIfAbsent(k, ...).add(v)</code>.</label></li>
+      <li><label><input type="checkbox"> putIfAbsent is eager; a null result means no mapping or removal.</label></li>
+      <li><label><input type="checkbox"> Do not modify the map inside the function; atomic only on ConcurrentHashMap.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"For enum keys I use EnumMap, which is just an array indexed by ordinal, and EnumSet, a bit vector; neither takes nulls. IdentityHashMap compares keys with double equals, so it breaks the Map contract on purpose; I'd only use it for things like deep copy, where I track physical objects. WeakHashMap drops an entry once its key is unreachable, but the values are strong, so a value pointing to its key leaks, and it's not a size-limited cache. For everyday code I use the Java 8 methods: merge with Integer::sum to count, computeIfAbsent to build a multimap. Traps: putIfAbsent builds its argument anyway, a function returning null means no mapping or removal, and the function must not modify the same map, so no recursive memo inside computeIfAbsent. And they're only atomic on ConcurrentHashMap."</em></p>
+  </div>
+</div>
+
+<div class="recall">
+  <p class="prompt">Recall 3. <strong>"Your service is slow and uses too much memory, and it shares collections between threads. What do you check?"</strong></p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Boxing: <code>List&lt;Integer&gt;</code> is several times bigger than <code>int[]</code>; LinkedList and HashSet worse.</label></li>
+      <li><label><input type="checkbox"> Resizing: presize ArrayList and <code>HashMap.newHashMap(n)</code>.</label></li>
+      <li><label><input type="checkbox"> Boxing bugs: <code>==</code> on Integer/Long, <code>remove(int)</code> vs <code>remove(Object)</code>.</label></li>
+      <li><label><input type="checkbox"> Plain collections shared by threads lose updates silently.</label></li>
+      <li><label><input type="checkbox"> Pick: ConcurrentHashMap, CopyOnWriteArrayList, ConcurrentSkipListMap, BlockingQueue.</label></li>
+      <li><label><input type="checkbox"> Synchronized wrapper needs a manual lock to iterate; bounded queue for backpressure.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"For memory I first look at boxing: a List of Integer stores a reference plus an Integer object per element, roughly 19 MB per million against 4 for an int array, and LinkedList or HashSet are worse, so hot data goes into primitive arrays or primitive collections. Then resizing: I presize ArrayList and use HashMap.newHashMap on Java 19 and later. Boxing also hides bugs, like comparing Longs with double equals, which only works up to 127. For the threads, plain collections lose updates without any error, so I pick the right concurrent one: ConcurrentHashMap for maps, ConcurrentSkipListMap if sorted, CopyOnWriteArrayList for read-mostly lists like listeners, and a bounded BlockingQueue between producers and consumers so a fast producer can't fill the heap. If I keep a synchronized wrapper, I lock it myself while iterating."</em></p>
+  </div>
+</div>
+
+<h2>If you missed questions, re-read</h2>
+<table>
+<tr><th>If you missed questions on…</th><th>Re-read</th></tr>
+<tr><td>floor/ceiling, subMap ends, live views, leaderboard ties</td><td><a href="0034-treemap-and-navigable-maps.html">Lesson 0034: TreeMap and NavigableMap</a></td></tr>
+<tr><td>heap order, top-K, min- vs max-heap, ArrayDeque</td><td><a href="0035-priorityqueue-and-top-k.html">Lesson 0035: PriorityQueue and top-K</a></td></tr>
+<tr><td>EnumMap, IdentityHashMap, WeakHashMap</td><td><a href="0036-enummap-identity-and-weak-maps.html">Lesson 0036: special-purpose maps</a></td></tr>
+<tr><td>merge, computeIfAbsent, null results, recursion</td><td><a href="0037-map-default-methods.html">Lesson 0037: Map power methods</a></td></tr>
+<tr><td>ArrayList growth, presizing, boxing memory, <code>==</code>, <code>remove(int)</code></td><td><a href="0038-capacity-boxing-and-memory.html">Lesson 0038: capacity and boxing</a></td></tr>
+<tr><td>lost updates, synchronized wrappers, copy-on-write, blocking queues</td><td><a href="0039-concurrent-collections.html">Lesson 0039: concurrent collections</a></td></tr>
+</table>
+
+<h2>Now do the exercise</h2>
+<p>If you skipped any of these, do it now; if you did them, redo the one with your lowest score from memory:</p>
+<ul>
+<li><a href="../exercises/0034-price-tiers-and-windows.md">Exercise 0034: price tiers and time windows</a></li>
+<li><a href="../exercises/0035-top-k-and-scheduling.md">Exercise 0035: top-K and scheduling</a></li>
+<li><a href="../exercises/0036-choose-the-special-map.md">Exercise 0036: choose the special map</a></li>
+<li><a href="../exercises/0037-refactor-to-map-methods.md">Exercise 0037: refactor to Map methods</a></li>
+<li><a href="../exercises/0038-size-the-cache.md">Exercise 0038: size the cache</a></li>
+<li><a href="../exercises/0039-pick-the-concurrent-structure.md">Exercise 0039: pick the concurrent structure</a></li>
+</ul>
+<p>Runnable examples: <a href="../examples/collections/NavigableMaps.java"><code>NavigableMaps.java</code></a> · <a href="../examples/collections/PriorityQueueTopK.java"><code>PriorityQueueTopK.java</code></a> · <a href="../examples/collections/SpecialPurposeMaps.java"><code>SpecialPurposeMaps.java</code></a> · <a href="../examples/collections/MapPowerMethods.java"><code>MapPowerMethods.java</code></a> · <a href="../examples/collections/CapacityAndBoxing.java"><code>CapacityAndBoxing.java</code></a> · <a href="../examples/collections/ConcurrentCollections.java"><code>ConcurrentCollections.java</code></a></p>
+
+<h2>What's next</h2>
+<p>This closes the collections block. The next block is the functional style of modern Java, and the interviewer's first question is usually: <em>"What is a functional interface, and what can a lambda capture?"</em> Start with <a href="0008-lambdas-and-functional-interfaces.html">lesson 0008</a>.</p>
+<p><strong>Read more:</strong> <a href="https://dev.java/learn/api/collections-framework/">dev.java: The Collections Framework</a>, Oracle's official tutorial, to see these structures from the angle of their interfaces.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"When is a TreeMap better than sorting a list once?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and your three checklist scores: they help me choose your next lesson.</div>
+
+<p><a href="0039-concurrent-collections.html">← Concurrent collections: synchronized, copy-on-write, blocking queues</a> &nbsp;|&nbsp; <a href="0008-lambdas-and-functional-interfaces.html">Lambdas: passing a piece of code as a value →</a></p>
+
+<footer>
+  <p>Facts checked against the Java 21 documentation and the OpenJDK 21 source, October 2026 (all facts come from lessons 0034 to 0039).</p>
+  <p>References: <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/TreeMap.html">TreeMap Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html">PriorityQueue Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/EnumMap.html">EnumMap Javadoc</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html">Map Javadoc</a> · <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-5.html#jls-5.1.7">JLS 21 §5.1.7</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html">BlockingQueue Javadoc</a> · <a href="../../RESOURCES.md">All resources</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

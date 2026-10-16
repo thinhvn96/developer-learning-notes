@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Java 27: Helpful NullPointerException</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Phần nào bị null? Helpful NullPointerException</h1>
+<p class="subtitle">Từ JDK 14, thông báo lỗi chỉ đúng vào mắt xích bị thiếu trong chuỗi.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Bài 0027 · bước 41/46 · Core · ~15 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Java (JDK 8, 17, 21)</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0027-helpful-nullpointerexceptions.html" hreflang="en" lang="en">English</a></p>
+
+<div class="mission"><strong>Vì sao có bài này?</strong> <code>NullPointerException</code> (NPE) là lỗi Java phổ biến nhất trong log production. Trên JDK 8, log chỉ cho bạn biết dòng nào. Trên JDK 17 và 21, nó cho biết <em>biểu thức nào</em> bị null, nếu bạn biết cách đọc. Interviewer rất thích hỏi <em>"Bạn debug một NPE thế nào?"</em>; đây là bước đầu tiên theo cách hiện đại.</div>
+
+<div class="win"><b>Thành quả hôm nay:</b> đọc một helpful NPE message và chỉ ra phần bị null, giải thích vì sao đôi khi nó ghi <code>&lt;local1&gt;</code>, và nói được nó xuất hiện ở JDK nào, bật mặc định từ JDK nào.</div>
+
+<dl class="words">
+  <dt>null</dt><dd>Giá trị đặc biệt nghĩa là "biến này không trỏ tới object nào".</dd>
+  <dt>NullPointerException (NPE)</dt><dd>Lỗi Java ném ra khi bạn dùng một null như thể nó là object, ví dụ gọi method trên nó.</dd>
+  <dt>exception message</dt><dd>Đoạn text bên trong exception. Bạn đọc nó bằng <code>e.getMessage()</code>; trong log nó được in sau tên exception.</dd>
+  <dt>stack trace</dt><dd>Danh sách các lời gọi method dẫn tới lỗi, kèm tên file và số dòng.</dd>
+  <dt>JVM</dt><dd>Java Virtual Machine: chương trình chạy bytecode đã compile của bạn. Nó phát hiện null và ném NPE.</dd>
+  <dt>debug information</dt><dd>Dữ liệu thêm mà <code>javac</code> có thể lưu vào file <code>.class</code>, như số dòng và tên biến local.</dd>
+  <dt>JVM flag</dt><dd>Tuỳ chọn bạn truyền cho <code>java</code> trên dòng lệnh, như <code>-XX:+SomeOption</code>.</dd>
+</dl>
+
+<h2>Trước khi bắt đầu</h2>
+<p>Nhìn dòng này và nói to: <em>"Nếu nó ném NPE, những biến nào có thể bị null?"</em> Đếm xem có mấy cái.</p>
+<pre><code>System.out.println(order.customer.address.city.toUpperCase());</code></pre>
+
+<h2>1. Thông báo của JDK 8: "có gì đó ở dòng 7"</h2>
+<p>Hình dung chỉ đường tới căn hộ của một người bạn: "tới toà nhà, lên tầng 3, tìm căn B, rồi gõ cửa". Bạn tới nơi và không đi tiếp được. Một người hướng dẫn tệ sẽ nói: "Chỉ đường của bạn hỏng ở đâu đó." Một người hướng dẫn tốt sẽ nói: "Bạn không tìm được căn B, vì tầng 3 không tồn tại."</p>
+<p>NPE của JDK 8 là người hướng dẫn tệ. Đây là đoạn code ở trên, chạy với detail message bị tắt, cho ra kết quả giống JDK cũ:</p>
+<pre><code>$ java -XX:-ShowCodeDetailsInExceptionMessages -cp g Order
+Exception in thread "main" java.lang.NullPointerException
+	at Order.main(Order.java:7)</code></pre>
+<p>Dòng 7 có bốn chỗ có thể null: <code>order</code>, <code>customer</code>, <code>address</code> và <code>city</code>. JEP 358 nói thẳng: "Tên file và số dòng không chỉ ra chính xác biến nào bị null."<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a> Trên JDK 8, bạn phải thêm log hoặc mở debugger để tìm.</p>
+
+<h2>2. Thông báo của JDK 14+: đúng mắt xích</h2>
+<p>JEP 358 (Java 14) nhằm "cải thiện tính dễ dùng của NullPointerException do JVM tạo ra, bằng cách mô tả chính xác biến nào bị null".<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a> Cùng chương trình đó trên JDK 21, không flag nào:</p>
+<pre><code>$ java -cp g Order
+Exception in thread "main" java.lang.NullPointerException: <span class="hl">Cannot read field "city" because "order.customer.address" is null</span>
+	at Order.main(Order.java:7)</code></pre>
+
+<figure>
+<svg viewBox="0 0 680 250" role="img" aria-label="Chuỗi order chấm customer chấm address chấm city chấm toUpperCase. order và customer ổn, address là null và được tô màu, city chưa được đọc và toUpperCase chưa được gọi. Phần message because order.customer.address is null trải qua ba khung đầu; Cannot read field city chỉ vào khung thứ tư.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="340" y="22" text-anchor="middle" font-size="11" opacity=".75">order.customer.address.city.toUpperCase()&#160;&#160;&#160;tính từ trái sang phải</text>
+    <rect x="20" y="40" width="110" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="75" y="62" text-anchor="middle">order</text>
+    <text x="75" y="80" text-anchor="middle" font-size="11" opacity=".75">ok</text>
+    <rect x="152" y="40" width="110" height="50" rx="6" fill="none" stroke="currentColor"/>
+    <text x="207" y="62" text-anchor="middle">customer</text>
+    <text x="207" y="80" text-anchor="middle" font-size="11" opacity=".75">ok</text>
+    <rect x="284" y="40" width="110" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="339" y="62" text-anchor="middle" fill="var(--accent)">address</text>
+    <text x="339" y="80" text-anchor="middle" font-size="11" fill="var(--accent)">null</text>
+    <g opacity=".45">
+      <rect x="416" y="40" width="110" height="50" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+      <text x="471" y="62" text-anchor="middle">city</text>
+      <text x="471" y="80" text-anchor="middle" font-size="11">chưa đọc</text>
+      <rect x="548" y="40" width="112" height="50" rx="6" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+      <text x="604" y="62" text-anchor="middle">toUpperCase()</text>
+      <text x="604" y="80" text-anchor="middle" font-size="11">chưa gọi</text>
+    </g>
+    <g fill="none" stroke="currentColor"><path d="M130 65h16M140 60l6 5-6 5M262 65h16M272 60l6 5-6 5"/></g>
+    <path d="M394 65h16M404 60l6 5-6 5" fill="none" stroke="var(--accent)"/>
+    <text x="405" y="54" text-anchor="middle" font-size="13" fill="var(--accent)">✗</text>
+    <path d="M20 110v10h374v-10" fill="none" stroke="var(--accent)"/>
+    <text x="207" y="142" text-anchor="middle" font-size="12" fill="var(--accent)">because "order.customer.address" is null</text>
+    <path d="M471 96v36" fill="none" stroke="currentColor"/>
+    <path d="M466 102l5-6 5 6" fill="none" stroke="currentColor"/>
+    <text x="520" y="158" text-anchor="middle">Cannot read field "city"</text>
+    <text x="340" y="196" text-anchor="middle" font-size="11" opacity=".8">nửa đầu: JVM đã cố làm gì · nửa sau: biểu thức bị null</text>
+    <text x="340" y="220" text-anchor="middle" font-size="11" opacity=".8">JVM dừng ở null đầu tiên, nên các phần bên phải không bao giờ chạy</text>
+  </g>
+</svg>
+<figcaption>Đọc message từ phần "because": nó ghi đoạn dài nhất của chuỗi đã được tính, và mắt xích cuối của đoạn đó là null.</figcaption>
+</figure>
+
+<h3>Đọc nó từng bước</h3>
+<pre><code><span class="c">Step 1  "order" was evaluated: not null</span>
+<span class="c">Step 2  ".customer" was read: not null</span>
+<span class="c">Step 3  ".address" was read: it is null</span>
+<span class="c">Step 4  the JVM tries to read ".city" from null → NPE</span>
+<span class="hl">Message = "Cannot read field "city"" (step 4) + "because "order.customer.address" is null" (step 3)</span></code></pre>
+<p>JEP đưa ra ví dụ cùng dạng: <code>Cannot read field "c" because "a.b" is null</code>.<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a> Vậy câu trả lời cho "Trước khi bắt đầu" là: bốn thứ <em>có thể</em> null, và message cho bạn biết cái nào <em>đã</em> null.</p>
+<p>Nửa đầu thay đổi theo thao tác. Vài message thật từ JDK 21:</p>
+<pre><code><span class="c">// calling a method on a null that a method returned</span>
+Cannot invoke "Npe2$User.getName()" because the return value of "Npe2.find(int)" is null
+<span class="c">// a chain of method calls</span>
+Cannot invoke "String.toUpperCase()" because the return value of "Npe2$User.getName()" is null
+<span class="c">// unboxing a null Integer into an int</span>
+Cannot invoke "java.lang.Integer.intValue()" because "&lt;local1&gt;" is null</code></pre>
+<p class="muted">Cái cuối là bẫy kinh điển: <code>int x = map.get(key);</code> ném NPE khi không có key, vì Java tự gọi <code>intValue()</code> trên giá trị null.</p>
+
+<h2>3. Vì sao nó ghi <code>&lt;local1&gt;</code>?</h2>
+<p>Chạy ví dụ của khoá học:</p>
+<pre><code>$ java java/examples/NpeDemo.java
+Cannot read field "city" because "&lt;local1&gt;.address" is null
+Cannot invoke "String.trim()" because "&lt;local2&gt;[0]" is null</code></pre>
+<p>Các message xuất hiện mà không cần flag nào trên JDK 21. Nhưng tên biến local hiện ra là <code>&lt;local1&gt;</code> và <code>&lt;local2&gt;</code>. Vì sao? Tên biến local chỉ có trong file <code>.class</code> nếu <code>javac</code> lưu chúng làm debug information. Khi không có, JEP 358 nói message dùng <code>&lt;local<em>i</em>&gt;</code> (một số thứ tự ô nhớ) thay thế; tên chỉ hiện khi "debug information được đưa vào file <code>class</code> (qua <code>javac -g</code>)".<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a> Source launcher compile mà không có debug info đó. Với <code>javac -g</code>, cùng các message ấy thành:</p>
+<pre><code>$ javac -g -d out java/examples/NpeDemo.java &amp;&amp; java -cp out NpeDemo
+Cannot read field "city" because "<span class="hl">u.address</span>" is null
+Cannot invoke "String.trim()" because "<span class="hl">names[0]</span>" is null</code></pre>
+<p>Mình đã chạy cả hai. Tên field và tên method lúc nào cũng có; chỉ tên biến local mới cần <code>-g</code>. Chỉ chạy <code>javac</code> thường là chưa đủ: theo tài liệu, "mặc định chỉ sinh thông tin số dòng và file source", còn <code>-g</code> "sinh toàn bộ debug information, gồm cả biến local".<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/javac.html">javac docs</a></p>
+
+<figure>
+<svg viewBox="0 0 680 200" role="img" aria-label="Một NPE message tách làm hai phần. Phần đầu, Cannot invoke String.trim, là việc JVM đã cố làm. Phần sau, because local2 index 0 is null, chỉ ra biểu thức bị null. Bên dưới, không có javac -g thì biến hiện là local2; có javac -g thì hiện là names.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <rect x="20" y="30" width="250" height="40" rx="6" fill="none" stroke="currentColor"/>
+    <text x="145" y="55" text-anchor="middle">Cannot invoke "String.trim()"</text>
+    <rect x="280" y="30" width="380" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="470" y="55" text-anchor="middle">because "<tspan fill="var(--accent)">&lt;local2&gt;[0]</tspan>" is null</text>
+    <text x="145" y="92" text-anchor="middle" font-size="11" opacity=".75">JVM đã cố làm gì</text>
+    <text x="470" y="92" text-anchor="middle" font-size="11" fill="var(--accent)">biểu thức nào bị null</text>
+    <path d="M470 100v24" fill="none" stroke="currentColor"/>
+    <path d="M465 118l5 6 5-6" fill="none" stroke="currentColor"/>
+    <rect x="280" y="130" width="185" height="44" rx="6" fill="none" stroke="currentColor"/>
+    <text x="372" y="150" text-anchor="middle" font-size="11" opacity=".75">không có tên local</text>
+    <text x="372" y="166" text-anchor="middle">"&lt;local2&gt;[0]"</text>
+    <rect x="475" y="130" width="185" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="567" y="150" text-anchor="middle" font-size="11" fill="var(--accent)">javac -g</text>
+    <text x="567" y="166" text-anchor="middle" fill="var(--accent)">"names[0]"</text>
+    <text x="20" y="150" font-size="11" opacity=".8">cùng một NPE, hai</text>
+    <text x="20" y="166" font-size="11" opacity=".8">cách compile:</text>
+  </g>
+</svg>
+<figcaption>Mỗi helpful message có hai nửa. Nửa sau cần <code>javac -g</code> để hiện tên biến local.</figcaption>
+</figure>
+
+<h2>4. JDK nào, flag nào, NPE nào</h2>
+<ol class="steps">
+  <li><strong>JDK 8 tới 13:</strong> không có detail message. Bạn chỉ có tên exception và stack trace.</li>
+  <li><strong>JDK 14:</strong> tính năng đã có nhưng mặc định tắt. Bạn bật bằng <code>-XX:+ShowCodeDetailsInExceptionMessages</code>; JEP nêu ý định bật nó mặc định ở bản sau.<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a></li>
+  <li><strong>JDK 15 trở đi (tức 17 và 21):</strong> bật mặc định. Thay đổi ở JDK 15 ghi rằng "Helpful NullPointerException của JEP 358 được in ra theo mặc định".<a class="src" href="https://bugs.openjdk.org/browse/JDK-8233014">JDK-8233014</a> Bạn có thể tắt bằng <code>-XX:-ShowCodeDetailsInExceptionMessages</code>, chính là cách mình tạo ra output "kiểu cũ" ở mục 1.</li>
+</ol>
+<p>Hai chi tiết interviewer thích:</p>
+<ul>
+  <li>Theo JEP, "chỉ những NPE được JVM trực tiếp tạo và ném ra mới có null-detail message".<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a> Nếu code của bạn <code>throw new NullPointerException()</code>, <code>getMessage()</code> trả về <code>null</code>. Mình đã chạy: nó in ra <code>null</code>.</li>
+  <li>Message được "tính khi cần", chỉ khi <code>getMessage()</code> được gọi, vì rất nhiều NPE bị catch rồi bỏ qua.<a class="src" href="https://openjdk.org/jeps/358">JEP 358</a></li>
+</ul>
+
+<h3>Bẫy: chỉ log một nửa exception</h3>
+<p>Có code log <code>"error: " + e.getMessage()</code>. Trên JDK 8, với NPE nó in ra <code>error: null</code>, nên team quen bỏ qua dòng đó. Trên JDK 17 và 21, message lại là phần hữu ích nhất. <strong>Cách sửa:</strong> log chính object exception (ví dụ <code>log.error("failed", e)</code>), để giữ cả message lẫn stack trace.</p>
+
+<h2>Luyện tập</h2>
+<p class="muted">Trả lời theo trí nhớ, đừng cuộn lên. Thứ tự đáp án thay đổi mỗi lần bạn mở trang.</p>
+<p class="score"></p>
+
+<div class="quiz">
+  <p class="q">Helpful NullPointerException message thêm vào thông tin gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>Biểu thức nào đã bị null</button>
+    <button class="opt">Tên của thread đang chạy</button>
+    <button class="opt">Kích thước heap hiện tại</button>
+    <button class="opt">Class loader đang được dùng</button>
+  </div>
+  <div class="why">JEP 358 mô tả "chính xác biến nào bị null", cộng với việc JVM đang cố làm gì.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Message là <code>Cannot read field "city" because "order.customer.address" is null</code>. Cái gì bị null?</p>
+  <div class="options">
+    <button class="opt" data-correct>order.customer.address</button>
+    <button class="opt">order.customer.address.city</button>
+    <button class="opt">order.customer</button>
+    <button class="opt">order</button>
+  </div>
+  <div class="why">Phần "because" chỉ ra biểu thức bị null. <code>order</code> và <code>customer</code> vẫn ổn; đọc <code>city</code> từ address null thì lỗi.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Vì sao message ghi <code>"&lt;local1&gt;.address"</code> thay vì <code>"u.address"</code>?</p>
+  <div class="options">
+    <button class="opt" data-correct>Class không có debug info của biến local</button>
+    <button class="opt">Biến u được khai báo là final</button>
+    <button class="opt">JVM giấu tên vì lý do bảo mật</button>
+    <button class="opt">NPE do chính chương trình tự ném</button>
+  </div>
+  <div class="why">Tên biến local chỉ có trong file class khi compile bằng <code>javac -g</code>. Không có thì JVM hiện số thứ tự ô nhớ.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Câu nào về các phiên bản JDK là đúng?</p>
+  <div class="options">
+    <button class="opt" data-correct>Có từ JDK 14, bật mặc định từ 15</button>
+    <button class="opt">Có từ JDK 8, bật mặc định từ 11</button>
+    <button class="opt">Có từ JDK 17, bật mặc định từ 21</button>
+    <button class="opt">Có từ JDK 21, phải dùng flag để bật</button>
+  </div>
+  <div class="why">JEP 358 đưa vào JDK 14, bật bằng <code>-XX:+ShowCodeDetailsInExceptionMessages</code>; JDK 15 bật nó mặc định.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Code của bạn chạy <code>throw new NullPointerException();</code>. Trên JDK 21, <code>getMessage()</code> trả về gì?</p>
+  <div class="options">
+    <button class="opt" data-correct>null, không có detail message</button>
+    <button class="opt">Một message chỉ ra tên biến</button>
+    <button class="opt">Chuỗi "Cannot invoke null"</button>
+    <button class="opt">Tên của method đã ném lỗi</button>
+  </div>
+  <div class="why">Chỉ NPE do JVM trực tiếp tạo và ném mới có helpful message.</div>
+</div>
+
+<div class="quiz">
+  <p class="q"><code>int count = map.get("x");</code> ném NPE. Vì sao?</p>
+  <div class="options">
+    <button class="opt" data-correct>get trả về null, unboxing gọi intValue()</button>
+    <button class="opt">Trong trường hợp này map luôn là null</button>
+    <button class="opt">Biến int không nhận được giá trị từ map</button>
+    <button class="opt">get ném NPE khi không tìm thấy key</button>
+  </div>
+  <div class="why">Thiếu key thì nhận <code>null</code>; đổi một <code>Integer</code> null thành <code>int</code> sẽ gọi <code>intValue()</code> trên null. Message nói đúng điều đó.</div>
+</div>
+
+<h2>Bài kiểm tra cuối: nói trong 60 giây</h2>
+<div class="recall">
+  <p class="prompt">Interviewer hỏi: <strong>"Bạn thấy một NullPointerException trong log production. Bạn tìm nguyên nhân thế nào?"</strong> Bấm giờ. Trả lời to, thành câu đầy đủ. Rồi bấm nút.</p>
+  <button class="reveal">Mình đã nói xong. Hiện checklist.</button>
+  <div class="answer">
+    <p>Chỉ tick những ý bạn thật sự đã nói:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Trên JDK 14+ (mặc định từ 15, tức 17 và 21), mình đọc helpful message trước.</label></li>
+      <li><label><input type="checkbox"> Nửa đầu: JVM đã cố làm gì; nửa "because": biểu thức nào bị null.</label></li>
+      <li><label><input type="checkbox"> Trên JDK 8 chỉ có số dòng, nên một chuỗi như <code>a.b.c</code> rất mơ hồ.</label></li>
+      <li><label><input type="checkbox"> <code>&lt;local1&gt;</code> nghĩa là thiếu debug info của biến local; compile bằng <code>javac -g</code> để có tên.</label></li>
+      <li><label><input type="checkbox"> Chỉ NPE do JVM ném mới có; <code>throw new NullPointerException()</code> không có message.</label></li>
+      <li><label><input type="checkbox"> Sau đó sửa tận gốc: vì sao nó null (thiếu dữ liệu, unboxing, method trả về null)?</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Câu trả lời mẫu</h3>
+    <p><em>"Đầu tiên em đọc exception message, chứ không chỉ nhìn stack trace. Từ JDK 14, và bật mặc định từ JDK 15, JVM in ra helpful NPE message, kiểu <code>Cannot read field "city" because "order.customer.address" is null</code>. Phần đầu là JVM đã cố làm gì, phần 'because' là biểu thức bị null, nên em biết ngay là address chứ không phải order hay customer. Trên JDK 8 chỉ có số dòng, với một chuỗi gọi liên tiếp thì rất mơ hồ. Nếu message hiện <code>&lt;local1&gt;</code> thay vì tên biến thì class được compile thiếu debug info của biến local; <code>javac -g</code> sẽ sửa được. Lưu ý là chỉ NPE do JVM ném mới có message này, NPE do code tự tạo thì không. Sau đó em tìm xem vì sao nó null: thiếu dữ liệu, method trả về null, hay unboxing một <code>Integer</code> null, rồi sửa tận gốc."</em></p>
+  </div>
+</div>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0027-read-the-npe.vi.md">Bài tập 0027: đọc NPE</a>. Ghi ra phần nào bị null cho từng message trước khi chạy bất cứ thứ gì.</p>
+<p>Ví dụ chạy được: <a href="../examples/NpeDemo.java"><code>NpeDemo.java</code></a></p>
+
+<h2>Tiếp theo là gì</h2>
+<p>Interviewer senior có thể hỏi: <em>"Làm sao để NPE không xảy ra ngay từ đầu?"</em> Các ý hay: kiểm tra đầu vào sớm (như compact constructor của record ở <a href="0003-records-and-immutability.vi.html">bài 0003</a>), trả về <code>Optional</code> thay vì null (<a href="0004-streams-and-optional.vi.html">bài 0004</a>), và xử lý <code>case null</code> ngay trong <code>switch</code> của JDK 21 (<a href="0015-pattern-matching-switch-and-record-patterns.vi.html">bài 0015</a>).</p>
+<p><strong>Đọc thêm:</strong> <a href="https://openjdk.org/jeps/358">JEP 358: Helpful NullPointerExceptions</a>. Đọc Summary và Description; các bảng trong đó liệt kê mọi dạng message.</p>
+
+<div class="ask"><strong>Có câu hỏi?</strong> Hỏi mình trong khung chat Claude Code. Mình là giáo viên của bạn, cứ hỏi bất cứ điều gì, ví dụ <em>"Build Maven của mình có compile với -g không?"</em> hoặc <em>"Chấm giúp câu trả lời 60 giây của mình"</em> (gõ lại những gì bạn đã nói). Nhớ báo luôn điểm quiz và điểm checklist: chúng giúp mình chọn bài tiếp theo cho bạn.</div>
+
+<p><a href="0014-sealed-classes.vi.html">← Sealed class: danh sách khách mời cho subclass</a> &nbsp;|&nbsp; <a href="0015-pattern-matching-switch-and-record-patterns.vi.html">switch &quot;mở hộp&quot; object như thế nào (JDK 21) →</a></p>
+
+<footer>
+  <p>Thông tin đã được kiểm tra với JEP 358, bug tracker của OpenJDK và tài liệu javac của Java 21, và chạy thử trên JDK 21, tháng 10/2026.</p>
+  <p>Tài liệu tham khảo: <a href="https://openjdk.org/jeps/358">JEP 358: Helpful NullPointerExceptions</a> · <a href="https://bugs.openjdk.org/browse/JDK-8233014">JDK-8233014: Enable ShowCodeDetailsInExceptionMessages by default</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/specs/man/javac.html">javac (JDK 21)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

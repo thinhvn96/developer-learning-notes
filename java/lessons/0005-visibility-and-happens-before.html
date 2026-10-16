@@ -8,75 +8,277 @@
 </head>
 <body>
 <main>
-<h1>Visibility and happens-before</h1>
-<p class="meta">Java (JDK 8, 17, 21) · Lesson 0005 · step 13 of 27 · Advanced · ~12 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a></p>
+<h1>Why one thread may not see another thread's write</h1>
+<p class="subtitle">Threads, shared memory, CPU caches, and the <em>happens-before</em> rule that makes a write visible.</p>
+<p class="meta">Java (JDK 8, 17, 21) · Lesson 0005 · step 30 of 46 · Advanced · ~25 minutes · <a href="../../index.html">Home</a> · <a href="../index.html">Java (JDK 8, 17, 21) ladder</a> · <a href="../../reference/roadmap.html">Roadmap</a> · <a class="lang" href="0005-visibility-and-happens-before.vi.html" hreflang="vi" lang="vi">Tiếng Việt</a></p>
+
+<div class="mission"><strong>Why this lesson?</strong> Every backend service runs many threads at once, and bugs between threads are the hardest to find: they appear once a week, only in production. Interviewers test this with <em>"What does <code>volatile</code> do?"</em> and <em>"What is happens-before?"</em> This lesson gives you the picture behind both answers.</div>
 
 <div class="win"><b>Today's win:</b> explain why a thread can miss another thread's write, and name three ways to create a happens-before edge.</div>
 
-<h2>The problem</h2>
-<p>If two threads access the same variable and at least one writes, and nothing orders them, you have a <em>data race</em>: "two conflicting accesses that are not ordered by a happens-before relationship".<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a> Without that ordering the reader is not guaranteed to see the write, and the JVM is free to reorder.</p>
-<h2>What creates ordering (happens-before edges)</h2>
+<dl class="words">
+  <dt>thread</dt><dd>One line of work inside your program. A program can run several threads at the same time, like several cooks in one kitchen.</dd>
+  <dt>shared memory</dt><dd>Memory that all threads of a program can read and write, for example a field of an object that two threads both use.</dd>
+  <dt>CPU cache</dt><dd>A small, very fast memory inside each processor core. The core keeps copies of recently used values there so it does not have to go to main memory every time.</dd>
+  <dt>visibility</dt><dd>Whether a value written by one thread can be seen by another thread.</dd>
+  <dt>data race</dt><dd>Two threads touch the same variable, at least one of them writes, and nothing puts the two accesses in order.</dd>
+  <dt>happens-before</dt><dd>A rule from the Java specification: if A happens-before B, then B is guaranteed to see what A wrote.</dd>
+  <dt><code>volatile</code></dt><dd>A keyword you put on a field. Writes to it become visible to every later read of it, in any thread.</dd>
+  <dt><code>synchronized</code></dt><dd>A keyword that lets only one thread at a time run a block of code, guarded by a lock on an object.</dd>
+</dl>
+
+<h2>Before you start</h2>
+<p>Say out loud: <em>"Thread W runs <code>while (!stop) {}</code>. The main thread later sets <code>stop = true</code>. Is W guaranteed to stop?"</em> Guess, and give a reason. You will check your answer in section 3.</p>
+
+<h2>1. What is a thread?</h2>
+<p>Think of a restaurant kitchen. The kitchen is your <strong>program</strong>. Each <strong>cook</strong> is a <span class="term">thread</span>: they follow their own list of steps, at their own speed, at the same time as the others.</p>
+<p>The Oracle tutorial says it the same way: "Threads exist within a process — every process has at least one." When your program starts, you have one thread, "called the <em>main thread</em>".<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Java tutorial: threads</a> You can start more:</p>
+<pre><code>Thread worker = new Thread(() -&gt; {
+    System.out.println("hello from the worker");
+});
+worker.start();   <span class="c">// the worker now runs at the same time as main</span>
+worker.join();    <span class="c">// main waits here until the worker has finished</span></code></pre>
 <ul>
-<li>An unlock of a monitor happens-before every later lock of that same monitor (<code>synchronized</code>).<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></li>
-<li>A write to a <code>volatile</code> field happens-before every later read of that field.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></li>
-<li><code>Thread.start()</code> happens-before the started thread's actions; a thread's actions happen-before another thread returns from <code>join()</code> on it.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></li>
-<li>Library edges: putting an object into a concurrent collection, submitting to an <code>Executor</code>, <code>Future.get()</code>, <code>Lock.unlock</code>/<code>lock</code>, <code>CountDownLatch.countDown</code>/<code>await</code>.<a class="cite" href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/package-summary.html">[2]</a></li>
+  <li><code>new Thread(...)</code> creates the thread. The code inside <code>() -&gt; { ... }</code> (a <em>lambda</em>, a small piece of code you pass around) is the work it will do.</li>
+  <li><code>start()</code> makes it run. From now on two cooks work in parallel.</li>
+  <li><code>join()</code> makes the main thread wait until the worker is done.</li>
 </ul>
-<p>The payoff: "If a program is correctly synchronized, then all executions of the program will appear to be sequentially consistent."<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a> You reason about interleavings, not reorderings.</p>
-<div class="aside">Senior detail: a non-volatile <code>long</code> or <code>double</code> write may be treated as two 32-bit writes, so a reader can see a torn value; volatile 64-bit writes are atomic.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a> Also, <code>volatile</code> gives visibility and ordering, not atomicity of <code>count++</code>. That is the next interview follow-up (a later lesson covers atomics).</div>
-<h2>Try it</h2>
-<pre><code>java java/examples/StopFlag.java
+
+<h2>2. Shared memory and CPU caches</h2>
+<p>All the cooks share one <strong>whiteboard</strong> on the wall: that is <span class="term">shared memory</span>. "Threads share the process's resources, including memory and open files", which the tutorial calls "efficient, but potentially problematic".<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Java tutorial: threads</a></p>
+<p>Walking to the whiteboard is slow, so each cook copies the values they need onto a <strong>personal notepad</strong>. That notepad is the <span class="term">CPU cache</span>. A cook may keep reading the notepad and never look at the whiteboard again. Another cook may write a new value on <em>their</em> notepad and copy it to the whiteboard much later.</p>
+
+<figure>
+<svg viewBox="0 0 680 260" role="img" aria-label="Two processor cores, each with its own cache. Core 1 has written stop = true in its cache; core 2 still has the old copy stop = false. Main memory is shared below.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="currentColor">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <rect x="40" y="20" width="250" height="50" rx="6"/>
+      <rect x="390" y="20" width="250" height="50" rx="6"/>
+      <rect x="40" y="190" width="600" height="50" rx="6"/>
+      <path d="M165 70v24M160 88l5 6 5-6"/>
+      <path d="M515 70v24M510 88l5 6 5-6"/>
+    </g>
+    <text x="165" y="42" text-anchor="middle">Core 1</text>
+    <text x="165" y="60" text-anchor="middle" font-size="11" opacity=".75">runs thread main</text>
+    <text x="515" y="42" text-anchor="middle">Core 2</text>
+    <text x="515" y="60" text-anchor="middle" font-size="11" opacity=".75">runs thread worker</text>
+    <rect x="40" y="100" width="250" height="44" rx="4" fill="none" stroke="currentColor"/>
+    <text x="165" y="127" text-anchor="middle">cache: stop = true</text>
+    <rect x="390" y="100" width="250" height="44" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="515" y="127" text-anchor="middle" fill="var(--accent)">cache: stop = false</text>
+    <g fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".7">
+      <path d="M165 144v40"/>
+      <path d="M515 144v40"/>
+    </g>
+    <text x="175" y="170" font-size="11" opacity=".75">copied back… when?</text>
+    <text x="525" y="170" font-size="11" fill="var(--accent)">re-read… when?</text>
+    <text x="340" y="212" text-anchor="middle">main memory (shared by all threads)</text>
+    <text x="340" y="230" text-anchor="middle" font-size="11" opacity=".75">field stop</text>
+  </g>
+</svg>
+<figcaption>The main thread wrote <code>stop = true</code>, but the worker may keep reading its own old copy. Nothing in plain Java code says <em>when</em> the copies are synced.</figcaption>
+</figure>
+
+<p class="muted">This picture is a mental model. The Java specification does not talk about caches at all; it only says which reads are <em>guaranteed</em> to see which writes. Caches, the compiler and the CPU are all allowed to reorder or delay things, as long as a single thread cannot notice. Another thread <em>can</em> notice.</p>
+<p>The Oracle tutorial shows the simplest case: thread A runs <code>counter++</code>, then thread B prints <code>counter</code>. The value printed "might well be "0", because there's no guarantee that thread A's change to <code>counter</code> will be visible to thread B — unless the programmer has established a happens-before relationship between these two statements."<a class="src" href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Java tutorial: memory consistency</a></p>
+<p>The Java Language Specification (JLS) gives this situation a name. Two accesses to the same variable are <em>conflicting</em> if at least one is a write, and a program with "two conflicting accesses that are not ordered by a happens-before relationship" contains a <span class="term">data race</span>.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a> Without that ordering the reader is not guaranteed to see the write, and the JVM is free to reorder.</p>
+
+<h2>3. Watch it: the stop flag</h2>
+<p>Here is the example program, <code>StopFlag.java</code>, slightly shortened:</p>
+<pre><code>static <span class="hl">volatile</span> boolean stop = false;
+
+Thread worker = new Thread(() -&gt; {
+    long spins = 0;
+    while (!stop) spins++;                 <span class="c">// keep reading stop</span>
+    System.out.println("worker saw stop after spinning");
+});
+worker.start();
+Thread.sleep(200);                         <span class="c">// main waits 0.2 s</span>
+stop = true;                               <span class="c">// volatile write</span>
+worker.join(2000);                         <span class="c">// wait at most 2 s for the worker</span></code></pre>
+<p>Follow it step by step:</p>
+<pre><code><span class="c">Step 1  main starts the worker                   start() happens-before the worker's actions</span>
+<span class="c">Step 2  worker reads stop → false, spins, reads again, again…</span>
+<span class="c">Step 3  main writes stop = true                  a volatile write</span>
+<span class="c">Step 4  worker's next read of stop               a volatile read that comes later</span>
+<span class="c">        → the rule says it must see true          → the loop ends</span>
+<span class="c">Step 5  main's join() returns                    the worker has finished</span></code></pre>
+<pre><code>$ java java/examples/StopFlag.java
 worker saw stop after spinning
 worker finished</code></pre>
-<p>Now delete <code>volatile</code> and rerun (exercise). The specification does not promise a hang or a success; that is exactly the point.</p>
+<p>Now imagine you delete <code>volatile</code>. Step 4 loses its guarantee. The worker <em>may</em> see <code>true</code> quickly, much later, or never: the compiler is even allowed to read <code>stop</code> once and keep the value. The specification does not promise a hang or a success; that is exactly the point. You will try it in the exercise.</p>
 
-<h2>Retrieval practice</h2>
-<p>Answer from memory. One attempt each.</p>
-<div class="quiz">
-  <p class="prompt">1. A data race needs two accesses that are...?</p>
-  <button>Both reads of a field</button>
-  <button>Ordered by a volatile</button>
-  <button data-correct>Unordered by happens-before</button>
-  <button>Both in one thread</button>
-  <p class="explain">A data race is conflicting accesses not ordered by happens-before.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">2. Which action does NOT create a happens-before edge?</p>
-  <button>A volatile write then read</button>
-  <button>A monitor unlock then lock</button>
-  <button>A Thread.start call</button>
-  <button data-correct>A plain field assignment</button>
-  <p class="explain">Plain accesses give no cross-thread ordering by themselves.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">3. What does <code>volatile</code> NOT give you?</p>
-  <button>Ordering with reads</button>
-  <button>Visibility of writes</button>
-  <button data-correct>Atomic count++ updates</button>
-  <button>Atomic 64-bit writes</button>
-  <p class="explain">volatile orders and publishes writes, but count++ is still read-modify-write, not atomic.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></p>
-</div>
-<div class="quiz">
-  <p class="prompt">4. Correctly synchronized programs appear...?</p>
-  <button>Deadlock free always</button>
-  <button data-correct>Sequentially consistent</button>
-  <button>Randomly reordered</button>
-  <button>Fully single-threaded</button>
-  <p class="explain">That is the JLS guarantee for programs free of data races.<a class="cite" href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">[1]</a></p>
-</div>
+<h2>4. The rule: happens-before</h2>
+<p>Back to the kitchen. A cook writes "table 5 is ready" on the whiteboard and then <strong>rings a bell</strong>. Any cook who hears the bell and then looks at the board is guaranteed to see the note, and <em>everything</em> written before the bell. The bell is a <span class="term">happens-before</span> edge.</p>
+<p>The JLS builds the rule from small pieces:<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></p>
+<ul>
+  <li><strong>Program order:</strong> "If <em>x</em> and <em>y</em> are actions of the same thread and <em>x</em> comes before <em>y</em> in program order, then <em>hb(x, y)</em>." Inside one thread, earlier lines happen-before later lines.</li>
+  <li><strong>Synchronization edges</strong> between threads (the list below).</li>
+  <li><strong>Transitivity:</strong> "If <em>hb(x, y)</em> and <em>hb(y, z)</em>, then <em>hb(x, z)</em>." Edges chain together.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 680 310" role="img" aria-label="Two thread timelines. Main writes data = 42, then volatile stop = true. A happens-before arrow goes to the worker's volatile read of stop, after which the worker reads data and sees 42.">
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" fill="currentColor">
+    <text x="150" y="30" text-anchor="middle" font-size="13">thread main</text>
+    <text x="530" y="30" text-anchor="middle" font-size="13">thread worker</text>
+    <g fill="none" stroke="currentColor" opacity=".45">
+      <path d="M150 42v28M150 178v112"/>
+      <path d="M530 42v28M530 106v90M530 284v6"/>
+    </g>
+    <text x="340" y="300" text-anchor="middle" font-size="11" opacity=".75">time flows down</text>
+    <rect x="50" y="70" width="200" height="36" rx="4" fill="none" stroke="currentColor"/>
+    <text x="150" y="93" text-anchor="middle">data = 42   (plain)</text>
+    <path d="M150 106v34M145 134l5 6 5-6" fill="none" stroke="currentColor"/>
+    <text x="160" y="128" font-size="11" opacity=".75">program order</text>
+    <rect x="50" y="142" width="200" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="150" y="165" text-anchor="middle" fill="var(--accent)">stop = true (volatile)</text>
+    <rect x="430" y="196" width="200" height="36" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="530" y="219" text-anchor="middle" fill="var(--accent)">read stop → true</text>
+    <path d="M250 165 L424 210" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+    <path d="M415 212l10-1-7-7" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+    <text x="340" y="172" text-anchor="middle" font-size="11" fill="var(--accent)">happens-before</text>
+    <path d="M530 232v20M525 246l5 6 5-6" fill="none" stroke="currentColor"/>
+    <rect x="430" y="254" width="200" height="30" rx="4" fill="none" stroke="currentColor"/>
+    <text x="530" y="274" text-anchor="middle">read data → 42</text>
+    <rect x="430" y="70" width="200" height="36" rx="4" fill="none" stroke="currentColor" stroke-dasharray="4 4" opacity=".7"/>
+    <text x="530" y="93" text-anchor="middle" opacity=".75">read stop → false</text>
+  </g>
+</svg>
+<figcaption>Program order (inside main) + the volatile edge (main → worker) chain together, so the worker is guaranteed to see <code>data = 42</code> too, even though <code>data</code> is not volatile.</figcaption>
+</figure>
+
+<p>Trace the chain in the picture:</p>
+<pre><code><span class="c">Step 1  data = 42      hb  stop = true       program order in main</span>
+<span class="c">Step 2  stop = true    hb  read stop → true  volatile write, later volatile read</span>
+<span class="c">Step 3  read stop      hb  read data         program order in worker</span>
+<span class="c">Step 4  transitivity:  data = 42  hb  read data   →  <span class="hl">the worker sees 42</span></span></code></pre>
+<p>This is the common "publish then flag" pattern: prepare the data with plain writes, then do one volatile write as the signal.</p>
+
+<h3>What creates a happens-before edge</h3>
+<ul>
+<li>An unlock of a monitor happens-before every later lock of that same monitor (<code>synchronized</code>).<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></li>
+<li>A write to a <code>volatile</code> field happens-before every later read of that field.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></li>
+<li><code>Thread.start()</code> happens-before the started thread's actions; a thread's actions happen-before another thread returns from <code>join()</code> on it.<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a></li>
+<li>Library edges: putting an object into a concurrent collection, submitting to an <code>Executor</code>, <code>Future.get()</code>, <code>Lock.unlock</code>/<code>lock</code>, <code>CountDownLatch.countDown</code>/<code>await</code>.<a class="src" href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent: Memory Consistency Properties</a></li>
+</ul>
+<p>So with <code>synchronized</code> the bell is "unlock, then the next lock of the same object". If the writer and the reader use <em>different</em> lock objects, there is no edge.</p>
+<p>The payoff: "If a program is correctly synchronized, then all executions of the program will appear to be sequentially consistent."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5</a> In plain words: remove every data race and you can reason about your program as if the threads' steps were simply interleaved, one at a time. You reason about interleavings, not reorderings.</p>
+<p class="muted">JDK 8 vs 17 vs 21: these rules are the same in all three versions. What changed around them is the tooling (for example virtual threads in JDK 21, lesson 0006), not the memory model.</p>
+
+<h2>5. Traps that interviewers like</h2>
+<h3>Trap 1: "volatile makes count++ safe"</h3>
+<p>It does not. <code>volatile</code> gives visibility and ordering, not atomicity of <code>count++</code>, which is three steps: read, add one, write. Two threads can both read 5 and both write 6. That is the next interview follow-up, and <a href="0024-atomics-and-locks.html">lesson 0024</a> shows the lost updates and the fix.</p>
+<h3>Trap 2: torn <code>long</code> and <code>double</code></h3>
+<p>A non-volatile <code>long</code> or <code>double</code> write may be treated as two 32-bit writes, so a reader can see a torn value: half from one write, half from another. "Writes and reads of volatile <code>long</code> and <code>double</code> values are always atomic."<a class="src" href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.7">JLS 17.7</a></p>
+<h3>Trap 3: "it worked on my laptop"</h3>
+<p>A racy program can pass every test on your machine and fail on a server with more cores or after the JIT compiler optimizes the loop. A test that passes proves nothing about a data race. The fix is to create the edge on purpose: <code>volatile</code>, <code>synchronized</code>, a lock, or a <code>java.util.concurrent</code> class.</p>
+
+<h2>Practice</h2>
+<p class="muted">Answer from memory, don't scroll up. The options are in a different order every time you open the page.</p>
 <p class="score"></p>
 
+<div class="quiz">
+  <p class="q">According to the JLS, what makes two conflicting accesses a data race?</p>
+  <div class="options">
+    <button class="opt" data-correct>They are not ordered by happens-before</button>
+    <button class="opt">They both read the field at the same time</button>
+    <button class="opt">They happen inside one single thread</button>
+    <button class="opt">They are ordered by a volatile write</button>
+  </div>
+  <div class="why">A data race is two conflicting accesses (at least one write) that no happens-before relationship orders (JLS 17.4.5).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Which of these does NOT create a happens-before edge between two threads?</p>
+  <div class="options">
+    <button class="opt" data-correct>A plain field write, then a plain read</button>
+    <button class="opt">A volatile write, then a read of that field</button>
+    <button class="opt">A monitor unlock, then a lock of that monitor</button>
+    <button class="opt">Calling start() on the new thread</button>
+  </div>
+  <div class="why">Plain accesses give no cross-thread ordering by themselves. The other three are listed edges in JLS 17.4.5.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does <code>volatile</code> NOT give you?</p>
+  <div class="options">
+    <button class="opt" data-correct>An atomic count++ on that field</button>
+    <button class="opt">Visibility of writes to later reads</button>
+    <button class="opt">Ordering of earlier writes before it</button>
+    <button class="opt">Atomic writes of a long or double</button>
+  </div>
+  <div class="why"><code>count++</code> is read, add, write: three steps. <code>volatile</code> makes each step visible but does not glue them together.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">Main writes <code>data = 42</code> (plain), then <code>ready = true</code> (volatile). The worker reads <code>ready</code> and gets <code>true</code>, then reads <code>data</code>. What does it see?</p>
+  <div class="options">
+    <button class="opt" data-correct>42, because the edges chain together</button>
+    <button class="opt">Maybe 0, because data is not volatile</button>
+    <button class="opt">It throws an IllegalStateException</button>
+    <button class="opt">It depends only on the CPU model</button>
+  </div>
+  <div class="why">Program order in main + the volatile edge + program order in the worker, joined by transitivity, give hb(data = 42, read data).</div>
+</div>
+
+<div class="quiz">
+  <p class="q">You remove <code>volatile</code> from the <code>stop</code> flag. What does the specification promise?</p>
+  <div class="options">
+    <button class="opt" data-correct>Nothing: it may stop, stop late or never</button>
+    <button class="opt">The worker will hang forever, every time</button>
+    <button class="opt">The worker stops, only a little bit later</button>
+    <button class="opt">The compiler refuses to build the program</button>
+  </div>
+  <div class="why">Without a happens-before edge there is no guarantee either way. That is why a passing test proves nothing.</div>
+</div>
+
+<div class="quiz">
+  <p class="q">What does the JLS promise for a correctly synchronized program?</p>
+  <div class="options">
+    <button class="opt" data-correct>All executions appear sequentially consistent</button>
+    <button class="opt">It can never deadlock, whatever locks it uses</button>
+    <button class="opt">It runs as fast as a single-threaded program</button>
+    <button class="opt">Its threads always run in the order started</button>
+  </div>
+  <div class="why">That is the JLS guarantee for programs free of data races: you may reason about simple interleavings. It says nothing about deadlock or speed.</div>
+</div>
+
+<h2>The final test: say it in 60 seconds</h2>
+<div class="recall">
+  <p class="prompt">An interviewer asks: <strong>"What is happens-before, and when do you need <code>volatile</code>?"</strong> Start a timer. Answer out loud, in full sentences. Then click the button.</p>
+  <button class="reveal">I've said it. Show the checklist.</button>
+  <div class="answer">
+    <p>Tick only the points you really said:</p>
+    <ul class="checklist">
+      <li><label><input type="checkbox"> Threads share memory, but without ordering a thread may not see another thread's write (caches, reordering).</label></li>
+      <li><label><input type="checkbox"> A data race: two conflicting accesses not ordered by happens-before.</label></li>
+      <li><label><input type="checkbox"> If A happens-before B, B is guaranteed to see A's writes.</label></li>
+      <li><label><input type="checkbox"> Edges: volatile write → later read, unlock → later lock, start(), join(), java.util.concurrent classes.</label></li>
+      <li><label><input type="checkbox"> Edges chain with program order (transitivity), so a volatile flag can publish plain data.</label></li>
+      <li><label><input type="checkbox"> volatile gives visibility and ordering, not atomic count++.</label></li>
+    </ul>
+    <p class="checklist-score"></p>
+    <h3>Example answer</h3>
+    <p><em>"Threads share the heap, but each core can cache values and the compiler can reorder code, so without some ordering one thread may never see another thread's write. The Java memory model defines that ordering as happens-before: if action A happens-before B, B sees what A wrote. If two threads access the same variable, one writes, and there's no happens-before between them, that's a data race. I create edges with a volatile write followed by a read, with unlock and lock of the same monitor, with Thread.start and join, or with java.util.concurrent classes like executors and latches. Edges chain with program order, so I can write data normally and then set a volatile flag to publish it. I use volatile for simple flags and publication, but not for count++, because volatile doesn't make read-modify-write atomic; for that I use an atomic or a lock."</em></p>
+  </div>
+</div>
+
 <h2>Now do the exercise</h2>
-<p><a href="../exercises/0005-remove-volatile.md">Exercise 0005: remove volatile and observe</a></p>
+<p><a href="../exercises/0005-remove-volatile.md">Exercise 0005: remove volatile and observe</a>. Write your prediction to the teacher first, then run the code.</p>
 <p>Runnable example: <a href="../examples/StopFlag.java"><code>StopFlag.java</code></a></p>
 
-<h2>Read next</h2>
-<p><strong>Primary source:</strong> <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">JLS 17.4: Memory Model</a>. Dense; read 17.4.5 (happens-before) only. Ask your teacher to translate any sentence.</p>
-<p><a href="0010-completablefuture.html">← JDK 8: CompletableFuture and async pipelines</a> &nbsp;|&nbsp; <a href="0024-atomics-and-locks.html">Atomics and ReentrantLock: fixing lost updates →</a></p>
+<h2>What's next</h2>
+<p>A senior interviewer will push: <em>"So <code>volatile int count; count++</code> from four threads: what is the result? How do you fix it, and what is the cost of each fix?"</em> <a href="0024-atomics-and-locks.html">Lesson 0024</a> runs exactly that and compares atomics with locks.</p>
+<p><strong>Read more:</strong> <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS 17.4.5: Happens-before Order</a>. Dense; read only 17.4.4 and 17.4.5, and ask your teacher to translate any sentence. For a gentler start, the <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Oracle tutorial page on memory consistency errors</a>.</p>
+
+<div class="ask"><strong>Have a question?</strong> Ask me in the Claude Code chat. I'm your teacher, so ask anything, for example <em>"Why would the compiler read stop only once?"</em> or <em>"Please check my 60-second answer"</em> (type what you said). Please also tell me your quiz score and checklist score: they help me choose your next lesson.</div>
+
+<p><a href="0044-review-jdk8.html">← Review 5: lambdas, streams, java.time and CompletableFuture</a> &nbsp;|&nbsp; <a href="0024-atomics-and-locks.html">Why count++ loses updates, and how to fix it →</a></p>
 
 <footer>
-  <p><strong>Ask your teacher.</strong> Anything unclear? Ask a follow-up in the Claude Code session: "explain that with a different example", "quiz me harder", "how would an interviewer probe this?".</p>
-  <p>References: [1] <a href="https://docs.oracle.com/javase/specs/jls/se25/html/jls-17.html">JLS 17: Threads and Locks</a> · [2] <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary (Memory Consistency Properties)</a> · <a href="../../RESOURCES.md">All resources</a></p>
+  <p>Facts checked against the Java Language Specification (Java SE 21), the Java 21 documentation and the Oracle Java Tutorials, October 2026.</p>
+  <p>References: <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html">JLS 17: Threads and Locks</a> · <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html">java.util.concurrent package summary (Memory Consistency Properties)</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Java Tutorials: Processes and Threads</a> · <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Java Tutorials: Memory Consistency Errors</a> · <a href="../../RESOURCES.md">All resources</a></p>
 </footer>
 </main>
 <script src="../../assets/quiz.js"></script>

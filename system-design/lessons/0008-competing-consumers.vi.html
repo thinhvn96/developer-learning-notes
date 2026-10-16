@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design 8: Competing consumers</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Competing consumers</h1>
+<p class="meta">System Design · Bài 0008 · bước 7/11 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình System Design</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0008-competing-consumers.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> giải thích được competing consumers (các consumer cạnh tranh) và phân biệt nó với publish-subscribe.</div>
+
+<h2>Ý tưởng</h2>
+<p>"Cho phép nhiều consumer đồng thời xử lý các message nhận được trên cùng một kênh messaging." Queue đảm bảo mỗi message chỉ tới một consumer; nhóm consumer có thể tăng hoặc giảm theo tải. Nó khác publish-subscribe: với competing consumers thì "một consumer nhận mỗi message"; với pub-sub thì "mọi consumer đều nhận mọi message".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+<h2>Lợi ích và lưu ý</h2>
+<ul><li>San phẳng tải, tin cậy hơn (một instance lỗi không chặn các instance khác), mở rộng được, không cần cơ chế phối hợp phức tạp; "message queue đảm bảo mỗi message được giao ít nhất một lần".<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></li>
+<li><strong>Thứ tự</strong> không được đảm bảo: hãy thiết kế để xử lý idempotent.</li>
+<li><strong>Poison message</strong> cần được giữ lại riêng (dead letter queue / giới hạn số lần giao).</li>
+<li><strong>Kết quả</strong> cần một kênh phản hồi và cơ chế correlation (ghép cặp request và phản hồi).</li>
+<li>Một queue duy nhất có thể trở thành nút thắt cổ chai; hãy phân vùng hoặc cân bằng qua nhiều queue.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></li></ul>
+<p>Bạn đã gặp nó ở đâu trong khóa học: các consumer RabbitMQ trên cùng một queue với ack và prefetch (<a href="../../rabbitmq/lessons/0003-acks-prefetch-redelivery.vi.html">bài học</a>), và một <a href="../../kafka/lessons/0003-consumers-groups-and-offsets.vi.html">consumer group</a> của Kafka (mỗi partition giao cho một consumer trong group). Không phù hợp khi các task phụ thuộc lẫn nhau hoặc phải chạy theo một trình tự nghiêm ngặt.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Competing consumers: bao nhiêu consumer nhận mỗi message?</p>
+  <button data-correct>Một</button>
+  <button>Không</button>
+  <button>Tất cả</button>
+  <button>Hai</button>
+  <p class="explain">Mỗi message chỉ do một consumer nhận.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Pub-sub: bao nhiêu consumer nhận mỗi message?</p>
+  <button>Một</button>
+  <button>Một nửa</button>
+  <button>Không</button>
+  <button data-correct>Mọi subscriber</button>
+  <p class="explain">Mọi consumer đều nhận mọi message.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Thứ tự giữa các competing consumer?</p>
+  <button>Bị đảo ngược</button>
+  <button data-correct>Không được đảm bảo</button>
+  <button>Được sắp xếp</button>
+  <button>Được đảm bảo</button>
+  <p class="explain">Thứ tự xử lý không được đảm bảo.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Consumer cứ crash ở một message. Dùng...?</p>
+  <button data-correct>Xử lý dead-letter</button>
+  <button>Fanout</button>
+  <button>Retry thêm mãi mãi</button>
+  <button>Queue lớn hơn</button>
+  <p class="explain">Poison message nên được chuyển ra chỗ khác, ví dụ một dead-letter queue.<a class="cite" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0008-scale-consumers.vi.md">Bài tập 0008: mở rộng consumer</a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">Azure: Competing Consumers</a>. Phần giải pháp và các điểm cần cân nhắc.</p>
+<p><a href="0007-queue-based-load-leveling.vi.html">← Queue-based load leveling</a> &nbsp;|&nbsp; <a href="0003-queue-versus-log.vi.html">Queue hay log: chọn RabbitMQ hay Kafka →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/competing-consumers">Azure: Competing Consumers</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

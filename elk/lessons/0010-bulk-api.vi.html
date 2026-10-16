@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ELK Stack 10: Bulk API và lỗi theo từng item</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Bulk API và lỗi theo từng item</h1>
+<p class="meta">ELK Stack · Bài 0010 · bước 8/14 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình ELK Stack</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0010-bulk-api.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> index nhiều document trong một request, và đọc kết quả của từng item thay vì tin vào HTTP status.</div>
+
+<h2>Vì sao dùng bulk</h2>
+<p>Bulk API thực hiện nhiều thao tác index hoặc delete trong một lần gọi; nó "giảm overhead và có thể tăng đáng kể tốc độ index". Body có định dạng <strong>NDJSON</strong>: một dòng action, tiếp theo (với index/create/update) là một dòng source; dòng cuối cùng phải kết thúc bằng ký tự xuống dòng. Các action: <code>index</code> (thêm hoặc thay thế), <code>create</code> (chỉ khi chưa tồn tại), <code>update</code> (cập nhật một phần), <code>delete</code>.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+<h2>Lỗi tính theo từng item</h2>
+<p>Response có cờ <code>errors</code> và một status cho từng item, nên cả request có thể thành công trong khi một số item lại thất bại.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+<pre><code>POST _bulk   (4 index actions, then create of an existing _id)
+errors flag: True
+  index 1 201 ... index 4 201
+  create 1 409 version_conflict_engine_exception</code></pre>
+<p>Luôn kiểm tra từng item; đừng bao giờ coi "HTTP 200" là mọi thứ đã được index. Script: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a>. Đi cặp với <a href="0004-near-real-time-search-and-refresh.vi.html">tinh chỉnh refresh</a>: khi bulk load, người ta thường tăng <code>refresh_interval</code> trong lúc chạy (xem bài tập).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Định dạng body của bulk request?</p>
+  <button>YAML</button>
+  <button data-correct>NDJSON</button>
+  <button>CSV</button>
+  <button>XML</button>
+  <p class="explain">API này yêu cầu JSON phân tách bằng dòng mới (newline-delimited JSON).<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Action nào thất bại nếu document đã tồn tại?</p>
+  <button>update</button>
+  <button>index</button>
+  <button>delete</button>
+  <button data-correct>create</button>
+  <p class="explain">create chỉ index khi document chưa tồn tại (lần chạy trả về 409).<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Bulk trả về HTTP 200 nghĩa là...?</p>
+  <button>Index đang green</button>
+  <button>Không gì được index</button>
+  <button>Mọi item đều thành công</button>
+  <button data-correct>Phải kiểm tra từng item</button>
+  <p class="explain">Status của từng item và cờ errors mới cho biết lỗi.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Lợi ích chính của bulk?</p>
+  <button data-correct>Ít overhead hơn</button>
+  <button>Nhiều replica hơn</button>
+  <button>Mapping nhỏ hơn</button>
+  <button>Analysis mạnh hơn</button>
+  <p class="explain">Nó giảm overhead và tăng tốc độ index.<a class="cite" href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0010-bulk-error-handling.vi.md">Bài tập 0010: xử lý lỗi bulk</a></p>
+<p>Ví dụ chạy được: <a href="../examples/03-analysis-bulk-aggs.sh"><code>03-analysis-bulk-aggs.sh</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">Elasticsearch: Bulk API</a>. Phần request body và response.</p>
+<p><a href="0005-query-dsl-term-match-bool.vi.html">← Query DSL: term, match và bool</a> &nbsp;|&nbsp; <a href="0011-aggregations.vi.html">Aggregation: bucket và metric →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hỏi tiếp ngay trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk">Elasticsearch: Bulk API</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

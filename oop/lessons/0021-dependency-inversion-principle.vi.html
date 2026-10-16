@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOP 21: SOLID 5: Dependency Inversion Principle</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>SOLID 5: Dependency Inversion Principle</h1>
+<p class="meta">OOP (Lập trình hướng đối tượng) · Bài 0021 · bước 21/22 · Advanced · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình OOP</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0021-dependency-inversion-principle.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> đảo ngược một dependency để logic nghiệp vụ cấp cao phụ thuộc vào một abstraction do chính nó sở hữu, và wiring các class cụ thể ở vòng ngoài.</div>
+
+<h2>Nguyên lý</h2>
+<p>"Nên phụ thuộc vào abstraction, không phụ thuộc vào thứ cụ thể."<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a> Module cấp cao (policy, logic nghiệp vụ) không nên phụ thuộc vào module cấp thấp (chi tiết); cả hai đều phụ thuộc vào abstraction.</p>
+<pre><code>java oop/examples/DipDemo.java
+email -&gt; ALERT: disk full
+sms   -&gt; ALERT: disk full
+[test double] ALERT: disk full</code></pre>
+<p><code>AlertService</code> phụ thuộc vào interface <code>Notifier</code>, và interface này nằm cùng chỗ với logic cấp cao. Email, SMS và một test double là các chi tiết được cắm vào ở vòng ngoài (<code>main</code>). Hãy so sánh với service bị gắn chặt trong bài <a href="0015-coupling-and-cohesion.vi.html">coupling và cohesion</a>. Mã nguồn: <a href="../examples/DipDemo.java"><code>DipDemo.java</code></a>.</p>
+<h2>DIP, DI và IoC</h2>
+<p>Dependency <em>inversion</em> là nguyên lý thiết kế; dependency <em>injection</em> là một kỹ thuật để cung cấp abstraction đó; một IoC container (Spring) tự động hoá việc wiring: "các object chỉ khai báo dependency của mình qua tham số constructor ... Sau đó IoC container sẽ inject các dependency đó" (<a href="../../spring-boot/lessons/0001-ioc-and-beans.vi.html">bài Spring IoC</a>).</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. DIP nói nên phụ thuộc vào...?</p>
+  <button data-correct>Abstraction</button>
+  <button>Static</button>
+  <button>Biến toàn cục</button>
+  <button>Class cụ thể</button>
+  <p class="explain">Phụ thuộc vào abstraction, không phụ thuộc vào thứ cụ thể.<a class="cite" href="https://en.wikipedia.org/wiki/SOLID">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Interface Notifier nên nằm ở đâu?</p>
+  <button>Cùng code email</button>
+  <button>Chỉ trong main</button>
+  <button>Chỉ trong test</button>
+  <button data-correct>Cùng logic cấp cao</button>
+  <p class="explain">Module cấp cao sở hữu abstraction.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Class cụ thể được chọn ở đâu?</p>
+  <button data-correct>Ở vòng ngoài (main)</button>
+  <button>Trong interface</button>
+  <button>Bên trong AlertService</button>
+  <button>Chỉ lúc compile</button>
+  <p class="explain">main wiring email, sms và một test double.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. DI là...?</p>
+  <button>Một thread pool</button>
+  <button>Giống hệt DIP</button>
+  <button data-correct>Kỹ thuật cung cấp dependency</button>
+  <button>Một database</button>
+  <p class="explain">Injection cung cấp abstraction; inversion là nguyên lý.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0021-invert-the-dependency.vi.md">Bài tập 21: đảo ngược dependency</a></p>
+<p>Ví dụ chạy được: <a href="../examples/DipDemo.java"><code>DipDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a>. Trang tổng quan về SOLID.</p>
+<p><a href="0020-interface-segregation-principle.vi.html">← SOLID 4: Interface Segregation Principle</a> &nbsp;|&nbsp; <a href="0022-god-objects-and-refactoring.vi.html">God object và refactor hướng tới SOLID →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "interviewer sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://en.wikipedia.org/wiki/SOLID">Wikipedia: SOLID</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

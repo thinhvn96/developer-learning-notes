@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL 7: Hàm tổng hợp, GROUP BY và HAVING</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Hàm tổng hợp, GROUP BY và HAVING</h1>
+<p class="meta">PostgreSQL · Bài 0007 · bước 2/13 · Foundation · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình PostgreSQL</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0007-aggregates-group-by-having.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> dùng hàm tổng hợp cùng GROUP BY, và biết một điều kiện lọc nên đặt ở WHERE hay HAVING.</div>
+
+<h2>Hàm tổng hợp</h2>
+<p>Hàm tổng hợp (aggregate) tính ra một kết quả từ nhiều dòng đầu vào: <code>count</code>, <code>sum</code>, <code>avg</code>, <code>max</code>, <code>min</code>.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a> Với <code>GROUP BY</code>, bạn nhận được một dòng kết quả cho mỗi nhóm.</p>
+<h2>WHERE vs HAVING</h2>
+<p>"<code>WHERE</code> chọn các dòng đầu vào trước khi tính nhóm và hàm tổng hợp ... còn <code>HAVING</code> chọn các dòng nhóm sau khi đã tính nhóm và hàm tổng hợp." Mệnh đề <code>WHERE</code> không được chứa hàm tổng hợp; <code>HAVING</code> thì luôn chứa.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+<pre><code>cd postgresql/examples &amp;&amp; ./run.sh 07-aggregates.sql
+GROUP BY city:           Hayward 2 rows, Oakland 1, San Francisco 2
+WHERE temp_lo &lt; 40 ...:  Hayward 1, Oakland 1                  # rows filtered first
+HAVING max(temp_lo)&lt;40:  Oakland 35                            # groups filtered after
+WHERE temp_lo = max(...): ERROR: aggregate functions are not allowed in WHERE</code></pre>
+<p>Cách sửa mà tài liệu đưa ra: dùng subquery, <code>WHERE temp_lo = (SELECT max(temp_lo) FROM weather)</code>.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a> Source: <a href="../examples/07-aggregates.sql"><code>07-aggregates.sql</code></a>. Hãy so sánh với <a href="0003-window-functions.vi.html">window function</a>, loại hàm giữ lại mọi dòng.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Mệnh đề nào lọc dòng trước khi gom nhóm?</p>
+  <button data-correct>WHERE</button>
+  <button>LIMIT</button>
+  <button>ORDER BY</button>
+  <button>HAVING</button>
+  <p class="explain">WHERE chọn các dòng đầu vào trước khi tính nhóm.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Mệnh đề nào chứa điều kiện trên hàm tổng hợp?</p>
+  <button>JOIN</button>
+  <button>FROM</button>
+  <button data-correct>HAVING</button>
+  <button>WHERE</button>
+  <p class="explain">HAVING chọn nhóm sau khi tổng hợp và luôn chứa hàm tổng hợp.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. WHERE có chứa được max(x) không?</p>
+  <button>Chỉ trong subquery</button>
+  <button>Chỉ khi có GROUP BY</button>
+  <button data-correct>Không, sẽ báo lỗi</button>
+  <button>Có, luôn được</button>
+  <p class="explain">PostgreSQL từ chối hàm tổng hợp trong WHERE (như lần chạy ở trên cho thấy).<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. GROUP BY city trả về bao nhiêu dòng cho mỗi city?</p>
+  <button>Mỗi dòng đầu vào một dòng</button>
+  <button>Hai</button>
+  <button data-correct>Một</button>
+  <button>Không dòng nào</button>
+  <p class="explain">Mỗi nhóm một dòng kết quả.<a class="cite" href="https://www.postgresql.org/docs/current/tutorial-agg.html">[1]</a></p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0007-report-queries.vi.md">Bài tập 0007: các query báo cáo</a></p>
+<p>Ví dụ chạy được: <a href="../examples/07-aggregates.sql"><code>07-aggregates.sql</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://www.postgresql.org/docs/current/tutorial-agg.html">PostgreSQL Tutorial: Aggregate Functions</a>. Mục 2.7.</p>
+<p><a href="0001-tables-and-constraints.vi.html">← Table và constraint</a> &nbsp;|&nbsp; <a href="0002-joins-inner-and-left.vi.html">Inner join, left join và cái bẫy WHERE →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi thêm trong phiên Claude Code: "giải thích lại bằng ví dụ khác", "hỏi khó hơn đi", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://www.postgresql.org/docs/current/tutorial-agg.html">PostgreSQL Tutorial: Aggregate functions</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>

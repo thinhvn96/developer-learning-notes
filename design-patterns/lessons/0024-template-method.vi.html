@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Patterns 24: Template Method</title>
+<link rel="stylesheet" href="../../assets/style.css">
+</head>
+<body>
+<main>
+<h1>Template Method</h1>
+<p class="meta">Design Patterns · Bài 0024 · bước 24/30 · Core · ~10 phút · <a href="../../index.vi.html">Trang chủ</a> · <a href="../index.vi.html">Lộ trình Design Patterns</a> · <a href="../../reference/roadmap.vi.html">Lộ trình tổng</a> · <a class="lang" href="0024-template-method.html" hreflang="en" lang="en">English</a></p>
+
+<div class="win"><b>Thành quả hôm nay:</b> cố định bộ khung của một thuật toán trong base class và để subclass cung cấp từng bước, đồng thời nhận ra các rủi ro.</div>
+
+<h2>Mục đích</h2>
+<p>Template Method là "một behavioral design pattern định nghĩa bộ khung của một thuật toán trong superclass nhưng cho phép subclass override những bước cụ thể của thuật toán mà không thay đổi cấu trúc của nó." Hãy dùng nó để cho client chỉ mở rộng một số bước nhất định, để dùng chung các thuật toán gần như giống hệt nhau, và để kéo code trùng lặp lên lớp cha.<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a></p>
+<h2>Ví dụ</h2><pre><code>java design-patterns/examples/TemplateMethodDemo.java
+a,b|1,2|end
+&lt;h1&gt;|&lt;p&gt;1&lt;/p&gt;|&lt;/html&gt;
+AbstractList (template) gives contains/indexOf/iterator for free: [0, 1, 4, 9, 16] contains 9? true</code></pre><p><code>generate()</code> là <code>final</code>, nên thứ tự header, body, footer không thể thay đổi; <code>header()</code> và <code>body()</code> là các bước abstract còn <code>footer()</code> là một hook tùy chọn. Trong JDK, <code>AbstractList</code> hoạt động theo cách này: implement <code>get</code> và <code>size</code> là được thừa hưởng phần còn lại (như trong lần chạy). Mã nguồn: <a href="../examples/TemplateMethodDemo.java"><code>TemplateMethodDemo.java</code></a>. Đây là hình dạng abstract class trong <a href="../../oop/lessons/0009-abstract-classes-vs-interfaces.vi.html">bài OOP</a>; mối nguy gọi method có thể override từ constructor vẫn áp dụng ở đây (<a href="../../oop/lessons/0005-initialization-order.vi.html">thứ tự khởi tạo</a>).</p>
+<h2>Ưu và nhược điểm</h2>
+<div class="cols"><p><strong>Ưu điểm</strong></p><ul><li>Client chỉ override những bước được chọn</li><li>Code trùng lặp được gom lên superclass</li></ul>
+<p><strong>Nhược điểm</strong></p><ul><li>Bộ khung có thể gò bó</li><li>Nguy cơ vi phạm Liskov nếu subclass triệt tiêu các bước mặc định</li><li>Càng nhiều bước càng khó bảo trì</li></ul></div>
+<p>(Theo trang mô tả pattern.)<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a> Template Method dựa trên kế thừa (tĩnh) còn Strategy dựa trên composition; factory method thường là các bước trong một template method.</p>
+
+<h2>Luyện truy hồi</h2>
+<p>Trả lời theo trí nhớ. Mỗi câu chỉ một lần chọn.</p>
+<div class="quiz">
+  <p class="prompt">1. Ai cố định thứ tự của thuật toán?</p>
+  <button>JVM</button>
+  <button data-correct>Base class</button>
+  <button>Client</button>
+  <button>Subclass</button>
+  <p class="explain">Superclass định nghĩa bộ khung.<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">2. Vì sao để template method là final?</p>
+  <button>Tốc độ</button>
+  <button data-correct>Không đổi được thứ tự</button>
+  <button>Để test</button>
+  <button>Serialization</button>
+  <p class="explain">Subclass override các bước, không override cấu trúc.</p>
+</div>
+<div class="quiz">
+  <p class="prompt">3. Rủi ro?</p>
+  <button>Mất đa hình</button>
+  <button>Trạng thái static</button>
+  <button data-correct>Vi phạm Liskov do triệt tiêu bước mặc định</button>
+  <button>Không có hook</button>
+  <p class="explain">Subclass triệt tiêu một bước mặc định có thể phá vỡ khả năng thay thế.<a class="cite" href="https://refactoring.guru/design-patterns/template-method">[1]</a></p>
+</div>
+<div class="quiz">
+  <p class="prompt">4. Ví dụ template trong JDK?</p>
+  <button>Integer</button>
+  <button data-correct>AbstractList</button>
+  <button>Proxy</button>
+  <button>Runtime</button>
+  <p class="explain">AbstractList chỉ cần get và size.</p>
+</div>
+<p class="score"></p>
+
+<h2>Bây giờ làm bài tập</h2>
+<p><a href="../exercises/0024-data-import-template.vi.md">Bài tập 24: một template nhập dữ liệu</a></p>
+<p>Ví dụ chạy được: <a href="../examples/TemplateMethodDemo.java"><code>TemplateMethodDemo.java</code></a></p>
+
+<h2>Đọc tiếp</h2>
+<p><strong>Nguồn chính:</strong> <a href="https://refactoring.guru/design-patterns/template-method">Template Method (Refactoring.Guru)</a>. Đọc các phần Intent, Applicability, Pros and cons.</p>
+<p><a href="0023-strategy.vi.html">← Strategy</a> &nbsp;|&nbsp; <a href="0025-visitor.vi.html">Visitor →</a></p>
+
+<footer>
+  <p><strong>Hỏi giáo viên.</strong> Có gì chưa rõ? Hãy hỏi tiếp trong phiên Claude Code: "giải thích bằng một ví dụ khác", "hỏi khó hơn nữa", "người phỏng vấn sẽ đào sâu chỗ này thế nào?".</p>
+  <p>Tài liệu tham khảo: [1] <a href="https://refactoring.guru/design-patterns/template-method">Template Method (Refactoring.Guru)</a> · <a href="../../RESOURCES.md">Tất cả tài nguyên</a></p>
+</footer>
+</main>
+<script src="../../assets/quiz.js"></script>
+</body>
+</html>
